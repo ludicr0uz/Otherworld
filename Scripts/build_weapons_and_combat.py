@@ -59,6 +59,9 @@ for _name in [m for m in sys.modules if m.split(".")[0] in ("uebp", "net", "comb
 from combat.aim_pitch import patch_aim_pitch                      # noqa: E402
 from combat.ammo_pickup import build_ammo_pickup                  # noqa: E402
 from combat.anim_blueprint import patch_anim_blueprint            # noqa: E402
+from combat.paths import ABP_PATH                                 # noqa: E402
+from combat.server_anim import patch_server_anim, unpatch_server_anim  # noqa: E402
+from combat.server_anim_consts import PLAYER                      # noqa: E402
 from Sound.build import build_sound_assets                        # noqa: E402
 from combat.body_pose import patch_body_pose                      # noqa: E402
 from combat.stance_clips import (                                 # noqa: E402
@@ -113,6 +116,8 @@ def main():
     # The sound assets, which the Blueprints below hold: Scripts/build_sound.py's
     # first step, run here too so a fresh checkout builds in the old order.
     build_sound_assets()
+    # Before any builder walks the anim graph (server_anim.py, "Order").
+    unpatch_server_anim(ABP_PATH)
     patch_anim_blueprint()
 
     # First of the Blueprints, and before anything that names its class: both
@@ -125,6 +130,7 @@ def main():
     # ready pose as seen through the player's own rig, so the body has to be
     # the final one before the first spec is built.
     skin = wear_skin()
+    unpatch_server_anim(skin.anim_bp)
     # Before anything compiles the anim BP (see unpatch_stance_clips).
     unpatch_stance_clips(skin)
     # Before the weapon component, whose Tick sets the AimPitch this declares.
@@ -137,6 +143,8 @@ def main():
     patch_stance_clips(skin)
     # The jog's speed onto the blend space's jog row, or the player walks.
     patch_gait(skin)
+    # Last of the anim graph's patches: the one branch a dedicated server takes.
+    patch_server_anim(skin.anim_bp, PLAYER)
 
     # Before the weapons: the shotgun's row names it, and its grip is solved
     # in it.

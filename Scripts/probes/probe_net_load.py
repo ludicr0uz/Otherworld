@@ -116,6 +116,16 @@ def _write(p, out):
     p.note(f"written to {path}")
 
 
+def _posed(world):
+    """{frames between two poses: how many bodies}, off the server's pose rule
+    (UOtherworldPoseLibrary; 0 is a body it does not throttle)."""
+    tally = {}
+    for body in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.Character):
+        every = str(unreal.OtherworldPoseLibrary.server_pose_every_frames(body))
+        tally[every] = tally.get(every, 0) + 1
+    return tally
+
+
 def probe_server(p):
     want = bots.count()
     if want:
@@ -137,8 +147,15 @@ def probe_server(p):
                    "deaths": status["deaths"] - first["deaths"]}
     out["hit_history"] = {"characters": _lib().hit_history_characters(world),
                           "samples": _lib().hit_history_total_samples(world)}
+    out["posed"] = _posed(world)
     _report(p, out)
     hist = out["hit_history"]
+    posed = out["posed"]
+    p.check("the server poses a body by how near a player is (combat/pose_tuning.py): "
+            "the bodies by the frames between two poses, at the window's end",
+            sum(posed.values()) >= want,
+            ", ".join(f"{n} every {'frame' if k == '1' else k + ' frames'}"
+                      for k, n in sorted(posed.items(), key=lambda kv: int(kv[0]))))
     p.check("the hit history records every character (a server with clients)",
             hist["samples"] > 0 and hist["characters"] >= want,
             f"{hist['characters']} characters, {hist['samples']} samples"

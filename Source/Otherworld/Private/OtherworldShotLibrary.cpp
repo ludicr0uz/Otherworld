@@ -83,6 +83,8 @@ bool UOtherworldShotLibrary::ShotTrace(AActor* Shooter, FVector Start, FVector E
 	if (History)
 	{
 		History->LastRewindSeconds = Rewind;
+		History->LastStart = Start;
+		History->LastEnd = End;
 	}
 	if (Rewind <= 0.f || !History || !History->IsRecording())
 	{
@@ -96,39 +98,16 @@ bool UOtherworldShotLibrary::ShotTrace(AActor* Shooter, FVector Start, FVector E
 	}
 
 	// The past: the world without the characters, then every character where
-	// it stood; the nearest wins.
+	// it stood (the history tries the capsules, and the bodies of the one
+	// struck); the nearest wins.
 	++History->RewoundShots;
 	const double At = World->GetTimeSeconds() - Rewind;
-	TArray<AActor*> Recorded;
-	History->CharactersRecorded(Recorded);
-	Params.AddIgnoredActors(Recorded);
+	Params.AddIgnoredActors(History->Recorded());
 	FHitResult WorldHit(Start, End);
 	const bool bWorld = World->LineTraceSingleByChannel(WorldHit, Start, End, ECC_Visibility, Params);
-	float Reach = bWorld ? WorldHit.Distance : static_cast<float>(FVector::Dist(Start, End));
+	const float Reach = bWorld ? WorldHit.Distance : static_cast<float>(FVector::Dist(Start, End));
 
-	bool bCharacter = false;
-	for (AActor* Actor : Recorded)
-	{
-		ACharacter* Character = Cast<ACharacter>(Actor);
-		if (!Character || Character == Shooter)
-		{
-			continue;
-		}
-		FHitResult Hit;
-		bool bBody = false;
-		FName Bone;
-		FVector Point;
-		if (History->TraceRewound(Character, At, Start, End, Hit, bBody, Bone, Point) && Hit.Distance < Reach)
-		{
-			Reach = Hit.Distance;
-			bCharacter = true;
-			OutHit = Hit;
-			bBodyHit = bBody;
-			BodyBone = Bone;
-			BodyPoint = Point;
-		}
-	}
-	if (bCharacter)
+	if (History->TraceRewound(Shooter, At, Start, End, Reach, OutHit, bBodyHit, BodyBone, BodyPoint))
 	{
 		if (bBodyHit)
 		{
@@ -148,10 +127,34 @@ bool UOtherworldShotLibrary::IsRecordingHitHistory(const UObject* WorldContextOb
 	return History && History->IsRecording();
 }
 
+int32 UOtherworldShotLibrary::HitHistoryPoses(const AActor* Character)
+{
+	const UOtherworldHitHistory* History = HistoryOf(Character);
+	return History ? History->PoseCount(Character) : 0;
+}
+
 int32 UOtherworldShotLibrary::HitHistorySamples(const AActor* Character)
 {
 	const UOtherworldHitHistory* History = HistoryOf(Character);
 	return History ? History->SampleCount(Character) : 0;
+}
+
+FVector UOtherworldShotLibrary::HitBoxThen(const AActor* Character, FName Bone, float SecondsAgo)
+{
+	FVector Location = FVector::ZeroVector;
+	const UWorld* World = Character ? Character->GetWorld() : nullptr;
+	if (const UOtherworldHitHistory* History = HistoryOf(Character))
+	{
+		History->BodyThen(Character, Bone, World->GetTimeSeconds() - SecondsAgo, Location);
+	}
+	return Location;
+}
+
+void UOtherworldShotLibrary::LastShotLine(const UObject* WorldContextObject, FVector& Start, FVector& End)
+{
+	const UOtherworldHitHistory* History = HistoryOf(WorldContextObject);
+	Start = History ? History->LastStart : FVector::ZeroVector;
+	End = History ? History->LastEnd : FVector::ZeroVector;
 }
 
 float UOtherworldShotLibrary::LastRewindSeconds(const UObject* WorldContextObject)

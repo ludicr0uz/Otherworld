@@ -4,6 +4,7 @@ that connects does is impact.py.
 """
 
 from combat.game_state import DEBUG_MODE_VAR
+from uebp.g import _G
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
 from combat.paths import ITEM_CLASS_PATH
 from net.state_consts import GAME_STATE_CLASS_PATH
@@ -11,6 +12,7 @@ from net.state_graph import game_state
 from combat.weapon_component.accuracy import AIM_SPREAD_VAR
 from combat.lag_tuning import EXTRA_REWIND_S, MAX_REWIND_S
 from combat.weapon_component.common import _prop
+from combat.weapon_component import shot_hits
 from combat.weapon_component.impact import _author_impact
 from combat.weapon_component.tracer import _author_tracer
 from uebp.nodes.math import (
@@ -184,8 +186,10 @@ def _author_fire(ed, held, muzzle, aim, exec_in):
         made)
 
     _author_impact(ed, brk, held, then(hit), body)
+    # What the pellets struck, told to every screen at once (shot_hits.py).
+    told = shot_hits.flush(_G(ed), [_loose_pin(loop, "Completed", is_input=False)])
     # The direction goes back too, so the shot's noise cone is the pellets' line.
-    return _loose_pin(loop, "Completed", is_input=False), direction
+    return told, direction
 
 
 def _author_shot_direction(ed, direction, exec_ins, keep):

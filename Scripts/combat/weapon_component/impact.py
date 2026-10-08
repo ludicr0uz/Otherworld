@@ -19,12 +19,12 @@ from combat.hit_zones import (
 )
 from combat.paths import HEALTH_CLASS_PATH
 from combat.tuning import COMBAT
-from combat.fx_vars import (
-    BLOOD_PARAM, LOCATION_PARAM, NORMAL_PARAM, PELLET_HIT, PELLET_HIT_PARAMS, SCALE_PARAM)
-from combat.weapon_component import fx
+from combat.fx_vars import BLOOD_PARAM, PELLET_HIT, PELLET_HIT_PARAMS, SCALE_PARAM, fx_event
+from combat.weapon_component import fx, shot_hits
 from combat.weapon_component.common import _prop
 from combat.weapon_component.headshot import _author_headshot
 from combat.weapon_component.surface_impact import _author_surface_impact
+from uebp import net
 from uebp.g import _G
 from uebp.nodes.actor import FN_GET_COMP
 from uebp.nodes.array import FN_ARR_CONTAINS
@@ -46,8 +46,16 @@ def _author_pellet_hit(g, exec_in, event):
 
 
 def author_pellet_fx(ed):
-    """The pellet's cosmetic pair (fx.py). Before Server_Fire, which tells it."""
-    fx.pair(ed, PELLET_HIT, PELLET_HIT_PARAMS, _author_pellet_hit, fx.SCREEN)
+    """Fx_PelletHit, the cosmetic itself, and the batch that tells a shot's
+    (shot_hits.py). Before Server_Fire, which notes into it."""
+    g = _G(ed)
+    event = g.keep(net.custom_event(ed, fx_event(PELLET_HIT), PELLET_HIT_PARAMS))
+    _author_pellet_hit(g, then(event), event)
+    ed.add_comment_to_nodes(
+        f"{fx_event(PELLET_HIT)} (impact.py): the cosmetic itself, once. Called once per "
+        "impact by Multicast_ShotHits, where this copy has a screen (shot_hits.py).",
+        g.made)
+    shot_hits.author_shot_hits(ed)
 
 
 def _author_impact(ed, brk, held, exec_in, body):
@@ -62,9 +70,10 @@ def _author_impact(ed, brk, held, exec_in, body):
     nothing. The damage is the weapon's, scaled by where on the body it
     landed, using the target's own hit-box tables.
 
-    The blood and the chips are told to every machine with a screen
-    (Multicast_PelletHit, fx.py): this graph runs on the server, which has
-    none, and the shooter predicted no hit.
+    The blood and the chips are told to every machine with a screen: noted
+    here, pellet by pellet, and told once after the last (Multicast_ShotHits,
+    shot_hits.py). This graph runs on the server, which has no screen, and
+    the shooter predicted no hit.
     """
     # Where the burst goes: the trace's hit, until the hit zone moves it onto
     # the body. Written before the cast so the scenery's chips read it too.
@@ -101,16 +110,14 @@ def _author_impact(ed, brk, held, exec_in, body):
     # so do the chips: Fx_PelletHit makes the one transform from these.
     normal = _loose_pin(brk, "ImpactNormal", is_input=False)
     g = _G(ed)
-    fx.tell(g, PELLET_HIT, [out(cast, "CastFailed")],
-                      **{LOCATION_PARAM: out(landed, HIT_POINT_VAR), NORMAL_PARAM: normal,
-                         SCALE_PARAM: out(spray), BLOOD_PARAM: False})
+    shot_hits.note(g, [out(cast, "CastFailed")], out(landed, HIT_POINT_VAR), normal,
+                   out(spray), blood=False)
 
     # The zone runs BEFORE the blood it is drawn to the right of: only a
     # pellet that struck a body (or a thing with health and no body) bleeds.
     zoned, zone_nodes = _author_hit_zone(ed, brk, then(cast), body)
-    bled = fx.tell(g, PELLET_HIT, zoned,
-                   **{LOCATION_PARAM: out(landed, HIT_POINT_VAR), NORMAL_PARAM: normal,
-                      SCALE_PARAM: out(spray), BLOOD_PARAM: True})
+    bled = shot_hits.note(g, zoned, out(landed, HIT_POINT_VAR), normal, out(spray),
+                          blood=True)
 
     dmg_pin, dmg_n = _prop(ed, IV.Damage, held)
     worth, in_head, worth_nodes = _zone_multiplier(ed, as_health)
@@ -138,8 +145,8 @@ def _author_impact(ed, brk, held, exec_in, body):
     shown = _author_damage_readout(ed, brk, out(scaled), worth, headed)
 
     ed.add_comment_to_nodes(
-        "A pellet on a body: blood out of the wound (told to every screen: "
-        "Multicast_PelletHit, Blood), and the target's TakeHit with the "
+        "A pellet on a body: blood out of the wound (noted for the shot's one "
+        "Multicast_ShotHits, Blood), and the target's TakeHit with the "
         "round's damage times its zone, the impact normal, this character's controller "
         "and the gun. The target floors its Health at zero and stamps the blow, on the "
         "server. No health component: the pellet hit the scenery, which chips and "

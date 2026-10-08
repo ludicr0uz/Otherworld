@@ -30,6 +30,11 @@ death or knockdown animation would need its own slot.
 
 The three slots (DefaultSlot, HitSlot, FullBodySlot) are named here because
 this is the file that splices them into ABP_Unarmed.
+
+THE SERVER BRANCH (task A4) is server_anim.py's: one Blend Poses by bool,
+after the hit blend, that a dedicated server takes past FullBodySlot and the
+Control Rig. The weapons build takes it out before this file runs and puts it
+back after the last anim graph patch, so nothing here ever meets it.
 """
 
 import unreal

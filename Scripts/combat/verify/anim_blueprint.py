@@ -1,6 +1,7 @@
 """verify.anim_blueprint -- ABP_Unarmed: the two layered blends and the three slots, wired in order.
 """
 
+from combat.server_anim_consts import BRANCH_CLASS, CLIENT_PIN
 from combat.anim_blueprint import (
     AIM_SLOT, FULL_BODY_SLOT, HIT_SLOT, UPPER_BODY_ROOT,
 )
@@ -108,6 +109,11 @@ def check_anim_graph_patch():
     if FULL_BODY_SLOT in slot_names and rigs:
         feeding = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
             BEL.find_input_pin(rigs[0], "Source"))]
+        # Through the server branch (server_anim.py), on its client pin: a
+        # dedicated server takes the pose from before the slot.
+        if len(feeding) == 1 and feeding[0].get_class().get_name() == BRANCH_CLASS:
+            feeding = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+                BEL.find_input_pin(feeding[0], CLIENT_PIN))]
         check(f"{FULL_BODY_SLOT} feeds the ControlRig, downstream of both blends",
               feeding == [slot_names[FULL_BODY_SLOT]],
               str([n.get_class().get_name() for n in feeding]))

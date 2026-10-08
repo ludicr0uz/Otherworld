@@ -52,9 +52,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # A live editor keeps imported modules between runs, so an edit to any npc
 # module would otherwise be ignored by the next build in the same editor.
-for _name in [m for m in sys.modules if m.split(".")[0] in ("uebp", "net", "npc")]:
+for _name in [m for m in sys.modules if m.split(".")[0] in ("uebp", "net", "npc", "combat")]:
     del sys.modules[_name]
 
+from combat.server_anim import patch_server_anim                # noqa: E402
+from combat.server_anim_consts import WANDERER                  # noqa: E402
 from forest_generator.npc_placement import NPC_VARIANTS          # noqa: E402
 from npc.character import (                                     # noqa: E402
     build_npc_blueprint, build_variant_blueprint,
@@ -96,6 +98,12 @@ def ensure_npc_variants(force=False):
         if not force and eas.does_asset_exist(variant.blueprint):
             out[variant.key] = eas.load_asset(variant.blueprint)
         else:
+            # The creature's own anim graph, before its Blueprint takes the
+            # class: the one branch a dedicated server takes (task A4,
+            # combat/server_anim.py). One with no anim Blueprint of its own
+            # wears the player's, which the weapons build branches.
+            if eas.does_asset_exist(variant.anim_bp):
+                patch_server_anim(variant.anim_bp, WANDERER)
             out[variant.key] = build_variant_blueprint(base, variant)
     return out
 

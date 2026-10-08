@@ -12,7 +12,6 @@ from combat.bullet_impact import (
     IMPACT_LIFETIME, _impact_pieces,
 )
 from combat.burst import BURST_PIECE_PREFIX, BURST_VELOCITY_ENCODE
-from combat.hit_zones import HIT_BONE_VAR
 from combat.materials import IMPACT_CHIP_COLOUR, IMPACT_DUST_COLOUR
 from combat.paths import (
     BULLET_IMPACT_BP_PATH, CUBE, MAT_IMPACT_CHIP, MAT_IMPACT_DUST, SPHERE,
@@ -198,7 +197,7 @@ def check_impact_spawn():
           got.get_name() if got else "None")
     # The axe's chips off a tree are the chop's (verify/chop.py), a thrown
     # blade's the throw's (verify/throw_strike.py): the pellet's bursts are
-    # Fx_PelletHit's, told to every screen by Multicast_PelletHit (verify/fx.py).
+    # Fx_PelletHit's, told to every screen a shot at a time (verify/shot_hits.py).
     chips = fxv.in_fx(FX.PELLET_HIT, _spawn_of(IMPACT_CLASS_VAR))
     blood = fxv.in_fx(FX.PELLET_HIT, _spawn_of("BloodClass"))
     check("Fx_PelletHit spawns the impact once, and the blood once",
@@ -213,29 +212,6 @@ def check_impact_spawn():
           and all(_fed_by(n, "Condition") and _fed_by(n, "Condition")[0][0]
                   == fxv.event(FX.fx_event(FX.PELLET_HIT)) for n, _pin in picks),
           str([pin for _n, pin in picks]))
-    told = fxv.calls(FX.PELLET_HIT)
-    no_blood = [c for c in told if str(PIN.get_pin_value(
-        BEL.find_input_pin(c, FX.BLOOD_PARAM))).lower() in ("false", "")]
-    bleeds = [c for c in told if c not in no_blood]
-    chip_exec = _fed_by(no_blood[0], "execute") if len(no_blood) == 1 else []
-    check("the server tells it twice: the chips (Blood false) off the health cast's "
-          "failed arm, what has no health",
-          len(told) == 2 and len(no_blood) == 1 and len(bleeds) == 1
-          and [pin for _n, pin in chip_exec] == ["CastFailed"],
-          f"{len(told)} tell(s), {len(no_blood)} without blood off "
-          f"{[pin for _n, pin in chip_exec]}")
-    # The blood sits behind the hit zone now (verify/hit_bodies.py), which the
-    # cast's other arm starts: the zone's first node is the HitBone reset.
-    cast = chip_exec[0][0] if len(chip_exec) == 1 else None
-    zone = ([str(BEL.get_node_title(PIN.get_owning_node(q)))
-             for q in PIN.list_connected_pins(BEL.find_then_pin(cast))]
-            if cast else [])
-    blood_exec = _fed_by(bleeds[0], "execute") if len(bleeds) == 1 else []
-    check("...and the blood (Blood true) off the same cast's other arm, behind the hit "
-          "zone, so a pellet never spawns both",
-          cast is not None and zone == [f"Set {HIT_BONE_VAR}"] and blood_exec
-          and all(n.get_path_name() != cast.get_path_name() for n, _pin in blood_exec),
-          f"the cast's then -> {zone}; blood off {[pin for _n, pin in blood_exec]}")
     chip_at, blood_at = (_fed_by(chips[0], "SpawnTransform"),
                          _fed_by(blood[0], "SpawnTransform"))
     check("both are spawned at the one transform: the impact point, turned onto "

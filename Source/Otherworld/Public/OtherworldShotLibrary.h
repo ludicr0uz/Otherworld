@@ -49,9 +49,28 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Shot")
 	static int32 HitHistorySamples(const AActor* Character);
 
+	/**
+	 * How many of those samples posed its bodies anew: all of them for a body
+	 * the server poses every frame, a third for one it poses at 10 Hz
+	 * (OtherworldServerPose.h).
+	 */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Shot")
+	static int32 HitHistoryPoses(const AActor* Character);
+
+	/**
+	 * Where the hit box on Character's bone Bone stood SecondsAgo, as a
+	 * rewound shot would be judged against it; the origin with no such box.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Shot")
+	static FVector HitBoxThen(const AActor* Character, FName Bone, float SecondsAgo);
+
 	/** The rewind the last ShotTrace used, in seconds (0 when it traced the present). */
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Shot", meta = (WorldContext = "WorldContextObject"))
 	static float LastRewindSeconds(const UObject* WorldContextObject);
+
+	/** The line the last ShotTrace traced: its pellet's start and end. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Shot", meta = (WorldContext = "WorldContextObject"))
+	static void LastShotLine(const UObject* WorldContextObject, FVector& Start, FVector& End);
 
 	/** Shots judged against the history, and those of them that struck a rewound body. */
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Shot", meta = (WorldContext = "WorldContextObject"))

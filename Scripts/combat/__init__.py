@@ -168,6 +168,9 @@ ASSETS AND PATCHES
   stance_clips      the player's anim BP: the Quaternius crouch, crawl and kneel
                     clips blended over the locomotion by PoseCrouch/PoseProne
                     and (searching a body) PoseKneel
+  server_anim       the one IsDedicatedServer branch of an anim graph, the player's
+                    and each wanderer's: a server skips what is for the eye (A4)
+  server_anim_consts  what that branch's server arm may hold, and why; ServerPose
   skin              the player's body (PlayerSkin, wear_skin)
   grip              hand-grip socket maths for holding a weapon: GripRotation
                     and GripLocation (the handle seated in the fist)
@@ -199,7 +202,10 @@ BP_HealthComponent (health_component wires the fragments together)
   damage            health is the server's: the TakeHit event every blow calls
                     (hit, owner_instigator), what replicates, OnRep_Health
   server_pose       a dedicated server refreshes the bones of every body with
-                    health: its hit bodies and muzzles are where clients see them
+                    health: its hit bodies and muzzles are where clients see them;
+                    and hands the body to the C++ that poses it by how near a
+                    player is and stops its other skinned meshes ticking (A4)
+  pose_tuning       how near, and how often: the numbers server_pose hands over
   respawn           spawn numbering, world-floor net, respawn band and delay
   replacement       the dead wanderer's replacement: the wait, the point, the spawn
   death             kill count, shells, ragdoll collapse, corpse, player death

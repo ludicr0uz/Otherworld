@@ -412,6 +412,8 @@ R  ------------------------------------>  Server_Reload: AsksServed + 1, ReloadN
   server every hit body and every muzzle stood in the reference pose. Every body with a
   health component is set to `AlwaysTickPoseAndRefreshBones` there, at BeginPlay,
   behind IsDedicatedServer. M22's history of hit boxes reads the same bones.
+  Always is not every frame (A4, "What the server spends on bodies it never draws"
+  below): the same arm hands the body to `ThrottleServerPose`.
 - **Where the target was** is the next section (M22): the server judges a remote
   shooter's pellets against where every character stood when the shooter fired.
 - **Not here:** the server takes the shot whether or not it has the player sprinting or
@@ -435,10 +437,15 @@ module (`serversupportsysdesign.md` 4.3: not practical in Blueprint); the number
 
 - **The history** (`UOtherworldHitHistory`, a world subsystem): after every actor has
   ticked (`FWorldDelegates::OnWorldPostActorTick`, so the kinematic bodies follow the
-  frame's pose) it records, for every `ACharacter`, the capsule's transform, whether it
-  blocked Visibility, and the world transform of each of the mesh's physics bodies, a
-  second back. Only on a server with clients (`NM_DedicatedServer`, `NM_ListenServer`):
-  single player records nothing.
+  frame's pose) it records every `ACharacter`, a second back, in two rings of fixed
+  capacity per character (A4: a frame allocates nothing; a `TMap` finds a character's):
+  the *frames* (the capsule's transform, whether it blocked Visibility, the mesh's own
+  frame; at most 30 a second, the rate a shot is judged at) and the *poses* (each physics
+  body in the mesh's frame, written only on a frame that posed the mesh anew, and only
+  for a body a pellet can stop on: a corpse has none). A body the server poses at 10 Hz
+  has ten poses a second and a rewound trace blends the two either side of its time.
+  Only on a server with clients (`NM_DedicatedServer`, `NM_ListenServer`): single player
+  records nothing.
 - **The rewind** is the shooter's connection's round trip (`UNetConnection::AvgLag`, the
   PlayerState's ping failing that) plus `EXTRA_REWIND_S`, at most `MAX_REWIND_S` (0.4 s:
   a player on a worse line is at the disadvantage, not the one they shoot). A local
@@ -449,7 +456,9 @@ module (`serversupportsysdesign.md` 4.3: not practical in Blueprint); the number
   with every recorded character ignored, then each character where it stood at the
   rewound time, and the nearest wins; the struck character's bodies are tried along the
   same line for the bone (`bBodyHit`, `BodyBone`, `BodyPoint`, which impact.py's hit
-  zone reads). The samples either side of the time are blended.
+  zone reads). Every capsule is tried first, from the frames alone (a character whose
+  capsule's sphere the line does not come near is not traced at all); a body's transform
+  is blended only for the one character struck.
 - **Nothing is moved.** The engine traces a body where it is now
   (`FBodyInstance::LineTrace`), so the line is carried from where the body was to where
   it is and the hit carried back: rigid transforms both ways, so the distance, the
@@ -470,6 +479,21 @@ module (`serversupportsysdesign.md` 4.3: not practical in Blueprint); the number
   loopback's frames), 7/8 with 150 ms (rewound 178 ms, wanted 150-220). Single player:
   `probe_headshot`, `probe_ads_hit`, `probe_net_fire --game`; `verify/hit_bodies.py`
   and `verify/player_body.py` check the node and what reads it.
+- **The history against the bone it records** (A4): the same probe asks, every frame of
+  the strafe, where the history put the chest's box 100 ms before
+  (`UOtherworldShotLibrary::HitBoxThen`) and compares it with the server's own track of
+  the bone: 0.00 cm apart over 240-260 frames a run. That check is exact; the hit count
+  is not. **The count's spread, measured 2026-10-08** (the MetaHuman-rigged player, this
+  Mac, the editor open): on the build before A4 it landed 7, 8, 5, 5, 6, 8 of 8 without
+  lag and 7 with 150 ms; on A4's, 6, 4, 5 and 4, 7, 5, and 4 to 8 across forty more runs
+  of its variants (the anim graph's server arm on and off, the foot IK and the flinch on
+  it and off it, the pose throttle off, A4's C++ under the old assets: none moved the
+  mean: about 5.6 of 8 over those runs against 6.6 over the seven before A4). Not shown
+  equal, and nothing found that makes it
+  different: the pellet's line passes 8-24 cm from the chest bone on every build
+  (`LastShotLine`), which is the edge of the torso, because the probe fires as soon as
+  the reticle is within 12 cm of a chest moving at 4 m/s. A run that lands 4 fails the
+  probe's 60% line. Treat one run of it as one sample.
 
 ## Melee, the guard, the throw and the take (M20, done)
 
@@ -749,10 +773,19 @@ the ask, predicting ---------->    Server_Fire / _Punch /        Multicast_<Name
 - **Every cosmetic is a pair of events on `BP_WeaponComponent`:** `Fx_<Name>` holds the
   one copy of its nodes; `Multicast_<Name>` (unreliable) is the server's word of it,
   whose gate asks whether this copy owes it, counts it in `FxPlayed` and calls
-  `Fx_<Name>`. Twelve pairs: `Shot`, `Reload`, `Punch`, `Slash`, `Throw(Start, Sharp)`,
-  `ThrowClip`, `PelletHit(Location, Normal, Scale, Blood)`, `PunchHit(Location)`,
-  `BladeHit(Location)`, `Chop(Location, Normal)`, `Stab(Location, Normal, HeadKill)`,
-  `Lodge(Location, Normal)`.
+  `Fx_<Name>`. The pairs: `Shot`, `Reload`, `Punch`, `Slash`, `Throw(Start, Sharp)`,
+  `ThrowClip`, `PunchHit(Location)`, `BladeHit(Location)`, `Chop(Location, Normal)`,
+  `Stab(Location, Normal, HeadKill)`, `Lodge(Location, Normal)`, `Match(Location)`.
+- **A shot's impacts are told once** (A4; `weapon_component/shot_hits.py`,
+  `verify/shot_hits.py`): `Fx_PelletHit(Location, Normal, Scale, Blood)` has no Multicast
+  of its own. The fire graph notes each pellet's impact onto three arrays as it lands
+  (where it told `Multicast_PelletHit`), and `FlushShotHits`, called off the pellet loop's
+  Completed, tells them in one `Multicast_ShotHits(Locations, Normals, Bloods, Scale)`
+  (unreliable, gate *screen*), which counts each entry in `FxPlayed` and calls
+  `Fx_PelletHit` per entry. One packet's worth of header a shot instead of eight, and
+  they all arrive: `probe_net_fx.py`'s client 2 counted 2 impact actors of a shotgun's 8
+  before (the other six never arrived; why was not traced: the likely cause is the
+  engine's cap on unreliable Multicasts an actor may send in a frame) and counts 8 now.
 - **Three gates** (`fx_vars.UNPREDICTED`, `OTHERS`, `SCREEN`):
   - *unpredicted*, `HasAuthority OR NOT LocalInput`: the owning client already played it
     as its prediction (`fx.predict`, off the authority Branch's false arm, where the ask
@@ -1321,3 +1354,92 @@ seconds both real players lie dead at once (`BP_ForestWandererAI_Zombie` 110–1
 `BP_ForestWandererAI_Wendigo` 32–48 a run); on a client, 16 `GetOwningPawn` reads by
 `BP_GraphicsMenuHUD` at each death, the frames between the pawn's death and the respawn. Neither
 happens with one living player, which is why no earlier probe met them.
+
+## What the server spends on bodies it never draws (A4, 2026-10-08)
+
+A dedicated server draws nothing and judges every shot against the bones, so it must pose
+every body; it need not pose one as a screen would. Four changes, each measured with A1's
+harness (`uepy.py --net --clients 2 --bots N --probe Scripts/probes/probe_net_load.py`,
+`Lvl_Forest_200m`, a 90 s window, this Mac with the editor open):
+
+- **Only the mesh the game runs on ticks** (`ThrottleServerPose`, C++,
+  `Source/Otherworld/Public/OtherworldServerPose.h`, called by `combat/server_pose.py`
+  behind its IsDedicatedServer Branch): every other skinned mesh on a body stops ticking
+  on a dedicated server. With the MetaHuman rig (`asset_pipeline/player_body.py`) that is
+  the MetaHuman's body, face and clothes, hung under the mannequin to be drawn: on the
+  server they were retargeting the body and solving the face's rig for nobody, 73% of
+  the game thread at 32 players.
+- **The mesh is posed by how near a player is** (the engine's Update Rate Optimization,
+  whose not-rendered rate the C++ rewrites per body four times a second;
+  `combat/pose_tuning.py`): within 30 m of another player's body every frame, further
+  off 10 times a second, with nobody within the characters' relevancy distance (150 m)
+  or as a ragdoll twice. A load test's bot counts as a player. The hit history keeps a
+  pose per posed frame and blends between them ("Lag compensation" above).
+- **The anim graphs have one IsDedicatedServer branch** (`combat/server_anim.py`,
+  `server_anim_consts.py`; `combat/verify/server_anim.py`, which the NPC verifier runs
+  for the wanderers too): a Blend Poses by bool on `ServerPose`, which the anim
+  Blueprint's own BlueprintInitializeAnimation writes once. A server skips the player's
+  foot IK (the Control Rig, which traces the ground under both feet) and FullBodySlot,
+  and never gives the support hand's IK a weight (`weapon_component/support_hand.py`).
+  It keeps the aim's blend (DefaultSlot: the arms' hit bodies and the muzzle) and the
+  flinch's (HitSlot), on the player and on the wanderers: each moves a hit box a shooter
+  is aiming at, and these graphs fan a pose out to a blend's base and its slot, so an
+  arm that left a blend out would update the locomotion under it fewer times a frame
+  than a client's does. **A new node for the eye goes on the client arm**; the verifier
+  fails a server arm that holds a slot, a blend or a node class the table does not list.
+- **A shot's impacts are one Multicast** ("Everyone sees and hears the fight" above),
+  and the hit history is two rings per character with the capsule tried before any body
+  is blended ("Lag compensation").
+
+| N bots | | server frame ms mean / p99 (Hz) | server world tick ms mean / p99 | characters, history frames each |
+|---|---|---|---|---|
+| 32 | before A4 (2026-10-08: the MetaHuman rig, landed after A1 and A2 measured) | 199.2 / 457.2 (5.0) | 194.1 / 442.1 | 77, 4 |
+| 32 | A1 and A2's own figure (2026-10-07, the adventurer's body, no MetaHuman) | 36.0 / 62.1 (27.8) | 26.9 / 55.6 | 75, 30 |
+| 32 | after, the foot IK still on the server arm | 37.9 / 145.0 (26.3) | 31.5 / 96.0 | 81, 30 |
+| 32 | **after A4** (traced) | 37.2 / 143.9 (26.8) | **25.3 / 87.0** | 77, 31 |
+| 62 | A1's figure (2026-10-07, no MetaHuman) | 45.8 / 110.4 (21.8) | 42.8 / 104.5 | 136, 19 |
+| 62 | **after A4**, 2 clients (13.2 GB of this Mac's 16: it swapped, client 2 never got its pawn) | 50.0 / 181.3 (20.0) | **44.5 / 144.1** | 128, 20 |
+| 62 | **after A4**, 1 client (8.4 GB) | 47.6 / 159.7 (21.0) | **42.4 / 112.6** | 150, 15 |
+
+- **What moved:** the MetaHuman's meshes, 14.9 s of a traced 20.4 s before, are 0.8 s of
+  20.1 s after (what is left of them is below); the foot IK was 5.5-6 ms of the 32-player
+  world tick. Before A4 the server made 5 frames a second at 32 players and was not
+  measured at 62.
+- **What did not:** against A1's own figures the frame is where it was (25.3 against
+  26.9 ms at 32, 42.4-44.5 against 42.8 at 62). The throttle has little to bite on in
+  this test: 62 bots on a 200 m map stand within 30 m of one another, so every living
+  body is posed every frame (65 of 150 bodies at the window's end; the other 85 were
+  corpses, lying their 60 s at 2 Hz, which before A4 were posed every frame too). The
+  mannequin the MetaHuman rig runs on costs more a pose than the adventurer A1 measured.
+  On `Lvl_Forest_1000m` the same players stand twenty-five times thinner; not measured
+  (the three processes do not fit this Mac there).
+- **The N = 62 world tick decides `serversupportsysdesign.md` 8's Tier 2 question:
+  42-44 ms mean, above the 25 ms line, so the Tier 2 server skeleton is the next task.**
+- **The three largest costs after** (the N = 32 server, 20.1 s of its window, 491 frames,
+  5.9 s (29%) of it the tick-rate sleep; `Saved/traces/net_load_32bots_a4_after_2026-10-08.utrace`):
+  1. **the mannequin's mesh, 24% of the game thread** (`CharacterMesh0` 4.84 s inclusive;
+     `USkinnedMeshComponent_TickComponent` 4.03 s, 2.97 s of it its own, over 48 281
+     ticks, 98 a frame; `ABP_Unarmed_C` 0.73 s). The pose itself, of every living body.
+  2. **the wanderers' behaviour trees, 11%** (2.20 s; the zombie's step 2.02 s).
+  3. **the weapon component's Tick, 6.4%** (1.29 s), then the health component 0.84 s,
+     the character movement 0.66 s, the net driver 0.28 s and the hit history's recording
+     0.18 s (0.37 ms a frame for 77 characters, as before: its cost is the walk over the
+     characters, not the allocation the rings removed). `ShotTrace` is 0.01 s for 1 664
+     pellets.
+- **Left:** something of the MetaHuman still runs each frame on a server though its
+  primary ticks are off (`Body` 0.52 s inclusive with `Legs` 0.28 s and `Torso` 0.20 s
+  under it, `Face` 0.28 s: 4% together; not a primary tick, not found which). A Tier 2
+  body would have none of them.
+- **Proof:** `uepy.py --net --clients 2 --probe-timeout 240 --probe
+  Scripts/probes/probe_net_server_pose.py` (on the server: one skinned mesh of a body's 6
+  ticks; every anim instance has `ServerPose`; two players 5 m apart are posed every
+  frame with a pose for each of the history's 31 frames; a wanderer 85 m off every 3
+  frames, 11 poses in 31 frames; a player moved 60 m off drops to that rate too. On a
+  client: `ServerPose` false, all 6 meshes tick, nothing throttled). `probe_net_fire.py`
+  (the server's gun is where the client's is), `probe_net_fx.py`, `probe_net_lag_hits.py`
+  with and without `--lag 150` ("Lag compensation" has its numbers and their spread),
+  and in single player `probe_ads_hit`, `probe_headshot`, `probe_net_fx --game`. Run the
+  `--game` probes one to a launch: `probe_headshot` and `probe_ads_hit` in one launch
+  fail each other, and the checks that put a hip round into a wanderer come and go from run
+  to run (`probe_headshot`'s chest, which its rounds also missed on the build before A4,
+  and `probe_bullet_impact`'s blood, which failed one run of two here).

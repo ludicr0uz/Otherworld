@@ -32,6 +32,8 @@ NODE_MODIFY_BONE = "Animation|SkeletalControls|Transform(Modify)Bone"
 NODE_TO_COMPONENT = "Animation|ConvertSpaces|LocalToComponent"
 NODE_TO_LOCAL = "Animation|ConvertSpaces|ComponentToLocal"
 NODE_TWO_BONE_IK = "Animation|SkeletalControls|TwoBoneIK"
+# Blend Poses by bool: BlendPose_0 while bActiveValue is true, BlendPose_1 while false.
+NODE_BLEND_BY_BOOL = "Animation|Blends|BlendPosesbybool"
 
 NODE_BREAK_HIT = "Collision|BreakHitResult"
 

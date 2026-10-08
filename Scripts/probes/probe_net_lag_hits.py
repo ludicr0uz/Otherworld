@@ -63,11 +63,31 @@ ACROSS_CM = 150.0
 # The rate either run must keep. Measured on this machine (the pistol, eight
 # rounds): 6/8 without lag and 7/8 with --lag 150; the one systematic miss is
 # the first shot after the join, rewound by the join's inflated round trip.
-# The old graph (no rewind) landed 0/8 with --lag 150.
+# The old graph (no rewind) landed 0/8 with --lag 150. One run is one sample:
+# measured again on 2026-10-08 (task A4), runs of the same build landed 4 to 8
+# of 8 (Scripts/net/CLAUDE.md, "Lag compensation").
 MIN_HIT_RATE = 0.6
 # How many samples the history holds for a character after a second of play.
 MIN_SAMPLES = 20
 NO_LAG_REWIND_S = 0.08
+# The history against the bone it records (UOtherworldShotLibrary::HitBoxThen):
+# how far back the chest's box is asked for every frame, and how near the
+# server's own track of the bone it must lie.
+BOX_BACK_S = 0.1
+BOX_NEAR_CM = 2.0
+
+
+def _box_off_track(track, boxes):
+    """For each frame's (time, where the history put the chest box BOX_BACK_S
+    before it): how far that is from the bone's own track at that moment."""
+    apart = []
+    for at, box in boxes:
+        then = at - BOX_BACK_S
+        for (t0, a), (t1, b) in zip(track, track[1:]):
+            if t0 <= then <= t1 and t1 > t0:
+                apart.append((box - (a + (b - a) * ((then - t0) / (t1 - t0)))).length())
+                break
+    return apart
 
 
 def _now(p):
@@ -148,6 +168,8 @@ def probe_server(p):
     # far back along that track the chest client 1 says it fired at lies.
     track, shots, judged, fell = [], [], [0], []
 
+    boxes = []
+
     def count():
         now = hp()
         if now < last[0] - 1e-3:
@@ -155,6 +177,7 @@ def probe_server(p):
             fell.append(_now(p))
         last[0] = now
         track.append((_now(p), two.mesh.get_socket_location(CHEST_BONE)))
+        boxes.append((_now(p), lib.hit_box_then(two, CHEST_BONE, BOX_BACK_S)))
         n = int(lib.rewound_shots(p.world()))
         if n > judged[0]:
             shots.append((_now(p), float(lib.last_rewind_seconds(p.world()))))
@@ -177,6 +200,11 @@ def probe_server(p):
                f"{got * 1000:.0f}/{want * 1000:.0f} {off:.0f}cm "
                f"{'hit' if any(0.0 <= t - at < 0.2 for t in fell) else 'miss'}"
                for (got, want, off), (at, _r) in zip(ideal, shots)))
+    apart = _box_off_track(track, boxes)
+    p.check(f"the history puts the chest's hit box where the chest was: {BOX_BACK_S * 1000:.0f} ms "
+            f"back it is within {BOX_NEAR_CM:g} cm of the server's own track of the bone, "
+            "frame after frame of the strafe", len(apart) >= 30 and max(apart) < BOX_NEAR_CM,
+            f"{len(apart)} frame(s), {max(apart) if apart else 0:.2f} cm at most")
     samples = int(lib.hit_history_samples(two))
     judged = int(lib.rewound_shots(p.world()))
     p.check("the server records every character's hit boxes while it has clients: "

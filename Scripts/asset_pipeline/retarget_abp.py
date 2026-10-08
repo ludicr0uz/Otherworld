@@ -1,5 +1,10 @@
 """retarget_abp -- fix_retargeted_abp(): make the batch-copied ABP_Unarmed
 address the Meshy skeleton it now runs on.
+
+The server branch (task A4, combat/server_anim.py) is not this file's: the
+NPC build splices it into each creature's graph and the weapons build into
+the player's, replacing whatever a copy carried over, so a re-retarget is
+followed by those two builds.
 """
 
 import unreal

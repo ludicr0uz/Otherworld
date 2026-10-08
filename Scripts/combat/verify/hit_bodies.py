@@ -8,6 +8,7 @@ from combat.hit_bodies import (
     COVERAGE_MAX_HEAD_OVERHANG, COVERAGE_MAX_OVERHANG, COVERAGE_MAX_UNCOVERED,
     body_coverage, body_fit_plan, saved_capsules,
 )
+from combat.fx_vars import ShotHitScale
 from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.ragdoll import RAGDOLL_MESH_ROOT
 from combat.verify.common import BEL, PIN, check, in_pins, shot_traces, titled
@@ -122,12 +123,11 @@ def check_body_miss_is_a_miss():
     onto = [n for n in marks if hit and n in _then(hit[0])]
     if not check_one("...the body's straight after the bone", onto):
         return
-    told = _then(onto[0])
-    reads = {t for n in told for t in _fed_by(n, "Location")}
-    check("...and the blood is told after it (Multicast_PelletHit), where HitPoint says",
-          len(told) == 1 and _title(told[0]).replace(" ", "").replace("_", "") == "MulticastPelletHit"
-          and reads == {f"Get {HIT_POINT_VAR}"},
-          f"{[_title(n) for n in told]} at {reads}")
+    noted = _then(onto[0])
+    check("...and the blood is noted after it, for the shot's one Multicast "
+          "(verify/shot_hits.py)",
+          [_title(n) for n in noted] == [f"Set {ShotHitScale}"],
+          str([_title(n) for n in noted]))
 
 
 def check_one(label, nodes):

@@ -5,6 +5,8 @@ an unreliable Multicast whose gate asks whether this copy owes it, counts it
 and calls Fx_<Name>; the owning client predicts the five it can; and the
 headshot's stamp is a RepNotify to the owner, rewritten with its clock.
 
+The pellet's is told in a batch, one Multicast a shot: verify/shot_hits.py.
+
 The helpers (``nodes_of``, ``calls``, ``predicts``) are what the other
 sections use to find a cosmetic's nodes now that they hang off an event
 rather than off the stage that tells it. Proof in the running game is
@@ -51,7 +53,7 @@ def nodes_of(name):
     """Every node of the cosmetic's two events: the events, what their exec
     runs, and the pure nodes feeding those."""
     found = []
-    for ev in (event(FX.fx_event(name)), event(FX.multicast_event(name))):
+    for ev in (event(e) for e in FX.events_of(name)):
         if ev is None:
             continue
         found.append(ev)
@@ -72,7 +74,8 @@ def in_fx(name, nodes):
 
 
 def is_fx_node(node):
-    return any(node.get_path_name() in _paths(name) for name in FX.COSMETICS)
+    return any(node.get_path_name() in _paths(name)
+               for name in (*FX.COSMETICS, *FX.BATCHED))
 
 
 def _calls_named(event_name):

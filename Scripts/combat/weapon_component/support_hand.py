@@ -15,16 +15,22 @@ HeldTwoHanded), so nothing here reads off Held.
 
 The anim instance is cast to the player's anim BP class, so a wearer with
 another anim BP simply fails the cast.
+
+A dedicated server writes neither (task A4): the hold is for the eye alone
+(no shooter aims at a left hand by where it rests on a gun), the IK it
+drives sits in the anim graph's shared tail, and left at its default 0 it is
+skipped there (server_anim.py; verify/server_anim.py checks this gate).
 """
 
 import unreal
 
-from uebp.graph import BEL, _connect, _node, _palette, _pin, out, then
+from uebp.graph import BEL, _connect, _node, _palette, _pin, else_, out, then
 from combat.skin import player_skin
 from combat.support_hand import SUPPORT_HAND_VAR, SUPPORT_POINT_VAR
 from combat.weapon_component.pose_weights import HELD_SUPPORT_POINT
 from combat.weapon_component.sight_pitch import _anim_class_path
 from uebp.nodes.actor import FN_ANIM_INSTANCE
+from uebp.nodes.system import FN_IS_DEDICATED_SERVER
 from combat.weapon_component import vars as WV
 
 
@@ -46,8 +52,12 @@ def _author_support_hand(ed, exec_ins):
     _connect(out(mesh, WV.OwnerMesh), _pin(anim, "self"))
     cast = keep(_palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2]))
     _connect(out(anim), _pin(cast, "Object"))
+    no_screen = keep(_node(ed, FN_IS_DEDICATED_SERVER))
+    server = keep(ed.add_branch_node())
+    _connect(out(no_screen), _pin(server, "Condition"))
     for e in exec_ins:
-        _connect(e, _pin(cast, "execute"))
+        _connect(e, _pin(server, "execute"))
+    _connect(else_(server), _pin(cast, "execute"))
     as_anim = next(p for p in BEL.list_output_pins(cast)
                    if str(unreal.BlueprintGraphPinLibrary.get_pin_name(p))
                    .startswith("As"))
@@ -65,5 +75,6 @@ def _author_support_hand(ed, exec_ins):
         f"Down the sights the left hand holds the gun: {SUPPORT_HAND_VAR} = "
         f"SightBlend and {SUPPORT_POINT_VAR} = {HELD_SUPPORT_POINT}, onto the "
         "player's anim BP, whose Two Bone IK they drive (Scripts/combat/"
-        "support_hand.py). 0 at the hip and on the shoulder.", made)
-    return (tail, out(cast, "CastFailed"))
+        "support_hand.py). 0 at the hip and on the shoulder, and never written "
+        "on a dedicated server, which draws no hand.", made)
+    return (tail, out(cast, "CastFailed"), then(server))

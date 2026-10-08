@@ -257,7 +257,20 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
     BeginPlay, behind IsDedicatedServer, sets the owner's mesh to
     `AlwaysTickPoseAndRefreshBones`. Nothing is rendered there, and an unrendered mesh
     keeps its reference pose: the hit bodies and the muzzle would be where no client
-    sees them.
+    sees them. The same arm calls `ThrottleServerPose` (C++; `pose_tuning.py`): the mesh
+    is posed every frame within 30 m of another player, 10 times a second further off,
+    twice as a ragdoll or with nobody near, and every other skinned mesh on the body (a
+    MetaHuman's) stops ticking there (A4; `Scripts/net/CLAUDE.md`, "What the server
+    spends on bodies it never draws").
+  - **The anim graph's server branch** (`server_anim.py`, `server_anim_consts.py`,
+    `verify/server_anim.py`): one Blend Poses by bool on the anim Blueprint's `ServerPose`
+    (IsDedicatedServer, written once), authored last of the anim graph's patches, and
+    taken out first (`unpatch_server_anim`) so the other builders meet the chain they
+    expect. A server skips the foot IK's Control Rig and FullBodySlot; the aim's and the
+    flinch's blends stay on both arms. **Anything new that is for the eye goes on the
+    client arm**: the verifier fails a server arm holding a slot, a blend or a node class
+    that `SERVER_ARM_CLASSES` and `SERVER_SLOTS` do not list. The NPC build branches each
+    wanderer's graph the same way (`build_npc_blueprints.py`).
   - **Probes:** `FireForced` and `ReloadForced` are the keys' stand-ins, read on the
     local arm, so on a client they go through the Server events. A probe that calls
     `Server_Fire` itself does so on the server (or in single player).
@@ -336,7 +349,8 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   `Fx_Punch`, `Fx_Slash`, `Fx_Throw`: called off the authority Branch's false arm, where
   the asks are); the point bursts (`PelletHit`, `PunchHit`, `BladeHit`, `Chop`, `Stab`,
   `Lodge`) nobody predicts, so every screen plays them at the server's word, the striker's
-  included; `ThrowClip` is the wind-up's own on the thrower and told to the others.
+  included (the pellets' not one by one: a shot's impacts are noted as they land and told
+  in one `Multicast_ShotHits`, `weapon_component/shot_hits.py`, A4); `ThrowClip` is the wind-up's own on the thrower and told to the others.
   - **Three gates, one per kind:** `UNPREDICTED` (HasAuthority OR NOT `LocalInput`: the
     owner already played it), `OTHERS` (NOT `LocalInput`), `SCREEN` (NOT IsDedicatedServer).
     Single player has authority, so each Multicast is a plain call that plays once.

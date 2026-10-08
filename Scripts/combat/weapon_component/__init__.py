@@ -82,8 +82,11 @@ _author_* fragment per concern, each in its own module:
   tracer      debug mode: the line each pellet flew, off the trace's own hit
               result (red to an impact, blue out to the range), and a point
   impact      a pellet that connected: damage, hit zones, debug readout, and
-              Fx_PelletHit (blood on a body, chips on the scenery), told to
-              every screen
+              Fx_PelletHit (blood on a body, chips on the scenery), noted
+              for the shot's batch
+  shot_hits   a shot's impacts told once (A4): the note onto three arrays,
+              FlushShotHits after the pellet loop, Multicast_ShotHits and
+              its loop over Fx_PelletHit
   headshot    the headshot stamp: HeadshotTime, when a round or a thrown
               blade last struck a head (the HUD's X round the reticle)
   surface_impact  a pellet that hit something with no health: BP_BulletImpact,

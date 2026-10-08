@@ -19,6 +19,8 @@ Scripts/dev/check_node_catalog.py.
               pellet's trace, rewound to the shooter's view on a server (M22)
   level.py    the game's own net library (C++, Source/Otherworld): whether an
               actor was placed in the level, which the take destroys (A2)
+  pose.py     the game's own pose library (C++, Source/Otherworld): how often a
+              dedicated server poses a body it never draws (A4)
   palette.py  palette nodes (events, casts, break/make) and the standard, actor
               and component macros
 """

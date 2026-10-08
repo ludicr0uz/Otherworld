@@ -8,6 +8,41 @@
 #include "PhysicsEngine/BodyInstance.h"
 #include "PhysicsEngine/BodySetup.h"
 
+namespace
+{
+	/** Whether this frame posed the mesh anew: false on a frame its update rate skipped (OtherworldServerPose.h). */
+	bool PosedThisFrame(const USkeletalMeshComponent& Mesh)
+	{
+		const FAnimUpdateRateParameters* Rate = Mesh.AnimUpdateRateParams;
+		return !Rate || !Mesh.ShouldUseUpdateRateOptimizations() || !Rate->DoEvaluationRateOptimizations()
+			|| !Rate->ShouldSkipEvaluation();
+	}
+
+	/** Drops the oldest entries of a ring while the one after them is already HistorySeconds old. */
+	void DropStale(const double* Times, int32& Start, int32& Num, double Horizon)
+	{
+		constexpr int32 Capacity = FOtherworldCharacterHistory::Capacity;
+		while (Num > 1 && Times[(Start + 1) % Capacity] <= Horizon)
+		{
+			Start = (Start + 1) % Capacity;
+			--Num;
+		}
+	}
+
+	/** The slot the next entry of a ring is written to: the one past the newest, or the oldest's when full. */
+	int32 Push(int32& Start, int32& Num)
+	{
+		constexpr int32 Capacity = FOtherworldCharacterHistory::Capacity;
+		if (Num == Capacity)
+		{
+			const int32 Slot = Start;
+			Start = (Start + 1) % Capacity;
+			return Slot;
+		}
+		return (Start + Num++) % Capacity;
+	}
+}
+
 void UOtherworldHitHistory::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -20,6 +55,7 @@ void UOtherworldHitHistory::Deinitialize()
 {
 	FWorldDelegates::OnWorldPostActorTick.Remove(TickHandle);
 	Histories.Empty();
+	RecordedActors.Empty();
 	Super::Deinitialize();
 }
 
@@ -45,60 +81,90 @@ void UOtherworldHitHistory::OnPostActorTick(UWorld* World, ELevelTick TickType, 
 
 void UOtherworldHitHistory::Record(double Now)
 {
+	constexpr int32 Capacity = FOtherworldCharacterHistory::Capacity;
+	// A frame sooner than this after the last is not kept: a second always fits the ring.
+	const double MinInterval = 0.9 / FramesPerSecond;
+	const double Horizon = Now - HistorySeconds;
+
 	for (TActorIterator<ACharacter> It(GetWorld()); It; ++It)
 	{
 		ACharacter* Character = *It;
-		if (!IsValid(Character))
-		{
-			continue;
-		}
 		const UCapsuleComponent* Capsule = Character->GetCapsuleComponent();
 		const USkeletalMeshComponent* Mesh = Character->GetMesh();
-		if (!Capsule || !Mesh)
+		if (!IsValid(Character) || !Capsule || !Mesh)
 		{
 			continue;
 		}
-		FOtherworldCharacterHistory* History = Histories.FindByPredicate(
-			[Character](const FOtherworldCharacterHistory& H) { return H.Character.Get() == Character; });
-		if (!History)
+		TUniquePtr<FOtherworldCharacterHistory>& Held = Histories.FindOrAdd(FObjectKey(Character));
+		if (!Held)
 		{
-			History = &Histories.AddDefaulted_GetRef();
-			History->Character = Character;
+			Held = MakeUnique<FOtherworldCharacterHistory>();
+			Held->Character = Character;
+		}
+		FOtherworldCharacterHistory& H = *Held;
+		if (H.FrameNum > 0 && Now - H.FrameTimes[H.Frame(H.FrameNum - 1)] < MinInterval)
+		{
+			continue;
 		}
 
-		FOtherworldBodySample Sample;
-		Sample.Time = Now;
 		const bool bCapsuleBody = Capsule->BodyInstance.IsValidBodyInstance();
-		Sample.bShootable = bCapsuleBody && Capsule->IsQueryCollisionEnabled()
+		const bool bShootable = bCapsuleBody && Capsule->IsQueryCollisionEnabled()
 			&& Capsule->GetCollisionResponseToChannel(ECC_Visibility) == ECR_Block;
-		Sample.Capsule = bCapsuleBody ? Capsule->BodyInstance.GetUnrealWorldTransform()
-									  : Capsule->GetComponentTransform();
-		Sample.Bodies.Reserve(Mesh->Bodies.Num());
-		for (const FBodyInstance* Body : Mesh->Bodies)
-		{
-			Sample.Bodies.Add(Body && Body->IsValidBodyInstance() ? Body->GetUnrealWorldTransform()
-																  : FTransform::Identity);
-		}
-		History->Samples.Add(MoveTemp(Sample));
+		const FTransform& MeshWorld = Mesh->GetComponentTransform();
+		const FTransform MeshFrame(MeshWorld.GetRotation(), MeshWorld.GetLocation());
 
-		int32 Stale = 0;
-		while (Stale + 1 < History->Samples.Num() && History->Samples[Stale + 1].Time <= Now - HistorySeconds)
+		const int32 f = Push(H.FrameStart, H.FrameNum);
+		H.FrameTimes[f] = Now;
+		H.bShootable[f] = bShootable;
+		H.Capsules[f] = bCapsuleBody ? Capsule->BodyInstance.GetUnrealWorldTransform()
+									 : Capsule->GetComponentTransform();
+		H.MeshFrames[f] = MeshFrame;
+		DropStale(H.FrameTimes, H.FrameStart, H.FrameNum, Horizon);
+
+		// The bodies: only of a character a pellet can stop on (a corpse's
+		// capsule stops none), and only when the mesh was posed anew.
+		const int32 Bodies = Mesh->Bodies.Num();
+		if (Bodies != H.BodyCount)
 		{
-			++Stale;
+			// Collision toggled, or the first frame: the poses kept no longer fit.
+			H.BodyCount = Bodies;
+			H.PoseBodies.SetNumUninitialized(Capacity * Bodies, EAllowShrinking::No);
+			H.PoseStart = H.PoseNum = 0;
 		}
-		if (Stale > 0)
+		if (bShootable && Bodies > 0 && (H.PoseNum == 0 || PosedThisFrame(*Mesh)))
 		{
-			History->Samples.RemoveAt(0, Stale, EAllowShrinking::No);
+			const int32 p = Push(H.PoseStart, H.PoseNum);
+			H.PoseTimes[p] = Now;
+			FTransform* Out = &H.PoseBodies[p * Bodies];
+			for (int32 b = 0; b < Bodies; ++b)
+			{
+				const FBodyInstance* Body = Mesh->Bodies[b];
+				Out[b] = Body && Body->IsValidBodyInstance()
+					? Body->GetUnrealWorldTransform().GetRelativeTransform(MeshFrame)
+					: FTransform::Identity;
+			}
 		}
+		DropStale(H.PoseTimes, H.PoseStart, H.PoseNum, Horizon);
 	}
-	Histories.RemoveAll([](const FOtherworldCharacterHistory& H) { return !H.Character.IsValid(); });
+
+	RecordedActors.Reset();
+	for (auto It = Histories.CreateIterator(); It; ++It)
+	{
+		const ACharacter* Character = It.Value()->Character.Get();
+		if (!Character)
+		{
+			It.RemoveCurrent();
+			continue;
+		}
+		RecordedActors.Add(Character);
+	}
 }
 
 void UOtherworldHitHistory::CharactersRecorded(TArray<AActor*>& Out) const
 {
-	for (const FOtherworldCharacterHistory& H : Histories)
+	for (const auto& Pair : Histories)
 	{
-		if (ACharacter* Character = H.Character.Get())
+		if (ACharacter* Character = Pair.Value->Character.Get())
 		{
 			Out.Add(Character);
 		}
@@ -107,58 +173,49 @@ void UOtherworldHitHistory::CharactersRecorded(TArray<AActor*>& Out) const
 
 const FOtherworldCharacterHistory* UOtherworldHitHistory::HistoryOf(const AActor* Character) const
 {
-	return Histories.FindByPredicate(
-		[Character](const FOtherworldCharacterHistory& H) { return H.Character.Get() == Character; });
+	const TUniquePtr<FOtherworldCharacterHistory>* Held = Histories.Find(FObjectKey(Character));
+	return Held ? Held->Get() : nullptr;
 }
 
 int32 UOtherworldHitHistory::SampleCount(const AActor* Character) const
 {
 	const FOtherworldCharacterHistory* History = HistoryOf(Character);
-	return History ? History->Samples.Num() : 0;
+	return History ? History->FrameNum : 0;
 }
 
-bool UOtherworldHitHistory::SampleAt(const FOtherworldCharacterHistory& History, double At, FOtherworldBodySample& Out)
+int32 UOtherworldHitHistory::PoseCount(const AActor* Character) const
 {
-	const TArray<FOtherworldBodySample>& S = History.Samples;
-	if (S.Num() == 0)
+	const FOtherworldCharacterHistory* History = HistoryOf(Character);
+	return History ? History->PoseNum : 0;
+}
+
+void UOtherworldHitHistory::Either(const double* Times, int32 Start, int32 Num, double At,
+	int32& OutA, int32& OutB, float& OutAlpha)
+{
+	constexpr int32 Capacity = FOtherworldCharacterHistory::Capacity;
+	const int32 Oldest = Start;
+	const int32 Newest = (Start + Num - 1) % Capacity;
+	OutAlpha = 0.f;
+	// Older than the ring: its oldest entry, the cap. Newer than the newest: now.
+	if (At <= Times[Oldest])
 	{
-		return false;
+		OutA = OutB = Oldest;
+		return;
 	}
-	// Older than the history: the oldest sample, the cap. Newer than the
-	// newest: now.
-	if (At <= S[0].Time)
+	if (At >= Times[Newest])
 	{
-		Out = S[0];
-		return true;
-	}
-	if (At >= S.Last().Time)
-	{
-		Out = S.Last();
-		return true;
+		OutA = OutB = Newest;
+		return;
 	}
 	int32 i = 0;
-	while (i + 1 < S.Num() && S[i + 1].Time < At)
+	while (i + 2 < Num && Times[(Start + i + 1) % Capacity] < At)
 	{
 		++i;
 	}
-	const FOtherworldBodySample& A = S[i];
-	const FOtherworldBodySample& B = S[i + 1];
-	const double Span = B.Time - A.Time;
-	const float Alpha = Span > 0.0 ? static_cast<float>((At - A.Time) / Span) : 1.f;
-	if (A.Bodies.Num() != B.Bodies.Num())
-	{
-		Out = Alpha < 0.5f ? A : B;
-		return true;
-	}
-	Out.Time = At;
-	Out.bShootable = (Alpha < 0.5f ? A : B).bShootable;
-	Out.Capsule.Blend(A.Capsule, B.Capsule, Alpha);
-	Out.Bodies.SetNum(A.Bodies.Num());
-	for (int32 b = 0; b < A.Bodies.Num(); ++b)
-	{
-		Out.Bodies[b].Blend(A.Bodies[b], B.Bodies[b], Alpha);
-	}
-	return true;
+	OutA = (Start + i) % Capacity;
+	OutB = (Start + i + 1) % Capacity;
+	const double Span = Times[OutB] - Times[OutA];
+	OutAlpha = Span > 0.0 ? static_cast<float>((At - Times[OutA]) / Span) : 1.f;
 }
 
 bool UOtherworldHitHistory::TraceBodyThen(const FBodyInstance& Body, const FTransform& Then,
@@ -185,47 +242,107 @@ bool UOtherworldHitHistory::TraceBodyThen(const FBodyInstance& Body, const FTran
 	return true;
 }
 
-bool UOtherworldHitHistory::TraceRewound(ACharacter* Character, double At, const FVector& Start, const FVector& End,
-	FHitResult& OutCapsule, bool& bOutBody, FName& OutBone, FVector& OutBodyPoint) const
+bool UOtherworldHitHistory::TraceRewound(const AActor* Shooter, double At, const FVector& Start, const FVector& End,
+	float Reach, FHitResult& OutCapsule, bool& bOutBody, FName& OutBone, FVector& OutBodyPoint) const
 {
 	bOutBody = false;
 	OutBone = NAME_None;
 	OutBodyPoint = FVector::ZeroVector;
-	const FOtherworldCharacterHistory* History = HistoryOf(Character);
-	if (!History)
-	{
-		return false;
-	}
-	FOtherworldBodySample Sample;
-	if (!SampleAt(*History, At, Sample) || !Sample.bShootable)
-	{
-		return false;
-	}
-	UCapsuleComponent* Capsule = Character->GetCapsuleComponent();
-	if (!Capsule || !Capsule->BodyInstance.IsValidBodyInstance()
-		|| !TraceBodyThen(Capsule->BodyInstance, Sample.Capsule, Start, End, OutCapsule))
-	{
-		return false;
-	}
-	OutCapsule.bBlockingHit = true;
-	OutCapsule.HitObjectHandle = FActorInstanceHandle(Character);
-	OutCapsule.Component = Capsule;
 
-	USkeletalMeshComponent* Mesh = Character->GetMesh();
-	if (!Mesh || Mesh->Bodies.Num() != Sample.Bodies.Num())
+	// Every capsule where it was, from the frames alone; the nearest wins.
+	const FOtherworldCharacterHistory* Struck = nullptr;
+	FTransform StruckFrame;
+	for (const auto& Pair : Histories)
 	{
-		return true;
-	}
-	float Best = TNumericLimits<float>::Max();
-	for (int32 b = 0; b < Mesh->Bodies.Num(); ++b)
-	{
-		const FBodyInstance* Body = Mesh->Bodies[b];
-		if (!Body || !Body->IsValidBodyInstance())
+		const FOtherworldCharacterHistory& H = *Pair.Value;
+		ACharacter* Character = H.Character.Get();
+		if (!Character || Character == Shooter || H.FrameNum == 0)
+		{
+			continue;
+		}
+		int32 A, B;
+		float Alpha;
+		Either(H.FrameTimes, H.FrameStart, H.FrameNum, At, A, B, Alpha);
+		if (!H.bShootable[Alpha < 0.5f ? A : B])
+		{
+			continue;
+		}
+		FTransform CapsuleThen = H.Capsules[A];
+		if (A != B)
+		{
+			CapsuleThen.Blend(H.Capsules[A], H.Capsules[B], Alpha);
+		}
+		// Far off the line: no trace at all. The bound is the capsule's own sphere.
+		const UCapsuleComponent* Capsule = Character->GetCapsuleComponent();
+		if (!Capsule || !Capsule->BodyInstance.IsValidBodyInstance())
+		{
+			continue;
+		}
+		const float Bound = Capsule->GetScaledCapsuleHalfHeight() + Capsule->GetScaledCapsuleRadius();
+		if (FMath::PointDistToSegmentSquared(CapsuleThen.GetLocation(), Start, End) > FMath::Square(Bound))
 		{
 			continue;
 		}
 		FHitResult Hit;
-		if (TraceBodyThen(*Body, Sample.Bodies[b], Start, End, Hit) && Hit.Time < Best)
+		if (!TraceBodyThen(Capsule->BodyInstance, CapsuleThen, Start, End, Hit) || Hit.Distance >= Reach)
+		{
+			continue;
+		}
+		Reach = Hit.Distance;
+		Struck = &H;
+		OutCapsule = Hit;
+		OutCapsule.bBlockingHit = true;
+		OutCapsule.HitObjectHandle = FActorInstanceHandle(Character);
+		OutCapsule.Component = Character->GetCapsuleComponent();
+		StruckFrame = H.MeshFrames[A];
+		if (A != B)
+		{
+			StruckFrame.Blend(H.MeshFrames[A], H.MeshFrames[B], Alpha);
+		}
+	}
+	if (!Struck)
+	{
+		return false;
+	}
+	// Only now the bodies, and only the struck character's.
+	if (USkeletalMeshComponent* Mesh = Struck->Character->GetMesh())
+	{
+		BodiesThen(*Struck, *Mesh, At, StruckFrame, Start, End, bOutBody, OutBone, OutBodyPoint);
+	}
+	return true;
+}
+
+void UOtherworldHitHistory::BodiesThen(const FOtherworldCharacterHistory& History, USkeletalMeshComponent& Mesh,
+	double At, const FTransform& MeshFrame, const FVector& Start, const FVector& End,
+	bool& bOutBody, FName& OutBone, FVector& OutBodyPoint) const
+{
+	// A mesh whose bodies are not the poses' (collision toggled since) is
+	// judged by its capsule alone.
+	const int32 Bodies = History.BodyCount;
+	if (History.PoseNum == 0 || Mesh.Bodies.Num() != Bodies)
+	{
+		return;
+	}
+	int32 A, B;
+	float Alpha;
+	Either(History.PoseTimes, History.PoseStart, History.PoseNum, At, A, B, Alpha);
+	const FTransform* PoseA = &History.PoseBodies[A * Bodies];
+	const FTransform* PoseB = &History.PoseBodies[B * Bodies];
+	float Best = TNumericLimits<float>::Max();
+	for (int32 b = 0; b < Bodies; ++b)
+	{
+		const FBodyInstance* Body = Mesh.Bodies[b];
+		if (!Body || !Body->IsValidBodyInstance())
+		{
+			continue;
+		}
+		FTransform InMesh = PoseA[b];
+		if (A != B)
+		{
+			InMesh.Blend(PoseA[b], PoseB[b], Alpha);
+		}
+		FHitResult Hit;
+		if (TraceBodyThen(*Body, InMesh * MeshFrame, Start, End, Hit) && Hit.Time < Best)
 		{
 			Best = Hit.Time;
 			bOutBody = true;
@@ -233,5 +350,46 @@ bool UOtherworldHitHistory::TraceRewound(ACharacter* Character, double At, const
 			OutBodyPoint = Hit.Location;
 		}
 	}
+}
+
+bool UOtherworldHitHistory::BodyThen(const AActor* Character, FName Bone, double At, FVector& OutLocation) const
+{
+	const FOtherworldCharacterHistory* History = HistoryOf(Character);
+	const ACharacter* Body = History ? History->Character.Get() : nullptr;
+	const USkeletalMeshComponent* Mesh = Body ? Body->GetMesh() : nullptr;
+	if (!Mesh || History->FrameNum == 0 || History->PoseNum == 0 || Mesh->Bodies.Num() != History->BodyCount)
+	{
+		return false;
+	}
+	int32 Index = INDEX_NONE;
+	for (int32 b = 0; b < Mesh->Bodies.Num(); ++b)
+	{
+		const FBodyInstance* Instance = Mesh->Bodies[b];
+		if (Instance && Instance->BodySetup.IsValid() && Instance->BodySetup->BoneName == Bone)
+		{
+			Index = b;
+			break;
+		}
+	}
+	if (Index == INDEX_NONE)
+	{
+		return false;
+	}
+	int32 A, B;
+	float Alpha;
+	Either(History->FrameTimes, History->FrameStart, History->FrameNum, At, A, B, Alpha);
+	FTransform MeshFrame = History->MeshFrames[A];
+	if (A != B)
+	{
+		MeshFrame.Blend(History->MeshFrames[A], History->MeshFrames[B], Alpha);
+	}
+	Either(History->PoseTimes, History->PoseStart, History->PoseNum, At, A, B, Alpha);
+	FTransform InMesh = History->PoseBodies[A * History->BodyCount + Index];
+	if (A != B)
+	{
+		InMesh.Blend(History->PoseBodies[A * History->BodyCount + Index],
+			History->PoseBodies[B * History->BodyCount + Index], Alpha);
+	}
+	OutLocation = (InMesh * MeshFrame).GetLocation();
 	return true;
 }

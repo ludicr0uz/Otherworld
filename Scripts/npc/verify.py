@@ -487,9 +487,20 @@ def check_relevancy():
               str(bp and relevancy.read(bp)))
 
 
+def check_server_anim():
+    """Each creature's anim graph has the one branch a dedicated server takes
+    (task A4): the checks are combat/verify/server_anim.py's."""
+    from combat.server_anim_consts import WANDERER
+    from combat.verify.server_anim import check_graph
+    for variant in NPC_VARIANTS:
+        if unreal.EditorAssetLibrary.does_asset_exist(variant.anim_bp):
+            check_graph(check, variant.anim_bp, WANDERER)
+
+
 def run():
     check_settings()
     check_relevancy()
+    check_server_anim()
     check_controller(AI_BP_PATH, NPC_VARIANTS[0].key)
     for variant in NPC_VARIANTS:
         check_controller(variant.ai_blueprint, variant.key)

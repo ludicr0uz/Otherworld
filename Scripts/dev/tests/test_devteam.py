@@ -13,6 +13,7 @@ from unittest import mock
 import _paths  # noqa: F401
 
 from devteam import fast, gate
+from devteam import limits as pacing
 from devteam.accounting import describe_time, merge_results, token_usage
 from devteam.session import (
     FAIL_MARK, Narrator, build_cmd, build_fix_prompt, build_prompt, fast_note,
@@ -333,6 +334,21 @@ class SessionTest(unittest.TestCase):
         self.assertIn("UEPY_SERVE", prompt)
         self.assertNotIn("UEPY_COLD=1", prompt)
 
+    def test_prompt_forbids_background_runs(self):
+        prompt = build_prompt(Task("Do X"), 1, 1, "/p", "| t |", True)
+        self.assertIn("never run_in_background", prompt)
+        self.assertIn("--probe A --probe B", prompt)
+
+    def test_follow_up_prompts(self):
+        from devteam.session import build_limit_resumed_prompt, build_uncommitted_prompt
+        self.assertIn("commit as asked", build_limit_resumed_prompt(True))
+        self.assertNotIn("commit as asked", build_limit_resumed_prompt(False))
+        self.assertIn(FAIL_MARK, build_limit_resumed_prompt(False))
+        prompt = build_uncommitted_prompt()
+        self.assertIn("without a commit", prompt)
+        self.assertIn("foreground", prompt)
+        self.assertIn(FAIL_MARK, prompt)
+
     def test_narrator_strips_the_cd_prefix(self):
         root = "/Users/me/Unreal Projects/Otherworld"
         n = Narrator(root)
@@ -394,6 +410,94 @@ class FastTest(unittest.TestCase):
             self.assertIsNone(fast.last_seen(os.path.join(tmp, "nowhere")))
         finally:
             shutil.rmtree(tmp)
+
+
+class FakeClock(object):
+    """time.time and time.sleep for a wait, without the waiting."""
+
+    def __init__(self, start):
+        self.now, self.slept = start, []
+
+    def time(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.now += seconds
+
+
+class FakePauser(object):
+    def __init__(self, after=None):
+        self.requested, self.after, self.ticks = False, after, 0
+
+    @contextlib.contextmanager
+    def watching(self, on_pause=None):
+        yield self
+
+
+class LimitsTest(unittest.TestCase):
+
+    def wait(self, info, start, refused=False, pauser=None):
+        clock, said = FakeClock(start), []
+        waited = pacing.wait(fast.Meter("auto", info), pauser, refused=refused,
+                             now=clock.time, sleep=clock.sleep, say=said.append)
+        return waited, clock, said
+
+    def test_room_means_no_wait(self):
+        waited, clock, said = self.wait(limits(0.9, 2000), 1000)
+        self.assertEqual((waited, clock.slept, said), (0, [], []))
+        self.assertEqual(self.wait(None, 1000)[0], 0)
+
+    def test_a_spent_window_is_slept_through_to_its_reset(self):
+        waited, clock, said = self.wait(limits(0.95, 2000), 1000)
+        self.assertEqual(clock.now, 2000 + pacing.MARGIN)
+        self.assertEqual(waited, 1000 + pacing.MARGIN)
+        self.assertTrue(all(s <= pacing.TICK for s in clock.slept))
+        self.assertIn("session limit at 95%", said[0])
+        self.assertIn("has reset", said[-1])
+
+    def test_a_reading_from_a_window_that_has_reset_is_room(self):
+        self.assertEqual(self.wait(limits(1.0, 900), 1000)[0], 0)
+
+    def test_a_refused_session_waits_for_the_reset_it_was_told(self):
+        info = {"status": "rejected", "resetsAt": 1500, "rateLimitType": "five_hour",
+                "unifiedWindows": {"five_hour": {"utilization": 1, "resetsAt": 1500}}}
+        waited, clock, _said = self.wait(info, 1000, refused=True)
+        self.assertEqual(clock.now, 1500 + pacing.MARGIN)
+
+    def test_a_refused_session_with_no_reset_time_waits_the_fallback(self):
+        waited, clock, said = self.wait(limits(0.3, 900), 1000, refused=True)
+        self.assertEqual(waited, pacing.FALLBACK)
+        self.assertIn("no reset time", said[0])
+
+    def test_a_typed_pause_ends_the_wait(self):
+        pauser = FakePauser()
+        clock, said = FakeClock(1000), []
+
+        def sleep(seconds):
+            clock.sleep(seconds)
+            pauser.requested = True
+        pacing.wait(fast.Meter("auto", limits(0.99, 5000)), pauser,
+                    now=clock.time, sleep=sleep, say=said.append)
+        self.assertEqual(len(clock.slept), 1)
+        self.assertFalse([s for s in said if "has reset" in s])
+
+    def test_limited_recognises_the_session_limit_result(self):
+        self.assertTrue(pacing.limited({"is_error": True, "api_error_status": 429,
+                                        "result": "You've hit your session limit"}))
+        self.assertTrue(pacing.limited({"is_error": True,
+                                        "result": "You've hit your session limit · resets 11:50pm"}))
+        self.assertFalse(pacing.limited({"is_error": True, "result": "FAILED: no"}))
+        self.assertFalse(pacing.limited({"is_error": False, "api_error_status": 429}))
+        self.assertFalse(pacing.limited({}))
+        self.assertFalse(pacing.limited(None))
+
+    def test_reset_at_prefers_the_event_s_own_window(self):
+        self.assertEqual(pacing.reset_at({"resetsAt": 10, "unifiedWindows": {
+            "five_hour": {"resetsAt": 20}}}), 10)
+        self.assertEqual(pacing.reset_at(limits(0.1, 20)), 20)
+        self.assertIsNone(pacing.reset_at({}))
+        self.assertIsNone(pacing.reset_at(None))
 
 
 class TriageTest(unittest.TestCase):

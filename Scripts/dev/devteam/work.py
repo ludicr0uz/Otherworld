@@ -8,17 +8,18 @@ behind ``dev-team resume <branch>``.
 """
 
 import datetime
+import hashlib
 import os
 import time
 
-from devteam import fab, gate, pause
+from devteam import fab, gate, limits, pause
 from devteam.accounting import (
     describe_time, describe_tokens, git, git_head, merge_results, tag_commit,
     token_usage,
 )
 from devteam.session import (
-    build_cmd, build_fix_prompt, build_prompt, build_resumed_prompt, run_session,
-    session_env,
+    build_cmd, build_fix_prompt, build_limit_resumed_prompt, build_prompt,
+    build_resumed_prompt, build_uncommitted_prompt, run_session, session_env,
 )
 from devteam.tasks import Task, tick
 from uepylib import editors, server
@@ -49,6 +50,16 @@ def tree_state():
     """What a sweep's result depends on: HEAD plus the uncommitted changes."""
     return (git(ROOT, "rev-parse", "HEAD").stdout.strip(),
             git(ROOT, "status", "--porcelain").stdout)
+
+
+def tree_fingerprint():
+    """What the working tree holds beyond HEAD, as one hash: the diff against
+    HEAD (an edit to a file that was already dirty changes it) and the list
+    of untracked files."""
+    digest = hashlib.sha1()
+    for out in (git(ROOT, "diff", "HEAD").stdout, git(ROOT, "status", "--porcelain").stdout):
+        digest.update(out.encode("utf-8", "replace"))
+    return digest.hexdigest()
 
 
 def sweep(label, log_path, pauser=None):
@@ -88,8 +99,44 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
             raise pause.Paused(stage, result, baseline, reports)
 
     def session(prompt, opts, **how):
-        return run_session(build_cmd(prompt, args.permission_mode, **how, **opts),
-                           ROOT, log_path, env, meter.see, pauser)
+        """One session -- waited for when the session limit is spent, and
+        when the limit stops it part way, waited for again and resumed (or
+        started over, if it had not begun). Returns (ok, report, result)."""
+        limits.wait(meter, pauser)
+        if pauser and pauser.requested:        # paused while waiting: nothing ran
+            return False, "", {"session_id": how.get("resume"), "interrupted": True}
+        ok, report, result = run_session(build_cmd(prompt, args.permission_mode, **how, **opts),
+                                         ROOT, log_path, env, meter.see, pauser)
+        while limits.limited(result):
+            print(f"    the session limit stopped this session ({limits.clock(time.time())})")
+            limits.wait(meter, pauser, refused=True)
+            if pauser and pauser.requested:
+                break
+            if result.get("session_id"):
+                again = dict(how, resume=result["session_id"])
+                again.pop("name", None)
+                ok, report, more = run_session(
+                    build_cmd(build_limit_resumed_prompt(args.commit), args.permission_mode,
+                              **again, **opts), ROOT, log_path, env, meter.see, pauser)
+                result = merge_results(result, more)
+            else:
+                ok, report, result = run_session(
+                    build_cmd(prompt, args.permission_mode, **how, **opts),
+                    ROOT, log_path, env, meter.see, pauser)
+        return ok, report, result
+
+    def ensure_committed(ok, reports, result, head0, tree0):
+        """A session that ended well but left new changes uncommitted (six of
+        77 did, each waiting on a background run) is sent back once to commit."""
+        if not (ok and args.commit and result.get("session_id")):
+            return ok, reports, result
+        if git_head(ROOT) != head0 or tree_fingerprint() == tree0:
+            return ok, reports, result
+        print("    the session ended without committing while the tree changed; "
+              "sending it back to finish")
+        ok, report, more = session(build_uncommitted_prompt(), common,
+                                   resume=result["session_id"])
+        return ok, reports + [report], merge_results(result, more)
 
     if parked is None:
         blocked = fab.preflight(task.fab, close_editors, **ask)
@@ -98,6 +145,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         if args.gate:
             state = tree_state()
             baseline = cache.get(state) or sweep("baseline", sweep_log, pauser)
+        limits.wait(meter, pauser)
         paused("start")
         prompt = build_prompt(task, n, total, progress,
                               gate.table(baseline) if baseline else None, args.commit)
@@ -107,6 +155,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     common = dict(model=task.model or args.model, effort=task.effort or args.effort,
                   budget=args.budget, fast=task.fast)
     earlier = list(parked.get("reports") or []) if parked else []
+    head0, tree0 = git_head(ROOT), tree_fingerprint()
     if parked is None:
         ok, report, result = session(prompt, common,
                                      name=f"dev-team {n}/{total}: {task.title}")
@@ -125,6 +174,8 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     ok, reports, result = fab.follow_up(ok, report, result, resume, close_editors, **ask)
     reports = earlier + reports
     paused("session", result, reports[:-1])
+    ok, reports, result = ensure_committed(ok, reports, result, head0, tree0)
+    paused("session", result, reports[:-1])
     gate_table = None
     if not (ok and args.gate):
         return ok, reports, result, gate_table, None
@@ -142,10 +193,13 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         fix = build_fix_prompt(problems, gate.table(baseline, after), args.commit)
         # Triage guessed low and the gate disagrees: fix at the default effort.
         fix_opts = dict(common, effort=args.effort) if task.triage else common
+        head0, tree0 = git_head(ROOT), tree_fingerprint()
         ok, report, fixed = session(fix, fix_opts, resume=result["session_id"])
         result = merge_results(result, fixed)
         paused("session", result, reports)
         reports.append(report)
+        ok, reports, result = ensure_committed(ok, reports, result, head0, tree0)
+        paused("session", result, reports)
         if not ok:
             break
         after = sweep("after fix", sweep_log, pauser)

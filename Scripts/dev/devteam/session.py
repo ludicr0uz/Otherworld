@@ -44,6 +44,13 @@ checks, traceback tails, plus the path of the full log); pass --full to see \
 everything. To check behaviour in the running game, write a probe and \
 run it with `uepy.py --game --probe FILE` (Scripts/probes/__init__.py).
 
+Run every command in the foreground: never run_in_background, and do not \
+start a run to poll for later. This headless session is never told when a \
+background command finishes, so a session that waits for one ends with its \
+work unverified and uncommitted. Give a long run a timeout instead (up to \
+600000 ms), and put several probes in one launch (`--probe A --probe B`) \
+rather than one launch each.
+
 {gate}
 
 {fab}
@@ -159,6 +166,34 @@ def build_resumed_prompt(branch, commit):
         where=f", on the branch {branch}" if branch else "",
         commit=" and commit on this branch as you would have" if commit else "",
         fail=FAIL_MARK)
+
+
+LIMIT_RESUMED = """\
+The Claude session limit stopped this session part way, and it has now reset: \
+dev-team waited it out and is resuming you. The command that was running, if \
+any, was ended with your turn and may need running again; the warm editor \
+boots again by itself on the next uepy.py call. Carry on with the task from \
+where you stopped{commit}, and end with the same kind of report; if you cannot \
+complete it, make its first line "{fail} <reason>"."""
+
+UNCOMMITTED = """\
+Your last turn ended without a commit, and the working tree has changes that \
+were not there when your session began. If you were waiting for a background \
+command: this headless session is never told when one finishes, and whatever \
+was running was ended with your turn. Run it again in the foreground (a \
+timeout of up to 600000 ms; several probes go in one launch with repeated \
+--probe) and read its output. Then finish the task: verify, commit as asked, \
+and end with the same kind of report. If the changes are not yours or the task \
+cannot be completed, make the report's first line "{fail} <reason>"."""
+
+
+def build_limit_resumed_prompt(commit):
+    return LIMIT_RESUMED.format(commit=" and commit as asked" if commit else "",
+                                fail=FAIL_MARK)
+
+
+def build_uncommitted_prompt():
+    return UNCOMMITTED.format(fail=FAIL_MARK)
 
 
 def build_cmd(prompt, permission_mode, name=None, model=None, effort=None,

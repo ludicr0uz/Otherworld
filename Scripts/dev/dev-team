@@ -66,6 +66,14 @@ session streamed (devteam/fast.py). --fast on / --fast off override the rule.
 Fast mode is billed to usage credits, not to the plan; where it cannot run,
 the session runs at standard speed and its ``session`` line says why.
 
+**Session limit.** When the five-hour limit is at 95% or more by the last
+reading, dev-team sleeps until it resets before starting a session -- at the
+start of a run too, if the newest transcript says the window is already spent.
+A session the limit stops part way is waited for and resumed, not failed
+(devteam/limits.py). A session that ends well but leaves new changes
+uncommitted (it was waiting on a background run, which a headless session is
+never told about) is sent back once to finish and commit.
+
 **Pause.** Type ``pause`` and Enter while a task is running. Its session is
 interrupted, everything uncommitted (but the task file) goes into one WIP
 commit on a new branch ``paused/<task>-<time>``, the branch the run was on is
@@ -106,7 +114,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(1, os.path.dirname(HERE))        # Scripts/: asset_pipeline
 
-from devteam import fab, fast, pause                                 # noqa: E402
+from devteam import fab, fast, limits, pause                         # noqa: E402
 from devteam.accounting import git_head                             # noqa: E402
 from devteam.tasks import Task, parse_tasks, requeue, tick          # noqa: E402
 from devteam.triage import triage                                   # noqa: E402
@@ -229,6 +237,9 @@ def main():
         sys.exit("dev-team: nothing to do (no unticked tasks)")
     skipped = len(tasks) - len(todo)
     print(f"dev-team: {len(todo)} task(s)" + (f", {skipped} already done" if skipped else ""))
+    meter = fast.Meter(args.fast, fast.last_seen(LOG_ROOT))
+    if not args.dry_run:
+        limits.wait(meter, pauser)          # triage is the first call on the limit
     triage_cost = size(todo, args)
     for i, t in enumerate(todo, 1):
         print(describe(i, t))
@@ -244,7 +255,6 @@ def main():
 
     outcomes, total_cost, cache = [], triage_cost, {}
     attempted = []      # run already and still unticked: not to be queued again
-    meter = fast.Meter(args.fast, fast.last_seen(LOG_ROOT))
     if pauser.enabled:
         print(f"dev-team: type '{pause.WORD}' and Enter to pause the task in hand")
     while todo:

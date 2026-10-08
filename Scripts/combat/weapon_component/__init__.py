@@ -97,9 +97,10 @@ _author_* fragment per concern, each in its own module:
   slot_moves  1-9 ask for a slot (AskSlot), Q for the bag's next item (AskNext):
               Server events; the serve, with authority: the request (the hand's
               item home, the asked one up) and the HUD's drag (MoveFrom/To)
-  record      the server's half of the inventory's record (record_vars.py):
-              written off the item actors after the sync, emptied by the shed,
-              marked to replicate with its OnReps
+  record      the weapon component's part in the inventory's record
+              (record_vars.py): the variables the old view reads, marked to
+              replicate with their OnReps. The record itself is C++ and is
+              written when something marked it (combat/dirty.py), not here
   view        a client's half: its item actors made from the record when one
               arrives (ViewRow, ViewTrim); another player's from HandClass;
               the rounds only once every ask is answered (shot_vars.py)

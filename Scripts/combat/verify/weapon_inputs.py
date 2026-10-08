@@ -21,8 +21,8 @@ from combat.verify.knife import is_melee_play, is_melee_sweep
 from combat.verify.throw import is_throw_play, is_throw_trace, launch_nodes
 from combat.verify.throw_aim import is_ready_node
 from combat.verify.common import (
-    BEL, PIN, by_pins, cdo, check, graph, in_pins, load, out_pins, pin_value, shot_traces,
-    titled,
+    BEL, PIN, by_pins, cdo, check, graph, in_pins, load, out_pins, past_marks, pin_value,
+    shot_traces, titled,
 )
 
 
@@ -265,7 +265,7 @@ def _check_pickup_keeps_held():
                 if "EquippedIndex" in str(BEL.get_node_title(n))]
     check("pick-up does not switch straight to what it picked up",
           not straight, f"{len(straight)} EquippedIndex write(s) fed by Array_Add")
-    placed = [n for a in adds for n in _linked(a, "then")
+    placed = [n for a in adds for n in past_marks(_linked(a, "then"))
               if str(BEL.get_node_title(n)).replace("\n", " ").startswith(f"Set {SLOT_VAR}")
               and pin_value(n, SLOT_VAR) == str(UNPLACED)]
     check("...it is set UNPLACED: the slot sync finds it a weapon slot, a bag slot, or the hand",

@@ -43,6 +43,7 @@ from combat.weapon_items import build_model
 from uebp.nodes.actor import FN_SET_OVERLAY, FN_SET_VISIBILITY
 from uebp.nodes.math import FN_AND, FN_GE_FF
 from uebp.nodes.system import FN_IS_SERVER, FN_TIME_SECONDS
+from combat.dirty import ITEM, mark_change_sites
 
 
 def build_hot_material():
@@ -224,6 +225,9 @@ def build_heated_model(bp, model, glow_at):
         raise RuntimeError(f"{path} failed to compile")
     # This Tick overrides BP_WeaponItem's, so the glimmer is authored again.
     author_glimmer(ed, [_author_cooling(ed, tick)])
+    # Going out by its own clock changes what its carrier's record says
+    # (combat/dirty.py).
+    mark_change_sites(ed, ITEM)
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")

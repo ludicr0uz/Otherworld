@@ -6,6 +6,11 @@ The server issues the loadout and writes it down as the record
 (combat/record_vars.py: a row per item, its class, slot and rounds), which
 replicates to the owning client; everyone else is told the class in hand.
 
+The record is one struct on a C++ component beside the weapon component
+(task A3a), written on a frame that changed what is carried and on no other;
+the weapon component's Inv* arrays are its mirror until the view reads the
+struct (A3b). Both are read here.
+
     everyone   its own character carries the six issued items in their
                slots; on a client they are made from the record, row for row
     a client   another player's character here holds one item: the hand's
@@ -15,6 +20,11 @@ replicates to the owning client; everyone else is told the class in hand.
     the server its copy of that character agrees after each, the record with
                it, and the refused move moved nothing; nobody else's changed
     client 2   sees the pistol in client 1's hand
+    the record is one struct: the same rows as the arrays, on the server and
+               on the owning client; nobody else is sent it, only the class
+               in hand; it is written when an ask changed something and not
+               while nothing does (the write count stands still), nothing
+               changed without marking it (the audit), and Push Model is on
 
 Single player (`--game`) asks the same of the one character: the asks are
 plain calls there, and the record is written just the same.
@@ -34,6 +44,7 @@ from combat.record_vars import FORCED, HandClass, InvClass, InvLoaded, InvReserv
 from combat.slot_tuning import (
     BAG_FIRST, HAND, PISTOL_SLOT, PRIMARY, SLOT_VAR, STARTER_HAND_FROM, STARTER_SLOTS)
 
+LIB = unreal.OtherworldInventoryLibrary
 RUNS_ON = ("server", "client", "standalone")
 # A client asks through the component's own graph (context.ask_slot).
 WRITABLE = [(WEAPON_COMP_BP_PATH, str(v)) for v in FORCED]
@@ -70,6 +81,36 @@ def _record(p, comp):
     return {_name(c): (s, l, r) for c, s, l, r in zip(*cols)}
 
 
+def _owner(comp):
+    return comp.get_owner()
+
+
+def _part(comp):
+    """The C++ component that holds ``comp``'s owner's record."""
+    return _owner(comp).get_component_by_class(unreal.OtherworldInventoryRecordComponent)
+
+
+def _struct(comp):
+    """The same off the record itself, the one struct."""
+    rows = _part(comp).get_editor_property("record").get_editor_property("items")
+    return {_name(r.get_editor_property("class")): (
+        r.get_editor_property("slot"), r.get_editor_property("loaded"),
+        r.get_editor_property("reserve")) for r in rows}
+
+
+def _told(comp):
+    """What everyone but the owner is told the hand holds."""
+    return _name(_part(comp).get_editor_property("hand_class"))
+
+
+def _writes(comp):
+    return LIB.inventory_record_writes(_owner(comp))
+
+
+def _stale(comp):
+    return LIB.inventory_record_stale(_owner(comp))
+
+
 def _slots(carried):
     return {k: v[0] for k, v in carried.items()}
 
@@ -101,6 +142,17 @@ def probe_server(p):
     p.check("with the class in hand, which everyone else is told (the shotgun)",
             all(_name(p.get(c, HandClass)) == "Shotgun" for c in comps),
             f"{[_name(p.get(c, HandClass)) for c in comps]}")
+    p.check("the record is one struct on its own component: the same rows, and the "
+            "same class in hand", all(_struct(c) == _carried(p, c) and _told(c) == "Shotgun"
+                                      for c in comps),
+            f"{[_slots(_struct(c)) for c in comps]}; hand {[_told(c) for c in comps]}")
+    before = [_writes(c) for c in comps]
+    yield 0.5
+    p.check("nothing changes, and the record is not written: no rewrite every Tick",
+            all(n > 0 for n in before) and [_writes(c) for c in comps] == before,
+            f"writes {before} -> {[_writes(c) for c in comps]}")
+    p.check("Push Model is on: the record is sent when it is marked, not compared "
+            "every update", LIB.is_push_model_on())
     p.post("ready")
 
     yield _await(lambda: p.posted("client 1", "moved"))
@@ -111,6 +163,11 @@ def probe_server(p):
             "and its record says so", len(moved) == 1
             and _record(p, comps[moved[0]]) == now[moved[0]],
             f"{[_slots(c).get('Axe') for c in now]}")
+    after = [_writes(c) for c in comps]
+    p.check("that move wrote its record, the struct with it, and nobody else's",
+            len(moved) == 1 and _struct(comps[moved[0]]) == now[moved[0]]
+            and [i for i, (a, b) in enumerate(zip(after, before)) if a > b] == moved,
+            f"writes {before} -> {after}")
     p.check("and nobody else's inventory changed",
             all(c == s for i, (c, s) in enumerate(zip(now, start)) if i not in moved),
             f"{len(now) - len(moved)} other(s)")
@@ -132,6 +189,10 @@ def probe_server(p):
     after = _carried(p, one)
     p.check("the server refuses a move no rule allows (the matches into the primary "
             "slot): nothing moved", after == got, f"{_slots(after)}")
+    p.check("the struct is still the items, and nothing changed them without marking "
+            "the record (the audit)", all(_struct(c) == _carried(p, c) for c in comps)
+            and all(_stale(c) == 0 for c in comps),
+            f"stale {[_stale(c) for c in comps]}")
     p.post("refused")
 
 
@@ -145,12 +206,18 @@ def probe_client(p):
             "from the record it was sent", _issued(start) and _record(p, own) == start,
             f"{_slots(start)}; record {_slots(_record(p, own))}")
     p.check("and holds the shotgun", _held(p, own) == "Shotgun", str(_held(p, own)))
+    p.check("the struct arrived whole, the same rows; the class in hand is not sent to "
+            "its owner", _struct(own) == start and _told(own) is None,
+            f"{_slots(_struct(own))}; hand {_told(own)}")
     theirs = [_comp(p, a) for a in _others(p)]
     yield _await(lambda: all(_held(p, c) for c in theirs), 5.0)
     p.check("another player's character here carries one item, the one in its hand, "
             "and none of its record", len(theirs) == p.clients - 1
             and all(_slots(_carried(p, c)) == {"Shotgun": HAND} and _record(p, c) == {}
                     for c in theirs), f"{[_slots(_carried(p, c)) for c in theirs]}")
+    p.check("nor of the struct: only the class in its hand",
+            all(_struct(c) == {} and _told(c) == "Shotgun" for c in theirs),
+            f"{[(_slots(_struct(c)), _told(c)) for c in theirs]}")
 
     if p.client != 1:
         yield _await(lambda: p.posted("client 1", "held"))
@@ -171,6 +238,9 @@ def probe_client(p):
     got = _slots(_carried(p, own))
     p.check("the refused move moved nothing here either",
             got["Matches"] == MATCHES_SLOT and got["Shotgun"] == PRIMARY, f"{got}")
+    yield _await(lambda: _struct(own) == _carried(p, own), 5.0)
+    p.check("and the struct here is the items still, after the move and the slot",
+            _struct(own) == _carried(p, own), f"{_slots(_struct(own))}")
 
 
 def _asks(p, own, start):
@@ -212,3 +282,10 @@ def probe(p):
             got["Matches"] == MATCHES_SLOT and got["Shotgun"] == PRIMARY, f"{got}")
     p.check("and the record is still the items", _record(p, own) == _carried(p, own),
             f"{_slots(_record(p, own))}")
+    p.check("the struct too: single player holds the record, and nothing travels",
+            _struct(own) == _carried(p, own), f"{_slots(_struct(own))}")
+    before = _writes(own)
+    yield 0.5
+    p.check("it was written when an ask changed something, and is not while nothing "
+            "does", before > 0 and _writes(own) == before and _stale(own) == 0,
+            f"writes {before} -> {_writes(own)}, stale {_stale(own)}")

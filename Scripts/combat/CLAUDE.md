@@ -137,8 +137,15 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   - **The slots are the server's** (M18; `Scripts/net/CLAUDE.md`, "The inventory"): the
     keys and the HUD call the Server events `AskSlot`, `AskMove` and `AskNext`, the serve
     below runs with authority only, and the server writes what is carried as a record
-    (`record_vars.py`, `weapon_component/record.py`) from which a client's item actors are
-    made (`view.py`). Single player is the same graphs, with authority.
+    (`record_vars.py`; a C++ struct on its own component, written on a frame that changed
+    it) from which a client's item actors are made (`view.py`). Single player is the same
+    graphs, with authority.
+  - **A graph that changes what is carried is followed by `mark_change_sites`**
+    (`combat/dirty.py`) before its compile: it puts `MarkInventoryDirty` behind every
+    write of `Inventory` or `Worn` and every Set of an item's `Slot`, `Loaded`,
+    `Reserve`, `Lit` or `Hot`. Never call the mark by hand, and never write the record's
+    variables from a graph. A check that reads an exec chain's neighbours looks through
+    the marks with `verify/common.py`'s `past_marks` / `before_marks`.
   - **A request is `SlotRequest`** (a number key, Q, Enter on a bag slot in the I panel, a
     click on a slot): a filled slot's item comes to hand, the hand's item going home first
     (the first slot from the primary on that it fits and that is free, the asked slot

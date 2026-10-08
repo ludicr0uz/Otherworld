@@ -17,7 +17,7 @@ from combat.slot_tuning import (
 from combat.ask_consts import ASK_MOVE, ASK_NEXT, ASK_SLOT, FROM_PARAM, SLOT_PARAM, TO_PARAM
 from combat.record_vars import FORCED, NO_ASK, MoveForcedFrom, MoveForcedTo, SlotForced
 from combat.verify.common import (
-    BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, pin_value)
+    BEL, PIN, before_marks, by_pins, cdo, check, in_pins, load, num_pin, pin_value)
 from combat.verify.fixtures import _is_exec, wc_cdo, wg
 from combat.weapon_component.inventory import STARTER_CLASS_VARS
 from combat.weapon_specs import _weapon_specs
@@ -87,7 +87,7 @@ def check_component_slots():
 
 def check_starter_slots():
     sets = [n for n in wg if _title(n) == f"Set {SLOT_VAR}"]
-    begin = [n for n in sets if any("Add" == _title(f) for f in _exec_feeders(n))
+    begin = [n for n in sets if any("Add" == _title(f) for f in before_marks(_exec_feeders(n)))
              and pin_value(n, SLOT_VAR) not in (str(UNPLACED),)
              # a literal: the take-off and the dragged wear write a wired one
              and not _feeders(n, SLOT_VAR)]

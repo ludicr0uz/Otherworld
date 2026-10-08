@@ -282,6 +282,10 @@ def _prepare(map_path):
     before anything is compiled.
     """
     setup_errors = make_writable(_state["writable"]) if _state["writable"] else []
+    # Every probe run audits the inventory's record: a change to what a player
+    # carries that nothing marked is an INVENTORY-RECORD-STALE line, which
+    # fails the run (Scripts/combat/dirty.py, uepylib/game.py).
+    unreal.OtherworldInventoryLibrary.set_inventory_record_audit(True)
     if setup_errors:
         _finish(setup_errors)
         return

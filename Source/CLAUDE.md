@@ -3,7 +3,8 @@
 Two modules and four targets. The runtime module, `Otherworld`, holds what multiplayer
 needs and a Blueprint cannot do (`serversupportsysdesign.md` 4.3): the player's
 predicted movement states (M12), the lag compensation of shots (M22), the server's
-replication graph (A2) and how often a dedicated server poses a body (A4). The editor-only
+replication graph (A2), how often a dedicated server poses a body (A4) and the record of
+what a player carries (A3a). The editor-only
 module, `OtherworldEditor`, holds what the Python builders need and Python cannot reach.
 Everything else stays in the Python builders.
 
@@ -20,6 +21,7 @@ Everything else stays in the Python builders.
 | `Otherworld/Public/OtherworldHitHistory.h`, `Private/….cpp` | `UOtherworldHitHistory`, a world subsystem: on a server with clients, where every character's capsule and physics bodies were, a second back, in two rings of fixed capacity per character (the frames, at most 30 a second; the poses, one per frame that posed the mesh anew), and the rewound trace against them (M22 and A4, below) |
 | `Otherworld/Public/OtherworldServerPose.h`, `Private/….cpp` | `UOtherworldServerPose`, a world subsystem, and `UOtherworldPoseLibrary` (Python: `unreal.OtherworldPoseLibrary`): on a dedicated server alone, how often a body's mesh is posed (every frame near another player, a few times a second further off, twice with nobody near or as a ragdoll: the engine's Update Rate Optimization, whose not-rendered rate it rewrites per body), and every other skinned mesh on the body stopped from ticking (A4; `Scripts/combat/server_pose.py` calls `ThrottleServerPose`, `Scripts/combat/pose_tuning.py` has the numbers, `Scripts/net/CLAUDE.md` the measurements) |
 | `Otherworld/Public/OtherworldShotLibrary.h`, `Private/….cpp` | `UOtherworldShotLibrary` (Python: `unreal.OtherworldShotLibrary`): `ShotTrace`, the pellet's one trace node (`Scripts/uebp/nodes/shot.py`), the rewind a shooter gets, and what the history did, for the probes |
+| `Otherworld/Public/OtherworldInventoryRecord.h`, `Private/….cpp` | What a player carries, as one record (A3a; `Scripts/net/CLAUDE.md`, "The inventory"): `FOtherworldInventoryRecord` (a row per item, a class per worn slot; its own `NetSerialize`, so it travels whole), `UOtherworldInventoryRecordComponent` (holds it on the character: `COND_OwnerOnly`, push-based, one RepNotify; `HandClass`, `HandLit`, `HandHot` `COND_SkipOwner`; reads the weapon component's Blueprint arrays and each item's variables by name, through reflection, and mirrors the record back into the weapon component's `Inv*` variables until A3b), `UOtherworldInventoryRecords` (a world subsystem: each marked record written once, after the actors ticked) and `UOtherworldInventoryLibrary` (Python: `unreal.OtherworldInventoryLibrary`): `MarkInventoryDirty` and `MarkCarriedItemDirty` for the graphs (`Scripts/uebp/nodes/inventory.py`, placed by `Scripts/combat/dirty.py`), and the probes' reads and the audit's switch |
 | `OtherworldEditor/OtherworldEditor.Build.cs` | the editor module's dependencies (adds `UnrealEd`, `BlueprintGraph`); only the Editor target lists it, so no game or server build carries it |
 | `Otherworld/Public/OtherworldLoadLibrary.h`, `Private/….cpp` | `UOtherworldLoadLibrary` (Python: `unreal.OtherworldLoadLibrary`): what the load test reads off a server or a client (A1, `Scripts/probes/probe_net_load.py`): each connection's bytes and packets in and out, open actor channels and lag (`FOtherworldConnectionStats`, read with `get_editor_property`), the frame and world-tick times sampled between `StartFrameTiming` and `StopFrameTiming`, and the hit history's characters and samples |
 | `Otherworld/Public/OtherworldReplicationGraph.h`, `Private/….cpp` | `UOtherworldReplicationGraph` (A2, `Scripts/net/CLAUDE.md` "Relevancy, update rates and dormancy"): the server's replication driver, named for the `IpNetDriver` in `Config/DefaultEngine.ini`. A grid-spatialisation node for everything with a place in the world, an always-relevant list for `bAlwaysRelevant` actors, and `UOtherworldReplicationGraphNode_ForConnection` per connection (the engine's viewer and view target, plus the viewer's PlayerState). Each class's cull distance and period are read off its CDO, which the builders write from `Scripts/net/relevancy_consts.py`; `CellSizeCm` is its one config value |
@@ -145,6 +147,19 @@ numbers, which the fire graph hands `ShotTrace` as pin literals.
     some of the time (seen 2026-10-08: twice not, once so). After each build compare the
     file with `ls -t Binaries/Mac/libUnrealEditor-Otherworld-*.dylib | head -1` and write
     the newest name into it by hand; the open editor keeps the copy it loaded.
+- **Push Model needs four things, and a fifth to be safe** (A3a): the target compiled
+  with it (`bWithPushModel`: an editor target has it, the Client and Server targets set
+  it, the Game target is left at the engine's default, off), the property declared push-based
+  (`DOREPLIFETIME_WITH_PARAMS_FAST`, `bIsPushBased`), `MARK_PROPERTY_DIRTY_FROM_NAME` at
+  every write, and `net.IsPushModelEnabled=1` (`Config/DefaultEngine.ini`). The fifth:
+  `Net.MakeBpPropertiesPushModel=0` beside it, or every Blueprint variable turns
+  push-based and one written by reflection or from Python is never sent, with nothing
+  logged (that emptied every client's inventory view here until it was set). Without the
+  first or the fourth, a push-based property is still sent, by comparison.
+- **A Blueprint variable read or written from C++ is found by name**
+  (`FindFProperty<FArrayProperty>(Class, Name)`, `FScriptArrayHelper`): the record
+  component's names are properties of its template, written by `combat/install.py` from
+  the builders' own constants and checked by `combat/verify/record.py`.
 - **Proving the module is loaded:** `lsof -p <editor pid> | grep Otherworld.*dylib`, or
   `hasattr(unreal, "OtherworldMovementLibrary")` in the editor's Python.
 - **A property for Python:** the component's state is `BlueprintReadOnly` (probes read it

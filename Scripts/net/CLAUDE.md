@@ -313,10 +313,41 @@ of them, plain data (`combat/record_vars.py`):
   world. A load is one `SpawnActor` per row. The character's save and a body's loot
   should hold rows of it, not a second form (a body still holds classes: a looted gun is
   a fresh one).
-- **The server writes it every Tick,** after the slot sync, behind HasAuthority
-  (`weapon_component/record.py`): no graph that changes what is carried has to remember
-  to. Replication compares before it sends, so an unchanged record costs no traffic. The
-  dead gate stops that Tick, so the shed empties the record itself.
+- **The record is one C++ struct, written on a frame that changed it** (A3a):
+  `FOtherworldInventoryRecord` (a row per item: class, slot, loaded, reserve, lit, hot;
+  and a class per worn slot), held by `UOtherworldInventoryRecordComponent` on the
+  character beside the weapon component (`combat/install.py`), sent to the owning client
+  whole (its own `NetSerialize`: a client never holds half of one), with `HandClass`,
+  `HandLit` and `HandHot` for everyone else. Nothing writes it every Tick. The table's
+  variables above are its **mirror** until A3b: the component writes them from the
+  struct in the same frame, they still replicate, and `view.py` still reads them.
+  - **A change site marks, and no graph does it by hand.** A node that writes
+    `Inventory` or `Worn`, or Sets an item's `Slot`, `Loaded`, `Reserve`, `Lit` or
+    `Hot`, is a change site. `combat/dirty.py`'s `mark_change_sites(ed, own)` finds them
+    by what they are and splices `MarkInventoryDirty` (`uebp/nodes/inventory.py`) in
+    behind each, once a graph is whole: the weapon component's 60, the stick's and the
+    blades' own clocks, the ammo pick-up, the HUD's single-player writes. A new graph
+    that changes what is carried needs only that call before its compile;
+    `verify/record.py` fails on a site with no mark.
+  - **The write is after the actors ticked** (`UOtherworldInventoryRecords`, a world
+    subsystem on `OnWorldPostActorTick`), so after the slot sync, once, however many
+    marks the frame made; with authority only, so in single player too, where nothing
+    travels. The shed empties `Inventory` and `Worn`, which marks: the record is written
+    empty that frame whatever the dead gate stops.
+  - **The audit finds what the pass cannot see** (a write from Python or C++, a carried
+    item destroyed in place): with `Otherworld.InventoryRecord.Audit 1`, which
+    `probes/boot.py` sets for every probe run, each unmarked record is compared with the
+    item actors every frame, and a difference is an `INVENTORY-RECORD-STALE` log line
+    naming both. `uepy.py --game` and `--net` count them (the "stale records" column)
+    and fail the run. A probe's own `p.set` of an item's state marks for itself.
+  - **Push Model is on for the record alone** (`Config/DefaultEngine.ini`):
+    `net.IsPushModelEnabled=1` and `Net.MakeBpPropertiesPushModel=0`. With the second
+    left at the engine's default every Blueprint variable becomes push-based, marked by
+    Blueprint Set nodes only, and one written any other way (the mirror, by reflection;
+    a probe, from Python) is silently never sent: that broke the client's whole view
+    until it was set.
+  - **`HandClass` on the component has no RepNotify** (the record's is the one): A3b's
+    view of another player's hand needs its own signal.
 - **A client holds no inventory of its own.** BeginPlay issues the loadout with authority
   only. A client's item actors are a **picture** of the record, local and unreplicated
   (`weapon_component/view.py`): each replicated variable is a RepNotify that raises
@@ -642,9 +673,10 @@ and the owning client's `Worn` is a picture of the record.
 | `AskDrop(SLOT_COUNT + slot)` (a worn garment dragged out of the inventory: M23's ask) | a garment is worn there | set down on the ground, `Dropped`: a replicated actor from its next Tick |
 
 - **The record is one more array, `WornClass`** (`combat/record_vars.py`): a row per slot
-  of `Worn`, the garment's class or none, written by the server every Tick beside the
-  inventory's rows (`record.py`, `_author_worn_record`) and emptied by the shed. Plain
-  data, as the rows are: the character's save writes it as it stands.
+  of `Worn`, the garment's class or none, written by the record component with the
+  inventory's rows on a frame that changed either (the struct's `Worn`; "The inventory",
+  above) and emptied with them at the shed. Plain data, as the rows are: the character's
+  save writes it as it stands.
 - **It replicates to the owning client alone** (`COND_OWNER_ONLY`), as the task asked:
   nothing is drawn worn yet, so nobody else has anything to draw. **The task that draws
   a garment on the body changes the condition** (everyone must see it, as `HandClass`

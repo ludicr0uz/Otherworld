@@ -19,7 +19,7 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 | the test garments on `Lvl_Forest_200m` | this package (`placement.py`) |
 | the slots, `ClothingSlot` on the item, `Worn`/`TakeOffSlot` on the weapon component | `combat/wear_tuning.py` |
 | putting one on, taking one off (the server's: `Scripts/net/CLAUDE.md`, "Clothing") | `combat/weapon_component/wear.py`, `wear_drag.py` (checks: `combat/verify/wear.py`) |
-| what is worn, as the owning client is told it and pictures it | `WornClass` in `combat/record_vars.py`, `weapon_component/record.py`, `view_worn.py` |
+| what is worn, as the owning client is told it and pictures it | `WornClass` in `combat/record_vars.py` (the record component's mirror of its `Worn`: `combat/dirty.py`), `view_worn.py` |
 | the **I** panel, and the character's portrait in it | `graphics_menu/wear_*.py`, `wbp_wear.py` (checks: `graphics_menu/wear_checks.py`); the picture: `item_icons/portrait.py` |
 | the icons | `item_icons/items.py` rows, `python3 Scripts/build_item_icons.py Hat ...` |
 | the base body in boxers, what the garments will be drawn on | `asset_pipeline/player_body.py` `CLOTHING_BASE_BODY` (a `catalog.py` spec); names in `specs.py` `BASE_BODY_*` (checks: `verify/base_body.py`) |

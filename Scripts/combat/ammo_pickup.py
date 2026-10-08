@@ -3,6 +3,7 @@
 
 import unreal
 
+from combat.dirty import OTHER, mark_change_sites
 from combat.glimmer import add_glimmer
 from combat.log import _log
 from net.players import nearest_living_player, player_pin
@@ -256,6 +257,9 @@ def build_ammo_pickup(rebuild=True):
          inv, loop, uses_n, endless_n, finite, counts, done_get, fresh, wants, give,
          item_res_n, shells, richer, store, mark, took_get, took, gone])
 
+    # The rounds it hands a carried gun change what its carrier's record
+    # says (combat/dirty.py).
+    mark_change_sites(ed, OTHER)
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_AmmoPickup failed to compile")

@@ -14,6 +14,13 @@ class CountTest(unittest.TestCase):
         self.assertEqual(counts["NPC spawns"], 1)
         self.assertEqual(counts["blueprint runtime errors"], 0)
 
+    def test_a_stale_inventory_record_is_counted_shown_and_failing(self):
+        text = "LogOtherworldInventory: Warning: INVENTORY-RECORD-STALE: BP_C_0 changed"
+        counts = dict(game.count_patterns(text, game.GAME_PATTERNS))
+        self.assertEqual(counts["stale records"], 1)
+        self.assertIn("stale records", game.FAILING)
+        self.assertEqual(game.notable_lines(text), [text])
+
     def test_notable_lines_are_capped(self):
         text = "\n".join(f"Accessed None {i}" for i in range(40))
         lines = game.notable_lines(text)

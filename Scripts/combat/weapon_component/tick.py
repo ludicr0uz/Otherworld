@@ -42,7 +42,7 @@ from combat.weapon_component.recoil import (
 )
 from combat.weapon_component.slot_moves import _author_slot_keys, _author_slot_serve
 from combat.weapon_component.slot_sync import _author_slot_sync
-from combat.weapon_component.record import _author_record, authority
+from combat.weapon_component.record import authority
 from combat.weapon_component.view import _author_view
 from uebp.g import _G
 from combat.weapon_component.head_hide import _author_head_hide
@@ -464,8 +464,8 @@ def _author_upkeep(ed, flight_exits):
     # --- the slots: requests and drags served, then every item placed --------
     # (slot_moves.py, slot_sync.py): last, so the equip below follows them.
     # The server serves them; a client's items are a picture of the server's
-    # record (view.py), which the server writes once the sync has placed them
-    # (record.py).
+    # record (view.py), which the server writes at the end of a frame that
+    # changed what is carried (combat/dirty.py).
     owns = ed.add_branch_node()
     _connect(authority(_G(ed)), _pin(owns, "Condition"))
     for exit_pin in flight_exits:
@@ -477,8 +477,10 @@ def _author_upkeep(ed, flight_exits):
     worn_exits = _author_wear_request(ed, _author_take_off(ed, [then(owns)]))
     flight_exits = (_author_slot_serve(ed, _author_drop_request(ed, worn_exits))
                     + _author_view(ed, [else_(owns)]))
+    # The record is not written here: what the sync and everything above
+    # changed is marked (combat/dirty.py), and the record component writes
+    # it after the actors ticked, on a frame that changed it.
     flight_exits = _author_slot_sync(ed, flight_exits)
-    flight_exits = _author_record(ed, flight_exits)
 
     # --- refresh -------------------------------------------------------------
     dirty_get = ed.add_get_member_variable_node(WV.NeedsRefresh)

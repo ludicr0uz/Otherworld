@@ -171,6 +171,7 @@ from combat import health_vars as HV  # noqa: E402
 from graphics_menu import hud_vars as MV                          # noqa: E402
 from uebp.vars import declare, defaults                           # noqa: E402
 from combat import settings_vars as SV  # noqa: E402
+from combat.dirty import OTHER, mark_change_sites  # noqa: E402
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -1001,6 +1002,10 @@ def build_hud_blueprint(rebuild=False):
 
     _author_tick(ed, tick)
     _author_draw(ed)
+    # What the HUD changes of what the player carries (the profile's load,
+    # the dev-all-guns cheat: single player's) is marked for the inventory's
+    # record, as the weapon component's own changes are (combat/dirty.py).
+    mark_change_sites(ed, OTHER)
 
     arrange(ed)
     if not BEL.compile_blueprint(bp):

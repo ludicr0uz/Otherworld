@@ -36,9 +36,13 @@ GAME_PATTERNS = (
     ("script warnings", r"LogScript: Warning"),
     ("NPC spawns", r"NPC-SPAWN"),
     ("NPC falls", r"NPC-FELL"),
+    # What a player carries changed and nothing marked its record
+    # (Scripts/combat/dirty.py): logged by the record's audit, which
+    # Scripts/probes/boot.py switches on for every probe run.
+    ("stale records", r"INVENTORY-RECORD-STALE"),
 )
-FAILING = ("blueprint runtime errors", "accessed None")
-NOTABLE = re.compile(r"Blueprint Runtime Error|Accessed None|NPC-FELL")
+FAILING = ("blueprint runtime errors", "accessed None", "stale records")
+NOTABLE = re.compile(r"Blueprint Runtime Error|Accessed None|NPC-FELL|INVENTORY-RECORD-STALE")
 MAX_NOTABLE = 15
 
 

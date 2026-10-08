@@ -159,6 +159,12 @@ class Probe(object):
             return
         obj.set_editor_property(name, value,
                                 unreal.PropertyAccessChangeNotifyMode.NEVER)
+        # A carried item's state written from here is a change no graph made,
+        # so nothing marked its carrier's record (combat/dirty.py): the
+        # probe's write marks it, as a graph's Set would.
+        from combat.record_vars import ITEM_STATE
+        if str(name) in ITEM_STATE and isinstance(obj, unreal.Actor):
+            unreal.OtherworldInventoryLibrary.mark_carried_item_dirty(obj)
 
     def hold(self, wc, index):
         """Bring Inventory[index] to hand, as a number key or a click on its

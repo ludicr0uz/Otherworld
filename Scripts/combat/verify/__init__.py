@@ -101,9 +101,11 @@ and it never relies on a variable another section left behind.
               point and sit on the shotgun, the grip unchanged
   interact    the interact key: its idle state, the probe's press, the reach,
               the ranking by AimPoint, a walk that only remembers
-  record      the inventory's record (M18): what replicates and to whom, the
-              server alone issuing, serving and writing, a client's picture
-              of it (ViewRow, ViewTrim)
+  record      the inventory's record (M18, A3a): what replicates and to whom,
+              the server alone issuing and serving, the C++ component that
+              holds it, no graph writing it, every change site marked (the
+              weapon component's and every other Blueprint's), a client's
+              picture of it (ViewRow, ViewTrim)
   shot        the shot and the reload as server requests (M19): the Server
               events, the pellets traced only in Server_Fire, the owning
               client's prediction off authority, the counters and the view

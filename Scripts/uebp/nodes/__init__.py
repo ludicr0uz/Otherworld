@@ -21,6 +21,9 @@ Scripts/dev/check_node_catalog.py.
               actor was placed in the level, which the take destroys (A2)
   pose.py     the game's own pose library (C++, Source/Otherworld): how often a
               dedicated server poses a body it never draws (A4)
+  inventory.py  the game's own inventory library (C++, Source/Otherworld): a
+              graph's word that what a player carries changed, so the server
+              writes its record that frame (A3a)
   palette.py  palette nodes (events, casts, break/make) and the standard, actor
               and component macros
 """

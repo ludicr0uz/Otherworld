@@ -92,9 +92,15 @@ DATA (constants and pure tables -- no Blueprint authoring)
   slot_tuning       the inventory's slots: the codes (the hand, primary,
                     secondary, pistol, melee, the bag's ten), WeaponKind, the
                     number keys, the issued items' slots, fits()
-  record_vars       the inventory's record (M18): the plain arrays the server
-                    writes and the owning client is sent, HandClass for everyone
-                    else, the view's events, a probe's forced asks
+  record_vars       the inventory's record (M18, A3a): what it is read from
+                    (CARRIED_ARRAYS, ITEM_STATE), the C++ component that holds
+                    it and the names it reads by, the arrays it mirrors to for
+                    the old view, HandClass for everyone else, the view's
+                    events, a probe's forced asks
+  dirty             the marks that have the record written: every node that
+                    changes what a player carries found by what it is, and
+                    MarkInventoryDirty spliced in behind it (mark_change_sites,
+                    called by each builder of such a graph before its compile)
   shot_vars         the shot and the reload as server requests (M19): the events'
                     names, AsksSent / AsksServed (which reconcile a client's
                     predicted rounds), the server's grace on the cooldown

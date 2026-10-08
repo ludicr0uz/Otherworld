@@ -25,8 +25,8 @@ from combat.paths import (
 )
 from combat.verify.chop import _branches_on, _pure_feeds, _ran_by, _spawns, _squash
 from combat.verify.common import (
-    BEL, PIN, by_pins, cdo, check, component_template, has_in_pin, load, num_pin,
-    out_pins, pin_value,
+    BEL, PIN, before_marks, by_pins, cdo, check, component_template, has_in_pin, is_mark,
+    load, num_pin, out_pins, pin_value,
 )
 from combat.verify.fixtures import w, wg
 from combat.verify.grip_fit import (
@@ -241,7 +241,7 @@ def check_light_strike(press):
                                            for p in BEL.list_input_pins(l)}
                                 for l in _ran_by(has[0])),
           str([_title(l) for h in has for l in _ran_by(h)]))
-    burnt = [n for n in wg if removes[0] in _ran_by(n)]
+    burnt = [n for n in wg if not is_mark(n) and removes[0] in before_marks(_ran_by(n))]
     check("...and destroys it, not the matches",
           len(burnt) == 1 and "destroy" in _squash(burnt[0])
           and [_title(f) for f in _feeders(burnt[0], "self")] == [f"Get {LIGHT_WOOD_VAR}"],

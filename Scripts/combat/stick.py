@@ -60,6 +60,7 @@ from uebp.nodes.actor import FN_SET_VISIBILITY
 from uebp.nodes.math import FN_AND, FN_GE_FF, FN_NOT
 from uebp.nodes.system import FN_IS_SERVER, FN_TIME_SECONDS
 from combat import item_vars as IV
+from combat.dirty import ITEM, mark_change_sites
 
 
 STICK_MESH = "/Game/Sourced/Quaternius/Survival/SM_WoodenTorch"
@@ -184,6 +185,9 @@ def build_stick(item_bp, rebuild=True):
         raise RuntimeError(f"{STICK_BP_PATH} failed to compile")
     # This Tick overrides BP_WeaponItem's, so the glimmer is authored again.
     author_glimmer(ed, _author_burn(ed, tick))
+    # Going out by its own clock changes what its carrier's record says
+    # (combat/dirty.py).
+    mark_change_sites(ed, ITEM)
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{STICK_BP_PATH} failed to compile")

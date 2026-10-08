@@ -19,6 +19,8 @@ from combat.hit_zones import install_hit_zones, make_shootable
 from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH, NPC_CLASS_PATH
 from combat.player_move import reparent_player, set_move_numbers
 from combat.player_pace import set_jog_speed
+from combat.record_vars import (
+    RECORD_COMPONENT, RECORD_COMPONENT_CLASS, RECORD_HAND_SLOT, RECORD_MIRROR, RECORD_SOURCE)
 from combat.weapon_component.stance import allow_crouch
 from net import relevancy
 from net.relevancy_consts import CHARACTER
@@ -44,6 +46,22 @@ def _uninstall_old_shotgun(bp):
         _log(f"removed the old welded shotgun: {sorted(present)}")
 
 
+def install_record(bp):
+    """The component that holds the inventory's record (C++; task A3a), beside
+    the weapon component it reads, told the names it reads by and mirrors to
+    (combat/record_vars.py). It replicates by its own constructor."""
+    cls = unreal.load_class(None, RECORD_COMPONENT_CLASS)
+    if not cls:
+        raise RuntimeError(f"{RECORD_COMPONENT_CLASS} is not loaded: compile the "
+                           "Otherworld module (Source/CLAUDE.md)")
+    template = _component_object(_add_component(bp, _root_handle(bp), cls, RECORD_COMPONENT))
+    for prop, name in {**RECORD_SOURCE, **RECORD_MIRROR}.items():
+        template.set_editor_property(prop, name)
+        if str(template.get_editor_property(prop)) != name:
+            raise RuntimeError(f"{RECORD_COMPONENT}.{prop} did not take {name!r}")
+    template.set_editor_property(*RECORD_HAND_SLOT)
+
+
 def install_on_character(health_bp, weapon_bp, footstep_bp):
     eas = _assets()
     bp = eas.load_asset(CHARACTER_BP_PATH)
@@ -52,13 +70,15 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     # First: it recompiles the Blueprint, and component handles do not outlive that.
     reparent_player(bp)
     _uninstall_old_shotgun(bp)
-    _drop_components(bp, {"HealthComponent", "WeaponComponent", "FootstepComponent"})
+    _drop_components(bp, {"HealthComponent", "WeaponComponent", "FootstepComponent",
+                          RECORD_COMPONENT})
     handles = {}
     for name, source in (("HealthComponent", health_bp),
                          ("WeaponComponent", weapon_bp),
                          ("FootstepComponent", footstep_bp)):
         handles[name] = _add_component(bp, _root_handle(bp),
                                        BEL.generated_class(source), name)
+    install_record(bp)
     # Symmetry, and forward planning: the player carries health too, so anything
     # that shoots back later needs to be able to hit them -- and hit them in
     # the head. (The wanderers' punch is not a trace and stays a body hit.)
@@ -82,7 +102,8 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     eas.save_loaded_asset(bp)
-    _log("player: HealthComponent + WeaponComponent + FootstepComponent installed")
+    _log("player: HealthComponent + WeaponComponent + FootstepComponent + "
+         f"{RECORD_COMPONENT} installed")
 
 
 def install_on_npc(health_bp, footstep_bp):

@@ -15,7 +15,8 @@ level's destroyed.
 from combat import item_vars as IV
 from combat.slot_tuning import HAND, HAND_FROM_VAR, HAS_ROOM_VAR, SLOT_VAR, WEAPON_KIND_VAR
 from combat.strike_vars import ITEM_PARAM, SERVER_TAKE, TAKE_REACH_CM
-from combat.verify.common import BEL, by_pins, check, graph, in_pins, num_pin, pin_value
+from combat.verify.common import (
+    BEL, before_marks, by_pins, check, graph, in_pins, num_pin, past_marks, pin_value)
 from combat.verify.fixtures import wc, wg
 from combat.verify.interact import _exec_from, _reads, _sources, _then, _title
 from combat.verify.punch import _feeds
@@ -203,9 +204,10 @@ def check_lodged_to_hand():
           "tree or a body), after the take set it UNPLACED",
           len(gates) == 1 and gates[0][1] == "then" and len(asked) == 1
           and _title(asked[0]) == f"Get {IV.Lodged}"
-          and [_title(n) for n, _pin in _exec_from(gates[0][0])] == [f"Set {SLOT_VAR}"],
+          and [_title(n) for n in before_marks([n for n, _pin in _exec_from(gates[0][0])])]
+          == [f"Set {SLOT_VAR}"],
           f"{len(gates)} gate(s)")
-    froms = [n for n in _then(hands[0])]
+    froms = past_marks(_then(hands[0]))
     check(f"...{HAND_FROM_VAR} its {WEAPON_KIND_VAR}: the melee slot's key puts it away",
           len(froms) == 1 and _title(froms[0]) == f"Set {HAND_FROM_VAR}"
           and [_title(f) for f in _sources(froms[0], HAND_FROM_VAR)]

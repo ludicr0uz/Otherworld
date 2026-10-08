@@ -23,7 +23,10 @@ Scripts/net/CLAUDE.md has the conventions and the traps.
 
   runner      the pure driver: advances probe generators on a clock, records checks
   context     Probe, the object a probe is handed: checks plus the game helpers
-  boot        in-game entry (init_unreal.py calls it when UEPY_PROBES is set)
+  boot        in-game entry (init_unreal.py calls it when UEPY_PROBES is set);
+              switches on the inventory record's audit for every run, so a
+              change to what a player carries that nothing marked fails it
+              (INVENTORY-RECORD-STALE: Scripts/combat/dirty.py)
   kept_slots  the tuning tabs' save slots, set aside for a run and put back
   net         a network run: which process this is (Where), RUNS_ON, the shared board
   bots        the load test's bots (uepy.py --net --bots N): the server's stand-ins for

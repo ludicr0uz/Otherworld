@@ -12,7 +12,7 @@ from combat import item_vars as IV
 from combat.item_world import AWAKE, DORMANT
 from combat.paths import (
     AXE_BP_PATH, CHARACTER_BP_PATH, ITEM_BP_PATH, KNIFE_BP_PATH, STICK_BP_PATH, WOOD_BP_PATH)
-from combat.verify.common import check, graph, load, pin_value
+from combat.verify.common import before_marks, check, graph, load, pin_value
 from combat.verify.fixtures import wg
 from combat.verify.record import _title, _upstream
 from combat.verify.world_items import _data_upstream
@@ -86,7 +86,8 @@ def check_wakes():
     for path, var in ((STICK_BP_PATH, "Lit"), (KNIFE_BP_PATH, "Hot"), (AXE_BP_PATH, "Hot")):
         nodes = list(graph(load(path)).list_all_nodes())
         woke = [n for n in _flushes(nodes)
-                if any(_title(u) == f"Set {var}" for u in _sources(n, "execute"))]
+                if any(_title(u) == f"Set {var}"
+                       for u in before_marks(_sources(n, "execute")))]
         check(f"{path.rsplit('/', 1)[-1]}: {var} lowered on the server's clock sends the "
               "lying item once more", len(woke) == 1, f"{len(woke)} flush(es)")
 

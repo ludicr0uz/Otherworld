@@ -93,6 +93,7 @@ from combat.weapon_component.look import author_set_look, replicate_look
 from combat.weapon_component.look_vars import TABLE as LOOK_TABLE
 from combat.record_vars import TABLE as RECORD_TABLE
 from combat.weapon_component.record import replicate_record
+from combat.dirty import CARRIER, mark_change_sites
 from combat.weapon_component.view import author_view_events
 from combat.weapon_component.view_worn import author_view_worn_event
 from combat.weapon_component.consume import author_consume_event
@@ -386,6 +387,11 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     author_loot_take(ed)
     author_ask_save_exit(ed)
 
+    # Every node above that changes what is carried is followed by the mark
+    # that has the record written (combat/dirty.py): last, once the graph is
+    # whole.
+    sites = mark_change_sites(ed, CARRIER)
+    _log(f"BP_WeaponComponent: {len(sites)} change sites marked for the record")
     _post_physics_tick(bp)
     arrange(ed)
     if not BEL.compile_blueprint(bp):

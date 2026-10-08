@@ -240,9 +240,9 @@ class ReportTest(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(lines[0].split(),
                          ["process", "joins", "bp", "errors", "accessed", "None", "net", "failures",
-                          "corrections"])
-        self.assertEqual(lines[1].split(), ["server", "2/2", "0", "0", "0", "0"])
-        self.assertEqual(lines[3].split(), ["client", "2", "1/1", "0", "0", "0", "0"])
+                          "stale", "records", "corrections"])
+        self.assertEqual(lines[1].split(), ["server", "2/2", "0", "0", "0", "0", "0"])
+        self.assertEqual(lines[3].split(), ["client", "2", "1/1", "0", "0", "0", "0", "0"])
         self.assertIn("[probe] ok    p @ server  1/1 checks passed", lines)
         self.assertIn("[probe] ok    p @ client 2  1/1 checks passed", lines)
 
@@ -261,9 +261,19 @@ class ReportTest(unittest.TestCase):
                             "LogNet: Warning: Network Failure: GameNetDriver[ConnectionLost]\n")
         lines, ok = net_report.summary(reports, 2)
         self.assertFalse(ok)
-        self.assertEqual(lines[2].split(), ["client", "1", "1/1", "1", "1", "1", "0"])
-        self.assertEqual(lines[1].split(), ["server", "2/2", "0", "0", "0", "0"])
+        self.assertEqual(lines[2].split(), ["client", "1", "1/1", "1", "1", "1", "0", "0"])
+        self.assertEqual(lines[1].split(), ["server", "2/2", "0", "0", "0", "0", "0"])
         self.assertEqual(sum(1 for l in lines if l.startswith("  | client 1: ")), 2)
+
+    def test_a_stale_inventory_record_fails_it(self):
+        # The record's audit (Scripts/combat/dirty.py): a change nothing marked.
+        reports = self.clean()
+        reports[0].text += ("LogOtherworldInventory: Warning: INVENTORY-RECORD-STALE: "
+                            "BP_C_0 changed with no MarkDirty.\n")
+        lines, ok = net_report.summary(reports, 2)
+        self.assertFalse(ok)
+        self.assertEqual(lines[1].split(), ["server", "2/2", "0", "0", "0", "1", "0"])
+        self.assertEqual(sum(1 for l in lines if l.startswith("  | server: ")), 1)
 
     def test_corrections_are_counted_and_fail_nothing(self):
         # A probe says how many a run may have; the report only counts them.
@@ -273,7 +283,7 @@ class ReportTest(unittest.TestCase):
         lines, ok = net_report.summary(reports, 2)
         self.assertTrue(ok)
         self.assertEqual(lines[0].split()[-1], "corrections")
-        self.assertEqual(lines[3].split(), ["client", "2", "1/1", "0", "0", "0", "2"])
+        self.assertEqual(lines[3].split(), ["client", "2", "1/1", "0", "0", "0", "0", "2"])
 
     def test_a_process_that_died_fails_it(self):
         reports = self.clean()

@@ -22,6 +22,9 @@ NET_PATTERNS = (
     ("bp errors", r"Blueprint Runtime Error"),
     ("accessed None", r"Accessed None"),
     ("net failures", r"Network Failure|Travel Failure|LogNet: Error"),
+    # The inventory record's audit (Scripts/combat/dirty.py): something
+    # changed what a player carries and did not mark the record.
+    ("stale records", r"INVENTORY-RECORD-STALE"),
 )
 # Counted and shown, never a failure by itself: a correction is the server
 # pulling a client back onto its own answer (rubber-banding when the client

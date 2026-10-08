@@ -48,6 +48,40 @@ def has_in_pin(node, name):
     return bool(pin) and pin.is_valid()
 
 
+# The calls that have the inventory's record written (combat/dirty.py): one
+# stands behind every node that changes what a player carries, so a check
+# that reads a chain's neighbours looks through them.
+RECORD_MARKS = ("MarkInventoryDirty", "MarkCarriedItemDirty")
+
+
+def is_mark(node):
+    return str(BEL.get_node_title(node)).replace("\n", " ").replace(" ", "") in RECORD_MARKS
+
+
+def _through(nodes, pins):
+    found = []
+    for n in nodes:
+        if not is_mark(n):
+            found.append(n)
+            continue
+        found += _through([PIN.get_owning_node(q) for p in pins(n)
+                           if "exec" in str(PIN.get_pin_type_display_string(p)).lower()
+                           for q in PIN.list_connected_pins(p)], pins)
+    return found
+
+
+def past_marks(nodes):
+    """``nodes`` (what an exec output runs), a record mark among them replaced
+    by what it runs in turn."""
+    return _through(nodes, BEL.list_output_pins)
+
+
+def before_marks(nodes):
+    """``nodes`` (what runs an exec input), a record mark among them replaced
+    by what runs it."""
+    return _through(nodes, BEL.list_input_pins)
+
+
 def by_pins(nodes, *required):
     want = {r.replace(" ", "") for r in required}
     return [n for n in nodes if want <= in_pins(n)]

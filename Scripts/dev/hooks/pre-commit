@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# pre-commit -- keep the repository code only.
+# pre-commit -- keep assets out of plain git (Git LFS files pass).
 #
 # Installed by pointing git at this directory, which is tracked, so the guard
 # travels with the clone instead of living in one machine's .git:
@@ -32,6 +32,9 @@ files=$(git diff --cached --name-only --diff-filter=AM -z | tr '\0' '\n')
 printf '%s\n' "$files" | while IFS= read -r f; do
     [ -z "$f" ] && continue
     [ -f "$f" ] || continue
+
+    # Git LFS commits a pointer, not the bytes: Content/ lives there.
+    [ "$(git check-attr filter -- "$f" | sed 's/.*: //')" = lfs ] && continue
 
     ext=$(printf '%s' "$f" | tr 'A-Z' 'a-z' | sed -n 's/.*\.\([a-z0-9]*\)$/\1/p')
     if printf '%s' "$ext" | grep -qE "^($BLOCKED)$"; then

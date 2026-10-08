@@ -93,10 +93,12 @@ sessions tens of millions of tokens.
 before each job, and the entry points purge their own packages. An editor started before that
 change needs its inbox hot-reloaded (see below).
 
-## The repository is code only
+## `Content/` is a Git LFS snapshot
 
-**Nothing under `Content/` is committed except `Content/Python`.** Every asset is either stock
-engine content or written by a script. `forest_generator/asset_sources.py` maps each `Content/`
+**`Content/` is committed through Git LFS** (`.gitattributes`: every `.uasset` and `.umap` under
+it), so a clone opens without a rebuild. A fresh clone needs `git lfs install` once. The scripts
+stay the source: every asset is either stock engine content or written by a script, and a rebuilt
+asset is committed like any other change. `forest_generator/asset_sources.py` maps each `Content/`
 directory to whatever produces it:
 
 | kind | restored by | verified by |
@@ -149,7 +151,8 @@ Official models, animations and Megascans come from Fab through the Fab plugin
 **Everything that isn't code goes in git-ignored `assets/`.** Never commit an archive: GitHub
 rejects files over 100 MB. After a fresh clone, arm the guard:
 `git config core.hooksPath Scripts/dev/hooks`. The pre-commit hook refuses files over 5 MB and
-content extensions (override with `--no-verify`).
+content extensions unless Git LFS tracks them (override with `--no-verify`); the pre-push hook
+beside it uploads the LFS objects.
 
 ## Run a script — fast
 

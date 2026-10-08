@@ -44,25 +44,21 @@ Thumbs.db
 # project did not write itself live here, and none of it is committed --
 # Scripts/forest_generator/asset_sources.py records where each one comes from
 # and Scripts/sync_assets.py puts it back.
-assets/
+/assets/
 
 # Python caches
 __pycache__/
 *.pyc
 
-# ── Code-only repository ─────────────────────────────────────────────────────
+# ── Content/ is a Git LFS snapshot ───────────────────────────────────────────
 #
-# Nothing under Content/ is committed. Every .uasset in this project is either
-# stock engine content or written by a script in Scripts/, and
-# Scripts/forest_generator/asset_sources.py records which is which:
+# Content/ is committed through Git LFS (.gitattributes), so a clone can open
+# the project without rebuilding it. The scripts in Scripts/ are still what
+# write every asset, and Scripts/forest_generator/asset_sources.py records
+# which script writes which directory:
 #
 #     python3 Scripts/sync_assets.py --status    what is present
 #     python3 Scripts/sync_assets.py --plan      how to rebuild it from nothing
-#
-# The exception is Content/Python, which the engine auto-discovers at start-up
-# and which is Python, not assets.
-Content/*
-!Content/Python/
 Content/Python/__pycache__/
 
 # Generator sidecars: megabytes apiece, and fully determined by the seed.

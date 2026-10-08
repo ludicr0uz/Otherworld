@@ -1538,9 +1538,11 @@ harness (`uepy.py --net --clients 2 --bots N --probe Scripts/probes/probe_net_lo
     branch, authored by `combat/gas_locomotion.py` and checked by
     `combat/verify/gas_locomotion.py`: a server takes the pose from before Foot Placement
     and Leg IK (the sample's ground traces under the feet) and keeps the search, the
-    lean, the aim offset, the root's offset and the pose history. The graph above
-    (`ABP_Unarmed` with the player's layers) is still built and checked, and is what G4
-    brings over. The motion matching reads the CharacterMovementComponent on each
+    lean, the aim offset, the root's offset and the pose history. The player's
+    layers (the graph above, with an Input Pose where the state machine was) are a
+    second anim blueprint linked into it on both arms since G4, with the branch above
+    as its own (`combat/weapon_layers.py`; `Scripts/combat/CLAUDE.md`, "The weapon
+    layers"): a server poses the stance, the aim and the flinch, and skips FullBodySlot. The motion matching reads the CharacterMovementComponent on each
     machine, so a simulated copy and the server's are animated with nothing replicated
     for it (`probes/probe_net_gas_locomotion.py`).
 - **A shot's impacts are one Multicast** ("Everyone sees and hears the fight" above),

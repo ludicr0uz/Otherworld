@@ -69,6 +69,9 @@ def patch_gait(skin):
     if skin.anim_bp.startswith(STOCK_DIR):
         _log("player gait: the mannequin's anim Blueprint is left in cm/s")
         return
+    if skin.gas:
+        _log("player gait: the motion matching has no blend space to scale a speed for")
+        return
     bp = _assets().load_asset(skin.anim_bp)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     setter, feeders = speed_feeders(ed)

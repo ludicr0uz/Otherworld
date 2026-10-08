@@ -28,8 +28,7 @@ from uebp.graph import BEL, _connect, _node, _palette, _pin, else_, out, then
 from combat.skin import player_skin
 from combat.support_hand import SUPPORT_HAND_VAR, SUPPORT_POINT_VAR
 from combat.weapon_component.pose_weights import HELD_SUPPORT_POINT
-from combat.weapon_component.sight_pitch import _anim_class_path
-from uebp.nodes.actor import FN_ANIM_INSTANCE
+from combat.weapon_component.sight_pitch import _anim_class_path, _anim_instance
 from uebp.nodes.system import FN_IS_DEDICATED_SERVER
 from combat.weapon_component import vars as WV
 
@@ -48,7 +47,7 @@ def _author_support_hand(ed, exec_ins):
         return n
 
     mesh = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
-    anim = keep(_node(ed, FN_ANIM_INSTANCE))
+    anim = keep(_anim_instance(ed, player_skin()))
     _connect(out(mesh, WV.OwnerMesh), _pin(anim, "self"))
     cast = keep(_palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2]))
     _connect(out(anim), _pin(cast, "Object"))

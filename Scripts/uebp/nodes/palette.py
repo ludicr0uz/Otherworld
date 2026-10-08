@@ -34,6 +34,15 @@ NODE_TO_LOCAL = "Animation|ConvertSpaces|ComponentToLocal"
 NODE_TWO_BONE_IK = "Animation|SkeletalControls|TwoBoneIK"
 # Blend Poses by bool: BlendPose_0 while bActiveValue is true, BlendPose_1 while false.
 NODE_BLEND_BY_BOOL = "Animation|Blends|BlendPosesbybool"
+NODE_LAYERED_BLEND = "Animation|Blends|Layeredblendperbone"
+# A montage slot. Only a registered slot has an entry: a new one is this node
+# renamed (combat/anim_blueprint._name_slot).
+NODE_SLOT_DEFAULT = "Animation|Montage|Slot'DefaultSlot'"
+# The pose a linked anim graph is handed (combat/weapon_layers.py). The node
+# that links one in is named for the anim Blueprint it links:
+# "Animation|LinkedAnimGraphs|<Blueprint>-LinkedAnimGraph", there while that
+# Blueprint is loaded and on the same skeleton.
+NODE_INPUT_POSE = "Animation|LinkedAnimGraphs|InputPose"
 
 NODE_BREAK_HIT = "Collision|BreakHitResult"
 

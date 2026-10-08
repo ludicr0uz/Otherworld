@@ -87,7 +87,12 @@ def probe(p):
 
     _place(npc, player)
     # The slot's weight follows on the next anim update, not on the play.
-    yield 0.1
+    # Asked for as soon as it is there, not a fixed wait later: the wanderer
+    # stood in front swings back, and its blow's flinch stops the punch's
+    # montage (all the slots share one montage group: docs/health.md).
+    asked = unreal.GameplayStatics.get_time_seconds(world)
+    yield lambda: (anim.is_slot_active(AIM_SLOT)
+                   or unreal.GameplayStatics.get_time_seconds(world) - asked > 0.1)
     p.check("...which takes the upper body", anim.is_slot_active(AIM_SLOT))
     yield lambda: not p.get(wc, PUNCH_PENDING_VAR)
     after = p.get(health, "Health")

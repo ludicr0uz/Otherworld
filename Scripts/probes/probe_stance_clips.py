@@ -70,7 +70,7 @@ def probe(p):
         "visibility_based_anim_tick_option",
         unreal.VisibilityBasedAnimTickOption.ALWAYS_TICK_POSE_AND_REFRESH_BONES,
         unreal.PropertyAccessChangeNotifyMode.NEVER)
-    anim = mesh.get_anim_instance()
+    anim = p.pose_instance(mesh)
     # The gun is held up, as an aim key holds it (no key can be injected): at
     # rest, standing or crouched, it is carried lowered. Prone keeps it up.
     p.set(wc, RAISE_FORCED_VAR, True)

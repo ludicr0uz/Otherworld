@@ -111,6 +111,16 @@ def check_player_gait():
         unreal.log_warning("[VERIFY] player gait: the mannequin's anim "
                            "Blueprint, left in cm/s")
         return
+    if skin.gas:
+        # No blend space: the motion matching picks the clip by the pace
+        # itself, and the weapon layers' GroundSpeed only asks "moving?".
+        ed = BGE.get_graph_editor_by_name(load(skin.anim_bp), "EventGraph")
+        _setter, feeders = speed_feeders(ed)
+        check("the weapon layers' GroundSpeed is the pawn's speed over the ground, in "
+              "cm/s: nothing scales it (the motion matching has no blend space)",
+              len(feeders) == 1 and not is_scale_node(feeders[0]),
+              str([str(BEL.get_node_title(n)) for n in feeders]))
+        return
     ed = BGE.get_graph_editor_by_name(load(skin.anim_bp), "EventGraph")
     _setter, feeders = speed_feeders(ed)
     scales = [n for n in feeders if is_scale_node(n)]

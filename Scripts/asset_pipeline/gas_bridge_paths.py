@@ -35,3 +35,13 @@ ABP_RETARGET_UEFN = f"{SOURCED_DIR}/ABP_MetaHuman_Retarget_UEFN"
 ABP_GAS_IDLE = f"{SOURCED_DIR}/ABP_GasIdle"
 # Its variable, which the sequence player reads its clip from.
 IDLE_VAR = "IdleClip"
+
+# The game's own clips on this skeleton (retarget_to_uefn.py): what the weapon
+# layers play over the motion matching.  The name the folders and the clips
+# carry is the player mesh's, less its SKM_: combat/hit_reaction.hit_reactions
+# finds a body's flinches by its mesh's name.
+PLAYER_FAMILY = PLAYER_MESH_GAS.rsplit("/SKM_", 1)[1]
+RTG_UEFN_FROM_MANNEQUIN = f"{SOURCED_DIR}/RTG_UEFN_from_Mannequin"
+# The mannequin the player wore before the bridge: the mesh those clips were
+# seen on, and so the one they are read off.
+CLIPS_FROM_MESH = SOCKETS_FROM

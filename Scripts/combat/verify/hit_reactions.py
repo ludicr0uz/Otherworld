@@ -6,6 +6,7 @@ import math
 
 import unreal
 
+from asset_pipeline.gas_bridge_paths import PLAYER_FAMILY
 from combat.anim_blueprint import FULL_BODY_SLOT, HIT_SLOT
 from combat.hit_reaction import (
     HIT_ANIM_FALLBACK_DIR, HIT_ANIM_ROOT, HIT_DIR_BACK, HIT_DIR_FRONT,
@@ -134,8 +135,11 @@ def check_flinching():
         for clip in HIT_REACTION_CLIPS:
             seq = load(f"{HIT_ANIM_ROOT}/{_family}/A_{_family}_{clip}")
             if seq:
-                _turns[clip] = _clip_motion(seq, "Hips", "Spine", "Head",
-                                            _mesh_fwd, _mesh_right)[2]
+                # A generated body's bones, or the mannequin's on the player's
+                # UEFN one (asset_pipeline/retarget_to_uefn.py).
+                _bones = (("pelvis", "spine_05", "head") if _family == PLAYER_FAMILY
+                          else ("Hips", "Spine", "Head"))
+                _turns[clip] = _clip_motion(seq, *_bones, _mesh_fwd, _mesh_right)[2]
         check(f"{_family}: all six flinches retargeted, none turning the chest past 60 deg",
               len(_turns) == 6 and max(_turns.values()) < 60.0,
               ", ".join(f"{c[12:]} {t:.0f}" for c, t in _turns.items()))

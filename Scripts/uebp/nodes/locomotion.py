@@ -19,6 +19,7 @@ FN_INT_TO_BYTE = "/Script/Engine.KismetMathLibrary.Conv_IntToByte"
 
 NODE_BREAK_FLOOR = "Utilities|Struct|BreakFindFloorResult"
 NODE_EVENT_INIT_ANIM = "AddEvent|EventBlueprintInitializeAnimation"
+NODE_EVENT_UPDATE_ANIM = "AddEvent|EventBlueprintUpdateAnimation"
 
 # The sample's own (/Game/GAS/Blueprints/Data): in the palette while loaded.
 NODE_MAKE_CHARACTER_PROPERTIES = "Utilities|Struct|MakeSCharacterPropertiesforAnimation"

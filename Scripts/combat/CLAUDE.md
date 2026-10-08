@@ -716,25 +716,10 @@ another player's copy and the server's).
   mannequin on the patched `ABP_Unarmed` again after a weapons build, with nothing else to
   change. A checkout without the sample (or without `build_gas_bridge.py`'s assets) wears
   the mannequin too, and says so.
-- **Two skins since G3** (`skin.py`): `player_skin()` is the rig the weapon layers, the
-  poses, the grips and the clips are keyed on (the mannequin and `ABP_Unarmed`, still
-  built and verified as before); `worn_skin()` is what the Mesh component wears
-  (`SKM_UEFN_Player` and the sample's anim Blueprint). Ask `worn_skin()` only about the
-  body that is on the character; everything about a pose or a layer asks `player_skin()`.
-  A probe finds the worn row with `skin_of_mesh` (`SKIN_GAS`). G4 makes them one again.
-- **The weapon, hold, aim, stance and hit-reaction layers are off the body until G4**
-  (`WEAPON_LAYERS = False`). They are not deleted: every builder still runs, into
-  `ABP_Unarmed`, which the wanderers run and the player no longer does. On the worn graph
-  the flag takes the sample's one montage slot (`DefaultSlot`, full body there) out of
-  the pose line, so nothing the weapon component plays reaches the body; the weapon
-  component's writes of `AimPitch`, the pose weights and the support hand cast to
-  `ABP_Unarmed`'s class and fail quietly on the player. Montages still run their clocks.
-  **Probes that read those poses fail until G4**: `probe_throw` (2 of 29: the ready
-  pose and the clip in the slot), `probe_corpse_loot` (the kneel's `PoseKneel`),
-  `probe_carry` (4 of 22: the gun does not come up, and a lowered gun's shot starts
-  69-99 cm from its muzzle, since `CARRY_GRIP` is where the old jog held the hand),
-  and by the same cause `probe_hold_poses`, `probe_sight_hands`,
-  `probe_shotgun_hands`, `probe_shotgun_thumb`, `probe_stance_clips` (not run in G3).
+- **One skin** (`skin.py`): `player_skin()` is `SKIN_GAS`, the UEFN mannequin. Its
+  `anim_bp` is the graph the layers, the slots and the pose variables are in
+  (`ABP_WeaponLayers`, below); `base_anim_bp` (`worn_anim_bp`) is what the Mesh component
+  runs, the sample's. A probe finds the row with `skin_of_mesh`.
 - **The anim Blueprint is patched where it lies, not copied.** The sample's choosers take
   an object of `SandboxCharacter_CMC_ABP_C` and of no other class: a duplicate ran, read
   the character correctly and was handed no database (`LogChooser: Error: ... ContextData
@@ -789,6 +774,69 @@ another player's copy and the server's).
   At 32 bots the server's world tick was 26.4 ms mean, 111.5 p99 (one client, a 45 s
   window, an editor open: A4's own figure was 25.3 / 87.0 with the editor closed), so
   the search itself did not show in the mean.
+
+## The weapon layers (G4, 2026-10-08)
+
+Everything a weapon, a stance or a hit does to the player's body is a second anim
+Blueprint on the sample's skeleton, `ABP_WeaponLayers` (`/Game/Sourced/MetaHuman`), linked
+into the motion-matching one by a Linked Anim Graph node after Remap Curves.
+`weapon_layers.py` authors its start (an Input Pose, the three slots), `gas_locomotion.py`
+the link, `weapon_layers_consts.py` holds the picture and the names,
+`verify/weapon_layers.py` and `verify/gas_locomotion.py` check them.
+
+- **Its graph has `ABP_Unarmed`'s shape, with an Input Pose where the state machine was**,
+  so `aim_pitch.py`, `body_pose.py`, `support_hand.py`, `stance_clips.py` and
+  `server_anim.py` run on it as written, each on `skin.anim_bp`, and so do their
+  verifiers. The sample's graph was not patched for them: it has component-space
+  conversions, blends and a root of its own that those builders would have taken for
+  theirs. The upper body is a layered blend per bone from `spine_01`, as it was: the
+  sample's graph has no AnimationLayering slot (its one montage slot is full body, and is
+  out of the pose line).
+- **The link is after the root's offset.** The aim's blend is in mesh space, so an aimed
+  chest faces where the capsule does; before Offset Root Bone it would face where the
+  lagging root does (the sample turns in place). It is before the feet and the pose
+  history, and on both arms of the base's server branch: the layers move the hit bodies
+  and the muzzle, and the layer graph has A4's branch of its own (a server skips
+  FullBodySlot), which is the one `verify/server_anim.py` checks for the player.
+- **The pose variables are on the linked instance, not the mesh's own.** A graph gets it
+  with `GetLinkedAnimGraphInstanceByTag(LAYERS_TAG)` on the mesh
+  (`weapon_component/sight_pitch._anim_instance`: the four writers, `sight_pitch`,
+  `pose_weights`, `support_hand`, `look`), a probe with `p.pose_instance(mesh)`. Montages
+  and slot questions (`PlaySlotAnimationAsDynamicMontage`, `IsSlotActive`,
+  `IsPlayingSlotAnimation`) stay on the mesh's own instance: the layer class has
+  `bUseMainInstanceMontageEvaluationData`, so its slots play the main instance's montages.
+- **A linked graph's tag is the graph node's `tag`**, not the inner struct's (`Tag` there
+  is a deprecated field Python calls protected).
+- **A clip belongs to one skeleton**, so the layers' clips are copies on
+  `SK_UEFN_Mannequin` (`asset_pipeline/retarget_to_uefn.py`: the two ready poses, the
+  punch and the six flinches off the mannequin, the crouch, crawl, kneel and throw off
+  Quaternius's own rig; `SKIN_GAS` names them), and the poses the build keys (the hold
+  poses, the shotgun's, the throw's, the slash) are keyed on that skeleton from them and
+  from the sample's idle.
+- **No clip played into a slot may have root motion** (`hold_pose.in_place`,
+  `verify/weapon_layers.py`). A montage of a clip with the flag on takes the character's
+  movement over. The sample's clips have it on, the hold poses are copies of its idle,
+  and a hold pose is a looping montage: with the knife or the axe out the player could
+  not walk. The mannequin's punch has it on too (150 cm forward), so until G3 a punch
+  carried the player forward; its copy here is in place, flag off.
+- **The body is 10 cm shorter than the mannequin** and the ready poses are retargeted
+  chain to chain, so the fist of a ready pose is 11-14 cm nearer and 14-19 cm lower in the
+  capsule's frame (`carry_tuning.CARRY_GRIP`, re-measured) and the sights' view with it.
+  The shotgun's grip thumb is laid for this hand (`shotgun_pose.SHOTGUN_THUMBS`).
+- **A body on another skeleton re-creates the hold poses** (`A_HoldItem` and the rest
+  are deleted and keyed again: `hold_pose._copy_of`), and every item Blueprint outside
+  this package that names one is left holding nothing: run `build_survival.py` and
+  `build_clothing.py` after the weapons build (their verifiers say so: "is carried in
+  A_HoldItem").
+- **Probes that share a game disturb each other** more than they did (the dev-all-guns
+  request, `RaiseForced`, a thrown item): `probe_carry`, `probe_knife`, `probe_punch`,
+  `probe_net_fire` and `probe_net_melee` pass alone and failed behind another probe.
+- **A headless frame is about 10 ms now**, so a probe that writes an eased value every
+  frame and reads what the Tick made of it (`probe_scope_hide` did) sees one ease step of
+  that size; hold the key's stand-in (`SightsForced`) and wait instead.
+- **`probe_sight_align` fails one check of 186** (the rifle, looking up 25°: the shot's
+  point 0.37° off the sight line). The view is still and the point is a hit 7.7 m away,
+  5 cm off the line: the aim trace grazing a branch from the lower eye point, not the pose.
 
 ## Tuning
 
@@ -856,10 +904,17 @@ These are feel checks a headless run can't do:
   the play rate); the run strafe, whose hips turn 22–37° toward the way it goes while the
   chest follows up to 46° (the sample's own strafe: is that the strafe wanted, or should
   the aim offset hold the chest squarer); turning in place with the view, idle breaks,
-  pivots and stops under real keys; the gun dangling in the running hand and the sights
-  view following it until G4; and the first seconds of a game from the editor binary,
+  pivots and stops under real keys; and the first seconds of a game from the editor binary,
   standing in the reference pose while the indices load;
 
+- the weapon layers on it (`weapon_layers.py`): seen in pictures (`probe_metahuman_look.py`:
+  the axe, the rifle carried and down its sights) and measured, never played. Whether the
+  sights' view, about 12 cm lower than on the mannequin, reads right; the MetaHuman's left
+  hand down the sights (the hidden mesh's is on the gun, `probe_sight_hands`; the drawn
+  one is open beside the receiver in the picture); the sample's own aim offset under a
+  lowered gun and with empty hands; a strafe's hips turning 22-37° under an aimed chest;
+  Foot Placement under a crouch, a crawl and a kneel; and the punch, which no longer
+  carries the player forward;
 - sprint held with an aim key until the stamina runs out: no key can be pressed in a headless
   game, so the latch setting (`SprintSpent`, `docs/stance.md`) is checked on the graph only.
   Whether needing to let go of Shift before the next sprint feels right;

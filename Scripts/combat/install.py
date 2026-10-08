@@ -23,7 +23,7 @@ from combat.hit_zones import install_hit_zones, make_shootable
 from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH, NPC_CLASS_PATH
 from combat.player_move import reparent_player, set_move_numbers
 from combat.player_pace import set_jog_speed
-from combat.skin import worn_skin
+from combat.skin import player_skin
 from combat.record_vars import (
     RECORD_COMPONENT, RECORD_COMPONENT_CLASS, RECORD_HAND_SLOT, RECORD_SOURCE, RECORD_VIEW)
 from combat.weapon_component.stance import allow_crouch
@@ -89,11 +89,11 @@ def install_guard(bp):
 
 def install_foley(bp):
     """The Game Animation Sample's foley component, with a sound bank that
-    holds nothing, on a player who wears its motion matching (worn_skin().gas).
+    holds nothing, on a player who wears its motion matching (player_skin().gas).
     Its clips' foot, jump and land notifies look for it on the owner and,
     finding none, play the sample's own sound in 2D; found, they fire into it,
     and it has nothing to play. The game's footsteps stay BP_FootstepComponent's."""
-    if not worn_skin().gas:
+    if not player_skin().gas:
         return
     name = GAS.FOLEY_COMPONENT_BP.rsplit("/", 1)[1]
     cls = unreal.load_class(None, f"{GAS.FOLEY_COMPONENT_BP}.{name}_C")

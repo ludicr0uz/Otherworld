@@ -270,7 +270,9 @@ GENERATED = (
         dest="Content/Sourced/MetaHuman",
         kind="generated",
         builders=("Scripts/asset_pipeline/build_metahuman_retarget.py",
-                  "Scripts/asset_pipeline/build_gas_bridge.py"),
+                  "Scripts/asset_pipeline/build_gas_bridge.py",
+                  "Scripts/asset_pipeline/retarget_to_uefn.py",
+                  "Scripts/build_weapons_and_combat.py"),
         note="What drives the MetaHuman body from the mannequin: IK_MetaHuman "
              "(the mannequin's chain table on metahuman_base_skel), "
              "RTG_MetaHuman_from_Mannequin, and ABP_MetaHuman_Retarget, an "
@@ -278,7 +280,13 @@ GENERATED = (
              "Retarget Pose From Mesh off the component it is attached to. "
              "Needs Content/MetaHumans (below) and the mannequin's IK rig "
              "(build_retarget.py, or this builds it). Worn when "
-             "player_body.PLAYER_RIG says \"metahuman\" (combat/skin.py).",
+             "player_body.PLAYER_RIG says \"metahuman\" (combat/skin.py). "
+             "Also the Game Animation Sample's side of it: the UEFN source "
+             "rig, its retargeters and SKM_UEFN_Player (build_gas_bridge.py), "
+             "RTG_UEFN_from_Mannequin (retarget_to_uefn.py, which writes the "
+             "game's clips for that skeleton under Characters/Anims/UEFN_Player "
+             "and Quaternius/UAL/UEFN_Player), and ABP_WeaponLayers, the "
+             "weapons build's (combat/weapon_layers.py).",
     ),
     AssetSource(
         dest="Content/Sourced/Mixamo",

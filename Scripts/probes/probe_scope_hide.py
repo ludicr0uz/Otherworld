@@ -1,9 +1,11 @@
 """Down the sniper's scope: the rifle and the player's own body leave the view.
 
-No key can be injected into a headless game, so the probe holds SightSeat at
-1 (the camera all the way to the eye point) by writing it every frame, which
-is what holding the sights key leads to; verify/sights.py checks the key and
-the ease. The sniper comes from the dev-all-guns request and is equipped the
+No key can be injected into a headless game, so the probe holds the sights
+key's stand-in (SightsForced) until SightSeat has carried the camera to the
+eye point; verify/sights.py checks the key and the ease. (It used to write
+SightSeat itself every frame: the Tick eases it one step home before it
+reads it, and at a headless frame of 10 ms that step is past the 0.9 the
+scope hides at.) The sniper comes from the dev-all-guns request and is equipped the
 way Q does (EquippedIndex + NeedsRefresh).
 
 Scoped: the sniper hidden, the body OwnerNoSee. Let go: both back. The
@@ -20,7 +22,7 @@ import unreal
 
 from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
-from combat.seat_tuning import SEAT_VAR
+from combat.seat_tuning import SEAT_VAR, SIGHTS_FORCED_VAR
 from combat.weapon_component.sights import SCOPE_HIDE_BLEND
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
@@ -30,11 +32,11 @@ HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
             (WEAPON_COMP_BP_PATH, WV.EquippedIndex),
             (WEAPON_COMP_BP_PATH, WV.NeedsRefresh),
-            (WEAPON_COMP_BP_PATH, SEAT_VAR),
+            (WEAPON_COMP_BP_PATH, SIGHTS_FORCED_VAR),
             (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)]
 SNIPER = "BP_SniperRifle_C"
 SHOTGUN = "BP_Shotgun_C"
-HOLD_FRAMES = 5
+SEATED = 0.99
 
 
 def _file():
@@ -64,19 +66,24 @@ def _equip(p, wc, name):
 
 
 def _hold_sights(p, wc):
-    """Keep SightSeat at 1 for a few frames; the last tick started from 1."""
-    left = [HOLD_FRAMES]
+    """Hold the sights key's stand-in until the camera is on the gun."""
+    p.set(wc, SIGHTS_FORCED_VAR, True)
+    yield lambda: p.get(wc, SEAT_VAR) > SEATED
+    yield 0.05
 
-    def step():
-        p.set(wc, SEAT_VAR, 1.0)
-        left[0] -= 1
-        return left[0] <= 0
-    yield step
+
+def _drawn(mesh):
+    """The body that is drawn: the mannequin, or the MetaHuman's Body under a
+    hidden one (weapon_component/body_parts.py reaches every such part)."""
+    if mesh.is_visible():
+        return mesh
+    return next((c for c in mesh.get_children_components(True)
+                 if isinstance(c, unreal.SkeletalMeshComponent) and c.is_visible()), mesh)
 
 
 def _state(p, wc, mesh):
-    return (p.get(wc, "Held").get_editor_property("hidden"), mesh.get_editor_property("owner_no_see"),
-            p.get(wc, SEAT_VAR))
+    return (p.get(wc, "Held").get_editor_property("hidden"),
+            _drawn(mesh).get_editor_property("owner_no_see"), p.get(wc, SEAT_VAR))
 
 
 def probe(p):
@@ -113,9 +120,10 @@ def _run(p):
     p.check("...and the player's body is hidden from their own camera",
             no_see, str(no_see))
     p.check("...but still drawn for everyone else (not hidden in game)",
-            not p.pawn().get_editor_property("hidden") and mesh.is_visible(),
-            f"{p.pawn().get_editor_property('hidden')} {mesh.is_visible()}")
+            not p.pawn().get_editor_property("hidden") and _drawn(mesh).is_visible(),
+            f"{p.pawn().get_editor_property('hidden')} {_drawn(mesh).is_visible()}")
 
+    p.set(wc, SIGHTS_FORCED_VAR, False)
     yield lambda: p.get(wc, SEAT_VAR) < 0.05
     hidden, no_see, _ = _state(p, wc, mesh)
     p.check("sights down: the sniper and the body are back",
@@ -127,3 +135,4 @@ def _run(p):
     p.check(f"the shotgun's irons ({SEAT_VAR} {blend:.3f}) hide nothing",
             blend > SCOPE_HIDE_BLEND and not hidden and not no_see,
             f"{hidden} {no_see}")
+    p.set(wc, SIGHTS_FORCED_VAR, False)

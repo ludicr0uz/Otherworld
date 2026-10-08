@@ -1,5 +1,6 @@
 """Pictures of the MetaHuman player from in front: standing, walking,
-sidestepping, with the axe and then down the rifle's sights.
+sidestepping, with the axe, with the rifle carried and then down its sights
+(from in front, from the side, and the player's own sight picture).
 
 Not a check: a way to SEE the MetaHuman wear the mannequin's animation,
 which the game's own camera cannot show. probe_bound_look.py's eye (a
@@ -17,11 +18,17 @@ import unreal
 
 from combat.game_state import DEBUG_MODE_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
+from combat.seat_tuning import SEAT_VAR, SIGHTS_FORCED_VAR
 from combat.weapon_component import vars as WV
+from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from net.state_consts import GAME_STATE_BP_PATH
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, WV.EquippedIndex), (GAME_STATE_BP_PATH, DEBUG_MODE_VAR)]
-HOLD = (("empty hands", None), ("axe", "BP_Axe_C"), ("rifle", "BP_Rifle_C"))
+HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
+WRITABLE = [(WEAPON_COMP_BP_PATH, WV.EquippedIndex), (GAME_STATE_BP_PATH, DEBUG_MODE_VAR),
+            (WEAPON_COMP_BP_PATH, SIGHTS_FORCED_VAR), (HUD_BP_PATH, DEV_GUNS_REQUEST_VAR)]
+# The rifle is a drop: the dev-all-guns request puts one in the bag.
+RIFLE = "BP_AssaultRifle_C"
+HOLD = (("empty hands", None), ("axe", "BP_Axe_C"), ("rifle", RIFLE))
 # Far enough back that the legs are in the picture: a strafe is told by them.
 EYE_AHEAD_CM, EYE_UP_CM, EYE_FOV = 420.0, 10.0, 50.0
 LOOK_AT_UP_CM = 0.0
@@ -79,6 +86,8 @@ def probe(p):
         unreal.SystemLibrary.execute_console_command(world, "shot")
         p.note(f"{label}: speed {player.get_velocity().length():.0f}, shot #{_count()}")
 
+    p.set(p.hud(), DEV_GUNS_REQUEST_VAR, True)
+    yield lambda: not p.get(p.hud(), DEV_GUNS_REQUEST_VAR)
     for label, cls in HOLD:
         bag = [i.get_class().get_name() for i in p.get(wc, "Inventory")]
         if cls:
@@ -99,5 +108,20 @@ def probe(p):
         # Once from the side, standing.
         yield moving(0.0, 0.0, 0.6, side=250.0)
         shot(f"{label}, standing, from the right")
+    # Down the rifle's sights (the sights key's stand-in, held): from in front,
+    # from the side, and then the player's own view, the sight picture.
+    if p.get(wc, "Held") is not None and p.get(wc, "Held").get_class().get_name() == RIFLE:
+        p.set(wc, SIGHTS_FORCED_VAR, True)
+        yield lambda: p.get(wc, SEAT_VAR) > 0.99
+        yield moving(0.0, 0.0, 0.6)
+        shot("rifle, down the sights")
+        yield moving(0.0, 0.0, 0.6, side=250.0)
+        shot("rifle, down the sights, from the right")
+        unreal.SystemLibrary.execute_console_command(world, "FOV 0", pc)
+        pc.set_view_target_with_blend(player)
+        yield 0.6
+        shot("rifle, down the sights: the player's own view")
+        yield 0.3
+        p.set(wc, SIGHTS_FORCED_VAR, False)
     unreal.SystemLibrary.execute_console_command(world, "FOV 0", pc)
     pc.set_view_target_with_blend(player)

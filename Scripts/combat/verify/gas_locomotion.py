@@ -1,6 +1,6 @@
 """verify.gas_locomotion -- the player's motion-matching base (task G3): the
 Game Animation Sample's anim Blueprint as combat/gas_locomotion.py patched
-it, and the body that runs it. Nothing while the player wears the mannequin
+it, the weapon layers linked into it (G4), and the body that runs it. Nothing while the player wears the mannequin
 (gas_locomotion_consts.GAS_LOCOMOTION off, or the sample not imported).
 
 What it plays in a game is probes/probe_gas_locomotion.py's.
@@ -9,14 +9,18 @@ What it plays in a game is probes/probe_gas_locomotion.py's.
 import unreal
 
 from asset_pipeline.gas_bridge_paths import PLAYER_SOCKETS
-from combat.gas_locomotion import enum_values, graphs, server_branches, slot_in_line
+from combat.gas_locomotion import (
+    enum_values, graphs, layer_links, link_class, link_tag, server_branches, slot_in_line,
+)
 from combat.gas_locomotion_consts import (
     ADDED_VARS, CHOOSER, EYE_CLASSES, FIELDS_SET, FOLEY_BANK_TABLE, FOLEY_BANK_VAR,
     FOLEY_COMPONENT, FOLEY_SILENT_BANK,
-    HISTORY_CLASS, WALK_BELOW_CMS, WEAPON_LAYERS,
+    HISTORY_CLASS, WALK_BELOW_CMS,
 )
 from combat.server_anim_consts import CLIENT_PIN, SERVER_PIN, SERVER_POSE_VAR
-from combat.skin import player_skin, worn_skin
+from combat.skin import player_skin
+from combat.weapon_layers import layers_class_path
+from combat.weapon_layers_consts import BEFORE_LINK_CLASS, LAYERS_ABP, LAYERS_TAG, MAIN_MONTAGES
 from combat.verify.common import _mesh_asset, check, component_template, components
 from combat.verify.fixtures import char
 from combat.verify.server_anim import _class, _flag_written_once, _sources, _title
@@ -74,11 +78,12 @@ def _has(obj, name):
 
 
 def check_anim_graph(bp, anim):
-    check("the weapon layers are off the motion-matching base (G3): its montage slot is "
-          f"{'in' if WEAPON_LAYERS else 'out of'} the pose line, as WEAPON_LAYERS says",
-          slot_in_line(anim) == WEAPON_LAYERS, f"in line: {slot_in_line(anim)}")
-    branches = server_branches(anim)
+    check("the sample's own montage slot (full body, before the root's offset) is out "
+          "of the pose line: the slots that play are the weapon layers'",
+          not slot_in_line(anim), f"in line: {slot_in_line(anim)}")
     roots = [n for n in anim.list_all_nodes() if _class(n) == "AnimGraphNode_Root"]
+    check_link(roots, anim)
+    branches = server_branches(anim)
     check("the motion-matching graph has ONE branch on what a dedicated server needs "
           f"of it (a Blend Poses by bool on {SERVER_POSE_VAR})",
           len(branches) == 1 and len(roots) == 1, f"{len(branches)} branch(es)")
@@ -103,6 +108,39 @@ def check_anim_graph(bp, anim):
           str(sorted(c for c in server if "Search" in c or "Motion" in c)))
     check("...the server's pose is the one the feet's nodes start from",
           feet_start_at_server_pose(branch))
+
+
+def check_link(roots, anim):
+    """The weapon layers, linked into the base (G4)."""
+    links = layer_links(anim)
+    check("the weapon layers' anim Blueprint is linked into the motion-matching graph, "
+          f"once, tagged {LAYERS_TAG} (how the weapon component finds its instance)",
+          len(links) == 1 and link_class(links[0]) == layers_class_path()
+          and link_tag(links[0]) == LAYERS_TAG,
+          str([(link_class(n), link_tag(n)) for n in links]))
+    if len(links) != 1 or len(roots) != 1:
+        return
+    before = {_class(n) for n in _sources(links[0])}
+    check("...after the root's offset (an aimed upper body is blended in mesh space: it "
+          "faces where the capsule does, not where the lagging root does)",
+          before == {BEFORE_LINK_CLASS}
+          and "AnimGraphNode_OffsetRootBone" in {_class(n) for n in _upstream(links[0])},
+          str(sorted(before)))
+    layers = _assets().load_asset(LAYERS_ABP)
+    cdo = unreal.get_default_object(BEL.generated_class(layers)) if layers else None
+    check("...and its slots play the montages of the body's main anim instance, which is "
+          "where the weapon and health components play them",
+          cdo is not None and cdo.get_editor_property(MAIN_MONTAGES) is True)
+
+
+def _upstream(node):
+    seen, stack = [], [node]
+    while stack:
+        for up in _sources(stack.pop()):
+            if up not in seen and _class(up).startswith("AnimGraphNode_"):
+                seen.append(up)
+                stack.append(up)
+    return seen
 
 
 def arm_of(root, branch, take):
@@ -153,21 +191,16 @@ def check_body():
           "FootstepComponent" in components(char))
     check("the sample's chooser of databases is here", _assets().does_asset_exist(CHOOSER),
           CHOOSER)
-    keyed = player_skin()
-    check("the weapon layers are still built, on the rig they are keyed on and into the "
-          "anim Blueprint the player no longer runs (G4 brings them over)",
-          keyed.anim_bp != worn_skin().anim_bp and _assets().does_asset_exist(keyed.anim_bp),
-          keyed.anim_bp)
 
 
 def run():
-    skin = worn_skin()
+    skin = player_skin()
     if not skin.gas:
         unreal.log_warning("[VERIFY] gas_locomotion: the player wears the mannequin; skipped")
         return
-    bp = _assets().load_asset(skin.anim_bp)
+    bp = _assets().load_asset(skin.worn_anim_bp)
     check("the player's anim Blueprint is the Game Animation Sample's", bp is not None,
-          skin.anim_bp)
+          skin.worn_anim_bp)
     if bp is None:
         return
     anim, _events, properties = graphs(bp)

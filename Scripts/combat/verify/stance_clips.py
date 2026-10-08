@@ -14,6 +14,7 @@ verify.body_pose checks.
 import unreal
 
 from asset_pipeline.rig_util import _bone_world
+from combat.weapon_layers_consts import INPUT_CLASS
 from combat.anim_blueprint import AIM_SLOT, _slot_name
 from combat.body_pose import (
     KNEEL_FROM_S, KNEEL_TIME, KNEEL_TO_S, MOVE_FULL_CM_S, POSE_CROUCH, POSE_KNEEL,
@@ -102,11 +103,13 @@ def check_stance_graph():
     lying = _up(down, "A") if _cls(down) == BLEND_CLASS else None
     low = _up(lying, "A") if _cls(lying) == BLEND_CLASS else None
     loco = _up(low, "A") if _cls(low) == BLEND_CLASS else None
+    # The locomotion: the state machine, or in the weapon layers' graph the
+    # pose the motion matching hands it (combat/weapon_layers.py).
     check("...over the stance blends: PoseProne over PoseCrouch over "
-          "the locomotion state machine",
+          "the locomotion",
           _cls(lying) == BLEND_CLASS and _title(_up(lying, "Alpha")) == f"Get {POSE_PRONE}"
           and _cls(low) == BLEND_CLASS and _title(_up(low, "Alpha")) == f"Get {POSE_CROUCH}"
-          and _cls(loco) == "AnimGraphNode_StateMachine",
+          and _cls(loco) == (INPUT_CLASS if skin.layers_tag else "AnimGraphNode_StateMachine"),
           f"{_cls(lying)} <- {_cls(low)} <- {_cls(loco)}")
     feeds = PIN.list_connected_pins(BEL.find_output_pin(down, "Pose")) if down else []
     check("...and so does the upper-body layered blend's base (the aim layer "

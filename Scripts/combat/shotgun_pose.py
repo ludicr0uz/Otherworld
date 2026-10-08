@@ -82,7 +82,11 @@ SHOTGUN_THUMBS = {
     # forward and up onto the top of the wrist, the second over it and down
     # its left side, and the tip points down that side at the other fingers'
     # tips, closing the hand round the wood.
-    "grip_thumb": ((0.84, -0.16, 0.52), (0.52, -0.60, -0.60), (0.45, 0.00, -0.89)),
+    # Measured on the worn hand (the UEFN mannequin's, G4): its thumb's
+    # knuckle is 3.4 cm right of the wrist's middle and its first bone 5.9 cm
+    # long, so the first line leans in that far for the middle joint to be
+    # over the wood, and the second (2.3 cm) goes nearly straight across.
+    "grip_thumb": ((0.654, -0.518, 0.551), (0.15, -0.90, -0.41), (0.20, 0.00, -0.98)),
     # The left hand is under the pump, its heel on the left: the thumb runs
     # forward and in to the pump's left side and lies along it, under the
     # barrel's top.

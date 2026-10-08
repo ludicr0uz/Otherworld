@@ -85,6 +85,8 @@ def _look(p, pawn):
     """What this machine's copy of ``pawn`` is posed by."""
     wc = p.component(pawn, WEAPON_COMP_CLASS_PATH)
     anim = pawn.mesh.get_anim_instance()
+    # The pose variables are the weapon layers' instance's (probes/context.py).
+    layers = p.pose_instance(pawn.mesh)
     aim = (SIGHTS if p.get(wc, WV.SightAiming) else SHOULDER) if p.get(wc, WV.Aiming) else HIP
     return {
         "stance": p.get(wc, STANCE_VAR),
@@ -97,9 +99,9 @@ def _look(p, pawn):
         "lowered": bool(p.get(wc, LOWERED_VAR)),
         "pose": _name(p.get(wc, HandPose)),
         "playing": bool(anim and anim.is_slot_active(AIM_SLOT)),
-        "crouch": float(p.get(anim, POSE_CROUCH)) if anim else 0.0,
-        "prone": float(p.get(anim, POSE_PRONE)) if anim else 0.0,
-        "pitch": float(p.get(anim, AIM_PITCH_VAR)) if anim else 0.0,
+        "crouch": float(p.get(layers, POSE_CROUCH)) if layers else 0.0,
+        "prone": float(p.get(layers, POSE_PRONE)) if layers else 0.0,
+        "pitch": float(p.get(layers, AIM_PITCH_VAR)) if layers else 0.0,
     }
 
 

@@ -52,13 +52,13 @@ from combat.weapon_component import vars as WV
 from combat.weapon_component.look_vars import (
     HIP, LOOK_PARAMS, REPLICATED, SERVER_SET_LOOK, SHOULDER, SIGHTS, HandPose, LookAim,
     LookLowered, LookPose, SentAim, SentLowered, SentPose)
-from combat.weapon_component.sight_pitch import _anim_class_path
+from combat.weapon_component.sight_pitch import _anim_class_path, _anim_instance
 from combat.weapon_component.stance import STANCE_VAR
 from net.guard import author_guard
 from uebp import net
 from uebp.g import _G
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, out, then
-from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_GET_BASE_AIM_ROT
+from uebp.nodes.actor import FN_GET_BASE_AIM_ROT
 from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_BOOL_TO_FLOAT, FN_BREAK_ROT, FN_CLAMP_II, FN_EQ_II, FN_GE_II, FN_INTERP_FF, FN_MUL_FF,
     FN_NE_OO, FN_NEQ_BB, FN_NEQ_II, FN_NORMALIZE_AXIS, FN_OR, FN_SELECT_II)
@@ -174,7 +174,8 @@ def _author_look_mirror(ed, tick, owner_out, exec_in):
     parts = g.call(FN_BREAK_ROT, InRot=out(view))
     signed = g.call(FN_NORMALIZE_AXIS, Angle=out(parts, "Pitch"))
     pitch = g.call(FN_MUL_FF, A=out(signed), B=g.get(WV.SightBlend))
-    anim = g.call(FN_ANIM_INSTANCE, self=g.get(WV.OwnerMesh))
+    anim = g.keep(_anim_instance(ed, player_skin()))
+    _connect(g.get(WV.OwnerMesh), _pin(anim, "self"))
     cast = g.keep(_palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2]))
     _connect(out(anim), _pin(cast, "Object"))
     _connect(then(as_pawn), _pin(cast, "execute"))

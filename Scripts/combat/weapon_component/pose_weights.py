@@ -35,9 +35,8 @@ from uebp.graph import BEL, _connect, _node, _palette, _pin, _set, else_, out, t
 from combat.paths import ITEM_CLASS_PATH
 from combat.skin import player_skin
 from combat.support_hand import SUPPORT_POINT_VAR
-from combat.weapon_component.sight_pitch import _anim_class_path
+from combat.weapon_component.sight_pitch import _anim_class_path, _anim_instance
 from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR
-from uebp.nodes.actor import FN_ANIM_INSTANCE
 from uebp.nodes.math import (
     FN_ABS, FN_ADD_FF, FN_AND, FN_BOOL_TO_FLOAT, FN_EQ_II, FN_FMOD, FN_INTERP_FF, FN_NOT,
     FN_SUB_FF)
@@ -138,7 +137,7 @@ def _author_pose_weights(ed, tick, held, armed_out, exec_ins):
     copied = _author_held_two_handed(ed, held, armed_out, exec_ins)
 
     mesh = ed.add_get_member_variable_node(WV.OwnerMesh)
-    anim = _node(ed, FN_ANIM_INSTANCE)
+    anim = _anim_instance(ed, player_skin())
     _connect(out(mesh, WV.OwnerMesh), _pin(anim, "self"))
     cast = _palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2])
     _connect(out(anim), _pin(cast, "Object"))

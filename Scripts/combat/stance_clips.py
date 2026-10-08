@@ -38,7 +38,8 @@ locomotion to what it fed. A skin without clips (PlayerSkin.stance_clips) gets
 nothing here and keeps the procedural crouch and prone.
 """
 
-from combat.aim_pitch import _feeding_all, _nodes_of
+from combat.aim_pitch import OWN_POSE_CLASSES, _feeding_all, _nodes_of
+from combat.aim_pitch import _remove_previous as _remove_pitch_chain
 from combat.anim_blueprint import AIM_SLOT, _slot_node
 from combat.body_pose import KNEEL_TIME, POSE_CROUCH, POSE_KNEEL, POSE_PRONE, move_alpha
 from combat.log import _log
@@ -144,6 +145,27 @@ def unpatch_stance_clips(skin):
     bp = _assets().load_asset(skin.anim_bp)
     if bp:
         _remove_previous(BGE.get_graph_editor_by_name(bp, "AnimGraph"))
+
+
+def retire_player_patches(anim_bp):
+    """Take the player's own patches out of ``anim_bp``, which the player no
+    longer runs: the stance clips, and the chain before the output (the aim's
+    pitch, the body poses, the support hand). What anim_blueprint.py put in
+    stays. For ABP_Unarmed once the player's layers are in another graph: it
+    is the mannequin fallback's, and what the creatures' copies are made of."""
+    bp = _assets().load_asset(anim_bp)
+    ed = BGE.get_graph_editor_by_name(bp, "AnimGraph")
+    roots = _nodes_of(ed, "AnimGraphNode_Root")
+    if not _mine(ed) and not any(_nodes_of(ed, c) for c in OWN_POSE_CLASSES):
+        return
+    _remove_previous(ed)
+    _remove_pitch_chain(ed, roots[0])
+    arrange(ed)
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError(f"{anim_bp} failed to compile without the player's patches")
+    _assets().save_loaded_asset(bp)
+    _log(f"{bp.get_name()}: the player's stance clips, pitch, poses and support hand "
+         "taken out (the player runs another anim Blueprint)")
 
 
 def patch_stance_clips(skin):

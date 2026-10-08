@@ -36,6 +36,7 @@ import math
 import unreal
 
 from combat.body_pose import _mul, _conj
+from combat.hold_pose import in_place
 from combat.log import _log
 from uebp.graph import _assets
 from combat.paths import HOLD_KNIFE_ANIM_PATH, KNIFE_ANIM_PATH
@@ -109,14 +110,14 @@ def _slash_clip(skin):
     if eal.does_asset_exist(KNIFE_ANIM_PATH):
         clip = _assets().load_asset(KNIFE_ANIM_PATH)
         if clip.get_editor_property("skeleton") == src.get_editor_property("skeleton"):
-            return clip, src
+            return in_place(clip), src
         if not eal.delete_asset(KNIFE_ANIM_PATH):
             raise RuntimeError(f"{KNIFE_ANIM_PATH} is on another skeleton and "
                                "could not be deleted; restart the editor")
     clip = eal.duplicate_asset(HOLD_KNIFE_ANIM_PATH, KNIFE_ANIM_PATH)
     if clip is None:
         raise RuntimeError(f"could not copy {HOLD_KNIFE_ANIM_PATH} to {KNIFE_ANIM_PATH}")
-    return clip, src
+    return in_place(clip), src
 
 
 def build_knife_slash(skin):

@@ -343,8 +343,10 @@ wear it:
   **G3 did otherwise, and cheaper:** the sockets are on a copy of the mesh
   (`SKM_UEFN_Player`, above), not on the skeleton, and are the mannequin's offsets
   copied: a socket's offset is in its bone's own space, which the rest pose does not
-  move. What is not re-measured is the smaller hand; G4, which puts a gun back into an
-  aimed hand, should look.
+  move. What is not re-measured is the smaller hand. G4 put a gun back into an aimed
+  hand and looked: the grips solve against the retargeted ready poses as they did against
+  the mannequin's (`combat/verify/grip_fit.py` is green), and only the shotgun's grip
+  thumb needed laying again for this hand (`combat/shotgun_pose.SHOTGUN_THUMBS`).
 - **Every clip the player has today stops playing** (as reasoned in G2; in G3 the worn
   graph's one montage slot is out of the pose line, so whether a mannequin clip would
   play on the UEFN mesh by bone name was not put to the test). Neither skeleton lists the other as
@@ -354,6 +356,15 @@ wear it:
   run on the UEFN mesh. The weapon layers, the stances, the throw and the hit reactions
   each need retargeting onto `SK_UEFN_Mannequin` (the rig built here is a ready target:
   same chain table) or a compatible-skeleton declaration, which was not tried.
+  **G4 retargeted them** (`retarget_to_uefn.py`, after `build_gas_bridge.py`): the
+  mannequin's two ready poses, punch and six flinches, read off `SKM_Manny_Simple`
+  through `RTG_UEFN_from_Mannequin`, into `/Game/Sourced/Characters/Anims/UEFN_Player`,
+  and Quaternius's crouch, crawl, kneel and throw, read off the packs' own rigs (one
+  retarget, not two), into `/Game/Sourced/Quaternius/UAL/UEFN_Player`. The target rig is
+  `IK_UEFN_Mannequin_Source`; the retargeter is the plain one (`plain_retarget.py`: in
+  place, the target's pose aligned chain to chain) and every copy has its root motion
+  flag off. `combat/skin.SKIN_GAS` names them. A compatible-skeleton declaration was not
+  tried: the two rest 20.7° apart at the hand.
 - **Ragdoll and hit bodies: another physics asset, same body names.** `PA_UEFN_Mannequin`
   has the mannequin's 22 bodies plus `spine_01`, so `HeadBones`/`LimbBones` and the bone a
   thrown blade lodges in carry over by name; the capsules are the sample's, fitted to a

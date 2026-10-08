@@ -23,8 +23,13 @@ foot placement. What this file changes in it, each time it runs:
                       Stance        Stand (the crouch set is G5's)
                       JustLanded,   kept here: the frame the fall ends, and
                       LandVelocity  the velocity of its last frame
-  THE SLOT        its one montage slot leaves the pose line while
-                  gas_locomotion_consts.WEAPON_LAYERS is False
+  THE SLOT        its one montage slot (full body, before the root's offset)
+                  leaves the pose line: the slots that play are the weapon
+                  layers'
+  THE LAYERS      one Linked Anim Graph node, after Remap Curves: the weapon
+                  layers' anim Blueprint (weapon_layers.py), which plays
+                  everything a weapon, a stance or a hit does to the body
+                  over this graph's pose (G4)
   THE FOLEY       silent_foley_bank(): the empty sound bank the sample's foley
                   component is given on the player (install.install_foley)
   THE SERVER      the one IsDedicatedServer branch (A4): a server skips the
@@ -38,13 +43,16 @@ sample's chooser's and its databases' business.
 import unreal
 
 from combat.gas_locomotion_consts import (
-    ABP_LOCOMOTION, ADDED_VARS, AFTER_SLOT_CLASS, EYE_CLASSES, FALL_VELOCITY, FIELDS_SET,
+    ABP_LOCOMOTION, ADDED_VARS, EYE_CLASSES, FALL_VELOCITY, FIELDS_SET,
     FOLEY_BANK_SOURCE, FOLEY_BANK_TABLE, FOLEY_SILENT_BANK,
     HISTORY_CLASS, JUST_LANDED_SECONDS, LAND_VELOCITY, LANDED_AT, PROPERTIES_GRAPH,
     PROPERTIES_VAR, SLOT_CLASS, SLOT_NAME, WALK_BELOW_CMS, WAS_FALLING,
-    WEAPON_LAYERS,
 )
 from combat.log import _log
+from combat.weapon_layers import layers_class_path
+from combat.weapon_layers_consts import (
+    BEFORE_LINK_CLASS, LAYERS_ABP, LAYERS_TAG, LINK_CLASS, LINK_IN_PIN,
+)
 from combat.server_anim_consts import (
     BRANCH_CLASS, CLIENT_PIN, FLAG_PIN, SERVER_PIN, SERVER_POSE_VAR,
 )
@@ -226,26 +234,71 @@ def slot_in_line(ed):
     return bool(_fed(_pin(slot, "Source"))) and bool(_fed(out(slot, "Pose")))
 
 
-def _place_slot(ed, wanted):
-    """Put the slot in the pose line, in front of the root's offset where the
-    sample has it, or take it out and join what it split."""
+def _remove_slot(ed):
+    """Take the sample's slot out of the pose line and join what it split:
+    the slots that play are the weapon layers'."""
+    if not slot_in_line(ed):
+        return
     slot = _slot(ed)
-    if slot_in_line(ed) == wanted:
-        return
-    if not wanted:
-        source, onward = _fed(_pin(slot, "Source")), _fed(out(slot, "Pose"))
-        PIN.break_pin_links(_pin(slot, "Source"))
-        PIN.break_pin_links(out(slot, "Pose"))
-        for pin in onward:
+    source, onward = _fed(_pin(slot, "Source")), _fed(out(slot, "Pose"))
+    PIN.break_pin_links(_pin(slot, "Source"))
+    PIN.break_pin_links(out(slot, "Pose"))
+    for pin in onward:
+        _connect(source[0], pin)
+
+
+# ─── The weapon layers ───────────────────────────────────────────────────────
+
+def layer_links(ed):
+    """The Linked Anim Graph nodes of the graph."""
+    return [n for n in ed.list_all_nodes() if _class(n) == LINK_CLASS]
+
+
+def link_tag(node):
+    return str(node.get_editor_property("tag"))
+
+
+def link_class(node):
+    """The path of the anim class a Linked Anim Graph node runs."""
+    cls = node.get_editor_property("node").get_editor_property("instance_class")
+    return cls.get_path_name() if cls else None
+
+
+def _remove_link(ed):
+    for link in layer_links(ed):
+        source, onward = _fed(_pin(link, LINK_IN_PIN)), _fed(out(link, "Pose"))
+        ed.remove_nodes([link])
+        for pin in onward if source else ():
             _connect(source[0], pin)
-        return
-    after = [n for n in ed.list_all_nodes() if _class(n) == AFTER_SLOT_CLASS]
-    if len(after) != 1:
-        raise RuntimeError(f"expected one {AFTER_SLOT_CLASS}, found {len(after)}")
-    source = _fed(_pin(after[0], "Source"))
-    PIN.break_pin_links(_pin(after[0], "Source"))
-    _connect(source[0], _pin(slot, "Source"))
-    _connect(out(slot, "Pose"), _pin(after[0], "Source"))
+
+
+def _author_link(ed):
+    """Link ABP_WeaponLayers in after Remap Curves: after the root's offset,
+    so an aimed upper body (a mesh-space blend) faces where the capsule does
+    and not where the lagging root does, and before the feet and the pose
+    history. Before the server branch is authored: it is on both its arms
+    (weapon_layers_consts.py)."""
+    if not unreal.load_class(None, layers_class_path()):
+        raise RuntimeError(f"{LAYERS_ABP} has no class: build_weapon_layers() runs first")
+    before = [n for n in ed.list_all_nodes() if _class(n) == BEFORE_LINK_CLASS]
+    if len(before) != 1:
+        raise RuntimeError(f"expected one {BEFORE_LINK_CLASS}, found {len(before)}")
+    pose = out(before[0], "Pose")
+    onward = _fed(pose)
+    PIN.break_pin_links(pose)
+    link = _palette(ed, f"Animation|LinkedAnimGraphs|{LAYERS_ABP.rsplit('/', 1)[1]}-LinkedAnimGraph")
+    # The graph node's own tag (the inner struct's is a deprecated one).
+    link.set_editor_property("tag", LAYERS_TAG)
+    if link_tag(link) != LAYERS_TAG or link_class(link) != layers_class_path():
+        raise RuntimeError(f"the link is {link_class(link)} tagged {link_tag(link)!r}")
+    _connect(pose, _pin(link, LINK_IN_PIN))
+    for pin in onward:
+        _connect(out(link, "Pose"), pin)
+    ed.add_comment_to_nodes(
+        f"The weapon layers ({LAYERS_ABP.rsplit('/', 1)[1]}, tagged {LAYERS_TAG}): the "
+        "stances, the ready pose, the swings and the throw, the flinch, the aim's pitch "
+        "and the support hand, over the motion matching's pose. On a server too: they "
+        "move the hit bodies and the muzzle. Scripts/combat/weapon_layers.py.", [link])
 
 
 # ─── The server branch ───────────────────────────────────────────────────────
@@ -375,11 +428,13 @@ def build_gas_locomotion():
     bp = eas.load_asset(ABP_LOCOMOTION)
     anim, events, properties = graphs(bp)
     _remove_server_branch(anim, events)
+    _remove_link(anim)
     declare(properties, ADDED_VARS)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{ABP_LOCOMOTION} failed to compile before the patch")
     _author_properties(bp, properties)
-    _place_slot(anim, WEAPON_LAYERS)
+    _remove_slot(anim)
+    _author_link(anim)
     _author_server_branch(anim, events)
     for ed in (anim, events, properties):
         arrange(ed)
@@ -388,6 +443,16 @@ def build_gas_locomotion():
     _apply_defaults(bp, defaults(ADDED_VARS))
     eas.save_loaded_asset(bp)
     _log(f"{ABP_LOCOMOTION.rsplit('/', 1)[1]}: the sample's motion matching, reading the "
-         f"CharacterMovementComponent; montage slot "
-         f"{'in' if WEAPON_LAYERS else 'out of'} the pose line; server branch before the feet")
+         f"CharacterMovementComponent; {LAYERS_ABP.rsplit('/', 1)[1]} linked in after the "
+         "root's offset; server branch before the feet")
     return bp
+
+
+def resave_gas_locomotion():
+    """Compile and save the base again, once the weapon layers' graph is
+    whole: the link holds that graph's class, which every builder after
+    build_gas_locomotion() has recompiled."""
+    bp = _assets().load_asset(ABP_LOCOMOTION)
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError(f"{ABP_LOCOMOTION} failed to compile over the finished layers")
+    _assets().save_loaded_asset(bp)

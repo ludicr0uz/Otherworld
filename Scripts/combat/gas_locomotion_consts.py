@@ -1,5 +1,6 @@
 """The player's motion-matching locomotion (task G3): its names, its one
-switch and its numbers. Constants only; gas_locomotion.py authors the anim
+switch and its numbers. (The weapon layers linked into it are
+weapon_layers_consts.py's.) Constants only; gas_locomotion.py authors the anim
 Blueprint, verify/gas_locomotion.py checks it.
 
 The player's base movement is Epic's Game Animation Sample ("GAS" here: its
@@ -13,7 +14,9 @@ database: "ContextData entry 0 expects an object of type
 SandboxCharacter_CMC_ABP_C").
 """
 
-from asset_pipeline.gas_bridge_paths import ABP_RETARGET_UEFN, PLAYER_MESH_GAS
+from asset_pipeline.gas_bridge_paths import (
+    ABP_RETARGET_UEFN, HIDDEN_SKELETON_GAS, IDLE_CLIP, PLAYER_MESH_GAS,
+)
 from asset_pipeline.gas_paths import ABP as SAMPLE_ABP
 from asset_pipeline.gas_paths import GAME_ROOT
 from asset_pipeline.metahuman_paths import SOURCED_DIR
@@ -24,18 +27,13 @@ from uebp.vars import BOOL, FLOAT, VECTOR, Var
 # as before G3, with nothing else to change.
 GAS_LOCOMOTION = True
 
-# The weapon, hold, aim and hit-reaction layers on the motion-matching base.
-# False for G3: they are still built, on the mannequin's rig and into
-# ABP_Unarmed (combat/skin.player_skin), which the player no longer wears, and
-# the graph's one montage slot is taken out of its pose line, so nothing the
-# weapon component plays reaches the body. G4 puts them back over this base
-# and removes the flag.
-WEAPON_LAYERS = False
-
 # What the player wears (git-ignored, as all of the sample is: a checkout
 # without it wears the mannequin).
 ABP_LOCOMOTION = SAMPLE_ABP
 MESH = PLAYER_MESH_GAS
+SKELETON = HIDDEN_SKELETON_GAS
+# Its standing idle: the body the hold poses are keyed on (combat/hold_pose.py).
+IDLE = IDLE_CLIP
 ABP_RETARGET = ABP_RETARGET_UEFN
 # What else must be here for it to run.
 CHOOSER = (f"{GAME_ROOT}/Characters/UEFN_Mannequin/Animations/MotionMatchingData/"
@@ -87,10 +85,11 @@ FIELDS_SET = ("ActorTransform", "AimingRotation", "OrientationIntent", "Velocity
 # sample's own MovementDirection, SteeringTime, GroundLocation and
 # BasedMovementDelta (its character sets none of them either).
 
-# The montage slot of the sample's graph, and the node it sits in front of.
+# The sample's own montage slot (full body, in front of the root's offset).
+# It is out of the pose line: the slots that play are the weapon layers'
+# (weapon_layers.py), linked in after the root's offset.
 SLOT_NAME = "DefaultSlot"
 SLOT_CLASS = "AnimGraphNode_Slot"
-AFTER_SLOT_CLASS = "AnimGraphNode_OffsetRootBone"
 
 # THE SERVER BRANCH (task A4, server_anim_consts.py). The sample's graph ends
 #   ... -> Remap Curves -> LocalToComponent -> Foot Placement -> Leg IK

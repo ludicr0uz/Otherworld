@@ -109,16 +109,32 @@ def _shown(anim, mesh, ref):
     return out
 
 
+ROOT_MOTION = "enable_root_motion"
+
+
+def in_place(clip):
+    """``clip`` with its root motion off, which every clip played into a slot
+    must have: a montage of a clip with root motion takes the character's
+    movement over (the anim instance's RootMotionFromMontagesOnly), and a pose
+    held in a looping montage then holds the player where they stand. The
+    Game Animation Sample's clips have it on (its idle is what the hold poses
+    are copies of: G4 found the player unable to walk with the knife out)."""
+    clip.set_editor_property(ROOT_MOTION, False)
+    if clip.get_editor_property(ROOT_MOTION):
+        raise RuntimeError(f"{clip.get_name()} kept its root motion")
+    return clip
+
+
 def _copy_of(src_path, dst_path):
     """The clip asset, a copy of ``src_path`` on first build. Reused afterwards
     (a just-written asset cannot be deleted in the same editor session),
-    unless the worn skeleton changed under it."""
+    unless the worn skeleton changed under it. In place, either way."""
     eal = unreal.EditorAssetLibrary
     src = _assets().load_asset(src_path)
     if eal.does_asset_exist(dst_path):
         clip = _assets().load_asset(dst_path)
         if clip.get_editor_property("skeleton") == src.get_editor_property("skeleton"):
-            return clip
+            return in_place(clip)
         # Minutes per clip (the editor walks every reference to it):
         # asset_pipeline/swap_player_body.py clears these before the build.
         _log(f"note: {dst_path} is keyed on another body's skeleton: deleting "
@@ -129,7 +145,7 @@ def _copy_of(src_path, dst_path):
     clip = eal.duplicate_asset(src_path, dst_path)
     if clip is None:
         raise RuntimeError(f"could not copy {src_path} to {dst_path}")
-    return clip
+    return in_place(clip)
 
 
 def hold_rotations(skin, dirs, comp):

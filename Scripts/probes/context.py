@@ -22,6 +22,7 @@ step from one process to another (net.py).
 ``unreal`` is imported lazily so the ledger half stays importable off-engine.
 """
 
+from combat.weapon_layers_consts import LAYERS_TAG
 from probes.net import Where
 
 
@@ -32,6 +33,16 @@ class Probe(object):
         self.map_path = map_path
         self.time = game_time
         self.net = where or Where()
+
+    @staticmethod
+    def pose_instance(mesh):
+        """The anim instance the pose variables are on (AimPitch, the stance
+        and guard weights, the support hand): the mesh's own, or with the
+        motion matching worn the weapon layers' instance linked into it
+        (combat/weapon_layers.py). Montages and slots are asked of the mesh's
+        own instance, whichever body it is."""
+        return (mesh.get_linked_anim_graph_instance_by_tag(LAYERS_TAG)
+                or mesh.get_anim_instance())
 
     # ─── which process this is ──────────────────────────────────────────────
 

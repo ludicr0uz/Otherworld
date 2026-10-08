@@ -72,7 +72,7 @@ def _run(p):
     skin = next(s for s in SKINS
                 if mesh.get_bone_index(s.pose_bones["hand_r"]) >= 0)
     hands = (("right", skin.pose_bones["hand_r"]), ("left", skin.pose_bones["hand_l"]))
-    anim = mesh.get_anim_instance()
+    anim = p.pose_instance(mesh)
     # The gun is up, as an aim key would have it, the whole run.
     p.set(wc, RAISE_FORCED_VAR, True)
     p.set(hud, DEV_GUNS_REQUEST_VAR, True)

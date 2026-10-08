@@ -1,20 +1,19 @@
 """What the player wears: the PlayerSkin table (Quinn fallback, generated
 adventurer) and wear_skin(), which puts it on BP_ThirdPersonCharacter.
 
-Two questions, one answer until G3 and two since:
-    player_skin()  the rig the weapon layers, the poses, the grips and the
-                   clips are keyed on (the mannequin, for a MetaHuman)
-    worn_skin()    what the Character's Mesh component wears. With
-                   gas_locomotion_consts.GAS_LOCOMOTION it is the UEFN
-                   mannequin running the motion-matching anim Blueprint
-                   (SKIN_GAS), which none of those layers is on yet; G4 puts
-                   them there and the two are one again.
+player_skin() is the one answer to "which body": the rig the weapon layers,
+the poses, the grips and the clips are keyed on, and what the Character's
+Mesh component wears. With gas_locomotion_consts.GAS_LOCOMOTION and a
+MetaHuman it is SKIN_GAS: the UEFN mannequin, running the motion-matching
+anim Blueprint (PlayerSkin.base_anim_bp) with the weapon layers' graph
+(PlayerSkin.anim_bp) linked into it.
 """
 
 import dataclasses
 
 import unreal
 
+from asset_pipeline.gas_bridge_paths import PLAYER_FAMILY
 from asset_pipeline.mannequin_bind.paths import bound_asset_dir, bound_asset_name
 from asset_pipeline.metahuman_paths import ABP_RETARGET, BODY_MESH, FACE_MESH
 from asset_pipeline.player_body import PLAYER_NAME, PLAYER_RIG
@@ -23,6 +22,7 @@ from combat import metahuman_body
 from combat.log import _log
 from uebp.graph import BEL, _assets, _component_object, _handles, _rot
 from combat.paths import CHARACTER_BP_PATH
+from combat.weapon_layers_consts import LAYERS_ABP, LAYERS_TAG
 
 
 # ─── What the player is wearing ──────────────────────────────────────────────
@@ -151,6 +151,19 @@ class PlayerSkin:
     # True when this mesh runs the motion-matching anim Blueprint
     # (gas_locomotion.py) and not a patched ABP_Unarmed.
     gas: bool = False
+    # What the Mesh component runs, where that is not ``anim_bp``: the
+    # motion-matching base, which links ``anim_bp`` (the weapon layers'
+    # graph, weapon_layers.py) in as a Linked Anim Graph tagged
+    # ``layers_tag``. ``anim_bp`` is always the graph the layers, the slots
+    # and the pose variables are in: what the builders patch and the weapon
+    # component writes to.
+    base_anim_bp: str = None
+    layers_tag: str = None
+
+    @property
+    def worn_anim_bp(self):
+        """The anim Blueprint on the Mesh component."""
+        return self.base_anim_bp or self.anim_bp
 
     @property
     def stance_clips(self):
@@ -261,13 +274,26 @@ SKIN_METAHUMAN = dataclasses.replace(
 
 # The same MetaHuman over the Game Animation Sample's mannequin, which runs
 # the motion-matching anim Blueprint (gas_locomotion.py; asset_pipeline/
-# CLAUDE.md, "The skeleton bridge"). Its bones and its grip socket are named
-# as the mannequin's are (asset_pipeline/gas_player_mesh.py copies the
-# sockets); its clips and poses are still the mannequin's and do not play on
-# it (see the top of this file).
+# CLAUDE.md, "The skeleton bridge") with the weapon layers linked into it
+# (weapon_layers.py). Its bones and its grip socket are named as the
+# mannequin's are (asset_pipeline/gas_player_mesh.py copies the sockets). A
+# clip belongs to one skeleton, so its clips are the mannequin's and
+# Quaternius's retargeted onto this one (asset_pipeline/retarget_to_uefn.py),
+# and its idle the sample's own.
+GAS_ANIMS = f"/Game/Sourced/Characters/Anims/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
+GAS_UAL_ANIMS = f"/Game/Sourced/Quaternius/UAL/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
 SKIN_GAS = dataclasses.replace(
-    SKIN_METAHUMAN, mesh=GAS.MESH, anim_bp=GAS.ABP_LOCOMOTION,
-    retarget=GAS.ABP_RETARGET, gas=True)
+    SKIN_METAHUMAN, mesh=GAS.MESH, anim_bp=LAYERS_ABP, base_anim_bp=GAS.ABP_LOCOMOTION,
+    layers_tag=LAYERS_TAG, retarget=GAS.ABP_RETARGET, gas=True,
+    aim_rifle=f"{GAS_ANIMS}MF_Rifle_Idle_ADS",
+    aim_pistol=f"{GAS_ANIMS}MF_Pistol_Idle_ADS",
+    idle=GAS.IDLE,
+    punch=f"{GAS_ANIMS}MM_Attack_01",
+    crouch_idle=f"{GAS_UAL_ANIMS}UAL1_Crouch_Idle_Loop",
+    crouch_walk=f"{GAS_UAL_ANIMS}UAL1_Crouch_Fwd_Loop",
+    prone_crawl=f"{GAS_UAL_ANIMS}UAL1_Swim_Fwd_Loop",
+    search_kneel=f"{GAS_UAL_ANIMS}UAL1_Fixing_Kneeling",
+    throw=f"{GAS_UAL_ANIMS}UAL2_OverhandThrow")
 
 
 # Every skin there is, most specific first: what a running game, which has no
@@ -298,25 +324,23 @@ def _without_missing_clips(skin, eas, who, builder):
                                prone_crawl=None, search_kneel=None)
 
 
-def worn_skin():
-    """What the Character's Mesh component wears: player_skin(), or over a
-    MetaHuman with GAS_LOCOMOTION the same skin on the UEFN mannequin and the
-    motion-matching anim Blueprint (SKIN_GAS's mesh, anim BP and retarget).
-
-    All of the bridge or none, as player_skin(): a checkout without the
-    sample wears the mannequin."""
-    skin = player_skin()
-    if not (GAS.GAS_LOCOMOTION and skin.metahuman):
-        return skin
-    eas = _assets()
-    missing = [p for p in (GAS.MESH, GAS.ABP_RETARGET, GAS.ABP_LOCOMOTION, GAS.CHOOSER)
-               if not eas.does_asset_exist(p)]
-    if missing:
-        _log(f"note: GAS_LOCOMOTION is on and {missing[0]} is not here — wearing the "
-             "mannequin. Run asset_pipeline/import_gas.py, then build_gas_bridge.py.")
-        return skin
-    return dataclasses.replace(skin, mesh=SKIN_GAS.mesh, anim_bp=SKIN_GAS.anim_bp,
-                               retarget=SKIN_GAS.retarget, gas=True)
+def _gas_skin(eas):
+    """SKIN_GAS if all of the bridge is here, else None: a checkout without
+    the sample, or without its bridge or the clips retargeted onto it, wears
+    the mannequin. (The layers' anim Blueprint is not asked for: the weapons
+    build makes it.)"""
+    if not GAS.GAS_LOCOMOTION:
+        return None
+    for need, by in ((GAS.ABP_LOCOMOTION, "import_gas.py"), (GAS.CHOOSER, "import_gas.py"),
+                     (GAS.MESH, "build_gas_bridge.py"), (GAS.ABP_RETARGET, "build_gas_bridge.py"),
+                     (SKIN_GAS.aim_rifle, "retarget_to_uefn.py"),
+                     (SKIN_GAS.aim_pistol, "retarget_to_uefn.py"),
+                     (SKIN_GAS.punch, "retarget_to_uefn.py")):
+        if not eas.does_asset_exist(need):
+            _log(f"note: GAS_LOCOMOTION is on and {need} is not here — wearing the "
+                 f"mannequin. Run asset_pipeline/{by}.")
+            return None
+    return _without_missing_clips(SKIN_GAS, eas, "the MetaHuman", "retarget_to_uefn.py")
 
 
 def player_skin():
@@ -329,6 +353,9 @@ def player_skin():
     eas = _assets()
     if PLAYER_RIG == "metahuman":
         if all(eas.does_asset_exist(p) for p in (BODY_MESH, FACE_MESH, ABP_RETARGET)):
+            gas = _gas_skin(eas)
+            if gas:
+                return gas
             return _without_missing_clips(SKIN_METAHUMAN, eas, "the MetaHuman",
                                           "retarget_ual_to_mannequin.py")
         _log(f"note: PLAYER_RIG is \"metahuman\" and {BODY_MESH} or {ABP_RETARGET} "
@@ -382,7 +409,7 @@ def wear_skin(skin=None):
     ships wearing SKM_Quinn_Simple, so a checkout without the asset pipeline
     passes through here writing the values that are already there.
     """
-    skin = skin or worn_skin()
+    skin = skin or player_skin()
     eas = _assets()
     bp = eas.load_asset(CHARACTER_BP_PATH)
     if not bp:
@@ -393,9 +420,10 @@ def wear_skin(skin=None):
     # An anim BP is bound to one skeleton, so a mismatch here is not a cosmetic
     # error: the component silently falls back to the reference pose and the
     # player slides around the map in a T-pose with nothing in the log.
-    anim_class = unreal.load_class(None, f"{skin.anim_bp}.{skin.anim_bp.rsplit('/', 1)[1]}_C")
+    worn = skin.worn_anim_bp
+    anim_class = unreal.load_class(None, f"{worn}.{worn.rsplit('/', 1)[1]}_C")
     if not anim_class:
-        raise RuntimeError(f"{skin.anim_bp} has no generated class — it did not compile")
+        raise RuntimeError(f"{worn} has no generated class — it did not compile")
 
     # By name, not "the first SkeletalMeshComponent": with a MetaHuman worn
     # there are five, and the subobject list is not in tree order.

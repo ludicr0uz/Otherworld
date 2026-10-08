@@ -11,15 +11,17 @@ the hip and the shoulder aim -- it writes 0 and the body stands as it did.
 NormalizeAxis because the control rotation stores looking down as 270..360.
 
 The anim instance is cast to the player's own anim BP class, so a wearer with
-another anim BP simply fails the cast and keeps the level pose.
+another anim BP simply fails the cast and keeps the level pose. Which instance
+that is on the body is _anim_instance()'s to say: with the motion matching
+worn it is the weapon layers' linked one, not the mesh's own.
 """
 
 import unreal
 
 from combat.aim_pitch import AIM_PITCH_VAR
-from uebp.graph import BEL, _connect, _node, _palette, _pin, out, then
+from uebp.graph import BEL, _connect, _node, _palette, _pin, _set, out, then
 from combat.skin import player_skin
-from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_GET_CONTROL_ROT
+from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_GET_CONTROL_ROT, FN_LINKED_ANIM_INSTANCE
 from uebp.nodes.math import FN_BREAK_ROT, FN_MUL_FF, FN_NORMALIZE_AXIS
 from combat.weapon_component import vars as WV
 
@@ -27,6 +29,17 @@ from combat.weapon_component import vars as WV
 def _anim_class_path(skin):
     name = skin.anim_bp.rsplit("/", 1)[1]
     return f"{skin.anim_bp}.{name}_C"
+
+
+def _anim_instance(ed, skin):
+    """The call (a mesh on ``self``) that returns the anim instance ``skin``'s
+    pose variables are on: the mesh's own, or with the motion matching worn
+    the weapon layers' instance linked into it (combat/weapon_layers.py)."""
+    if not skin.layers_tag:
+        return _node(ed, FN_ANIM_INSTANCE)
+    linked = _node(ed, FN_LINKED_ANIM_INSTANCE)
+    _set(linked, "InTag", skin.layers_tag)
+    return linked
 
 
 def _author_sight_pitch(ed, pc_out, exec_ins):
@@ -54,7 +67,7 @@ def _author_sight_pitch(ed, pc_out, exec_ins):
     _connect(out(blend, WV.SightBlend), _pin(scaled, "B"))
 
     mesh = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
-    anim = keep(_node(ed, FN_ANIM_INSTANCE))
+    anim = keep(_anim_instance(ed, skin))
     _connect(out(mesh, WV.OwnerMesh), _pin(anim, "self"))
     cast = keep(_palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2]))
     _connect(out(anim), _pin(cast, "Object"))

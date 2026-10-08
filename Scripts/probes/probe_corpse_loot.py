@@ -159,7 +159,7 @@ def _check_kneel(p, hud, wc, stand_hips):
     player = p.pawn()
     pc = player.get_controller()
     mesh = player.get_editor_property("mesh")
-    anim = mesh.get_anim_instance()
+    anim = p.pose_instance(mesh)
     yield lambda: p.get(wc, SEARCHING_VAR)
     p.check("the open window is Searching, and the controller ignores move input",
             p.get(wc, SEARCHING_VAR) and p.get(hud, LOOT_KNEELING_VAR)

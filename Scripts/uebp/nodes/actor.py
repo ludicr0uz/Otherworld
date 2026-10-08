@@ -163,6 +163,8 @@ FN_SOCKET_LOC = "/Script/Engine.SceneComponent.GetSocketLocation"
 FN_SOCKET_ROT = "/Script/Engine.SceneComponent.GetSocketRotation"
 
 FN_ANIM_INSTANCE = "/Script/Engine.SkeletalMeshComponent.GetAnimInstance"
+# The instance of an anim Blueprint linked into the mesh's own, by its node's tag.
+FN_LINKED_ANIM_INSTANCE = "/Script/Engine.SkeletalMeshComponent.GetLinkedAnimGraphInstanceByTag"
 # Every body in the physics asset, not the component's one root body --
 # see RAGDOLL_PROFILE. SkeletalMeshComponent has no SetSimulatePhysics
 # UFunction at all, so there is no node to reach for by mistake.

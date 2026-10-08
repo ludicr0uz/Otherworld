@@ -41,8 +41,11 @@ a node once per link that reaches it, so an arm that left a blend out would
 update the locomotion under it fewer times a frame than a client's does
 (server_anim.py, "The branch").
 
-The later animation tasks put the player's new locomotion on the client arm;
-the server arm keeps this one.
+The player's graph is two since G4: the motion-matching base, whose own
+branch skips the feet's ground traces (gas_locomotion.py), and the weapon
+layers linked into it on both of that branch's arms (weapon_layers.py),
+which is the graph this file's rule is checked on. Its locomotion is the pose
+it is handed.
 
 A montage still runs its clock on a server (the anim instance advances it,
 slot or no slot), so one that times something keeps timing it.
@@ -73,6 +76,9 @@ SERVER_SLOTS = {PLAYER: ("DefaultSlot", "HitSlot"), WANDERER: ("DefaultSlot", "H
 # SERVER_SLOTS, a layered blend the one that slot feeds, and the IK held at 0.
 SERVER_ARM_CLASSES = (
     "AnimGraphNode_Root", BRANCH_CLASS,
+    # The pose the motion-matching base hands the weapon layers' graph
+    # (weapon_layers.py): the locomotion, as that graph sees it.
+    "AnimGraphNode_LinkedInputPose",
     "AnimGraphNode_StateMachine", "AnimGraphNode_SequencePlayer",
     "AnimGraphNode_SequenceEvaluator", "AnimGraphNode_TwoWayBlend",
     "AnimGraphNode_LocalToComponentSpace", "AnimGraphNode_ComponentToLocalSpace",

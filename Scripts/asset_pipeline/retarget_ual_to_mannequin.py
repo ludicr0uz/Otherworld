@@ -14,13 +14,8 @@ where combat/skin.SKIN_BOUND looks for the crouch, the crawl, the kneel and
 the throw.  (The per-body flow does the same retarget per body:
 ual_retarget.py, retarget_player_clips.py.)
 
-The retargeter is the plain one.  retarget_rig.build_retargeter is written for
-a Meshy target -- its finger offsets, its palm calibration and its mapping
-check all name Meshy's bones -- and none of that is needed here: the UAL rig is
-named and oriented the mannequin's way, so the chains map by name and the
-palms need no turn.  What is kept from it is what the game needs of any clip:
-in place (the character's movement moves the body, not the clip) and the
-target's pose aligned chain to chain.
+The retargeter is the plain one (plain_retarget.py says why): the UAL rig is
+named and oriented the mannequin's way.
 """
 
 import os
@@ -33,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 for _name in [m for m in sys.modules if m.startswith("asset_pipeline")]:
     del sys.modules[_name]
 
+from asset_pipeline.plain_retarget import build_plain_retargeter    # noqa: E402
 from asset_pipeline.quaternius_paths import (                       # noqa: E402
     CROUCH_IDLE, CROUCH_WALK, PRONE_CRAWL, SEARCH_KNEEL, THROW, UAL_PACKS,
     pack_dir, ual_anim_dir, ual_clip, ual_retargeter_path)
@@ -40,7 +36,7 @@ from asset_pipeline.retarget_paths import IK_MANNEQUIN, MANNEQUIN_MESH   # noqa:
 from asset_pipeline.retarget_rig import build_ik_rig                # noqa: E402
 from asset_pipeline.rig_chains import (                             # noqa: E402
     CHAINS_MANNEQUIN, RETARGET_ROOT_MANNEQUIN, ROOT_MOTION_BONE_MANNEQUIN)
-from asset_pipeline.rig_util import _load, _reuse_or_create         # noqa: E402
+from asset_pipeline.rig_util import _load                           # noqa: E402
 from asset_pipeline.ual_retarget import _batch, _fresh, build_ual_rig   # noqa: E402
 
 EAL = unreal.EditorAssetLibrary
@@ -53,32 +49,7 @@ def _log(msg):
 
 
 def build_retargeter(source_rig, target_rig, pkg):
-    rtg = _reuse_or_create(pkg, unreal.IKRetargeter, unreal.IKRetargetFactory())
-    ctl = unreal.IKRetargeterController.get_controller(rtg)
-    ctl.remove_all_ops()
-    ctl.set_ik_rig(unreal.RetargetSourceOrTarget.SOURCE, source_rig)
-    ctl.set_ik_rig(unreal.RetargetSourceOrTarget.TARGET, target_rig)
-    ctl.add_default_ops()
-    ctl.auto_map_chains(unreal.AutoMapChainType.EXACT, True)
-    # In place, for retarget_rig.py's reasons: root motion off, and the
-    # pelvis's travel across the ground zeroed (its bob is kept).
-    for i in range(ctl.get_num_retarget_ops()):
-        op = str(ctl.get_op_name(i))
-        if op == "Root Motion":
-            ctl.set_retarget_op_enabled(i, False)
-        elif op == "Pelvis Motion":
-            oc = ctl.get_op_controller(i)
-            st = oc.get_settings()
-            st.set_editor_property("scale_horizontal", 0.0)
-            oc.set_settings(st)
-    ctl.auto_align_all_bones(unreal.RetargetSourceOrTarget.TARGET,
-                             unreal.RetargetAutoAlignMethod.CHAIN_TO_CHAIN)
-    unmapped = [c for c in sorted(CHAINS_MANNEQUIN)
-                if str(ctl.get_source_chain(c)) in ("", "None")]
-    if unmapped:
-        raise RuntimeError(f"{pkg}: target chains with no source: {unmapped}")
-    EAL.save_asset(pkg)
-    return rtg
+    return build_plain_retargeter(source_rig, target_rig, pkg, sorted(CHAINS_MANNEQUIN))
 
 
 def imported_packs():

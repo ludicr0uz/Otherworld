@@ -29,6 +29,7 @@ SAME_RAD = 2e-3             # a track that is the rifle pose's, per key sampled
 SAME_CM = 0.01
 # A joint axis may sit this far inside the wood: a thumb pressed on it (cm).
 SINK_CM = 1.0
+VIRTUAL_BONE_PREFIX = "vb "
 # How far a left finger's joint may stand off the pump: a centimetre of finger
 # and a little air (measured at most 1.6; the rifle pose's stood 3.4-4.7 off
 # its right side, and its knuckles 2 cm inside the wood).
@@ -83,6 +84,11 @@ def check_shotgun_clip():
     has = {b.lower() for b in mesh_ref_pose(worn)}
     for track in sorted(str(t) for t in theirs.get_bone_track_names()):
         if track.lower() in thumbs or track.lower() in arm or track.lower() not in has:
+            continue
+        # A virtual bone (the UEFN skeleton's "VB ..." set) is worked out from
+        # the bones it is hung between when the clip is read, so the left
+        # hand's follow the left hand.
+        if track.lower().startswith(VIRTUAL_BONE_PREFIX):
             continue
         for f in frames:
             a, b = _sampled(clip, track, f), _sampled(rifle, track, f)

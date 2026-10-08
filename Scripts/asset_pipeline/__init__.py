@@ -82,6 +82,12 @@ Editor-side, in pipeline order:
                                 SK_Mannequin, and the checks only an editor can make
     retarget_ual_to_mannequin.py  entry point: the Quaternius clips onto SK_Mannequin,
                                 once, for every bound body
+    retarget_to_uefn.py         entry point: the game's own clips (the mannequin's
+                                ready poses, punch and flinches, Quaternius's stances
+                                and throw) onto SK_UEFN_Mannequin, for the weapon
+                                layers over the motion matching
+    plain_retarget.py           the retargeter between two rigs named the
+                                mannequin's way: in place, aligned chain to chain
     bound_look.py               entry point (tooling): photograph the bound body,
                                 the per-body one and Quinn in the same clip poses
     import_ui_art.py            entry point: HUD art PNGs -> textures

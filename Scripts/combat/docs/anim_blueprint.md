@@ -14,6 +14,20 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   1. Spawn the palette entry for an *existing* slot (`Animation|Montage|Slot'DefaultSlot'`).
   2. Rename `node.slot_name`.
   3. Compile, which registers it.
+- **Linking one anim Blueprint into another** (`weapon_layers.py`, `gas_locomotion.py`):
+  the linked graph starts at `Animation|LinkedAnimGraphs|InputPose`; the node that links
+  it is the palette entry `Animation|LinkedAnimGraphs|<Blueprint>-LinkedAnimGraph`, there
+  while that Blueprint is loaded and on the same skeleton, with one `InPose` pin. Its tag
+  is the graph node's `tag` (the inner struct's `Tag` is deprecated and protected).
+  Variables live on the linked instance (`GetLinkedAnimGraphInstanceByTag` on the mesh);
+  montages played on the mesh's own instance reach the linked graph's slots only with
+  `use_main_instance_montage_evaluation_data` on the linked class's defaults.
+- **A clip played into a slot must have `enable_root_motion` off**, or its montage takes
+  the character's movement over; a copy of a clip keeps the source's flag
+  (`hold_pose.in_place`).
+- **A graph left half-authored by a script that raised stays that way in the editor**
+  (the asset on disk is untouched, and `reload_packages` refuses while another loaded
+  package refers to it): rejoin the pins by hand in a script, or restart the editor.
 - **Turning a bone:** `Animation|SkeletalControls|Transform(Modify)Bone` works on a component-space
   pose. Wrap it in `Animation|ConvertSpaces|LocalToComponent` / `ComponentToLocal`. Its
   `Rotation` pin shows by default and takes a `MakeRotator` fed by an ABP variable.

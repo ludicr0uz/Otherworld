@@ -170,3 +170,15 @@ int32 UOtherworldLoadLibrary::HitHistoryTotalSamples(const UObject* WorldContext
 	}
 	return Total;
 }
+
+AActor* UOtherworldLoadLibrary::SpawnActorAt(const UObject* WorldContextObject, TSubclassOf<AActor> ActorClass, const FTransform& Transform)
+{
+	UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	if (!World || !ActorClass || World->GetNetMode() == NM_Client)
+	{
+		return nullptr;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	return World->SpawnActor<AActor>(ActorClass, Transform, Params);
+}

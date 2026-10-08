@@ -34,6 +34,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Otherworld|Movement")
 	static void SetAimWalk(AActor* Character, bool bAiming);
 
+	/** One press of the crouch key in a sprint: the next move slides, or does not. */
+	UFUNCTION(BlueprintCallable, Category = "Otherworld|Movement")
+	static void RequestSlide(AActor* Character);
+
 	// --- the state, for the graphs that show or gate on it.
 
 	/**
@@ -51,6 +55,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Movement")
 	static bool IsSprintSpent(const AActor* Character);
+
+	/** In a slide, on any machine. On another player's copy it is what the server replicated. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Movement")
+	static bool IsSliding(const AActor* Character);
 
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Movement")
 	static bool IsSprintAhead(const AActor* Character);

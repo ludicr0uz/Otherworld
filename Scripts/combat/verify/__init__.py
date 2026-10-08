@@ -167,6 +167,10 @@ and it never relies on a variable another section left behind.
               pose line, the weapon layers linked into it (G4), its own
               server branch, the sockets and the silent foley component on
               the body that runs it
+  gas_moves   the sample's other moves (G5), each behind its switch: the
+              crouch as the motion matching's Stance, the slide on the
+              movement component and in the layers, the traversal component
+              as patched (any Character, the RPC guard) and behind the jump key
   weapon_layers  the weapon layers' anim Blueprint (G4): its one pose in and
               three slots, the weapon component's reach to its linked
               instance, and no clip played into a slot having root motion
@@ -175,6 +179,6 @@ and it never relies on a variable another section left behind.
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "glimmer", "heat",
+    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
 )

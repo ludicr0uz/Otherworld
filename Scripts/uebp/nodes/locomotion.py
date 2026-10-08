@@ -29,3 +29,8 @@ NODE_MAKE_INPUT_STATE = "Utilities|Struct|MakeSPlayerInputState"
 NODE_BYTE_TO_GAIT = "Utilities|Enum|BytetoEnumE_Gait"
 NODE_BYTE_TO_MOVEMENT_MODE = "Utilities|Enum|BytetoEnumE_MovementMode"
 NODE_BYTE_TO_ROTATION_MODE = "Utilities|Enum|BytetoEnumE_RotationMode"
+NODE_BYTE_TO_STANCE = "Utilities|Enum|BytetoEnumE_Stance"
+# The sample's traversal structs (combat/gas_traversal.py).
+NODE_MAKE_TRAVERSAL_PROPERTIES = "Utilities|Struct|MakeSCharacterPropertiesforTraversal"
+NODE_MAKE_TRAVERSAL_INPUTS = "Utilities|Struct|MakeSTraversalCheckInputs"
+NODE_BREAK_TRAVERSAL_RESULT = "Utilities|Struct|BreakSTraversalCheckResult"

@@ -187,6 +187,18 @@ ASSETS AND PATCHES
                     line, the weapon layers linked in, its server branch, the
                     silent foley bank
   gas_locomotion_consts  its switch (GAS_LOCOMOTION), names and numbers
+  gas_moves_tuning  the sample's other moves (G5): the three switches
+                    (GAS_CROUCH, GAS_SLIDE, GAS_TRAVERSAL), the slide's and
+                    the traversal's names and numbers
+  gas_moves         which of them the player has: each switch and the
+                    motion-matching body under it (crouch_on, slide_on,
+                    traversal_on)
+  gas_traversal     traversal (G5): the sample's AC_TraversalLogic patched to
+                    read any Character and to ask the RPC guard, the
+                    component and MotionWarping on the player, the jump key's
+                    JumpPressed event
+  gas_traversal_slot  where the traversal montages reach the body: the
+                    sample's own slot on one arm of a blend by OwTraversing
   weapon_layers     ABP_WeaponLayers (G4): the anim Blueprint the player's
                     slots, stances, pitch, poses and support hand are authored
                     in, linked into the motion-matching base; its Input Pose,

@@ -73,7 +73,11 @@ WAS_FALLING = Var("OwWasFalling", BOOL, False)
 FALL_VELOCITY = Var("OwFallVelocity", VECTOR)
 LAND_VELOCITY = Var("OwLandVelocity", VECTOR)
 LANDED_AT = Var("OwLandedAt", FLOAT, 0.0)
-ADDED_VARS = (WAS_FALLING, FALL_VELOCITY, LAND_VELOCITY, LANDED_AT)
+# ...and whether the pawn's traversal component is playing a traversal (G5):
+# what puts the sample's own montage slot in the pose line
+# (gas_traversal_slot.py). Declared always, written only with traversal on.
+TRAVERSING = Var("OwTraversing", BOOL, False)
+ADDED_VARS = (WAS_FALLING, FALL_VELOCITY, LAND_VELOCITY, LANDED_AT, TRAVERSING)
 
 # The struct's fields (S_CharacterPropertiesForAnimation), as the Make node
 # names its pins: each is followed by an id, so a pin is matched by its head.
@@ -81,15 +85,20 @@ FIELDS_SET = ("ActorTransform", "AimingRotation", "OrientationIntent", "Velocity
               "InputAcceleration", "CurrentMaxAcceleration", "CurrentMaxDeceleration",
               "GroundNormal", "Gait", "MovementMode", "RotationMode", "InputState",
               "JustLanded", "LandVelocity")
-# Left at the struct's defaults: Stance (Stand: the crouch is G5's), the
-# sample's own MovementDirection, SteeringTime, GroundLocation and
+# Stance is set too while the crouch is the sample's (gas_locomotion.fields_set).
+# Left at the struct's defaults: the sample's own MovementDirection, SteeringTime, GroundLocation and
 # BasedMovementDelta (its character sets none of them either).
 
 # The sample's own montage slot (full body, in front of the root's offset).
 # It is out of the pose line: the slots that play are the weapon layers'
 # (weapon_layers.py), linked in after the root's offset.
+# With traversal on (gas_moves.traversal_on(), G5) it is on one arm of a blend
+# in front of the root's offset, in the line only while a traversal plays
+# (gas_traversal_slot.py): the layers' ready and hold poses play in a slot of
+# this same name.
 SLOT_NAME = "DefaultSlot"
 SLOT_CLASS = "AnimGraphNode_Slot"
+OFFSET_ROOT_CLASS = "AnimGraphNode_OffsetRootBone"
 
 # THE SERVER BRANCH (task A4, server_anim_consts.py). The sample's graph ends
 #   ... -> Remap Curves -> LocalToComponent -> Foot Placement -> Leg IK

@@ -1,7 +1,7 @@
 """The carry: writes Lowered once a frame, which is whether the ready pose is
 off (ready_pose.py and the equip in inventory.py read it).
 
-    Lowered = Sprinting
+    Lowered = Sprinting (or, G5, in a traversal: its montage is the whole body's)
               OR (Held is a gun AND NOT Stance == PRONE
                   AND NOT (Aiming OR Blocking OR RaiseForced
                            OR SightSeat > SEAT_HOLD
@@ -36,18 +36,22 @@ which is what the pose followed before there was a carry.
 from combat.carry_tuning import (
     CARRY_GRIP, CARRY_RAISE_HOLD_S, LOWERED_VAR, RAISE_FORCED_VAR,
 )
+from combat.gas_moves import traversal_on
+from combat.gas_moves_tuning import DOING_VAR, TRAVERSAL_BP
 from uebp.graph import _connect, _node, _pin, _set, _vec, else_, out, then
 from combat.seat_tuning import SEAT_HOLD, SEAT_VAR
 from combat.torch_tuning import BURNS_VAR
 from combat.weapon_component.common import _muzzle_location, _prop
 from combat.weapon_component.stance import PRONE, STANCE_VAR
-from uebp.nodes.actor import FN_GET_OWNER, FN_GET_TRANSFORM
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNER, FN_GET_TRANSFORM
 from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_VV, FN_AND, FN_EQ_II, FN_GREATER_FF, FN_LESS_FF, FN_NOT, FN_OR,
     FN_SELECT_VECTOR, FN_TRANSFORM_LOC)
 from uebp.nodes.system import FN_TIME_SECONDS
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
+
+TRAVERSAL_CLASS = f"{TRAVERSAL_BP}.{TRAVERSAL_BP.rsplit('/', 1)[1]}_C"
 
 
 def _author_shot_origin(ed, held):
@@ -97,6 +101,21 @@ def _author_carry(ed, held, armed_out, exec_ins):
         _connect(a, _pin(n, "A"))
         return out(n)
 
+    def or_climbing(pin):
+        """``pin``, or in one of the sample's traversals (G5): its montage is
+        the whole body's, so the hand's pose is off for as long as it plays
+        (and the keep-alive, which asks Lowered, does not play the pose over
+        it: one montage of a group stops the other). Sprinting stays the
+        first thing Lowered is made of, on A."""
+        if not traversal_on():
+            return pin
+        comp = keep(_node(ed, FN_GET_COMP))
+        _connect(out(keep(_node(ed, FN_GET_OWNER))), _pin(comp, "self"))
+        _pin(comp, "ComponentClass").set_pin_value(TRAVERSAL_CLASS)
+        doing = keep(ed.add_get_member_variable_node(DOING_VAR, TRAVERSAL_CLASS))
+        _connect(out(comp), _pin(doing, "self"))
+        return gate2(FN_OR, pin, out(doing, DOING_VAR))
+
     gate = keep(ed.add_branch_node())
     _connect(armed_out, _pin(gate, "Condition"))
     for e in exec_ins:
@@ -136,16 +155,15 @@ def _author_carry(ed, held, armed_out, exec_ins):
     _set(lying, "B", PRONE)
     upright = negate(out(lying))
     gun_down = gate2(FN_AND, gun_down, upright)
-    down = gate2(FN_OR, get(WV.Sprinting), gun_down)
+    down = gate2(FN_OR, get(WV.Sprinting), or_climbing(gun_down))
 
     mark = keep(ed.add_set_member_variable_node(LOWERED_VAR))
     _connect(down, _pin(mark, LOWERED_VAR))
     _connect(then(gate), _pin(mark, "execute"))
 
     # --- empty hands: the pose follows the sprint alone -----------------------
-    running = keep(ed.add_get_member_variable_node(WV.Sprinting))
     plain = keep(ed.add_set_member_variable_node(LOWERED_VAR))
-    _connect(out(running, WV.Sprinting), _pin(plain, LOWERED_VAR))
+    _connect(or_climbing(get(WV.Sprinting)), _pin(plain, LOWERED_VAR))
     _connect(else_(gate), _pin(plain, "execute"))
 
     ed.add_comment_to_nodes(

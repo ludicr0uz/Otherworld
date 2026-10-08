@@ -19,6 +19,8 @@ its MaxWalkSpeed (player_pace.py). The graphs only hand it the keys
 
 import unreal
 
+from combat.gas_moves import slide_on
+from combat.gas_moves_tuning import SLIDE_MIN_START_SCALE, SLIDE_SECONDS
 from combat.log import _log
 from combat.paths import MOVE_CHARACTER_CLASS_PATH
 from combat.player_pace import movement_of
@@ -41,7 +43,16 @@ MOVE_NUMBERS = {
     "prone_speed_scale": COMBAT.prone_speed_scale,
     "crouch_half_height": COMBAT.crouch_half_height_cm,
     "prone_half_height": COMBAT.prone_half_height_cm,
+    # The slide (G5, gas_moves_tuning.py). Whether there is one is
+    # slide_numbers(): it depends on the body the player wears.
+    "slide_seconds": SLIDE_SECONDS,
+    "slide_min_start_speed": SLIDE_MIN_START_SCALE * COMBAT.sprint_speed_cms,
 }
+
+
+def slide_numbers():
+    """The slide's switch on the movement template: {property: value}."""
+    return {"slide_enabled": slide_on()}
 
 
 def _settings(movement):
@@ -105,5 +116,10 @@ def set_move_numbers(bp):
         got = movement.get_editor_property(name)
         if abs(got - value) > 1e-4:
             raise RuntimeError(f"{name} stayed at {got}, wanted {value}")
+    for name, value in slide_numbers().items():
+        movement.set_editor_property(name, value)
+        if movement.get_editor_property(name) != value:
+            raise RuntimeError(f"{name} stayed at {not value}")
     _log(f"player: movement states are the movement component's "
-         f"({len(MOVE_NUMBERS)} numbers written)")
+         f"({len(MOVE_NUMBERS)} numbers written; the slide is "
+         f"{'on' if slide_on() else 'off'})")

@@ -31,6 +31,8 @@ from combat.body_pose import (
     GUARD_ARMS, GUARD_GUN, KNEEL_BLEND_SPEED, KNEEL_FROM_S, KNEEL_TIME, KNEEL_TO_S,
     POSE_BLEND_SPEED, POSE_CROUCH, POSE_KNEEL, POSE_PRONE,
 )
+from combat.gas_moves import slide_on
+from combat.gas_moves_tuning import POSE_SLIDE, SLIDE_BLEND_SPEED
 from uebp.graph import BEL, _connect, _node, _palette, _pin, _set, else_, out, then
 from combat.paths import ITEM_CLASS_PATH
 from combat.skin import player_skin
@@ -40,6 +42,8 @@ from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR
 from uebp.nodes.math import (
     FN_ABS, FN_ADD_FF, FN_AND, FN_BOOL_TO_FLOAT, FN_EQ_II, FN_FMOD, FN_INTERP_FF, FN_NOT,
     FN_SUB_FF)
+from uebp.nodes.actor import FN_GET_OWNER
+from uebp.nodes.move import FN_IS_SLIDING
 from uebp.nodes.system import FN_TIME_SECONDS
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
@@ -105,6 +109,13 @@ def _targets(ed):
     _connect(_pin(searching, SEARCHING_VAR, is_input=False), _pin(down, "A"))
     _connect(_pin(up, "ReturnValue", is_input=False), _pin(down, "B"))
     out[POSE_KNEEL] = _pin(down, "ReturnValue", is_input=False)
+    if slide_on():
+        # The movement's own answer, so another player's copy and the
+        # server's slide with it (uebp.nodes.move).
+        sliding = _node(ed, FN_IS_SLIDING)
+        _connect(_pin(_node(ed, FN_GET_OWNER), "ReturnValue", is_input=False),
+                 _pin(sliding, "Character"))
+        out[POSE_SLIDE] = _pin(sliding, "ReturnValue", is_input=False)
     return out
 
 
@@ -151,7 +162,8 @@ def _author_pose_weights(ed, tick, held, armed_out, exec_ins):
     tail = then(cast)
     for weight, speed in ((POSE_CROUCH, POSE_BLEND_SPEED), (POSE_PRONE, POSE_BLEND_SPEED),
                           (GUARD_ARMS, POSE_BLEND_SPEED), (GUARD_GUN, POSE_BLEND_SPEED),
-                          (POSE_KNEEL, KNEEL_BLEND_SPEED)):
+                          (POSE_KNEEL, KNEEL_BLEND_SPEED),
+                          *(((POSE_SLIDE, SLIDE_BLEND_SPEED),) if slide_on() else ())):
         target = _node(ed, FN_BOOL_TO_FLOAT)
         _connect(targets[weight], _pin(target, "InBool"))
         now = ed.add_get_member_variable_node(weight, anim_class)

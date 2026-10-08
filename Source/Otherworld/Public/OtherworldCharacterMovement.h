@@ -12,6 +12,9 @@
 //             the stamina latch and the forward cone (SprintConeMinDot).
 //   prone     FLAG_Custom_1. A crouch (the engine's own flag) to ProneHalfHeight.
 //   aim-walk  FLAG_Custom_2. AimWalkAlpha eases towards it; the walk slows by it.
+//   slide     FLAG_Custom_3, one press (G5). A sprint that is asked to slide
+//             crouches and coasts along the way it was going for SlideSeconds,
+//             slowing to the crouch's pace; it steers nothing and spends nothing.
 //
 // Stamina is simulated with the moves, so the client predicts it; the client
 // reports its own with each move, and a correction carries the server's.
@@ -34,6 +37,11 @@ public:
 	uint8 bWantsProne : 1;
 	uint8 bWantsAimWalk : 1;
 	uint8 bStartSprintSpent : 1;
+	uint8 bWantsSlide : 1;
+	uint8 bStartSliding : 1;
+	float StartSlideTime = 0.f;
+	float StartSlideSpeed = 0.f;
+	FVector StartSlideDirection = FVector::ZeroVector;
 	float StartStamina = 0.f;
 	float StartAimWalkAlpha = 0.f;
 	/** After the move: what the server is told, to compare with its own. */
@@ -78,6 +86,10 @@ struct FOtherworldMoveResponseDataContainer : public FCharacterMoveResponseDataC
 	float Stamina = 0.f;
 	float AimWalkAlpha = 0.f;
 	bool bSprintSpent = false;
+	bool bSliding = false;
+	float SlideTime = 0.f;
+	float SlideStartSpeed = 0.f;
+	FVector SlideDirection = FVector::ZeroVector;
 
 	virtual void ServerFillResponseData(const UCharacterMovementComponent& CharacterMovement, const FClientAdjustment& PendingAdjustment) override;
 	virtual bool Serialize(UCharacterMovementComponent& CharacterMovement, FArchive& Ar, UPackageMap* PackageMap) override;
@@ -130,6 +142,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Otherworld|Stance", meta = (ForceUnits = "cm"))
 	float ProneHalfHeight = 40.f;
 
+	/** Off: a slide asked for never starts (combat/slide_tuning.py, GAS_SLIDE). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Otherworld|Slide")
+	bool bSlideEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Otherworld|Slide", meta = (ForceUnits = "s"))
+	float SlideSeconds = 1.f;
+
+	/** A slide starts only from a sprint going at least this fast over the ground. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Otherworld|Slide", meta = (ForceUnits = "cm/s"))
+	float SlideMinStartSpeed = 450.f;
+
 	/** How far the client's stamina may be from the server's before the server corrects it. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Otherworld|Pace")
 	float StaminaErrorTolerance = 2.f;
@@ -144,6 +167,10 @@ public:
 
 	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
 	bool bWantsAimWalk = false;
+
+	/** One press: the next move starts a slide or does not, and clears it. */
+	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
+	bool bWantsSlide = false;
 
 	// --- what the movement made of it: the same on the owning client and the server.
 
@@ -162,6 +189,19 @@ public:
 
 	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
 	float AimWalkAlpha = 0.f;
+
+	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
+	bool bSliding = false;
+
+	/** Seconds into the slide, the speed it began at and the way it goes. */
+	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
+	float SlideTime = 0.f;
+
+	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
+	float SlideStartSpeed = 0.f;
+
+	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
+	FVector SlideDirection = FVector::ZeroVector;
 
 	/** Corrections this client has taken from the server since it began. Each is also a log line. */
 	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
@@ -188,6 +228,10 @@ private:
 	/** The way the player faces, for the sprint's cone: the view's yaw. */
 	FVector FacingDirection() const;
 	float GroundSpeed() const;
+	/** The slide's speed at SlideTime: from the speed it began at down to the crouch's. */
+	float SlideSpeed() const;
+	/** Start, carry on or end the slide, before the engine acts on the crouch. */
+	void UpdateSlide(float DeltaSeconds);
 
 	FOtherworldNetworkMoveDataContainer MoveDataContainer;
 	FOtherworldMoveResponseDataContainer MoveResponseContainer;

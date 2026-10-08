@@ -31,7 +31,7 @@ The defaults are all rebindable on the settings screen:
   **1-4** bring the primary, secondary, pistol or melee slot's item to hand (the same key
   again puts it back: empty hands), **5-9** the bag's first five slots, **Q** the next filled
   bag slot, round the bag (not the weapon slots: `NextRequest`, `probes/probe_slots.py`) (all fixed keys, not settings binds: see "The slots" below), **G** drops, **E** interacts (an item in reach is picked up; a campfire heats the knife or axe in hand), **Shift** sprints, **F** blocks (held),
-  **C** toggles crouch, **Z** toggles prone, **Left Alt** held down the sights holds the breath (`docs/aiming.md`), **V** held cocks the arm and shows the throw's arc, which ends on the reticle's point, and a click throws (see below).
+  **C** toggles crouch (in a sprint it slides: G5, "Crouch, slide and traversal from the sample"), **Z** toggles prone, **Left Alt** held down the sights holds the breath (`docs/aiming.md`), **V** held cocks the arm and shows the throw's arc, which ends on the reticle's point, and a click throws (see below).
 - **R** reloads, and restarts from the death menu.
 - M belongs to the graphics menu; **I** (the inventory: the backpack and the worn
   garments, with drag and drop) and Tab (the loot window) to the HUD.
@@ -736,8 +736,8 @@ another player's copy and the server's).
   implements and replicates nothing for it, and it runs on every machine. The speeds,
   the stamina-gated sprint and the aim's walk stay the C++ movement's: the gait is read
   off them (`IsSprinting`; a pace under `WALK_BELOW_CMS` is a walk), never set. The
-  player faces the view, so the rotation mode is Strafe. Stance is always Stand: the
-  crouch, the slide and traversal are G5's. `AC_PreCMCTick` and `AC_PostABPTick` did not
+  player faces the view, so the rotation mode is Strafe. Stance is Crouch while the
+  movement crouches (G5, below). `AC_PreCMCTick` and `AC_PostABPTick` did not
   come across: each only broadcasts its own tick, the first for the sample character's
   speed logic (ours is C++) and the second for nothing the graph reads.
   - **The landing is kept on the anim instance** (`OwWasFalling`, `OwFallVelocity`,
@@ -791,7 +791,7 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
   conversions, blends and a root of its own that those builders would have taken for
   theirs. The upper body is a layered blend per bone from `spine_01`, as it was: the
   sample's graph has no AnimationLayering slot (its one montage slot is full body, and is
-  out of the pose line).
+  out of the pose line but while a traversal plays: G5, below).
 - **The link is after the root's offset.** The aim's blend is in mesh space, so an aimed
   chest faces where the capsule does; before Offset Root Bone it would face where the
   lagging root does (the sample turns in place). It is before the feet and the pose
@@ -837,6 +837,82 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
 - **`probe_sight_align` fails one check of 186** (the rifle, looking up 25°: the shot's
   point 0.37° off the sight line). The view is still and the point is a hit 7.7 m away,
   5 cm off the line: the aim trace grazing a branch from the lower eye point, not the pose.
+
+## Crouch, slide and traversal from the sample (G5, 2026-10-08)
+
+The moves the sample ships beyond the walk and the run, on the keys the game already
+had, each behind its own switch in `gas_moves_tuning.py` (`GAS_CROUCH`, `GAS_SLIDE`,
+`GAS_TRAVERSAL`; a builder or a verifier asks `gas_moves.crouch_on()` and its two
+siblings, which are also off on the mannequin fallback). Change one, then run the
+weapons build. `verify/gas_moves.py` checks each switch both ways,
+`probes/probe_gas_traversal.py` crouches, slides and mantles a 1 m block, and
+`probes/probe_net_slide.py` slides as a lagged client.
+
+- **The crouch is the sample's Stance.** `Update_PropertiesFromCharacter` sets
+  `Stance = Crouch` while `GetStance(pawn) == 1` (crouched, not prone: the movement's own
+  answer, so every machine's copy), and the sample's chooser picks its crouch databases
+  (idles, walks, starts, stops, pivots, the stand-to-crouch transition). The weapon
+  layers then author **no** crouch blend (`stance_clips.py`): the two Quaternius crouch
+  clips are still built and named by the skin, and come back with the switch off.
+  `PoseCrouch` is still eased (nothing reads it on this body). Prone, the kneel and the
+  crawl are the layers' as before; the capsule, the speed and the key are unchanged.
+- **The slide is ours, posed by the sample's clip.** The sample's CMC character has no
+  slide: its slide is the Mover variant's movement mode and the Mover's chooser, neither
+  of which came across (the CMC chooser has no slide row). So the movement is a state of
+  `UOtherworldCharacterMovement` (`Source/CLAUDE.md`, "Predicted movement"): the crouch
+  key pressed in a sprint (`weapon_component/stance.py`: `RequestSlide`, and that one
+  frame the stance is the crouch although sprinting) starts it if the sprint is going at
+  least `SLIDE_MIN_START_SCALE` of its speed; it coasts along the way it was going for
+  `SLIDE_SECONDS` (1 s, about 3.7 m), from its speed down to the crouch's, steering and
+  spending nothing, and ends crouched (sprint still held: the sprint's escape stands it
+  up, as ever). Standing up, lying down or leaving the ground ends it early.
+  - The pose is `M_Neutral_Slide_FootOut_Loop` blended in by `PoseSlide` in the layers'
+    graph, over the crouch and under the crawl; the weapon component eases `PoseSlide`
+    to `IsSliding(owner)`, which a simulated copy answers from the character's
+    replicated `bSliding`. The clip holds its own root (`force_root_lock`).
+  - **`CrouchForced` is a probe's press of the crouch key**, ORed with the key and spent
+    by the frame that read it, after the slide's Branch (the press is a pure read).
+  - **A sprint is a sprint only while it is steered ahead**: a probe that presses the key
+    and stops steering on the same frame gets a crouch, not a slide.
+- **Traversal is the sample's own component** (`gas_traversal.py`): `AC_TraversalLogic`
+  on the player as `GasTraversal`, with a `MotionWarping` component. The jump key's
+  `Started` calls `JumpPressed`, a custom event of the character (a probe calls it: an
+  injected `IA_Jump` never reaches a headless game): on the ground, not crouched and not
+  already in one, it calls `TryTraversalAction` with the sample's own sweep (75 to 350 cm
+  ahead by speed) and jumps only when the check or the montage choice failed.
+  - **It climbs `LevelBlock_Traversable` and nothing else.** The check casts what the
+    sweep hits to that class and reads the ledges off its splines. **The forest has
+    none**, so until blocks are placed (or the check is taught the forest's rocks and
+    logs) the jump key jumps everywhere, as before. The probe spawns one
+    (`OtherworldLoadLibrary.SpawnActorAt`).
+  - **The component is patched where it lies** (a row of `gas_paths.PATCHED`): both
+    reads of `S_CharacterPropertiesForTraversal` are made from the owner as a Character
+    (the sample asked through `BPI_SandboxCharacter_Pawn`), and its Server event asks the
+    RPC guard first (by its own name, which has no row: the default rate), then refuses a
+    ledge further than `LEDGE_REACH_CM` from the server's copy.
+  - **Its montages play in the base's own `Slot(DefaultSlot)`, which is in the pose line
+    only while one plays** (`gas_traversal_slot.py`: one Blend Poses by bool on
+    `OwTraversing`, the component's `DoingTraversalAction`). The layers' ready and hold
+    poses play in a slot of the same name, upper body only, in their own graph: with the
+    sample's slot always in the line a raised gun or a knife in hand became the whole
+    body's pose and the motion matching under it stopped (the legs stood while the
+    capsule ran). `probe_gas_traversal`'s first check guards it.
+  - **While one plays the hand's pose is off** (`weapon_component/carry.py`: `Lowered`
+    is also `DoingTraversalAction`): the sample's Play Montage stops every montage, and
+    the keep-alive, which asks `Lowered`, would otherwise play the hold pose over the
+    climb (one montage of a group stops the other). The pose is back when it ends.
+  - **Removing an earlier run's nodes walks data pins only** (`_data_feeders`). A walk
+    through exec pins reaches the graph's events: it took the component's BeginPlay out
+    and unhooked `TryTraversalAction`'s entry, and the jump key then did nothing at all.
+    `verify/gas_moves.py` checks both are whole.
+  - **As a client of a server it is authored and not proven.** The component replicates
+    and the flow is the sample's (the client's check, a Server event, a Multicast, and
+    the sample's own client-authoritative position for the montage's length:
+    `SetReplicationBehavior`). There is no `--net` probe: a block a probe spawns exists
+    on one machine, and the levels have none. Prove it before blocks go into a level
+    (`Scripts/net/CLAUDE.md`, "Traversal").
+  - A shot fired in a traversal leaves from the carry's lowered point (`Lowered` is
+    held), and the fire gate does not ask about it.
 
 ## Tuning
 
@@ -906,6 +982,15 @@ These are feel checks a headless run can't do:
   the aim offset hold the chest squarer); turning in place with the view, idle breaks,
   pivots and stops under real keys; and the first seconds of a game from the editor binary,
   standing in the reference pose while the indices load;
+
+- the sample's crouch, the slide and the mantle (G5, `gas_moves_tuning.py`): measured by
+  `probe_gas_traversal.py`, never seen or played. How the sample's crouch reads under a
+  raised gun and at the crouch's 180 cm/s; the slide: whether 1 s and about 3.7 m feel
+  right, the one loop clip blended in over 0.1 s with no "into" and no "out" (the sample
+  has both, for the Mover), a gun in the sliding hand, the camera dropping with the
+  capsule in one frame, and that it makes the crouch's noise; the mantle: the arms over
+  whatever is in the hand a moment before, the hold pose snapping back as it ends, and
+  the 0.25 s back to the motion matching;
 
 - the weapon layers on it (`weapon_layers.py`): seen in pictures (`probe_metahuman_look.py`:
   the axe, the rifle carried and down its sights) and measured, never played. Whether the

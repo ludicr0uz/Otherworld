@@ -132,6 +132,12 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
 ## The crouch and crawl clips (`stance_clips.py`)
 
+- **On the motion-matching body the crouch is not a clip of ours** (G5,
+  `gas_moves_tuning.GAS_CROUCH`): the sample's crouch set plays, picked by its chooser on
+  `Stance`, and no crouch blend is authored; the crouch key in a sprint slides
+  (`GAS_SLIDE`). `Scripts/combat/CLAUDE.md`, "Crouch, slide and traversal from the
+  sample". What follows about the crouch clips is the fallback's, and the switch-off's.
+
 - **On the adventurer the low stances are clips**, from the Quaternius Universal Animation
   Library (CC0; `asset_pipeline/import_quaternius.py` retargets every UAL clip onto the
   adventurer, into `/Game/Sourced/Quaternius/UAL/Adventurer01`). `PlayerSkin` names four (the fourth is `search_kneel`, below):

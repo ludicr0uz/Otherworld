@@ -10,13 +10,15 @@ import unreal
 
 from asset_pipeline.gas_bridge_paths import PLAYER_SOCKETS
 from combat.gas_locomotion import (
-    enum_values, graphs, layer_links, link_class, link_tag, server_branches, slot_in_line,
+    enum_values, fields_set, graphs, layer_links, link_class, link_tag, server_branches,
+    slot_in_line,
 )
 from combat.gas_locomotion_consts import (
-    ADDED_VARS, CHOOSER, EYE_CLASSES, FIELDS_SET, FOLEY_BANK_TABLE, FOLEY_BANK_VAR,
+    ADDED_VARS, CHOOSER, EYE_CLASSES, FOLEY_BANK_TABLE, FOLEY_BANK_VAR,
     FOLEY_COMPONENT, FOLEY_SILENT_BANK,
     HISTORY_CLASS, WALK_BELOW_CMS,
 )
+from combat.gas_moves import crouch_on, traversal_on
 from combat.server_anim_consts import CLIENT_PIN, SERVER_PIN, SERVER_POSE_VAR
 from combat.skin import player_skin
 from combat.weapon_layers import layers_class_path
@@ -46,9 +48,11 @@ def check_properties(bp, ed):
              and "Character Properties" in _title(n)]
     fed = sorted(str(PIN.get_pin_name(p)).split("_")[0]
                  for m in makes for p in BEL.list_input_pins(m) if _linked(p))
-    check(f"...one struct, with {len(FIELDS_SET)} fields of it set from the character "
-          "and the rest left at the sample's defaults (Stance among them: no crouch yet)",
-          len(makes) == 1 and fed == sorted(FIELDS_SET), str(fed))
+    check(f"...one struct, with {len(fields_set())} fields of it set from the character "
+          "and the rest left at the sample's defaults ("
+          + ("Stance is set: the crouch is the sample's, G5)" if crouch_on()
+             else "Stance among them: the crouch is the layers' clips)"),
+          len(makes) == 1 and fed == sorted(fields_set()), str(fed))
     sprint = [n for n in nodes if _title(n).replace(" ", "") == "IsSprinting"]
     paces = [n for n in nodes if _title(n).replace(" ", "") == "GetMaxSpeed"]
     limits = {float(PIN.get_pin_value(BEL.find_input_pin(c, "B")) or 0.0)
@@ -78,9 +82,11 @@ def _has(obj, name):
 
 
 def check_anim_graph(bp, anim):
-    check("the sample's own montage slot (full body, before the root's offset) is out "
-          "of the pose line: the slots that play are the weapon layers'",
-          not slot_in_line(anim), f"in line: {slot_in_line(anim)}")
+    if not traversal_on():
+        # With traversal on it is on one arm of a blend: verify/gas_moves.py.
+        check("the sample's own montage slot (full body, before the root's offset) is out "
+              "of the pose line: the slots that play are the weapon layers'",
+              not slot_in_line(anim), f"in line: {slot_in_line(anim)}")
     roots = [n for n in anim.list_all_nodes() if _class(n) == "AnimGraphNode_Root"]
     check_link(roots, anim)
     branches = server_branches(anim)

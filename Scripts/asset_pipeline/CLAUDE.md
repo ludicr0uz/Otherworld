@@ -241,11 +241,14 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/check_gas_load.py   # in a fr
   in: `dev/tests/test_gas_import.py`). **Name a GAS asset by its `/Game/GAS` path.** A
   package saved in this project is written with the new paths. The asset registry applies
   the redirects too: a copied package's dependencies read back as `/Game/GAS` names.
-- **Three packages are changed after the copy** (`gas_paths.PATCHED`; the copy keeps a
+- **Four packages are changed after the copy** (`gas_paths.PATCHED`; the copy keeps a
   patched file). `SandboxCharacter_CMC_ABP` is the weapons build's to patch
   (`combat/gas_locomotion.py`: what it reads of its character, its montage slot, the
   server branch), where it lies, because the sample's choosers take an object of its
-  class and of no other. The other two are `patch_gas_notifies.py`'s
+  class and of no other. `AC_TraversalLogic` is the weapons build's too (G5,
+  `combat/gas_traversal.py`: it reads any Character, and its Server event asks the RPC
+  guard); to get the sample's own back, copy the one file over from the sample and build
+  again. The other two are `patch_gas_notifies.py`'s
   (`gas_paths.PATCHED_NOTIFIES`): `BP_AnimNotify_TriggerRagdoll` and
   `BP_NotifyState_OverrideMovementMode` cast to the Mover character and do nothing for any
   other, so without it they fail to compile on every load of a clip that carries one. Their
@@ -270,8 +273,9 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/check_gas_load.py   # in a fr
   nobody here authors. What they found in it the day it arrived is what the wiring has to
   face when one of these goes onto the player:
   - `AC_TraversalLogic` has a Server event of its own, `PerformTraversalAction_Server`, that
-    asks no RPC guard (`combat/verify/guard.py` allows Server events on the weapon component
-    alone);
+    asked no RPC guard (`combat/verify/guard.py` allows Server events on the weapon component
+    alone). G5 put the guard at its head (`combat/gas_traversal.py`,
+    `combat/verify/gas_moves.py`);
   - `SandboxCharacter_CMC_ABP`'s `Debug_ExperimentalStateMachine` asks for a player by index
     (`net/input_checks.py`);
   - `LevelBlock` draws a random number no row of `net/random_consts.py` covers.

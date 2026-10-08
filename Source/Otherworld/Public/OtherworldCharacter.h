@@ -27,6 +27,10 @@ public:
 	UPROPERTY(Transient, ReplicatedUsing = OnRep_Prone, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
 	bool bProne = false;
 
+	/** In a slide (G5). The server writes it with each move; only simulated copies receive it, to pose by. */
+	UPROPERTY(Transient, Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
+	bool bSliding = false;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void OnRep_IsCrouched() override;
 

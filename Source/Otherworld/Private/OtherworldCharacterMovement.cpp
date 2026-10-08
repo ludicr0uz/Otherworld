@@ -11,6 +11,7 @@ namespace
 	const uint8 FLAG_Sprint = FSavedMove_Character::FLAG_Custom_0;
 	const uint8 FLAG_Prone = FSavedMove_Character::FLAG_Custom_1;
 	const uint8 FLAG_AimWalk = FSavedMove_Character::FLAG_Custom_2;
+	const uint8 FLAG_Slide = FSavedMove_Character::FLAG_Custom_3;
 
 	// The capsule is the height it was asked for; this is float slack only.
 	const float HeightSlack = 0.5f;
@@ -30,6 +31,11 @@ void FOtherworldSavedMove::Clear()
 	bWantsProne = false;
 	bWantsAimWalk = false;
 	bStartSprintSpent = false;
+	bWantsSlide = false;
+	bStartSliding = false;
+	StartSlideTime = 0.f;
+	StartSlideSpeed = 0.f;
+	StartSlideDirection = FVector::ZeroVector;
 	StartStamina = 0.f;
 	StartAimWalkAlpha = 0.f;
 	EndStamina = 0.f;
@@ -46,6 +52,11 @@ void FOtherworldSavedMove::SetMoveFor(ACharacter* C, float InDeltaTime, FVector 
 		bStartSprintSpent = Movement->bSprintSpent;
 		StartStamina = Movement->Stamina;
 		StartAimWalkAlpha = Movement->AimWalkAlpha;
+		bWantsSlide = Movement->bWantsSlide;
+		bStartSliding = Movement->bSliding;
+		StartSlideTime = Movement->SlideTime;
+		StartSlideSpeed = Movement->SlideStartSpeed;
+		StartSlideDirection = Movement->SlideDirection;
 	}
 }
 
@@ -68,6 +79,11 @@ bool FOtherworldSavedMove::CanCombineWith(const FSavedMovePtr& NewMove, ACharact
 	{
 		return false;
 	}
+	// The press is one move's, and a slide starts or ends inside a move.
+	if (bWantsSlide || Other->bWantsSlide || bStartSliding != Other->bStartSliding)
+	{
+		return false;
+	}
 	return Super::CanCombineWith(NewMove, InCharacter, MaxDelta);
 }
 
@@ -81,11 +97,19 @@ void FOtherworldSavedMove::CombineWith(const FSavedMove_Character* OldMove, ACha
 	bStartSprintSpent = Old->bStartSprintSpent;
 	StartStamina = Old->StartStamina;
 	StartAimWalkAlpha = Old->StartAimWalkAlpha;
+	bStartSliding = Old->bStartSliding;
+	StartSlideTime = Old->StartSlideTime;
+	StartSlideSpeed = Old->StartSlideSpeed;
+	StartSlideDirection = Old->StartSlideDirection;
 	if (UOtherworldCharacterMovement* Movement = MovementOf(InCharacter))
 	{
 		Movement->bSprintSpent = bStartSprintSpent;
 		Movement->Stamina = StartStamina;
 		Movement->AimWalkAlpha = StartAimWalkAlpha;
+		Movement->bSliding = bStartSliding;
+		Movement->SlideTime = StartSlideTime;
+		Movement->SlideStartSpeed = StartSlideSpeed;
+		Movement->SlideDirection = StartSlideDirection;
 	}
 }
 
@@ -103,6 +127,10 @@ uint8 FOtherworldSavedMove::GetCompressedFlags() const
 	if (bWantsAimWalk)
 	{
 		Flags |= FLAG_AimWalk;
+	}
+	if (bWantsSlide)
+	{
+		Flags |= FLAG_Slide;
 	}
 	return Flags;
 }
@@ -152,6 +180,10 @@ void FOtherworldMoveResponseDataContainer::ServerFillResponseData(const UCharact
 	Stamina = Movement->Stamina;
 	AimWalkAlpha = Movement->AimWalkAlpha;
 	bSprintSpent = Movement->bSprintSpent;
+	bSliding = Movement->bSliding;
+	SlideTime = Movement->SlideTime;
+	SlideStartSpeed = Movement->SlideStartSpeed;
+	SlideDirection = Movement->SlideDirection;
 }
 
 bool FOtherworldMoveResponseDataContainer::Serialize(UCharacterMovementComponent& CharacterMovement, FArchive& Ar, UPackageMap* PackageMap)
@@ -162,6 +194,13 @@ bool FOtherworldMoveResponseDataContainer::Serialize(UCharacterMovementComponent
 		Ar << Stamina;
 		Ar << AimWalkAlpha;
 		Ar.SerializeBits(&bSprintSpent, 1);
+		Ar.SerializeBits(&bSliding, 1);
+		if (bSliding)
+		{
+			Ar << SlideTime;
+			Ar << SlideStartSpeed;
+			Ar << SlideDirection;
+		}
 	}
 	return bOk && !Ar.IsError();
 }
@@ -200,8 +239,45 @@ FVector UOtherworldCharacterMovement::FacingDirection() const
 	return FVector::ForwardVector;
 }
 
+float UOtherworldCharacterMovement::SlideSpeed() const
+{
+	const float Alpha = FMath::Clamp(SlideTime / FMath::Max(SlideSeconds, UE_KINDA_SMALL_NUMBER), 0.f, 1.f);
+	return FMath::Lerp(SlideStartSpeed, MaxWalkSpeed * CrouchSpeedScale, Alpha);
+}
+
+void UOtherworldCharacterMovement::UpdateSlide(float DeltaSeconds)
+{
+	// bSprinting is the last move's answer: a slide is asked of a sprint.
+	if (bSliding)
+	{
+		SlideTime += DeltaSeconds;
+		// Standing up (the key again, or the sprint's escape), lying down
+		// or leaving the ground ends it; so does its time.
+		if (SlideTime >= SlideSeconds || !bWantsToCrouch || bWantsProne || !IsMovingOnGround())
+		{
+			bSliding = false;
+		}
+	}
+	else if (bSlideEnabled && bWantsSlide && bSprinting && IsMovingOnGround() && Velocity.Size2D() >= SlideMinStartSpeed)
+	{
+		bSliding = true;
+		SlideTime = 0.f;
+		SlideStartSpeed = Velocity.Size2D();
+		SlideDirection = Velocity.GetSafeNormal2D();
+		bWantsToCrouch = true;
+		bWantsProne = false;
+	}
+	// One press is one move's: the owning machine clears it here, and the
+	// server reads each move's own flag.
+	bWantsSlide = false;
+}
+
 float UOtherworldCharacterMovement::GroundSpeed() const
 {
+	if (bSliding)
+	{
+		return SlideSpeed();
+	}
 	if (IsCrouching())
 	{
 		return MaxWalkSpeed * (bWantsProne ? ProneSpeedScale : CrouchSpeedScale);
@@ -234,6 +310,8 @@ void UOtherworldCharacterMovement::UpdateCharacterStateBeforeMovement(float Delt
 		return;
 	}
 
+	UpdateSlide(DeltaSeconds);
+
 	// The engine sizes the capsule only as a crouch starts, so going between
 	// crouch and prone stands up first; Super crouches again, to the new
 	// height, in this same step.
@@ -254,7 +332,12 @@ void UOtherworldCharacterMovement::UpdateCharacterStateBeforeMovement(float Delt
 	const FVector Steer = Acceleration.GetSafeNormal2D();
 	bSprintAhead = (Steer | FacingDirection()) >= SprintConeMinDot;
 	bSprintSpent = bWantsToSprint && (bSprintSpent || Stamina <= 0.f);
-	bSprinting = bWantsToSprint && !bSprintSpent && bSprintAhead;
+	bSprinting = bWantsToSprint && !bSprintSpent && bSprintAhead && !bSliding;
+	if (bSliding)
+	{
+		// It coasts: the way and the pace are the slide's, whatever is steered.
+		Velocity = SlideDirection * SlideSpeed() + FVector(0., 0., Velocity.Z);
+	}
 	const float Rate = bSprinting ? -StaminaDrainPerSecond : StaminaRegenPerSecond;
 	Stamina = FMath::Clamp(Stamina + Rate * DeltaSeconds, 0.f, MaxStamina);
 
@@ -268,6 +351,7 @@ void UOtherworldCharacterMovement::UpdateCharacterStateBeforeMovement(float Delt
 		if (AOtherworldCharacter* Body = Cast<AOtherworldCharacter>(CharacterOwner))
 		{
 			Body->bProne = bWantsProne && IsCrouching();
+			Body->bSliding = bSliding;
 		}
 	}
 }
@@ -278,6 +362,7 @@ void UOtherworldCharacterMovement::UpdateFromCompressedFlags(uint8 Flags)
 	bWantsToSprint = (Flags & FLAG_Sprint) != 0;
 	bWantsProne = (Flags & FLAG_Prone) != 0;
 	bWantsAimWalk = (Flags & FLAG_AimWalk) != 0;
+	bWantsSlide = (Flags & FLAG_Slide) != 0;
 }
 
 FNetworkPredictionData_Client* UOtherworldCharacterMovement::GetPredictionData_Client() const
@@ -297,10 +382,12 @@ bool UOtherworldCharacterMovement::ClientUpdatePositionAfterServerUpdate()
 	const bool bRealSprint = bWantsToSprint;
 	const bool bRealProne = bWantsProne;
 	const bool bRealAimWalk = bWantsAimWalk;
+	const bool bRealSlide = bWantsSlide;
 	const bool bReplayed = Super::ClientUpdatePositionAfterServerUpdate();
 	bWantsToSprint = bRealSprint;
 	bWantsProne = bRealProne;
 	bWantsAimWalk = bRealAimWalk;
+	bWantsSlide = bRealSlide;
 	return bReplayed;
 }
 
@@ -336,4 +423,11 @@ void UOtherworldCharacterMovement::OnClientCorrectionReceived(FNetworkPrediction
 	Stamina = MoveResponseContainer.Stamina;
 	AimWalkAlpha = MoveResponseContainer.AimWalkAlpha;
 	bSprintSpent = MoveResponseContainer.bSprintSpent;
+	bSliding = MoveResponseContainer.bSliding;
+	if (bSliding)
+	{
+		SlideTime = MoveResponseContainer.SlideTime;
+		SlideStartSpeed = MoveResponseContainer.SlideStartSpeed;
+		SlideDirection = MoveResponseContainer.SlideDirection;
+	}
 }

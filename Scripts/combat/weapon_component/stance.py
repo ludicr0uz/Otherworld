@@ -25,18 +25,22 @@ for the player and every wanderer, and never learns what a stance is.
 import unreal
 
 from combat.footsteps import FOOTSTEP_BP_PATH
+from combat.gas_moves import slide_on
 from combat.log import _log
 from uebp.graph import (
-    _component_object, _connect, _handles, _loose_pin, _node, _palette, _pin, _set, out,
-    then)
+    _component_object, _connect, _handles, _loose_pin, _node, _palette, _pin, _set, else_,
+    out, then)
 from combat.tuning import COMBAT, CROUCH_KEY, PRONE_KEY
 from uebp.nodes.actor import FN_GET_COMP, FN_WAS_PRESSED
-from uebp.nodes.math import FN_EQ_II, FN_SELECT_FF, FN_SELECT_II
-from uebp.nodes.move import FN_SET_STANCE
+from uebp.nodes.math import FN_AND, FN_EQ_II, FN_NOT, FN_OR, FN_SELECT_FF, FN_SELECT_II
+from uebp.nodes.move import FN_REQUEST_SLIDE, FN_SET_STANCE
 from uebp.nodes.palette import NODE_CAST_FOOTSTEP
 from combat.weapon_component import vars as WV
 
 STANCE_VAR = "Stance"
+# A probe's press of the crouch key: read with the key, and spent by the
+# frame that read it, so one write is one press (probes/probe_gas_traversal.py).
+CROUCH_FORCED_VAR = "CrouchForced"
 STAND, CROUCH, PRONE = 0, 1, 2
 FOOTSTEP_CLASS_PATH = f"{FOOTSTEP_BP_PATH}.BP_FootstepComponent_C"
 
@@ -89,15 +93,32 @@ def _author_stance_toggle(ed, pc_out, key_pins, exec_ins):
         Stance = Sprinting ? STAND : p
 
     Each WasInputKeyJustPressed is read exactly once. Sprint wins because it is
-    the escape, the same reason it wins over the guard. Returns the Set node.
+    the escape, the same reason it wins over the guard.
+
+    With the slide on (gas_moves.slide_on(), G5) the crouch key pressed in a
+    sprint is the one frame sprint does not win:
+
+        slide  = CrouchPressed AND Sprinting
+        Stance = (Sprinting AND NOT CrouchPressed) ? STAND : p
+
+    so that frame the stance is the crouch, and the caller asks the movement
+    for a slide. A slide that starts is not a sprint (the movement says so),
+    so the crouch stays; one that does not start stands up again next frame.
+
+    Returns the Set node and the slide's bool pin (None with the slide off).
     """
     stance = ed.add_get_member_variable_node(STANCE_VAR)
     stance_out = out(stance, STANCE_VAR)
 
-    def toggled(var, target):
+    def toggled(var, target, forced=None):
         pressed = _node(ed, FN_WAS_PRESSED)
         _connect(pc_out, _pin(pressed, "self"))
         _connect(key_pins[var], _pin(pressed, "Key"))
+        if forced:
+            either = _node(ed, FN_OR)
+            _connect(out(pressed), _pin(either, "A"))
+            _connect(out(ed.add_get_member_variable_node(forced), forced), _pin(either, "B"))
+            pressed = either
         already = _node(ed, FN_EQ_II)
         _connect(stance_out, _pin(already, "A"))
         _set(already, "B", target)
@@ -107,7 +128,7 @@ def _author_stance_toggle(ed, pc_out, key_pins, exec_ins):
         _connect(out(already), _pin(flip, "bPickA"))
         return (out(pressed), out(flip))
 
-    c_pressed, c_flip = toggled("KeyCrouch", CROUCH)
+    c_pressed, c_flip = toggled("KeyCrouch", CROUCH, CROUCH_FORCED_VAR)
     p_pressed, p_flip = toggled("KeyProne", PRONE)
     after_c = _node(ed, FN_SELECT_II)
     _connect(c_flip, _pin(after_c, "A"))
@@ -120,13 +141,26 @@ def _author_stance_toggle(ed, pc_out, key_pins, exec_ins):
     stood = _node(ed, FN_SELECT_II)
     _set(stood, "A", STAND)
     _connect(out(after_p), _pin(stood, "B"))
-    _connect(out(ed.add_get_member_variable_node(WV.Sprinting), WV.Sprinting), _pin(stood, "bPickA"))
+    sprinting = out(ed.add_get_member_variable_node(WV.Sprinting), WV.Sprinting)
+    slide = None
+    if slide_on():
+        asked = _node(ed, FN_AND)
+        _connect(c_pressed, _pin(asked, "A"))
+        _connect(sprinting, _pin(asked, "B"))
+        slide = out(asked)
+        no_press = _node(ed, FN_NOT)
+        _connect(c_pressed, _pin(no_press, "A"))
+        escape = _node(ed, FN_AND)
+        _connect(sprinting, _pin(escape, "A"))
+        _connect(out(no_press), _pin(escape, "B"))
+        sprinting = out(escape)
+    _connect(sprinting, _pin(stood, "bPickA"))
 
     mark = ed.add_set_member_variable_node(STANCE_VAR)
     _connect(out(stood), _pin(mark, STANCE_VAR))
     for e in exec_ins:
         _connect(e, _pin(mark, "execute"))
-    return mark
+    return mark, slide
 
 
 def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
@@ -140,7 +174,7 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
     Returns the exec pins to carry on from.
     """
     before = {n.get_name() for n in ed.list_all_nodes()}
-    mark = _author_stance_toggle(ed, pc_out, key_pins, exec_ins)
+    mark, slide = _author_stance_toggle(ed, pc_out, key_pins, exec_ins)
     stance = ed.add_get_member_variable_node(STANCE_VAR)
     stance_out = out(stance, STANCE_VAR)
 
@@ -151,6 +185,17 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
     _connect(owner_out, _pin(apply, "Character"))
     _connect(stance_out, _pin(apply, "Stance"))
     _connect(then(mark), _pin(apply, "execute"))
+    stanced = then(apply)
+    if slide is not None:
+        # The slide: one press, sent with the next move. Whether it is a
+        # slide the movement decides, on this machine and the server alike.
+        gate = ed.add_branch_node()
+        _connect(slide, _pin(gate, "Condition"))
+        _connect(stanced, _pin(gate, "execute"))
+        ask = _node(ed, FN_REQUEST_SLIDE)
+        _connect(owner_out, _pin(ask, "Character"))
+        _connect(then(gate), _pin(ask, "execute"))
+        stanced = [then(ask), else_(gate)]
 
     # --- and how loud the feet are -------------------------------------------
     comp = _node(ed, FN_GET_COMP)
@@ -158,7 +203,14 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
     _pin(comp, "ComponentClass").set_pin_value(FOOTSTEP_CLASS_PATH)
     as_feet = _palette(ed, NODE_CAST_FOOTSTEP)
     _connect(out(comp), _pin(as_feet, "Object"))
-    _connect(then(apply), _pin(as_feet, "execute"))
+    # The probe's press is spent here, after everything that asked about it
+    # (the press is a pure read: spent earlier, the slide's Branch would
+    # read it gone).
+    spend = ed.add_set_member_variable_node(CROUCH_FORCED_VAR)
+    _set(spend, CROUCH_FORCED_VAR, False)
+    for e in ([stanced] if not isinstance(stanced, list) else stanced):
+        _connect(e, _pin(spend, "execute"))
+    _connect(then(spend), _pin(as_feet, "execute"))
     feet = _loose_pin(as_feet, "AsBPFootstepComponent", is_input=False)
     tail = then(as_feet)
     for var, crouch, prone in (

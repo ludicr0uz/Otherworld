@@ -3,6 +3,8 @@ a shot or a reload raises it (weapon_component/carry.py writes Lowered, and the
 ready pose follows it). probes/probe_carry.py shows the same in the game.
 """
 
+from combat.gas_moves import traversal_on
+from combat.gas_moves_tuning import DOING_VAR
 from combat.carry_tuning import (
     CARRY_GRIP, CARRY_RAISE_HOLD_S, LOWERED_VAR, POSE_LOWERED_VAR, RAISE_FORCED_VAR,
 )
@@ -83,8 +85,11 @@ def check_carry_state():
           any(num_pin(n, "B") == PRONE for n in fed
               if STANCE_VAR in _reads(_feeds(BEL.find_input_pin(n, "A"), 2))),
           f"PRONE is {PRONE}")
-    check("...and with empty hands it is Sprinting alone",
-          _reads(plain[0][1]) == {"Sprinting"}, str(sorted(_reads(plain[0][1]))))
+    # ...or in a traversal (G5): the component's flag, off the owner.
+    alone = {"Sprinting"} | ({DOING_VAR, "ReturnValue"} if traversal_on() else set())
+    check("...and with empty hands it is Sprinting alone"
+          + (" (or the traversal component's DoingTraversalAction)" if traversal_on() else ""),
+          _reads(plain[0][1]) == alone, str(sorted(_reads(plain[0][1]))))
     gates = {_gate(n) for n in sets}
     gate = next(iter(gates)) if len(gates) == 1 else None
     cond = _feeds(BEL.find_input_pin(gate, "Condition"), 4) if gate else []

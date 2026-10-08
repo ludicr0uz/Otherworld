@@ -1502,6 +1502,36 @@ asks) asks first, one way:
   GUN SETTINGS page is refused its extra rounds (the table is written at build time).
   The guard does not rate-limit what the engine sends itself (movement).
 
+## The slide, and traversal (G5, 2026-10-08)
+
+- **The slide is predicted movement**, the fourth state of the C++ movement component
+  (`Source/CLAUDE.md`, "Predicted movement"; `Scripts/combat/CLAUDE.md`, "Crouch, slide
+  and traversal from the sample"): the owning client asks with one saved-move flag and
+  slides at once, the server slides its copy by the same rule, and another player's copy
+  poses it from the character's replicated `bSliding` (`IsSliding(owner)`).
+  `probes/probe_net_slide.py` (`--clients 1 --lag 120`): sliding 22 ms after the press
+  at 209 ms of ping, no correction through it, the server's copy sliding and then
+  crouched. It leaves its player standing, for a probe that shares the game.
+- **Traversal is authored for a server and not proven on one.** The sample's
+  `AC_TraversalLogic` rides on the player and replicates. Its flow is the sample's: the
+  owning machine checks and picks the montage, `PerformTraversalAction_Server` tells
+  everyone (`PerformTraversalAction_Clients`, a Multicast), and for the montage's length
+  the server takes the client's position (`SetReplicationBehavior`:
+  `bIgnoreClientMovementErrorChecksAndCorrection`,
+  `bServerAcceptClientAuthoritativePosition`). What this project added: the Server event
+  asks the RPC guard first (its name has no row in `guard_consts.RATES`, whose rows are
+  the weapon component's events and checked as such, so it gets `DEFAULT_RATE`) and
+  refuses a ledge further than a traversal reaches from the server's copy
+  (`combat/gas_traversal.py`).
+  - **Open, before a traversable block goes into a level:** the client-authoritative
+    window is a trust the rest of the movement does not give (a client that claims a
+    traversal moves where it likes until the montage ends); the result names the block by
+    its component, which must be net-addressable (a level-placed block is, a spawned one
+    is not); and there is no `--net` probe, since a block spawned by a probe exists on
+    one machine. No level has such a block today, so nothing can start one.
+  - The jump key's own check runs on the owning machine only; with no block it is two
+    capsule sweeps and a jump.
+
 ## What the server spends on bodies it never draws (A4, 2026-10-08)
 
 A dedicated server draws nothing and judges every shot against the bones, so it must pose

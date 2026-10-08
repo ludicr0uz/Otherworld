@@ -86,4 +86,12 @@ public:
 	/** Every character's samples in the hit history, added up. */
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Load", meta = (WorldContext = "WorldContextObject"))
 	static int32 HitHistoryTotalSamples(const UObject* WorldContextObject);
+
+	/**
+	 * Spawn an actor into a running game, for a probe that needs a thing the
+	 * level does not have (probe_gas_traversal.py's block): Python has no
+	 * spawn of its own there. Null without authority.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Otherworld|Load", meta = (WorldContext = "WorldContextObject"))
+	static AActor* SpawnActorAt(const UObject* WorldContextObject, TSubclassOf<AActor> ActorClass, const FTransform& Transform);
 };

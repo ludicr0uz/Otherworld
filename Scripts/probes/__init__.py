@@ -38,5 +38,7 @@ Scripts/net/CLAUDE.md has the conventions and the traps.
   metahuman_follow  how far the MetaHuman stands from the hidden mesh it follows,
               and its face and garments from it; shared by probe_metahuman_body,
               probe_gas_idle and probe_gas_locomotion
+              (probe_gas_traversal: the crouch, the slide and a mantle, G5;
+              probe_net_slide: the slide predicted under lag)
   probe_*     the probes themselves, one behaviour each
 """

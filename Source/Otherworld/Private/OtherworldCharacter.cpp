@@ -13,6 +13,7 @@ void AOtherworldCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(AOtherworldCharacter, bProne, COND_SimulatedOnly);
+	DOREPLIFETIME_CONDITION(AOtherworldCharacter, bSliding, COND_SimulatedOnly);
 }
 
 void AOtherworldCharacter::OnRep_IsCrouched()

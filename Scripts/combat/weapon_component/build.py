@@ -61,7 +61,7 @@ from combat.sprint_tuning import (
     STAMINA_REGEN_VAR,
 )
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
-from combat.weapon_component.stance import STANCE_VAR, STAND
+from combat.weapon_component.stance import CROUCH_FORCED_VAR, STANCE_VAR, STAND
 from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
 from combat.chop_tuning import (
     CHOP_COUNT_VAR, CHOP_ITEM_VAR, CHOP_TREE_VAR, WOOD_CLASS_VAR, WOOD_SPOT_VAR,
@@ -316,6 +316,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
              BEL.get_object_reference_type(unreal.Actor.static_class()))
     _declare(ed, INTERACT_GAP_VAR, _float_type())
     _declare(ed, INTERACT_FORCED_VAR, BEL.get_basic_type_by_name("bool"))
+    _declare(ed, CROUCH_FORCED_VAR, BEL.get_basic_type_by_name("bool"))
     # The throw (throw.py): the aim and the launch it stores, the item in the
     # air, and the arc actor it draws on.
     for name in (THROW_AIMING_VAR, THROW_FORCED_VAR, THROW_CLICK_FORCED_VAR):
@@ -472,6 +473,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         BLOW_DAMAGE_VAR: 0.0,
         INTERACT_GAP_VAR: INTERACT_NO_GAP,
         INTERACT_FORCED_VAR: False,
+        CROUCH_FORCED_VAR: False,
         THROW_AIMING_VAR: False,
         THROW_FORCED_VAR: False,
         THROW_CLICK_FORCED_VAR: False,

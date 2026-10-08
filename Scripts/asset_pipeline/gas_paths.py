@@ -82,9 +82,12 @@ PATCHED_NOTIFIES = (
 # patch.  The anim blueprint is the weapons build's to patch
 # (combat/gas_locomotion.py: what it reads of its character, its montage slot,
 # the server branch); it is patched where it lies because the sample's
-# choosers take an object of its class and no other.
+# choosers take an object of its class and no other.  The traversal component
+# is the weapons build's too (combat/gas_traversal.py: it reads any Character,
+# and its Server event asks the RPC guard).
 PATCHED = PATCHED_NOTIFIES + (
     "/Game/Blueprints/SandboxCharacter_CMC_ABP",
+    "/Game/Blueprints/AC_TraversalLogic",
 )
 
 ABP = GAME_ROOT + "/Blueprints/SandboxCharacter_CMC_ABP"

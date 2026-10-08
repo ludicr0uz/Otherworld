@@ -11,7 +11,11 @@ from Sound.sound_monsters import BINDINGS as MONSTER_SOUNDS
 from Sound.sound_weapons import RETIRED_SOUNDS
 from combat import gas_locomotion_consts as GAS
 from combat.camera import aim_camera, face_the_camera
+from combat import gas_moves_tuning as MOVES
 from combat.gas_locomotion import silent_foley_bank
+from combat.gas_traversal import (
+    author_jump, install_traversal, replicate_traversal, unauthor_jump,
+)
 from combat.log import _log
 from uebp import net
 from uebp.nodes.guard import GUARD_CLASS
@@ -117,8 +121,11 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     # First: it recompiles the Blueprint, and component handles do not outlive that.
     reparent_player(bp)
     _uninstall_old_shotgun(bp)
+    # Before its component goes: the jump key's traversal nodes read it.
+    unauthor_jump(bp)
     _drop_components(bp, {"HealthComponent", "WeaponComponent", "FootstepComponent",
-                          RECORD_COMPONENT, GUARD_COMPONENT, GAS.FOLEY_COMPONENT})
+                          RECORD_COMPONENT, GUARD_COMPONENT, GAS.FOLEY_COMPONENT,
+                          MOVES.TRAVERSAL_COMPONENT, MOVES.WARP_COMPONENT})
     handles = {}
     for name, source in (("HealthComponent", health_bp),
                          ("WeaponComponent", weapon_bp),
@@ -128,6 +135,8 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     install_record(bp)
     install_guard(bp)
     install_foley(bp)
+    # The sample's traversal (G5): its component and the warp its montages need.
+    install_traversal(bp)
     # Symmetry, and forward planning: the player carries health too, so anything
     # that shoots back later needs to be able to hit them -- and hit them in
     # the head. (The wanderers' punch is not a trace and stays a body hit.)
@@ -146,6 +155,10 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     # template's default, written after a compile.
     net.replicate_component(bp, "WeaponComponent")
     net.replicate_component(bp, "HealthComponent")
+    replicate_traversal(bp)
+    # The jump key tries a traversal first (G5); it reads the component, so
+    # after the compile that made it a variable.
+    author_jump(bp)
     # How far a player's character is sent, and how often (task A2).
     relevancy.apply(bp, CHARACTER)
     if not BEL.compile_blueprint(bp):

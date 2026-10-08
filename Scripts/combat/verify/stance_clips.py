@@ -20,6 +20,8 @@ from combat.body_pose import (
     KNEEL_FROM_S, KNEEL_TIME, KNEEL_TO_S, MOVE_FULL_CM_S, POSE_CROUCH, POSE_KNEEL,
     POSE_PRONE, PRONE_CRAWL_LIFT_CM, PRONE_HIPS_CM, crawl_hips_z,
 )
+from combat.gas_moves import crouch_on, slide_on
+from combat.gas_moves_tuning import POSE_SLIDE, SLIDE_CLIP
 from combat.skin import player_skin
 from combat.stance_clips import (
     BLEND_CLASS, CROUCH_WALK_RATE, EVALUATOR_CLASS, OWN_CLASSES, PLAYER_CLASS,
@@ -85,8 +87,15 @@ def check_stance_graph():
         check(f"{abp.get_name()}: no stance clips on this rig, and no stance "
               "blend left in its AnimGraph", not ours, str(len(ours)))
         return
-    check(f"{abp.get_name()}: five stance blends, three players, two evaluators",
-          sorted(_cls(n) for n in ours) == sorted([BLEND_CLASS] * 5 + [PLAYER_CLASS] * 3
+    # The crouch's two blends and two players are not there while the crouch
+    # is the motion matching's (G5); the slide adds a blend and a player.
+    blends = 5 - (2 if crouch_on() else 0) + (1 if slide_on() else 0)
+    players = 3 - (2 if crouch_on() else 0) + (1 if slide_on() else 0)
+    check(f"{abp.get_name()}: {blends} stance blends, {players} players, two evaluators"
+          + (" (no crouch clip: the crouch is the motion matching's)" if crouch_on() else "")
+          + (" (and the slide's)" if slide_on() else ""),
+          sorted(_cls(n) for n in ours) == sorted([BLEND_CLASS] * blends
+                                                  + [PLAYER_CLASS] * players
                                                   + [EVALUATOR_CLASS] * 2),
           str(sorted(_cls(n) for n in ours)))
 
@@ -101,14 +110,26 @@ def check_stance_graph():
           and _title(_up(kneel, "ExplicitTime")) == f"Get {KNEEL_TIME}",
           f"{_cls(down)} <- {_clip_of(kneel)} @ {_title(_up(kneel, 'ExplicitTime')) if kneel else None}")
     lying = _up(down, "A") if _cls(down) == BLEND_CLASS else None
-    low = _up(lying, "A") if _cls(lying) == BLEND_CLASS else None
-    loco = _up(low, "A") if _cls(low) == BLEND_CLASS else None
+    under = _up(lying, "A") if _cls(lying) == BLEND_CLASS else None
+    slide = under if slide_on() else None
+    if slide_on():
+        under = _up(slide, "A") if _cls(slide) == BLEND_CLASS else None
+        played = _up(slide, "B") if _cls(slide) == BLEND_CLASS else None
+        check(f"the slide: {POSE_SLIDE} blends the sample's slide loop in over the "
+              "crouch, under the crawl",
+              _cls(slide) == BLEND_CLASS and _title(_up(slide, "Alpha")) == f"Get {POSE_SLIDE}"
+              and _cls(played) == PLAYER_CLASS and _clip_of(played) == SLIDE_CLIP,
+              f"{_cls(slide)} <- {_clip_of(played)}")
+    low = None if crouch_on() else under
+    loco = under if crouch_on() else (_up(low, "A") if _cls(low) == BLEND_CLASS else None)
     # The locomotion: the state machine, or in the weapon layers' graph the
     # pose the motion matching hands it (combat/weapon_layers.py).
-    check("...over the stance blends: PoseProne over PoseCrouch over "
-          "the locomotion",
+    check("...over the stance blends: PoseProne over "
+          + ("the locomotion, which crouches itself (no PoseCrouch blend)" if crouch_on()
+             else "PoseCrouch over the locomotion"),
           _cls(lying) == BLEND_CLASS and _title(_up(lying, "Alpha")) == f"Get {POSE_PRONE}"
-          and _cls(low) == BLEND_CLASS and _title(_up(low, "Alpha")) == f"Get {POSE_CROUCH}"
+          and (crouch_on() or (_cls(low) == BLEND_CLASS
+                               and _title(_up(low, "Alpha")) == f"Get {POSE_CROUCH}"))
           and _cls(loco) == (INPUT_CLASS if skin.layers_tag else "AnimGraphNode_StateMachine"),
           f"{_cls(lying)} <- {_cls(low)} <- {_cls(loco)}")
     feeds = PIN.list_connected_pins(BEL.find_output_pin(down, "Pose")) if down else []
@@ -117,16 +138,18 @@ def check_stance_graph():
           sorted(_cls(PIN.get_owning_node(p)) for p in feeds)
           == ["AnimGraphNode_LayeredBoneBlend", "AnimGraphNode_Slot"],
           str([_cls(PIN.get_owning_node(p)) for p in feeds]))
-    if not (low and lying):
+    if not ((low or crouch_on()) and lying):
         return
 
-    crouch = _up(low, "B")
-    still, walk = (_up(crouch, "A"), _up(crouch, "B")) if crouch else (None, None)
-    check("crouch: the still clip, and the walking one as GroundSpeed rises",
-          _cls(crouch) == BLEND_CLASS and _moved_by_speed(crouch)
-          and _clip_of(still) == skin.crouch_idle and _clip_of(walk) == skin.crouch_walk
-          and abs(_rate(walk) - CROUCH_WALK_RATE) < 1e-6,
-          f"{_clip_of(still)} / {_clip_of(walk)}")
+    crouch = None
+    if not crouch_on():
+        crouch = _up(low, "B")
+        still, walk = (_up(crouch, "A"), _up(crouch, "B")) if crouch else (None, None)
+        check("crouch: the still clip, and the walking one as GroundSpeed rises",
+              _cls(crouch) == BLEND_CLASS and _moved_by_speed(crouch)
+              and _clip_of(still) == skin.crouch_idle and _clip_of(walk) == skin.crouch_walk
+              and abs(_rate(walk) - CROUCH_WALK_RATE) < 1e-6,
+              f"{_clip_of(still)} / {_clip_of(walk)}")
     crawl = _up(lying, "B")
     rest, moving = (_up(crawl, "A"), _up(crawl, "B")) if crawl else (None, None)
     check(f"prone: the crawl held at {PRONE_REST_S:g} s still, and played at "
@@ -137,7 +160,7 @@ def check_stance_graph():
           and _cls(moving) == PLAYER_CLASS and _clip_of(moving) == skin.prone_crawl
           and abs(_rate(moving) - PRONE_CRAWL_RATE) < 1e-6,
           f"{_clip_of(rest)} @ {num_pin(rest, 'ExplicitTime') if rest else None}")
-    clamp = _up(crouch, "Alpha") if crouch else None
+    clamp = _up(crouch or crawl, "Alpha") if (crouch or crawl) else None
     scale = _up(clamp, "Value") if clamp else None
     check(f"...Move is clamp(GroundSpeed x 1/{MOVE_FULL_CM_S:g}, 0, 1)",
           clamp is not None and num_pin(clamp, "Min") == 0.0 and num_pin(clamp, "Max") == 1.0
@@ -156,7 +179,7 @@ def _z(z):
 
 def check_crouch_clips():
     skin = player_skin()
-    if not skin.stance_clips:
+    if not skin.stance_clips or crouch_on():
         return
     b = skin.pose_bones
     feet = [b["foot_l"], b["foot_r"]]

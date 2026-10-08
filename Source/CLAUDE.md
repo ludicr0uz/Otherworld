@@ -26,7 +26,7 @@ Everything else stays in the Python builders.
 | `Otherworld/Private/OtherworldInventoryLibrary.cpp` | `UOtherworldInventoryLibrary` (Python: `unreal.OtherworldInventoryLibrary`; declared in the record's header): `MarkInventoryDirty` and `MarkCarriedItemDirty` for the graphs (`Scripts/uebp/nodes/inventory.py`, placed by `Scripts/combat/dirty.py`), the view's reads of the record (`InventoryRow`, `WornRow`, `HandRow`, for `Scripts/combat/weapon_component/view.py`), the save's (`InventoryRecordOf`, `InventoryRecordToBytes`, `InventoryRecordFromBytes`), and the probes' reads and the audit's switch |
 | `Otherworld/Public/OtherworldRpcGuard.h`, `Private/….cpp` | `UOtherworldRpcGuard` (A5; `Scripts/net/CLAUDE.md`, "Every Server event asks the guard first"): a component on the player with the two checks a Blueprint Server event has no `_Validate` for. `Allow(Name)`, a token bucket per event name per connection (the state is keyed by the `UNetConnection`, so it outlives a character), which logs `RPC-REFUSED` and past `KickRefusals` in `KickSeconds` closes the connection (`ENetCloseResult::Extended`, `ClosedByRpcGuard`); and `AimAllowed(AimPoint)`, the cone along `GetBaseAimRotation` a shot's point must lie in. Both pass uncounted unless the owner's controller is a remote player's. Its numbers are `EditAnywhere`, written by `combat/install.py` from `Scripts/net/guard_consts.py`; `Counted`, `Refused`, `AimRefused` and `bKicked` (Python: `kicked`) are for the probes |
 | `OtherworldEditor/OtherworldEditor.Build.cs` | the editor module's dependencies (adds `UnrealEd`, `BlueprintGraph`); only the Editor target lists it, so no game or server build carries it |
-| `Otherworld/Public/OtherworldLoadLibrary.h`, `Private/….cpp` | `UOtherworldLoadLibrary` (Python: `unreal.OtherworldLoadLibrary`): what the load test reads off a server or a client (A1, `Scripts/probes/probe_net_load.py`): each connection's bytes and packets in and out, open actor channels and lag (`FOtherworldConnectionStats`, read with `get_editor_property`), the frame and world-tick times sampled between `StartFrameTiming` and `StopFrameTiming`, and the hit history's characters and samples |
+| `Otherworld/Public/OtherworldLoadLibrary.h`, `Private/….cpp` | `UOtherworldLoadLibrary` (Python: `unreal.OtherworldLoadLibrary`): what the load test reads off a server or a client (A1, `Scripts/probes/probe_net_load.py`): each connection's bytes and packets in and out, open actor channels and lag (`FOtherworldConnectionStats`, read with `get_editor_property`), the frame and world-tick times sampled between `StartFrameTiming` and `StopFrameTiming`, and the hit history's characters and samples; and `SpawnActorAt`, a spawn for a probe that needs a thing the level lacks (Python has none in a game; `probe_gas_traversal.py`'s block) |
 | `Otherworld/Public/OtherworldReplicationGraph.h`, `Private/….cpp` | `UOtherworldReplicationGraph` (A2, `Scripts/net/CLAUDE.md` "Relevancy, update rates and dormancy"): the server's replication driver, named for the `IpNetDriver` in `Config/DefaultEngine.ini`. A grid-spatialisation node for everything with a place in the world, an always-relevant list for `bAlwaysRelevant` actors, and `UOtherworldReplicationGraphNode_ForConnection` per connection (the engine's viewer and view target, plus the viewer's PlayerState). Each class's cull distance and period are read off its CDO, which the builders write from `Scripts/net/relevancy_consts.py`; `CellSizeCm` is its one config value |
 | `Otherworld/Public/OtherworldNetLibrary.h`, `Private/….cpp` | `UOtherworldNetLibrary` (Python: `unreal.OtherworldNetLibrary`): `IsLevelActor`, whether an actor was placed in the level (`AActor::IsNetStartupActor`, not Blueprint-callable), which the take asks before destroying one (`Scripts/uebp/nodes/level.py`); and `SendServerEvent(Target, Event, Arguments)` for the probes (A5): a Blueprint Server event sent from a client as the VM sends one (`CallRemoteFunction`), each parameter from its text, which Python's `call_method` cannot do |
 | `OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h`, `Private/….cpp` | `UOtherworldBlueprintNetLibrary` (Python: `unreal.OtherworldBlueprintNetLibrary`): a custom event's net flags and parameters, a variable's replication and OnRep graph, and the same read back off a compiled class. Wrapped by `Scripts/uebp/net.py`; checked by `Scripts/dev/check_net_authoring.py` |
@@ -54,10 +54,21 @@ are listed under `Modules` in `Otherworld.uproject` (`OtherworldEditor` as type 
 ## Predicted movement (`UOtherworldCharacterMovement`, M12)
 
 - **What a graph may do:** hand it what the player wants (`SetSprintHeld`, `SetStance`,
-  `SetAimWalk`, on the machine that reads the keys) and read what it made of that
+  `SetAimWalk`, `RequestSlide`, on the machine that reads the keys) and read what it made of that
   (`IsSprinting`, `GetStamina`, ...). A graph never writes `MaxWalkSpeed`, a crouched height or
   the stamina: a value written from a Blueprint exists on one machine, and the server pulls
   the client back to its own (the verifiers fail on such a write).
+- **The slide is the fourth state** (G5; `FLAG_Custom_3`, the last free flag;
+  `combat/gas_moves_tuning.py`). Its want is one press, not a held key: `RequestSlide`
+  raises `bWantsSlide`, the next move starts a slide or does not, and `UpdateSlide`
+  clears it (the server reads each move's own flag). It starts only from a move that was
+  sprinting, on the ground, at `SlideMinStartSpeed` or more, and only with
+  `bSlideEnabled` (off by default: the builder turns it on). While it lasts the velocity
+  is written each step, along `SlideDirection` at `SlideSpeed()`, and the sprint is off.
+  Its clock, speed and way are saved with each move (restored by `CombineWith`) and
+  carried by a correction; another player's copy reads `AOtherworldCharacter::bSliding`
+  (replicated to simulated copies, as `bProne`). `probes/probe_net_slide.py`: no
+  correction through a slide at 200 ms.
 - **The numbers are properties of the character's template**, written by
   `combat/player_move.py` from the tuning tables, so the server and every client read the
   same ones off the same asset. `SetPace`, `SetStamina` and `SpendStamina` do nothing

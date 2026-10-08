@@ -9,6 +9,8 @@ MOVE_LIBRARY = "/Script/Otherworld.OtherworldMovementLibrary"
 FN_SET_SPRINT_HELD = MOVE_LIBRARY + ".SetSprintHeld"
 FN_SET_STANCE = MOVE_LIBRARY + ".SetStance"
 FN_SET_AIM_WALK = MOVE_LIBRARY + ".SetAimWalk"
+# One press of the crouch key in a sprint (G5): the next move slides or does not.
+FN_REQUEST_SLIDE = MOVE_LIBRARY + ".RequestSlide"
 
 # The state the movement made of them.
 # 0 stand, 1 crouch, 2 prone, on any machine (a simulated copy included).
@@ -16,6 +18,8 @@ FN_GET_STANCE = MOVE_LIBRARY + ".GetStance"
 FN_GET_STAMINA = MOVE_LIBRARY + ".GetStamina"
 FN_IS_SPRINTING = MOVE_LIBRARY + ".IsSprinting"
 FN_IS_SPRINT_SPENT = MOVE_LIBRARY + ".IsSprintSpent"
+# In a slide, on any machine (a simulated copy included).
+FN_IS_SLIDING = MOVE_LIBRARY + ".IsSliding"
 FN_IS_SPRINT_AHEAD = MOVE_LIBRARY + ".IsSprintAhead"
 
 # The server's alone (and single player's): nothing on a client.

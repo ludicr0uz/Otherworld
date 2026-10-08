@@ -20,12 +20,16 @@ foot placement. What this file changes in it, each time it runs:
                                     body to its velocity (the player faces
                                     the view, so it strafes)
                       MovementMode  InAir while falling, else OnGround
-                      Stance        Stand (the crouch set is G5's)
+                      Stance        Crouch while the movement crouches and
+                                    is not prone (gas_moves.crouch_on(): the
+                                    sample's crouch set, G5), else Stand
                       JustLanded,   kept here: the frame the fall ends, and
                       LandVelocity  the velocity of its last frame
   THE SLOT        its one montage slot (full body, before the root's offset)
                   leaves the pose line: the slots that play are the weapon
-                  layers'
+                  layers'. With traversal on (gas_moves.traversal_on(), G5) it
+                  is back on one arm of a blend, in the line only while a
+                  traversal plays (gas_traversal_slot.py)
   THE LAYERS      one Linked Anim Graph node, after Remap Curves: the weapon
                   layers' anim Blueprint (weapon_layers.py), which plays
                   everything a weapon, a stance or a hit does to the body
@@ -48,6 +52,10 @@ from combat.gas_locomotion_consts import (
     HISTORY_CLASS, JUST_LANDED_SECONDS, LAND_VELOCITY, LANDED_AT, PROPERTIES_GRAPH,
     PROPERTIES_VAR, SLOT_CLASS, SLOT_NAME, WALK_BELOW_CMS, WAS_FALLING,
 )
+from combat.gas_moves import crouch_on, traversal_on
+from combat.gas_traversal_slot import (
+    author_traversal_slot, author_traversing_flag, remove_traversal_slot,
+)
 from combat.log import _log
 from combat.weapon_layers import layers_class_path
 from combat.weapon_layers_consts import (
@@ -68,11 +76,11 @@ from uebp.nodes.locomotion import (
     FN_ACTOR_ROT, FN_CURRENT_ACCELERATION, FN_INT_TO_BYTE, FN_IS_FALLING,
     FN_MAX_ACCELERATION, FN_MAX_SPEED, FN_SELECT_INT, FN_TRY_GET_PAWN_OWNER,
     NODE_BREAK_FLOOR, NODE_BYTE_TO_GAIT, NODE_BYTE_TO_MOVEMENT_MODE,
-    NODE_BYTE_TO_ROTATION_MODE, NODE_EVENT_INIT_ANIM, NODE_MAKE_CHARACTER_PROPERTIES,
+    NODE_BYTE_TO_ROTATION_MODE, NODE_BYTE_TO_STANCE, NODE_EVENT_INIT_ANIM, NODE_MAKE_CHARACTER_PROPERTIES,
     NODE_MAKE_INPUT_STATE,
 )
-from uebp.nodes.math import FN_AND, FN_GREATER_FF, FN_LESS_FF, FN_NOT, FN_SUB_FF
-from uebp.nodes.move import FN_IS_SPRINTING
+from uebp.nodes.math import FN_AND, FN_EQ_II, FN_GREATER_FF, FN_LESS_FF, FN_NOT, FN_SUB_FF
+from uebp.nodes.move import FN_GET_STANCE, FN_IS_SPRINTING
 from uebp.nodes.palette import NODE_BLEND_BY_BOOL, NODE_BREAK_HIT, NODE_CAST_CHARACTER
 from uebp.nodes.system import FN_IS_DEDICATED_SERVER, FN_TIME_SECONDS
 from uebp.vars import BOOL, declare, defaults
@@ -103,7 +111,7 @@ def enum_values(bp):
     RotationMode, read off the compiled class: the byte each member is."""
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     found = {}
-    for var in ("Gait", "MovementMode", "RotationMode"):
+    for var in ("Gait", "MovementMode", "RotationMode", "Stance"):
         kind = type(cdo.get_editor_property(var))
         found[var] = {m: int(getattr(kind, m).value) for m in dir(kind) if m.isupper()}
     return found
@@ -198,19 +206,34 @@ def _author_properties(bp, ed):
         "JustLanded": out(just_landed),
         "LandVelocity": g.get(LAND_VELOCITY),
     }
-    if set(fields) != set(FIELDS_SET):
+    if crouch_on():
+        # The movement's own answer (1: crouched and not prone), so another
+        # player's copy and the server's crouch with it. Prone and a slide
+        # are the weapon layers' clips, over whatever this picks.
+        crouched = g.call(FN_EQ_II, A=out(g.call(FN_GET_STANCE, Character=char)), B="1")
+        fields["Stance"] = _as_enum(g, NODE_BYTE_TO_STANCE, _pick(
+            g, out(crouched), values["Stance"]["CROUCH"], values["Stance"]["STAND"]))
+    if set(fields) != set(fields_set()):
         raise RuntimeError("FIELDS_SET and the fields authored here disagree")
     for name, pin in fields.items():
         _connect(pin, _field(make, name))
     # One write, reached from every way through the landing's branches.
-    g.put(PROPERTIES_VAR, next(iter(BEL.list_output_pins(make))),
-          [kept, done, else_pin(ed, landed)])
+    wrote = g.put(PROPERTIES_VAR, next(iter(BEL.list_output_pins(make))),
+                  [kept, done, else_pin(ed, landed)])
+    if traversal_on():
+        author_traversing_flag(g, char, [wrote])
     ed.add_comment_to_nodes(
         "What the motion matching reads of its character, straight off the "
         "CharacterMovementComponent (the sample asked its own character through an "
         "interface): the game's speeds and sprint decide the gait, the body strafes "
         "while it faces the view, and the landing is kept here. "
         "Scripts/combat/gas_locomotion.py.", g.made)
+
+
+def fields_set():
+    """The struct's fields the patch sets: Stance with them while the crouch
+    is the sample's."""
+    return FIELDS_SET + (("Stance",) if crouch_on() else ())
 
 
 def else_pin(ed, then_pin):
@@ -429,11 +452,14 @@ def build_gas_locomotion():
     anim, events, properties = graphs(bp)
     _remove_server_branch(anim, events)
     _remove_link(anim)
+    remove_traversal_slot(anim, _slot(anim))
     declare(properties, ADDED_VARS)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{ABP_LOCOMOTION} failed to compile before the patch")
     _author_properties(bp, properties)
     _remove_slot(anim)
+    if traversal_on():
+        author_traversal_slot(anim, _slot(anim))
     _author_link(anim)
     _author_server_branch(anim, events)
     for ed in (anim, events, properties):

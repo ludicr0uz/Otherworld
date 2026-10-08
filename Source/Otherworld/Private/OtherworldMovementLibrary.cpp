@@ -1,6 +1,7 @@
 #include "OtherworldMovementLibrary.h"
 
 #include "GameFramework/Character.h"
+#include "OtherworldCharacter.h"
 #include "OtherworldCharacterMovement.h"
 
 namespace
@@ -61,6 +62,25 @@ int32 UOtherworldMovementLibrary::GetStance(const AActor* Character)
 	}
 	// On a simulated copy bWantsProne is the character's replicated bProne.
 	return Movement->bWantsProne ? 2 : 1;
+}
+
+void UOtherworldMovementLibrary::RequestSlide(AActor* Character)
+{
+	if (UOtherworldCharacterMovement* Movement = MovementOf(Character))
+	{
+		Movement->bWantsSlide = true;
+	}
+}
+
+bool UOtherworldMovementLibrary::IsSliding(const AActor* Character)
+{
+	if (Character && Character->GetLocalRole() == ROLE_SimulatedProxy)
+	{
+		const AOtherworldCharacter* Body = Cast<AOtherworldCharacter>(Character);
+		return Body && Body->bSliding;
+	}
+	const UOtherworldCharacterMovement* Movement = MovementOf(Character);
+	return Movement && Movement->bSliding;
 }
 
 void UOtherworldMovementLibrary::SetAimWalk(AActor* Character, bool bAiming)

@@ -70,6 +70,8 @@ Editor-side, in pipeline order:
                                 blueprint, and ABP_GasIdle
     gas_bridge_paths.py         constants: what the hidden mesh becomes, the idle,
                                 and what that build writes
+    gas_player_mesh.py          SKM_UEFN_Player: the hidden mesh the player wears on
+                                the bridge, the sample's with the game's sockets
     gas_idle_abp.py             ABP_GasIdle: one sequence player on the UEFN skeleton
     metahuman_retarget.py       a retargeter between two rigs and the retargeting
                                 anim blueprint pointed at it (the mannequin's

@@ -11,7 +11,7 @@ from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, HIT_BONE_VAR, HIT_POINT_VAR, LIMB_BONES_VAR, hit_zones,
 )
 from combat.lag_tuning import EXTRA_REWIND_S, MAX_REWIND_S
-from combat.skin import SKIN_QUINN, player_skin
+from combat.skin import SKIN_QUINN, player_skin, worn_skin
 from combat.tuning import COMBAT
 from combat.verify.fixtures import char, npc, wg
 from combat.verify.common import (
@@ -31,7 +31,11 @@ def check_player_body():
     # mismatch is the silent one: the component falls back to the reference pose
     # and the player slides around the map in a bind pose with nothing in the log.
 
-    skin = player_skin()
+    # What the Mesh component wears. The rig the ready poses are keyed on is
+    # player_skin(): the same, or under the motion matching the mannequin's
+    # still (combat/skin.py).
+    skin = worn_skin()
+    keyed = player_skin()
     unreal.log_warning(f"[VERIFY] player skin: {skin.mesh.rsplit('/', 1)[1]}")
     worn = _mesh_asset(char) if char else None
     check("the player wears the skin the builder resolved",
@@ -105,11 +109,16 @@ def check_player_body():
           not _fallback, str(_fallback))
     # Every ready pose the weapons name has to live on the skeleton being worn, or
     # PlaySlotAnimationAsDynamicMontage plays nothing and the gun hangs at the hip.
-    for _label, _pose in (("rifle", skin.aim_rifle), ("pistol", skin.aim_pistol)):
+    # (Under the motion matching that is G3's state on purpose: the weapon
+    # layers are off, and the poses stay on the rig they are keyed on.)
+    _keyed_mesh = load(keyed.mesh)
+    for _label, _pose in (("rifle", keyed.aim_rifle), ("pistol", keyed.aim_pistol)):
         _p = load(_pose)
-        check(f"the {_label} ready pose is authored for the worn skeleton",
-              _p is not None and worn is not None
-              and _p.get_editor_property("skeleton") == worn.get_editor_property("skeleton"),
+        check(f"the {_label} ready pose is authored for the "
+              f"{'keyed rig' if skin.gas else 'worn'} skeleton",
+              _p is not None and _keyed_mesh is not None
+              and _p.get_editor_property("skeleton")
+              == _keyed_mesh.get_editor_property("skeleton"),
               str(_p.get_editor_property("skeleton").get_name()) if _p else "missing")
 
 

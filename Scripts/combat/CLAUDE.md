@@ -702,6 +702,94 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   8 × 18 = 144, so one connected shot kills a 100 HP wanderer. The weapons differ in how damage
   is delivered, not in how much.
 
+## The motion-matching base (G3, 2026-10-08)
+
+The player's base movement is Epic's Game Animation Sample ("GAS": its motion matching,
+not the ability system): the sample's `SandboxCharacter_CMC_ABP` and its
+`CHT_PoseSearchDatabases` chooser, on the hidden UEFN mannequin the MetaHuman follows
+(`Scripts/asset_pipeline/CLAUDE.md`, "The skeleton bridge"). `gas_locomotion.py` authors
+it, `gas_locomotion_consts.py` holds its names, `verify/gas_locomotion.py` checks the
+graph and `probes/probe_gas_locomotion.py` what it plays (`probe_net_gas_locomotion.py`:
+another player's copy and the server's).
+
+- **One switch: `GAS_LOCOMOTION`** (`gas_locomotion_consts.py`). Off, the player is the
+  mannequin on the patched `ABP_Unarmed` again after a weapons build, with nothing else to
+  change. A checkout without the sample (or without `build_gas_bridge.py`'s assets) wears
+  the mannequin too, and says so.
+- **Two skins since G3** (`skin.py`): `player_skin()` is the rig the weapon layers, the
+  poses, the grips and the clips are keyed on (the mannequin and `ABP_Unarmed`, still
+  built and verified as before); `worn_skin()` is what the Mesh component wears
+  (`SKM_UEFN_Player` and the sample's anim Blueprint). Ask `worn_skin()` only about the
+  body that is on the character; everything about a pose or a layer asks `player_skin()`.
+  A probe finds the worn row with `skin_of_mesh` (`SKIN_GAS`). G4 makes them one again.
+- **The weapon, hold, aim, stance and hit-reaction layers are off the body until G4**
+  (`WEAPON_LAYERS = False`). They are not deleted: every builder still runs, into
+  `ABP_Unarmed`, which the wanderers run and the player no longer does. On the worn graph
+  the flag takes the sample's one montage slot (`DefaultSlot`, full body there) out of
+  the pose line, so nothing the weapon component plays reaches the body; the weapon
+  component's writes of `AimPitch`, the pose weights and the support hand cast to
+  `ABP_Unarmed`'s class and fail quietly on the player. Montages still run their clocks.
+  **Probes that read those poses fail until G4**: `probe_throw` (2 of 29: the ready
+  pose and the clip in the slot), `probe_corpse_loot` (the kneel's `PoseKneel`),
+  `probe_carry` (4 of 22: the gun does not come up, and a lowered gun's shot starts
+  69-99 cm from its muzzle, since `CARRY_GRIP` is where the old jog held the hand),
+  and by the same cause `probe_hold_poses`, `probe_sight_hands`,
+  `probe_shotgun_hands`, `probe_shotgun_thumb`, `probe_stance_clips` (not run in G3).
+- **The anim Blueprint is patched where it lies, not copied.** The sample's choosers take
+  an object of `SandboxCharacter_CMC_ABP_C` and of no other class: a duplicate ran, read
+  the character correctly and was handed no database (`LogChooser: Error: ... ContextData
+  entry 0 expects an object of type SandboxCharacter_CMC_ABP_C`). So it is a row of
+  `gas_paths.PATCHED`, `import_gas.py` leaves it alone once it is here, and the weapons
+  build patches it every run (each part is taken out or rebuilt first). To get the
+  sample's own back, delete the file and run `import_gas.py`.
+- **What it reads of the character is re-authored** (`Update_PropertiesFromCharacter`).
+  As shipped it asks the pawn for `S_CharacterPropertiesForAnimation` through
+  `BPI_SandboxCharacter_Pawn`; patched it fills that struct from the pawn's
+  `CharacterMovementComponent`, as the sample's own character did (read off
+  `SandboxCharacter_CMC.Get_PropertiesForAnimation` with a cold run of
+  `dev/graph_fingerprint.fingerprint` on the sample project). So the character Blueprint
+  implements and replicates nothing for it, and it runs on every machine. The speeds,
+  the stamina-gated sprint and the aim's walk stay the C++ movement's: the gait is read
+  off them (`IsSprinting`; a pace under `WALK_BELOW_CMS` is a walk), never set. The
+  player faces the view, so the rotation mode is Strafe. Stance is always Stand: the
+  crouch, the slide and traversal are G5's. `AC_PreCMCTick` and `AC_PostABPTick` did not
+  come across: each only broadcasts its own tick, the first for the sample character's
+  speed logic (ours is C++) and the second for nothing the graph reads.
+  - **The landing is kept on the anim instance** (`OwWasFalling`, `OwFallVelocity`,
+    `OwLandVelocity`, `OwLandedAt`): the sample's character kept `JustLanded` from its
+    own `OnLanded`.
+  - **An enum the graph must choose at run time is a number cast to it**
+    (`Utilities|Enum|BytetoEnumE_Gait`, behind `SelectInt` and `Conv_IntToByte`); the
+    numbers are read off the compiled class's Python enums at build time.
+  - **A `K2Node_PropertyAccess` says nothing to Python** (no path, no `export_text`):
+    which fields a graph reads was learned from the sample character's Make node, not
+    from the anim Blueprint's readers.
+- **The databases' search indices are built as a game starts** when it runs from the
+  editor binary (out of the derived-data cache after the first time): until they are
+  there the motion matching picks nothing and the body stands in its reference pose,
+  with `LogPoseSearch: ... databases AsyncBuildIndex are in still in progress` in the
+  log. `probe_gas_locomotion` waits for the first pick. A packaged game has them cooked.
+- **The server branch is its own** (`gas_locomotion._author_server_branch`; A4's rule,
+  `server_anim_consts.py`): one Blend Poses by bool on `ServerPose`, before the pose
+  history. A server skips Foot Placement and Leg IK (the ground traces under the feet,
+  as the old graph's Control Rig was); the search, the lean, the aim offset, the root's
+  offset and the pose history are on both arms. `verify/server_anim.py` still checks
+  `ABP_Unarmed`'s branch (the keyed rig's, and each wanderer's); the worn graph's is
+  `verify/gas_locomotion.py`'s. The sample's graph has a blend by bool of its own (the
+  aim offset's), so the server's is found by its flag, not by its class.
+- **The sample's foley component rides on the player, silent** (`install.install_foley`,
+  `GasFoley`). The sample's clips carry foot, jump and land notifies that look for
+  `AC_FoleyEvents` on the owner and play the sample's own sound in 2D when there is
+  none. The player's has a bank with nothing in it (`DA_SilentFoleyBank`): with no bank
+  at all it logs an `Accessed None` at every footfall. The game's footsteps are still
+  `BP_FootstepComponent`'s, by ground covered.
+- **Memory:** a server or a `-nullrhi` client peaks at 4.2–4.3 GB with the sample's
+  databases loaded (1.9 GB before). The chooser brings in the dense, sparse and
+  extreme-sparse sets alike; dropping the ones the game never selects is not done.
+  At 32 bots the server's world tick was 26.4 ms mean, 111.5 p99 (one client, a 45 s
+  window, an editor open: A4's own figure was 25.3 / 87.0 with the editor closed), so
+  the search itself did not show in the mean.
+
 ## Tuning
 
 `COMBAT`, a frozen `CombatConfig` in `tuning.py`, is the **one** place global combat numbers
@@ -761,6 +849,16 @@ touches the fire graph doesn't pay for the notes on blood.
 ## Still needs a play session
 
 These are feel checks a headless run can't do:
+
+- the motion matching (`gas_locomotion.py`): it was seen in six 1280x720 pictures from in
+  front (`probe_metahuman_look.py`) and measured, never played. Whether the jog at 400 and
+  the sprint at 600 cm/s read right on clips shot for the sample's 500 and 700 (it scales
+  the play rate); the run strafe, whose hips turn 22–37° toward the way it goes while the
+  chest follows up to 46° (the sample's own strafe: is that the strafe wanted, or should
+  the aim offset hold the chest squarer); turning in place with the view, idle breaks,
+  pivots and stops under real keys; the gun dangling in the running hand and the sights
+  view following it until G4; and the first seconds of a game from the editor binary,
+  standing in the reference pose while the indices load;
 
 - sprint held with an aim key until the stamina runs out: no key can be pressed in a headless
   game, so the latch setting (`SprintSpent`, `docs/stance.md`) is checked on the graph only.

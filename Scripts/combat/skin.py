@@ -1,5 +1,14 @@
 """What the player wears: the PlayerSkin table (Quinn fallback, generated
 adventurer) and wear_skin(), which puts it on BP_ThirdPersonCharacter.
+
+Two questions, one answer until G3 and two since:
+    player_skin()  the rig the weapon layers, the poses, the grips and the
+                   clips are keyed on (the mannequin, for a MetaHuman)
+    worn_skin()    what the Character's Mesh component wears. With
+                   gas_locomotion_consts.GAS_LOCOMOTION it is the UEFN
+                   mannequin running the motion-matching anim Blueprint
+                   (SKIN_GAS), which none of those layers is on yet; G4 puts
+                   them there and the two are one again.
 """
 
 import dataclasses
@@ -9,6 +18,7 @@ import unreal
 from asset_pipeline.mannequin_bind.paths import bound_asset_dir, bound_asset_name
 from asset_pipeline.metahuman_paths import ABP_RETARGET, BODY_MESH, FACE_MESH
 from asset_pipeline.player_body import PLAYER_NAME, PLAYER_RIG
+from combat import gas_locomotion_consts as GAS
 from combat import metahuman_body
 from combat.log import _log
 from uebp.graph import BEL, _assets, _component_object, _handles, _rot
@@ -135,6 +145,12 @@ class PlayerSkin:
     # the mannequin: it is the mannequin that is animated, gripped, hit and
     # ragdolled; the MetaHuman follows its pose through an IK retargeter.
     metahuman: bool = False
+    # The anim Blueprint the MetaHuman's Body follows this mesh through; None
+    # is the mannequin's (metahuman_paths.ABP_RETARGET).
+    retarget: str = None
+    # True when this mesh runs the motion-matching anim Blueprint
+    # (gas_locomotion.py) and not a patched ABP_Unarmed.
+    gas: bool = False
 
     @property
     def stance_clips(self):
@@ -243,9 +259,20 @@ SKIN_METAHUMAN = dataclasses.replace(
     metahuman=True)
 
 
+# The same MetaHuman over the Game Animation Sample's mannequin, which runs
+# the motion-matching anim Blueprint (gas_locomotion.py; asset_pipeline/
+# CLAUDE.md, "The skeleton bridge"). Its bones and its grip socket are named
+# as the mannequin's are (asset_pipeline/gas_player_mesh.py copies the
+# sockets); its clips and poses are still the mannequin's and do not play on
+# it (see the top of this file).
+SKIN_GAS = dataclasses.replace(
+    SKIN_METAHUMAN, mesh=GAS.MESH, anim_bp=GAS.ABP_LOCOMOTION,
+    retarget=GAS.ABP_RETARGET, gas=True)
+
+
 # Every skin there is, most specific first: what a running game, which has no
 # asset subsystem to resolve player_skin() with, matches the worn mesh against.
-SKINS = (SKIN_METAHUMAN, SKIN_BOUND, SKIN_ADVENTURER, SKIN_QUINN)
+SKINS = (SKIN_GAS, SKIN_METAHUMAN, SKIN_BOUND, SKIN_ADVENTURER, SKIN_QUINN)
 
 
 def skin_of_mesh(worn):
@@ -269,6 +296,27 @@ def _without_missing_clips(skin, eas, who, builder):
          f"procedurally. Run asset_pipeline/{builder}.")
     return dataclasses.replace(skin, crouch_idle=None, crouch_walk=None,
                                prone_crawl=None, search_kneel=None)
+
+
+def worn_skin():
+    """What the Character's Mesh component wears: player_skin(), or over a
+    MetaHuman with GAS_LOCOMOTION the same skin on the UEFN mannequin and the
+    motion-matching anim Blueprint (SKIN_GAS's mesh, anim BP and retarget).
+
+    All of the bridge or none, as player_skin(): a checkout without the
+    sample wears the mannequin."""
+    skin = player_skin()
+    if not (GAS.GAS_LOCOMOTION and skin.metahuman):
+        return skin
+    eas = _assets()
+    missing = [p for p in (GAS.MESH, GAS.ABP_RETARGET, GAS.ABP_LOCOMOTION, GAS.CHOOSER)
+               if not eas.does_asset_exist(p)]
+    if missing:
+        _log(f"note: GAS_LOCOMOTION is on and {missing[0]} is not here — wearing the "
+             "mannequin. Run asset_pipeline/import_gas.py, then build_gas_bridge.py.")
+        return skin
+    return dataclasses.replace(skin, mesh=SKIN_GAS.mesh, anim_bp=SKIN_GAS.anim_bp,
+                               retarget=SKIN_GAS.retarget, gas=True)
 
 
 def player_skin():
@@ -334,7 +382,7 @@ def wear_skin(skin=None):
     ships wearing SKM_Quinn_Simple, so a checkout without the asset pipeline
     passes through here writing the values that are already there.
     """
-    skin = skin or player_skin()
+    skin = skin or worn_skin()
     eas = _assets()
     bp = eas.load_asset(CHARACTER_BP_PATH)
     if not bp:
@@ -376,7 +424,7 @@ def wear_skin(skin=None):
     # follow and for the weapon in its hand.
     comp.set_editor_property("visible", not skin.metahuman)
     if skin.metahuman:
-        metahuman_body.install(bp, mesh_handle)
+        metahuman_body.install(bp, mesh_handle, skin.retarget)
     else:
         metahuman_body.remove(bp)
     if not BEL.compile_blueprint(bp):

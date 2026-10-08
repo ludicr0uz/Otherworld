@@ -206,11 +206,12 @@ python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_metah
 - Measured (probe_metahuman_body): the MetaHuman's head, hands and feet land within 7 cm of
   the mannequin's standing, falling and dead; the face and garments within 0 cm of the body.
 
-## The Game Animation Sample: the motion-matching set, copied and not yet used (2026-10-08)
+## The Game Animation Sample: the motion-matching set, copied (2026-10-08)
 
 Epic's Game Animation Sample ("GAS" here; nothing to do with the Gameplay Ability System) is
 in the project under `/Game/GAS`: **2723 packages, 2.7 GB** (the MetaHuman's 441 and 1.1 GB
-beside it), not committed (`.gitignore`). Nothing in the game references it yet.
+beside it), not committed (`.gitignore`). Since G3 the player's base movement is its anim
+blueprint and databases (`Scripts/combat/CLAUDE.md`, "The motion-matching base").
 
 ```bash
 python3 Scripts/asset_pipeline/import_gas.py                 # host-side copy; --check, --manifest
@@ -240,8 +241,12 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/check_gas_load.py   # in a fr
   in: `dev/tests/test_gas_import.py`). **Name a GAS asset by its `/Game/GAS` path.** A
   package saved in this project is written with the new paths. The asset registry applies
   the redirects too: a copied package's dependencies read back as `/Game/GAS` names.
-- **Two packages are changed after the copy** (`gas_paths.PATCHED`,
-  `patch_gas_notifies.py`): `BP_AnimNotify_TriggerRagdoll` and
+- **Three packages are changed after the copy** (`gas_paths.PATCHED`; the copy keeps a
+  patched file). `SandboxCharacter_CMC_ABP` is the weapons build's to patch
+  (`combat/gas_locomotion.py`: what it reads of its character, its montage slot, the
+  server branch), where it lies, because the sample's choosers take an object of its
+  class and of no other. The other two are `patch_gas_notifies.py`'s
+  (`gas_paths.PATCHED_NOTIFIES`): `BP_AnimNotify_TriggerRagdoll` and
   `BP_NotifyState_OverrideMovementMode` cast to the Mover character and do nothing for any
   other, so without it they fail to compile on every load of a clip that carries one. Their
   graphs are removed; the class and its variables stay. The copy keeps a patched file.
@@ -277,7 +282,9 @@ The sample's clips, databases and anim blueprint are on `SK_UEFN_Mannequin`; the
 hidden mesh is `SK_Mannequin`. **The choice: the hidden mesh becomes `SKM_UEFN_Mannequin`**
 (bridge (a)), and the MetaHuman follows it through a second retargeter whose source rig is on
 that skeleton. The sample then plays as it shipped: nothing of its 2355 packages is
-retargeted, copied or re-pointed. Proven on one idle; **the game does not wear it yet**.
+retargeted, copied or re-pointed. Proven on one idle (G2), and **worn by the game since
+G3**: `combat/skin.SKIN_GAS`, on `SKM_UEFN_Player`, a copy of the sample's mesh with the
+game's sockets.
 
 ```bash
 python3 Scripts/dev/uepy.py Scripts/asset_pipeline/build_gas_bridge.py
@@ -291,7 +298,14 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/measure_gas_bridge.py   # Sav
   same name there, so the map onto `IK_MetaHuman` is exact), `RTG_MetaHuman_from_UEFN`,
   `ABP_MetaHuman_Retarget_UEFN` (what the Body component wears over a UEFN parent) and
   `ABP_GasIdle` (one sequence player of `M_Neutral_Stand_Idle_Loop`; the sample has no
-  `M_Neutral_Idle_Loop`).
+  `M_Neutral_Idle_Loop`), and `SKM_UEFN_Player` (`gas_player_mesh.py`): the sample's mesh
+  copied, on the same skeleton, with `HandGrip_R`, `HandGrip_L`, `weapon_r_muzzle` and
+  `foot_l/r_Socket` added as the mannequin has them (same bone, same offset in that bone's
+  space). The sample's own mesh stays a byte copy.
+  - **A socket can be made from Python after all**: `SkeletalMeshSocket(outer=mesh)`,
+    `mesh.add_socket(socket, False)`, then `mesh.rename_socket("Socket", name)` (a new
+    one is named `Socket`; `SocketName` and `BoneName` are read-only as properties) and
+    `socket.set_socket_parent(mesh, bone)`. It is a mesh socket, not the skeleton's.
 - **The proof is a probe that wears it for one run**: `probe_gas_idle.py` puts the UEFN
   mesh and `ABP_GasIdle` on the live player's Mesh component and the UEFN retarget blueprint
   on Body, checks them, and puts the mannequin back. Measured: the hidden mesh's pose is
@@ -326,7 +340,14 @@ wear it:
   `gas_paths.PATCHED`, as the two notifies are; `grip._BoneGrip` is the fallback that
   needs no socket. The hand's rest rotation differs by 20.7°, so the socket's offset is
   measured again, not copied.
-- **Every clip the player has today stops playing.** Neither skeleton lists the other as
+  **G3 did otherwise, and cheaper:** the sockets are on a copy of the mesh
+  (`SKM_UEFN_Player`, above), not on the skeleton, and are the mannequin's offsets
+  copied: a socket's offset is in its bone's own space, which the rest pose does not
+  move. What is not re-measured is the smaller hand; G4, which puts a gun back into an
+  aimed hand, should look.
+- **Every clip the player has today stops playing** (as reasoned in G2; in G3 the worn
+  graph's one montage slot is out of the pose line, so whether a mannequin clip would
+  play on the UEFN mesh by bone name was not put to the test). Neither skeleton lists the other as
   compatible, so `ABP_Unarmed` and what it plays (41 clips and a blend space on
   `SK_Mannequin` reached from the player's blueprint, the Quaternius library retargeted
   onto the mannequin, the seven poses the weapons build keys on the worn skeleton) do not

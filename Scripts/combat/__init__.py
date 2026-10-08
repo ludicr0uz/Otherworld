@@ -177,7 +177,15 @@ ASSETS AND PATCHES
   server_anim       the one IsDedicatedServer branch of an anim graph, the player's
                     and each wanderer's: a server skips what is for the eye (A4)
   server_anim_consts  what that branch's server arm may hold, and why; ServerPose
-  skin              the player's body (PlayerSkin, wear_skin)
+  skin              the player's body (PlayerSkin, wear_skin): player_skin() is the
+                    rig the layers and poses are keyed on, worn_skin() what the
+                    Mesh component wears (the two differ under the motion matching)
+  gas_locomotion    the player's motion-matching base (G3): the Game Animation
+                    Sample's anim Blueprint patched to read the
+                    CharacterMovementComponent, its montage slot off the pose
+                    line, its server branch, the silent foley bank
+  gas_locomotion_consts  its switch (GAS_LOCOMOTION), the WEAPON_LAYERS flag,
+                    names and numbers
   grip              hand-grip socket maths for holding a weapon: GripRotation
                     and GripLocation (the handle seated in the fist)
   lodge             how a thrown blade sits in the tree it lodged in, out of

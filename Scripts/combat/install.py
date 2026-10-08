@@ -1,6 +1,7 @@
 """Installing on the characters: puts the health, weapon and footstep
-components on BP_ThirdPersonCharacter and the wanderer, and retires
-superseded assets.
+components on BP_ThirdPersonCharacter and the wanderer (and, on a player who
+wears the motion matching, the sample's foley component, silenced), and
+retires superseded assets.
 """
 
 import unreal
@@ -8,7 +9,9 @@ import unreal
 from Sound.bind import write_components
 from Sound.sound_monsters import BINDINGS as MONSTER_SOUNDS
 from Sound.sound_weapons import RETIRED_SOUNDS
+from combat import gas_locomotion_consts as GAS
 from combat.camera import aim_camera, face_the_camera
+from combat.gas_locomotion import silent_foley_bank
 from combat.log import _log
 from uebp import net
 from uebp.nodes.guard import GUARD_CLASS
@@ -20,6 +23,7 @@ from combat.hit_zones import install_hit_zones, make_shootable
 from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH, NPC_CLASS_PATH
 from combat.player_move import reparent_player, set_move_numbers
 from combat.player_pace import set_jog_speed
+from combat.skin import worn_skin
 from combat.record_vars import (
     RECORD_COMPONENT, RECORD_COMPONENT_CLASS, RECORD_HAND_SLOT, RECORD_SOURCE, RECORD_VIEW)
 from combat.weapon_component.stance import allow_crouch
@@ -83,6 +87,28 @@ def install_guard(bp):
             raise RuntimeError(f"{GUARD_COMPONENT}.{prop} did not take {value!r}")
 
 
+def install_foley(bp):
+    """The Game Animation Sample's foley component, with a sound bank that
+    holds nothing, on a player who wears its motion matching (worn_skin().gas).
+    Its clips' foot, jump and land notifies look for it on the owner and,
+    finding none, play the sample's own sound in 2D; found, they fire into it,
+    and it has nothing to play. The game's footsteps stay BP_FootstepComponent's."""
+    if not worn_skin().gas:
+        return
+    name = GAS.FOLEY_COMPONENT_BP.rsplit("/", 1)[1]
+    cls = unreal.load_class(None, f"{GAS.FOLEY_COMPONENT_BP}.{name}_C")
+    if not cls:
+        raise RuntimeError(f"{GAS.FOLEY_COMPONENT_BP} is not here: run "
+                           "asset_pipeline/import_gas.py")
+    bank = silent_foley_bank()
+    template = _component_object(_add_component(bp, _root_handle(bp), cls,
+                                                GAS.FOLEY_COMPONENT))
+    template.set_editor_property(GAS.FOLEY_BANK_VAR, bank)
+    if template.get_editor_property(GAS.FOLEY_BANK_VAR) != bank:
+        raise RuntimeError(f"{GAS.FOLEY_COMPONENT} did not take the silent bank: the "
+                           "sample's footsteps would play over the game's")
+
+
 def install_on_character(health_bp, weapon_bp, footstep_bp):
     eas = _assets()
     bp = eas.load_asset(CHARACTER_BP_PATH)
@@ -92,7 +118,7 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     reparent_player(bp)
     _uninstall_old_shotgun(bp)
     _drop_components(bp, {"HealthComponent", "WeaponComponent", "FootstepComponent",
-                          RECORD_COMPONENT, GUARD_COMPONENT})
+                          RECORD_COMPONENT, GUARD_COMPONENT, GAS.FOLEY_COMPONENT})
     handles = {}
     for name, source in (("HealthComponent", health_bp),
                          ("WeaponComponent", weapon_bp),
@@ -101,6 +127,7 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
                                        BEL.generated_class(source), name)
     install_record(bp)
     install_guard(bp)
+    install_foley(bp)
     # Symmetry, and forward planning: the player carries health too, so anything
     # that shoots back later needs to be able to hit them -- and hit them in
     # the head. (The wanderers' punch is not a trace and stays a body hit.)

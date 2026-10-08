@@ -15,14 +15,19 @@ import os
 
 import unreal
 
+from combat.game_state import DEBUG_MODE_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.weapon_component import vars as WV
+from net.state_consts import GAME_STATE_BP_PATH
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, WV.EquippedIndex)]
+WRITABLE = [(WEAPON_COMP_BP_PATH, WV.EquippedIndex), (GAME_STATE_BP_PATH, DEBUG_MODE_VAR)]
 HOLD = (("empty hands", None), ("axe", "BP_Axe_C"), ("rifle", "BP_Rifle_C"))
-EYE_AHEAD_CM, EYE_UP_CM, EYE_FOV = 300.0, 10.0, 50.0
+# Far enough back that the legs are in the picture: a strafe is told by them.
+EYE_AHEAD_CM, EYE_UP_CM, EYE_FOV = 420.0, 10.0, 50.0
+LOOK_AT_UP_CM = 0.0
 MOVES = (("standing", 0.0, 0.0), ("walking forward", 1.0, 0.0),
          ("sidestepping right", 0.0, 1.0))
+REST_S, SETTLE_S = 0.8, 2.2
 SHOTS_DIR = os.path.join(unreal.Paths.project_saved_dir(), "Screenshots", "MacEditor")
 
 
@@ -41,6 +46,9 @@ def probe(p):
     if eye is None:
         p.note("no wanderer to look through")
         return
+    # Debug mode (a saved setting) draws each wanderer's sight cone, and the
+    # eye's own starts at the camera: off for the pictures.
+    p.set(p.game_state(), DEBUG_MODE_VAR, False)
     eye.set_actor_hidden_in_game(True)
     eye.set_actor_enable_collision(False)
     pc.set_view_target_with_blend(eye)
@@ -52,7 +60,7 @@ def probe(p):
         eye.set_actor_location_and_rotation(
             here + ahead * EYE_AHEAD_CM + right * side + unreal.Vector(0.0, 0.0, EYE_UP_CM),
             unreal.MathLibrary.find_look_at_rotation(
-                eye.get_actor_location(), here + unreal.Vector(0.0, 0.0, 30.0)),
+                eye.get_actor_location(), here + unreal.Vector(0.0, 0.0, LOOK_AT_UP_CM)),
             False, True)
 
     def moving(fwd, right, seconds, side=0.0):
@@ -80,7 +88,11 @@ def probe(p):
             p.hold(wc, bag.index(cls))
         yield moving(0.0, 0.0, 1.0)
         for name, fwd, right in MOVES:
-            yield moving(fwd, right, 1.2)
+            # From standing, and long enough to be past the start: motion
+            # matching plays a start or a pivot first, and the picture is of
+            # the move itself.
+            yield moving(0.0, 0.0, REST_S)
+            yield moving(fwd, right, SETTLE_S)
             shot(f"{label}, {name}")
             yield moving(fwd, right, 0.33)
             shot(f"{label}, {name}, a third of a second on")

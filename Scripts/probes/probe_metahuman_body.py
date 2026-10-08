@@ -1,8 +1,9 @@
 """The MetaHuman body follows the mannequin in the running game.
 
-The player's mannequin is hidden and still runs ABP_Unarmed; the MetaHuman
-body hangs under it wearing ABP_MetaHuman_Retarget (combat/metahuman_body.py)
-and should land on the same pose every frame: head over head, hands on hands,
+The player's mannequin is hidden and runs the game's animation (the
+motion matching on the UEFN mannequin, or ABP_Unarmed: combat/skin.py); the
+MetaHuman body hangs under it wearing that skin's retargeting anim Blueprint
+(combat/metahuman_body.py) and should land on the same pose every frame: head over head, hands on hands,
 feet on feet, within the proportion difference of two different men. The
 face and the clothing should follow the body. Measured standing, then in a
 fall (the jump clip), then dead, when the mannequin's ragdoll should carry
@@ -11,8 +12,10 @@ the MetaHuman down with it.
 
 import unreal
 
+from asset_pipeline.metahuman_paths import ABP_RETARGET
 from combat import health_vars as HV
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH
+from combat.skin import skin_of_mesh
 
 from probes.metahuman_follow import _comp, _follow
 
@@ -44,8 +47,11 @@ def probe(p):
     p.check("the mannequin is hidden and the MetaHuman body is drawn",
             not mannequin.is_visible() and body.is_visible())
     inst = body.get_anim_instance()
-    p.check("the body runs ABP_MetaHuman_Retarget",
-            inst is not None and inst.get_class().get_name() == "ABP_MetaHuman_Retarget_C",
+    # The retargeter whose source rig is on the worn mesh's skeleton.
+    skin = skin_of_mesh(mannequin.get_skeletal_mesh_asset().get_path_name())
+    want = (getattr(skin, "retarget", None) or ABP_RETARGET).rsplit("/", 1)[1]
+    p.check(f"the body runs {want}",
+            inst is not None and inst.get_class().get_name() == f"{want}_C",
             inst.get_class().get_name() if inst else "no anim instance")
     finst = face.get_anim_instance()
     p.check("the face runs Face_AnimBP",

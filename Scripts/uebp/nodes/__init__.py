@@ -26,6 +26,9 @@ Scripts/dev/check_node_catalog.py.
   inventory.py  the game's own inventory library (C++, Source/Otherworld): a
               graph's word that what a player carries changed, so the server
               writes its record that frame (A3a)
+  locomotion.py  what the player's motion-matching anim blueprint reads its
+              character through: the movement component, and the Game
+              Animation Sample's structs and enums
   palette.py  palette nodes (events, casts, break/make) and the standard, actor
               and component macros
 """

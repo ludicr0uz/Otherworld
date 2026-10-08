@@ -46,6 +46,7 @@ from asset_pipeline.gas_bridge_paths import (                      # noqa: E402
     ABP_RETARGET_UEFN, HIDDEN_MESH_GAS, IK_UEFN, RTG_FROM_UEFN,
 )
 from asset_pipeline.gas_idle_abp import build_idle_blueprint       # noqa: E402
+from asset_pipeline.gas_player_mesh import build_player_mesh       # noqa: E402
 from asset_pipeline.metahuman_paths import BODY_MESH, IK_METAHUMAN  # noqa: E402
 from asset_pipeline.metahuman_retarget import (                    # noqa: E402
     build_anim_blueprint, build_retargeter,
@@ -72,6 +73,7 @@ def main():
                            align=True)
     build_anim_blueprint(rtg, ABP_RETARGET_UEFN)
     build_idle_blueprint()
+    build_player_mesh()
     _log("done")
 
 

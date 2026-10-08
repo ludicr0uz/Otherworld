@@ -105,9 +105,17 @@ def probe(p):
     cm, at = _clip_gap(hidden, idle)
     p.check(f"its pose is a frame of that clip (limb ends within {CLIP_CM:.0f} cm)",
             cm < CLIP_CM, f"{cm:.2f} cm from the frame at {at:.1f} s")
-    p.check("and not a mesh that plays nothing (the mannequin's hand was "
-            f"over {UNPOSED_CM:.0f} cm from the clip's)", unposed > UNPOSED_CM,
-            f"{unposed:.1f} cm before the swap")
+    if was_mesh.get_editor_property("skeleton") == skeleton:
+        # Since G3 the game wears the bridge itself: before the swap the
+        # hidden mesh was already this mannequin, standing in the motion
+        # matching's own pick of an idle.
+        p.check("and the game's own mesh already stood in the sample's idle before the "
+                f"swap (its hand within {UNPOSED_CM:.0f} cm of the clip's)",
+                unposed <= UNPOSED_CM, f"{unposed:.1f} cm before the swap")
+    else:
+        p.check("and not a mesh that plays nothing (the mannequin's hand was "
+                f"over {UNPOSED_CM:.0f} cm from the clip's)", unposed > UNPOSED_CM,
+                f"{unposed:.1f} cm before the swap")
     binst = body.get_anim_instance()
     p.check("the body runs ABP_MetaHuman_Retarget_UEFN",
             binst is not None

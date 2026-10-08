@@ -1358,6 +1358,11 @@ or owns, at the rate each thing needs, and a late joiner's world is the server's
 | client, `-nullrhi` | 1.9 GB | 2.2 GB |
 | client, `--windowed` | 5.8 GB | not measured |
 
+Since G3 (2026-10-08) every process loads the Game Animation Sample's databases with the
+player's motion matching: a server or a `-nullrhi` client peaks at 4.2–4.3 GB on the 200 m
+map, and a server with two `-nullrhi` clients at 12.9 GB (`Scripts/combat/CLAUDE.md`, "The
+motion-matching base").
+
 ## Measured at scale (A1, 2026-10-07)
 
 The load harness is `uepy.py --net --bots N`: the dedicated server (the editor binary with
@@ -1529,6 +1534,15 @@ harness (`uepy.py --net --clients 2 --bots N --probe Scripts/probes/probe_net_lo
   arm that left a blend out would update the locomotion under it fewer times a frame
   than a client's does. **A new node for the eye goes on the client arm**; the verifier
   fails a server arm that holds a slot, a blend or a node class the table does not list.
+  - **The player's worn graph is the motion matching's since G3**, and has the same one
+    branch, authored by `combat/gas_locomotion.py` and checked by
+    `combat/verify/gas_locomotion.py`: a server takes the pose from before Foot Placement
+    and Leg IK (the sample's ground traces under the feet) and keeps the search, the
+    lean, the aim offset, the root's offset and the pose history. The graph above
+    (`ABP_Unarmed` with the player's layers) is still built and checked, and is what G4
+    brings over. The motion matching reads the CharacterMovementComponent on each
+    machine, so a simulated copy and the server's are animated with nothing replicated
+    for it (`probes/probe_net_gas_locomotion.py`).
 - **A shot's impacts are one Multicast** ("Everyone sees and hears the fight" above),
   and the hit history is two rings per character with the capsule tried before any body
   is blended ("Lag compensation").

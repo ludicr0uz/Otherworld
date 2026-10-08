@@ -10,7 +10,7 @@ import unreal
 
 from asset_pipeline import catalog, player_body, quaternius_paths
 from combat.hit_bodies import _bodies
-from combat.skin import SKIN_ADVENTURER, SKIN_BOUND, SKIN_METAHUMAN, player_skin
+from combat.skin import SKIN_ADVENTURER, SKIN_BOUND, SKIN_METAHUMAN, player_skin, worn_skin
 from combat.verify.common import _mesh_asset, check, load
 from combat.verify.fixtures import char
 
@@ -50,10 +50,13 @@ def check_one_setting():
     metahuman = player_body.PLAYER_RIG == "metahuman" and player_skin().metahuman
     want = (SKIN_METAHUMAN.mesh if metahuman else SKIN_BOUND.mesh if bound
             else _mesh_path(name))
+    # The hidden mesh is the mannequin the layers are keyed on, or under the
+    # motion matching the UEFN one (combat/skin.worn_skin).
+    hidden = worn_skin().mesh if metahuman else want
     check(f"the player wears {'the MetaHuman over the mannequin' if metahuman else name}, "
           "not the mannequin fallback: all of its assets are built",
           player_skin().mesh == want and worn is not None
-          and worn.get_path_name().split(".")[0] == want,
+          and worn.get_path_name().split(".")[0] == hidden,
           f"skin {player_skin().mesh}, worn {worn.get_path_name() if worn else None}")
     if bound or metahuman:
         # What follows is about the per-body skeleton's physics asset.

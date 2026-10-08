@@ -15,6 +15,15 @@ from asset_pipeline.metahuman_paths import SOURCED_DIR
 HIDDEN_MESH_GAS = f"{UEFN}/Meshes/SKM_UEFN_Mannequin"
 HIDDEN_SKELETON_GAS = f"{UEFN}/Meshes/SK_UEFN_Mannequin"
 
+# What the player's hidden mesh component wears once the game is on the bridge
+# (gas_player_mesh.py): a copy of that mesh, on the same skeleton, with the
+# sockets the game attaches to.  The sample's own mesh is left a byte copy.
+PLAYER_MESH_GAS = f"{SOURCED_DIR}/SKM_UEFN_Player"
+# Where those sockets are read from: the mannequin the game was built on.
+SOCKETS_FROM = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"
+PLAYER_SOCKETS = ("HandGrip_R", "HandGrip_L", "weapon_r_muzzle",
+                  "foot_l_Socket", "foot_r_Socket")
+
 # The one clip the proof plays: the sample's standing idle.
 IDLE_CLIP = f"{UEFN}/Animations/Idle/M_Neutral_Stand_Idle_Loop"
 

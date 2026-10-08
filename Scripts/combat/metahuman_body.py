@@ -78,11 +78,14 @@ def _sync_entry(name, option):
     return entry
 
 
-def install(bp, mannequin_handle):
+def install(bp, mannequin_handle, retarget=None):
     """Graft the MetaHuman under the mannequin's handle. Rebuilt from
-    nothing each time, so a run after an edit here leaves no stale part."""
+    nothing each time, so a run after an edit here leaves no stale part.
+    ``retarget`` is the anim Blueprint the body follows its parent through:
+    the mannequin's unless the parent is another mesh (PlayerSkin.retarget)."""
+    retarget = retarget or ABP_RETARGET
     _drop_components(bp, COMPONENTS)
-    body, body_comp = _skeletal(bp, mannequin_handle, BODY, BODY_MESH, ABP_RETARGET)
+    body, body_comp = _skeletal(bp, mannequin_handle, BODY, BODY_MESH, retarget)
     face, _face_comp = _skeletal(bp, body, FACE, FACE_MESH, FACE_ANIM_BP)
     for name, mesh in CLOTHING.items():
         _skeletal(bp, body, name, mesh)
@@ -110,7 +113,7 @@ def install(bp, mannequin_handle):
     sync.set_editor_property("custom_lod_mapping",
                              {n: mapping for n in (BODY, *CLOTHING)})
     got = body_comp.get_editor_property("anim_class")
-    if got != _anim_class(ABP_RETARGET):
+    if got != _anim_class(retarget):
         raise RuntimeError(f"the body's anim class did not stick: {got}")
     _log(f"player: MetaHuman body, face, {len(CLOTHING)} garments and "
          f"{len(GROOMS)} grooms under the mannequin")

@@ -10,7 +10,7 @@ does anything for any other character.  The Mover variant is not copied
 clip that carries one.  Their clips still name them, so they cannot be left
 behind: this removes each one's function graphs, which leaves a notify of the
 same class and variables that does nothing, and saves it.  import_gas.py
-keeps a package listed in gas_paths.PATCHED once it is here, so the copy does
+keeps a package listed in gas_paths.PATCHED (these two: PATCHED_NOTIFIES) once it is here, so the copy does
 not undo this; delete the file to take the sample's again.
 """
 import os
@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 for _m in [m for m in sys.modules if m.split(".")[0] == "asset_pipeline"]:
     del sys.modules[_m]
 
-from asset_pipeline.gas_paths import PATCHED, gas  # noqa: E402
+from asset_pipeline.gas_paths import PATCHED_NOTIFIES, gas  # noqa: E402
 
 BEL = unreal.BlueprintEditorLibrary
 
@@ -53,7 +53,7 @@ def _patch(path):
 
 
 def main():
-    for pkg in PATCHED:
+    for pkg in PATCHED_NOTIFIES:
         _patch(gas(pkg))
 
 

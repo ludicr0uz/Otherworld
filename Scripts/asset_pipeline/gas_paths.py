@@ -72,11 +72,19 @@ REDIRECTED = (
 )
 
 # Copied, then changed in this project by patch_gas_notifies.py: the notifies
-# only the Mover character answers.  import_gas.py copies one only while it is
-# not here, so a re-run does not put the sample's back over the patch.
-PATCHED = (
+# only the Mover character answers.
+PATCHED_NOTIFIES = (
     "/Game/Blueprints/AnimNotifies/BP_AnimNotify_TriggerRagdoll",
     "/Game/Blueprints/AnimNotifies/BP_NotifyState_OverrideMovementMode",
+)
+# Every package changed here after the copy.  import_gas.py copies one only
+# while it is not here, so a re-run does not put the sample's back over the
+# patch.  The anim blueprint is the weapons build's to patch
+# (combat/gas_locomotion.py: what it reads of its character, its montage slot,
+# the server branch); it is patched where it lies because the sample's
+# choosers take an object of its class and no other.
+PATCHED = PATCHED_NOTIFIES + (
+    "/Game/Blueprints/SandboxCharacter_CMC_ABP",
 )
 
 ABP = GAME_ROOT + "/Blueprints/SandboxCharacter_CMC_ABP"

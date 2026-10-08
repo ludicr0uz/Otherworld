@@ -99,7 +99,8 @@ from combat.player_gait import patch_gait                         # noqa: E402
 from combat.hit_bodies import fit_hit_bodies                      # noqa: E402
 from combat.ragdoll import tune_ragdolls                          # noqa: E402
 from combat.settings_savegame import build_settings_savegame      # noqa: E402
-from combat.skin import wear_skin                                 # noqa: E402
+from combat.gas_locomotion import build_gas_locomotion            # noqa: E402
+from combat.skin import player_skin, wear_skin, worn_skin         # noqa: E402
 from combat.tuning import GUN_DROP_CHANCE, GUN_LOOT_TABLE         # noqa: E402
 from combat.weapon_component.build import build_weapon_component  # noqa: E402
 from combat.weapon_items import build_weapon, build_weapon_item   # noqa: E402
@@ -129,7 +130,16 @@ def main():
     # Before the weapons: every weapon's GripRotation is solved against the
     # ready pose as seen through the player's own rig, so the body has to be
     # the final one before the first spec is built.
-    skin = wear_skin()
+    worn = worn_skin()
+    if worn.gas:
+        # The motion-matching anim Blueprint, before the body that runs it.
+        build_gas_locomotion()
+    wear_skin(worn)
+    # The rig the weapon layers, the poses and the grips are keyed on: the
+    # worn one, or with the motion matching worn the mannequin's still, whose
+    # anim Blueprint the player no longer runs (combat/skin.py; G4 brings the
+    # layers over).
+    skin = player_skin()
     unpatch_server_anim(skin.anim_bp)
     # Before anything compiles the anim BP (see unpatch_stance_clips).
     unpatch_stance_clips(skin)
@@ -213,7 +223,7 @@ def main():
 
     _log(f"done — five weapons, a knife, an axe, matches and a stick, ammunition, inventory, aiming down the sights, "
          f"footsteps, blood, death, drops and respawn, worn by "
-         f"{skin.mesh.rsplit('/', 1)[1]}")
+         f"{worn.mesh.rsplit('/', 1)[1]}")
 
 
 if __name__ == "__main__":

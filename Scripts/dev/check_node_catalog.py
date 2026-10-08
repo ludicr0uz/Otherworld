@@ -6,7 +6,7 @@ A function path that does not resolve yields a pinless node, and a palette
 name that does not exist yields nothing: either way the failure surfaces much
 later, in whichever builder first uses it. This makes each node in a scratch
 Blueprint under /Game/Tmp (one per kind of graph a builder authors: an actor,
-a HUD, a game instance, a controller, a widget, a BT task, an ability, an anim graph), asserts
+a HUD, a game instance, a controller, a widget, a BT task, an ability, an anim graph and an anim Blueprint's event graph), asserts
 it has pins exactly as uebp.graph._node does, and deletes the scratch assets.
 A path passes if it resolves in any of them. Exits non-zero on a miss.
 """
@@ -100,6 +100,12 @@ def scratch_graphs():
         ed = BGE.get_graph_editor_by_name(copy, "AnimGraph") if copy else None
         if ed:
             out.append(("AnimGraph", ed, path))
+        # ...and its event graph, emptied: an anim instance's own events
+        # (BlueprintInitializeAnimation) are in no other graph's palette.
+        events = BGE.get_graph_editor_by_name(copy, "EventGraph") if copy else None
+        if events:
+            events.remove_nodes(events.list_all_nodes())
+            out.append(("AnimEvents", events, path))
     return out
 
 
@@ -127,7 +133,7 @@ def main():
             unreal.log_warning(f"[VERIFY] {'PASS' if where else 'FAIL'}  {name}"
                                + (f" — {paths[name]} resolves nowhere" if not where else ""))
     finally:
-        for _ctx, _ed, path in graphs:
+        for path in sorted({path for _ctx, _ed, path in graphs}):
             unreal.EditorAssetLibrary.delete_asset(path)
     unreal.log_warning(f"[VERIFY] {len(paths) - len(missed)}/{len(paths)} checks passed "
                        f"(node catalog paths, over {len(graphs)} graph contexts)")

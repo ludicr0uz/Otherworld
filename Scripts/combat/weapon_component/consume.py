@@ -30,6 +30,7 @@ held down fires it -- an automatic on the next frame, anything on a press that
 is still reported.
 """
 
+from net.guard import author_guard
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from uebp import net
 from uebp.g import _G
@@ -158,8 +159,9 @@ def author_consume_event(ed):
     g = _G(ed, ITEM_CLASS_PATH)
     keep = g.keep
     event = keep(net.server_event(ed, SERVER_CONSUME, []))
+    go, _refused = author_guard(g, SERVER_CONSUME, [then(event)])
     held = g.get(WV.Held)
-    there, _empty = g.branch(out(g.call(FN_IS_VALID, Object=held)), [then(event)])
+    there, _empty = g.branch(out(g.call(FN_IS_VALID, Object=held)), [go])
     edible, _not = g.branch(g.iget(held, IV.Consumable), [there])
     garment = g.call(FN_GE_II, A=g.iget(held, CLOTHING_SLOT_VAR), B=0)
     _worn, food = g.branch(out(garment), [edible])

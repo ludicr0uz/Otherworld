@@ -45,6 +45,7 @@ read behind the Branch on Using or UsePressed, which are false with empty
 hands. Numbers and names: torch_tuning.py.
 """
 
+from net.guard import author_guard
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.fire_vars import SERVER_KINDLE
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
@@ -177,7 +178,8 @@ def author_kindle_event(ed):
     copy of the owner. Before the Tick, which calls it by name."""
     g = _G(ed, ITEM_CLASS_PATH)
     event = g.keep(net.server_event(ed, SERVER_KINDLE))
-    alive = _author_alive(g, [then(event)])
+    go, _refused = author_guard(g, SERVER_KINDLE, [then(event)])
+    alive = _author_alive(g, [go])
     held = g.get(WV.Held)
     armed, _bare = g.branch(valid(g, held), alive)
     unlit = op(g, FN_AND, g.iget(held, BURNS_VAR), not_(g, g.iget(held, LIT_VAR)))

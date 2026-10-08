@@ -3,8 +3,8 @@
 Two modules and four targets. The runtime module, `Otherworld`, holds what multiplayer
 needs and a Blueprint cannot do (`serversupportsysdesign.md` 4.3): the player's
 predicted movement states (M12), the lag compensation of shots (M22), the server's
-replication graph (A2), how often a dedicated server poses a body (A4) and the record of
-what a player carries (A3a, A3b). The editor-only
+replication graph (A2), how often a dedicated server poses a body (A4), the record of
+what a player carries (A3a, A3b) and what a Server event checks before it runs (A5). The editor-only
 module, `OtherworldEditor`, holds what the Python builders need and Python cannot reach.
 Everything else stays in the Python builders.
 
@@ -24,10 +24,11 @@ Everything else stays in the Python builders.
 | `Otherworld/Public/OtherworldInventoryRecord.h`, `Private/….cpp` | What a player carries, as one record (A3a, A3b; `Scripts/net/CLAUDE.md`, "The inventory"): `FOtherworldInventoryRecord` (a row per item, a class per worn slot; its own `NetSerialize`, so it travels whole), `UOtherworldInventoryRecordComponent` (holds it on the character: `COND_OwnerOnly`, push-based, one RepNotify; `HandClass`, `HandLit`, `HandHot` `COND_SkipOwner`; reads the weapon component's Blueprint arrays and each item's variables by name, through reflection, and on a client raises that component's `ViewDirty`, by name, when a record or a hand arrives), `UOtherworldInventoryRecords` (a world subsystem: each marked record written once, after the actors ticked) and `UOtherworldRecordSave` (a `USaveGame` with one byte array: the record as a save holds it) |
 | `Otherworld/Private/OtherworldInventoryBytes.cpp` | The record's saved form: `FOtherworldInventoryRecord::ToBytes` and `FromBytes`, a version first, classes by path; the layout is the file's first comment |
 | `Otherworld/Private/OtherworldInventoryLibrary.cpp` | `UOtherworldInventoryLibrary` (Python: `unreal.OtherworldInventoryLibrary`; declared in the record's header): `MarkInventoryDirty` and `MarkCarriedItemDirty` for the graphs (`Scripts/uebp/nodes/inventory.py`, placed by `Scripts/combat/dirty.py`), the view's reads of the record (`InventoryRow`, `WornRow`, `HandRow`, for `Scripts/combat/weapon_component/view.py`), the save's (`InventoryRecordOf`, `InventoryRecordToBytes`, `InventoryRecordFromBytes`), and the probes' reads and the audit's switch |
+| `Otherworld/Public/OtherworldRpcGuard.h`, `Private/….cpp` | `UOtherworldRpcGuard` (A5; `Scripts/net/CLAUDE.md`, "Every Server event asks the guard first"): a component on the player with the two checks a Blueprint Server event has no `_Validate` for. `Allow(Name)`, a token bucket per event name per connection (the state is keyed by the `UNetConnection`, so it outlives a character), which logs `RPC-REFUSED` and past `KickRefusals` in `KickSeconds` closes the connection (`ENetCloseResult::Extended`, `ClosedByRpcGuard`); and `AimAllowed(AimPoint)`, the cone along `GetBaseAimRotation` a shot's point must lie in. Both pass uncounted unless the owner's controller is a remote player's. Its numbers are `EditAnywhere`, written by `combat/install.py` from `Scripts/net/guard_consts.py`; `Counted`, `Refused`, `AimRefused` and `bKicked` (Python: `kicked`) are for the probes |
 | `OtherworldEditor/OtherworldEditor.Build.cs` | the editor module's dependencies (adds `UnrealEd`, `BlueprintGraph`); only the Editor target lists it, so no game or server build carries it |
 | `Otherworld/Public/OtherworldLoadLibrary.h`, `Private/….cpp` | `UOtherworldLoadLibrary` (Python: `unreal.OtherworldLoadLibrary`): what the load test reads off a server or a client (A1, `Scripts/probes/probe_net_load.py`): each connection's bytes and packets in and out, open actor channels and lag (`FOtherworldConnectionStats`, read with `get_editor_property`), the frame and world-tick times sampled between `StartFrameTiming` and `StopFrameTiming`, and the hit history's characters and samples |
 | `Otherworld/Public/OtherworldReplicationGraph.h`, `Private/….cpp` | `UOtherworldReplicationGraph` (A2, `Scripts/net/CLAUDE.md` "Relevancy, update rates and dormancy"): the server's replication driver, named for the `IpNetDriver` in `Config/DefaultEngine.ini`. A grid-spatialisation node for everything with a place in the world, an always-relevant list for `bAlwaysRelevant` actors, and `UOtherworldReplicationGraphNode_ForConnection` per connection (the engine's viewer and view target, plus the viewer's PlayerState). Each class's cull distance and period are read off its CDO, which the builders write from `Scripts/net/relevancy_consts.py`; `CellSizeCm` is its one config value |
-| `Otherworld/Public/OtherworldNetLibrary.h`, `Private/….cpp` | `UOtherworldNetLibrary` (Python: `unreal.OtherworldNetLibrary`): `IsLevelActor`, whether an actor was placed in the level (`AActor::IsNetStartupActor`, not Blueprint-callable), which the take asks before destroying one (`Scripts/uebp/nodes/level.py`) |
+| `Otherworld/Public/OtherworldNetLibrary.h`, `Private/….cpp` | `UOtherworldNetLibrary` (Python: `unreal.OtherworldNetLibrary`): `IsLevelActor`, whether an actor was placed in the level (`AActor::IsNetStartupActor`, not Blueprint-callable), which the take asks before destroying one (`Scripts/uebp/nodes/level.py`); and `SendServerEvent(Target, Event, Arguments)` for the probes (A5): a Blueprint Server event sent from a client as the VM sends one (`CallRemoteFunction`), each parameter from its text, which Python's `call_method` cannot do |
 | `OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h`, `Private/….cpp` | `UOtherworldBlueprintNetLibrary` (Python: `unreal.OtherworldBlueprintNetLibrary`): a custom event's net flags and parameters, a variable's replication and OnRep graph, and the same read back off a compiled class. Wrapped by `Scripts/uebp/net.py`; checked by `Scripts/dev/check_net_authoring.py` |
 
 They began as the packaging step's generated files in `Intermediate/Source`; both modules
@@ -188,6 +189,13 @@ numbers, which the fire graph hands `ShotTrace` as pin literals.
   Python names it in snake case, turns `bool` plus out-parameters into a return of `None` or
   the tuple of outs, and an `enum class` into `unreal.<Enum>.<UPPER_SNAKE>`. Change one and
   the running editor still has the old: close it, compile, and let `uepy.py` boot a new one.
+- **`GetFunctionCallspace` says a Blueprint Server event called from C++ on a client
+  would run locally** (seen in `SendServerEvent`, A5), so it cannot be the test of
+  "would this travel". Ask whether the owner lacks authority, call `CallRemoteFunction`
+  and take its bool.
+- **`FNetCloseResult` is `UE::Net::FNetCloseResult`** (`Net/Core/Connection/NetCloseResult.h`);
+  a custom reason is `ENetCloseResult::Extended` with the reason as its error context.
+  The server logs it; the client is told only `ConnectionLost`.
 - **Editor-only code goes in `OtherworldEditor`, never the runtime module:** `UnrealEd` and
   `BlueprintGraph` do not exist in a game or server build.
 - **New code keeps both modes:** single player is the standalone net mode of the same code

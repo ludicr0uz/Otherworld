@@ -22,8 +22,12 @@ the server's Tick serves it (slot_moves.py, drop_request.py, wear.py,
 wear_drag.py), where a slot
 out of range, an empty one or an item that does not fit is refused. In
 single player a Server event is a plain call, so nothing there changed.
+Each of them asks the RPC guard first (net/guard.py, task A5): no more than
+ASK_RATE a second from one connection.
 """
 
+from net.guard import author_guard
+from uebp.g import _G
 from uebp.graph import _connect, _pin, _set, out, then
 from uebp.net import custom_event, server_event
 from uebp.vars import INT
@@ -55,6 +59,10 @@ def author_asks(ed):
         make = server_event if name in SERVER_ASKS else custom_event
         event = make(ed, name, [(p, INT) for p in params])
         made, flow = [event], then(event)
+        if name in SERVER_ASKS:
+            g = _G(ed)
+            flow, _refused = author_guard(g, name, [flow])
+            made += g.made
         for var, param in WRITES[name]:
             put = ed.add_set_member_variable_node(var)
             if param in params:

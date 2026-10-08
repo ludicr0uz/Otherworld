@@ -54,6 +54,7 @@ from combat.weapon_component.look_vars import (
     LookLowered, LookPose, SentAim, SentLowered, SentPose)
 from combat.weapon_component.sight_pitch import _anim_class_path
 from combat.weapon_component.stance import STANCE_VAR
+from net.guard import author_guard
 from uebp import net
 from uebp.g import _G
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, out, then
@@ -76,7 +77,8 @@ def author_set_look(ed):
     g = _G(ed)
     event = g.keep(net.server_event(ed, SERVER_SET_LOOK, LOOK_PARAMS))
     mode = g.call(FN_CLAMP_II, Value=out(event, "Aim"), Min=HIP, Max=SIGHTS)
-    tail = g.put(LookAim, out(mode), [then(event)])
+    go, _refused = author_guard(g, SERVER_SET_LOOK, [then(event)])
+    tail = g.put(LookAim, out(mode), [go])
     tail = g.put(LookLowered, out(event, "Lowered"), [tail])
     g.put(LookPose, out(event, "Pose"), [tail])
     ed.add_comment_to_nodes(

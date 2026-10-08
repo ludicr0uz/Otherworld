@@ -163,7 +163,9 @@ def check_knife_press():
               if any(MELEE_VAR in out_pins(f) for f in _feeders(n, FX.SHARP_PARAM))]
     slash = graph(wc).find_event_node(SERVER_SLASH)
     served = [n for n in melee if slash is not None
-              and slash in [e for f in _feeders(n, "execute") for e in _feeders(f, "execute")]]
+              and slash in [e for f in _feeders(n, "execute") for a in _feeders(f, "execute")
+                            # ...past the guard's Allow and its Branch (verify/guard.py).
+                            for b in _feeders(a, "execute") for e in _feeders(b, "execute")]]
     melee = [n for n in melee if n not in served]
     check("one Branch asks Held.Melee at the fire gate and one in the slash's Server "
           "event; the throw's tell and its prediction read it for the sound's Sharp",

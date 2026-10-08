@@ -17,6 +17,8 @@ Scripts/dev/check_node_catalog.py.
               movement component, its state read back, the server's writes
   shot.py     the game's own shot library (C++, Source/Otherworld): the
               pellet's trace, rewound to the shooter's view on a server (M22)
+  guard.py    the game's own RPC guard (C++, Source/Otherworld): what every
+              Server event asks first, and the shot of its AimPoint (A5)
   level.py    the game's own net library (C++, Source/Otherworld): whether an
               actor was placed in the level, which the take destroys (A2)
   pose.py     the game's own pose library (C++, Source/Otherworld): how often a

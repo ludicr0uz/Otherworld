@@ -90,9 +90,12 @@ def check_server_fires():
     check("...and the pellets' damage is dealt there", len(hits) >= 1, str(len(hits)))
     served = [n for n in wg if _title(n).startswith("Set")
               and _title(n).endswith(f" {AsksServed}")]
-    first = [f for n in served for f in _feeders(n, "execute")]
-    check(f"both Server events count themselves served first, fired or refused "
-          f"({AsksServed})", len(served) == 2 and len(first) == 2
+    # Behind the guard's Allow and before its Branch (verify/guard.py): a
+    # shot the guard refuses is counted served too.
+    first = [e for n in served for f in _feeders(n, "execute") if _title(f) == "Allow"
+             for e in _feeders(f, "execute")]
+    check(f"both Server events count themselves served first, fired or refused, by "
+          f"the guard too ({AsksServed})", len(served) == 2 and len(first) == 2
           and all(_event(e) in first for e in SERVER_EVENTS), f"{len(served)} write(s)")
     if not draws:
         return
@@ -121,8 +124,10 @@ def check_server_fires():
           "never raises the gun's rate", len(stamps) == 1 and len(late) == 1,
           f"{len(stamps)} stamp(s), {len(late)} Max")
     aims = [q for q in PIN.list_connected_pins(BEL.find_output_pin(fire, AIM_PARAM))]
-    check(f"the shooter's {AIM_PARAM} is read once: the pellets' direction",
-          len(aims) == 1, str(len(aims)))
+    asked = [q for q in aims
+             if _title(PIN.get_owning_node(q)).replace(" ", "") == "AimAllowed"]
+    check(f"the shooter's {AIM_PARAM} is read twice: the guard's AimAllowed, and the "
+          "pellets' direction", len(aims) == 2 and len(asked) == 1, str(len(aims)))
 
 
 def _reads_behind(node, depth=4):

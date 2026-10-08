@@ -8,6 +8,12 @@ Blueprint runtime error, an "Accessed None" or a network failure, and every
 probe passed in every process it ran in -- and ran in at least one. Each
 row also counts the movement corrections the process logged, which fail
 nothing here.
+
+One network failure is no failure: a client the server's RPC guard kicked
+(the server logs RPC-KICKED, Scripts/net/guard_consts.py) loses its
+connection, which is what the probe that had it kicked is there to see. For
+each kick the server logged, one client whose only network failures are a
+lost connection is forgiven them, and its row says so.
 """
 
 import os
@@ -32,6 +38,11 @@ NET_PATTERNS = (
 # (Source/Otherworld). A probe says how many a run may have
 # (probes/probe_net_move_states.py).
 CORRECTION = r"MOVE-CORRECTION"
+# The server's RPC guard closing a connection, and what the client it closed
+# logs: nothing but a lost connection.
+KICK = r"RPC-KICKED"
+NET_FAILURES = "net failures"
+LOST = "ConnectionLost"
 NOTABLE = re.compile("|".join(p for _l, p in NET_PATTERNS))
 MAX_LINE = 200
 
@@ -60,6 +71,17 @@ class ProcessReport(object):
                 for label, pattern in NET_PATTERNS]
 
     @property
+    def kicks(self):
+        return len(re.findall(KICK, self.text)) if self.is_server else 0
+
+    def lost_only(self):
+        """Did this client log a network failure, and none but a lost
+        connection?"""
+        pattern = dict(NET_PATTERNS)[NET_FAILURES]
+        lines = [l for l in self.text.splitlines() if re.search(pattern, l)]
+        return bool(lines) and not self.is_server and all(LOST in l for l in lines)
+
+    @property
     def corrections(self):
         return len(re.findall(CORRECTION, self.text))
 
@@ -77,14 +99,19 @@ def summary(reports, clients):
     heads = ["process", "joins"] + labels + ["corrections"]
     lines = ["  " + "".join(f"{h:<15}" for h in heads).rstrip()]
     ok = True
+    kicks = sum(r.kicks for r in reports)
     for r in reports:
         want = r.expected_joins(clients)
         counts = r.counts()
         died = "" if r.exit_code is None else f"died (exit {r.exit_code})"
+        kicked = kicks > 0 and r.lost_only()
+        if kicked:
+            kicks -= 1
         cells = ([r.name, f"{r.joins}/{want}"] + [str(n) for _l, n in counts]
-                 + [str(r.corrections), died])
+                 + [str(r.corrections), died or ("kicked by the RPC guard" if kicked else "")])
         lines.append("  " + "".join(f"{c:<15}" for c in cells).rstrip())
-        if r.joins != want or died or any(n for _l, n in counts) or not r.text:
+        bad = [n for label, n in counts if n and not (kicked and label == NET_FAILURES)]
+        if r.joins != want or died or bad or not r.text:
             ok = False
     for r in reports:
         if not r.text:

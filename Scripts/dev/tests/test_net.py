@@ -285,6 +285,34 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(lines[0].split()[-1], "corrections")
         self.assertEqual(lines[3].split(), ["client", "2", "1/1", "0", "0", "0", "0", "2"])
 
+    LOST = ("LogNet: Error: UEngine::BroadcastNetworkFailure: FailureType = ConnectionLost\n"
+            "LogNet: Warning: Network Failure: GameNetDriver[ConnectionLost]: lost.\n")
+    KICKED = "LogOtherworldRpcGuard: Warning: RPC-KICKED ClosedByRpcGuard: 101 refusals\n"
+
+    def test_a_client_the_rpc_guard_kicked_is_forgiven_its_lost_connection(self):
+        reports = self.clean()
+        reports[0].text += self.KICKED
+        reports[1].text += self.LOST
+        lines, ok = net_report.summary(reports, 2)
+        self.assertTrue(ok)
+        self.assertEqual(lines[2].split()[:8], ["client", "1", "1/1", "0", "0", "2", "0", "0"])
+        self.assertIn("kicked by the RPC guard", lines[2])
+
+    def test_one_kick_forgives_one_client_and_only_a_lost_connection(self):
+        reports = self.clean()
+        reports[0].text += self.KICKED
+        reports[1].text += self.LOST
+        reports[2].text += self.LOST
+        self.assertFalse(net_report.summary(reports, 2)[1])
+        reports = self.clean()
+        reports[0].text += self.KICKED
+        reports[1].text += self.LOST + "LogNet: Warning: Travel Failure: [ClientTravelFailure]\n"
+        self.assertFalse(net_report.summary(reports, 2)[1])
+        # ...and with no kick logged, a lost connection is a failure as before.
+        reports = self.clean()
+        reports[1].text += self.LOST
+        self.assertFalse(net_report.summary(reports, 2)[1])
+
     def test_a_process_that_died_fails_it(self):
         reports = self.clean()
         reports[0].exit_code = 3

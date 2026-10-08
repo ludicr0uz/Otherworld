@@ -2,13 +2,15 @@
 picture): the two Server events, the reload both machines run, and the local
 arm's asks, which are also the owning client's prediction.
 
-    Server_Fire(AimPoint)   the server's: counted served, then refused unless
+    Server_Fire(AimPoint)   the server's: the guard's Allow (net/guard.py),
+                            counted served whatever it said, then its
+                            AimAllowed of the client's AimPoint; refused unless
                             Held is valid, the owner alive, the item a gun
                             (not Melee, Consumable or Lights), a round in it
                             and its cooldown over (within FIRE_GRACE_S); then
                             firing.py's shot from the server's own muzzle to
                             the client's AimPoint, and its noise
-    Server_Reload           counted served, then ReloadNow
+    Server_Reload           the guard's Allow, counted served, then ReloadNow
     ReloadNow               Held valid and the owner alive: ammo.py's reload
 
     _author_shot_ask        the trigger's gate passed, where the keys are:
@@ -32,6 +34,7 @@ block are the server's, and a sprint's end and the shot behind it travel
 separately, so the server would refuse honest shots.
 """
 
+from net.guard import author_aim_guard, author_allow
 from uebp import net
 from uebp.g import _G
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, out, then
@@ -91,9 +94,14 @@ def _author_alive(g, execs):
 def _author_server_fire(ed):
     g = _G(ed, ITEM_CLASS_PATH)
     event = g.keep(net.server_event(ed, SERVER_FIRE, FIRE_PARAMS))
-    flow = _count(g, AsksServed, [then(event)])
+    # Asked first, and counted served either way: a refused shot's round is
+    # handed back like any other the server did not fire.
+    flow, allowed = author_allow(g, SERVER_FIRE, [then(event)])
+    flow = _count(g, AsksServed, [flow])
+    go, _refused = g.branch(allowed, [flow])
+    aimed, _behind = author_aim_guard(g, out(event, AIM_PARAM), [go])
     held = g.get(WV.Held)
-    armed, _empty = g.branch(valid(g, held), [flow])
+    armed, _empty = g.branch(valid(g, held), [aimed])
     alive = _author_alive(g, [armed])
     # Only a gun is fired: the knife, food and the matches have the fire key's
     # other arms, which are not this request.
@@ -106,8 +114,9 @@ def _author_server_fire(ed):
     cooled = op(g, FN_GE_FF, soon, g.iget(held, IV.NextFireTime))
     fire, _refused = g.branch(op(g, FN_AND, has_ammo, cooled), [gun])
     ed.add_comment_to_nodes(
-        f"{SERVER_FIRE} (shot.py): the owning client's trigger. Counted served, then "
-        "refused unless there is a gun in a living hand with a round in it and its "
+        f"{SERVER_FIRE} (shot.py): the owning client's trigger. The guard is asked "
+        "(net/guard.py: how often, and an AimPoint its view could rest on); counted "
+        "served either way, then refused unless there is a gun in a living hand with a round in it and its "
         f"cooldown over (within {FIRE_GRACE_S:g} s: packets do not arrive evenly). The "
         "shot is traced from this machine's muzzle to the client's AimPoint.", g.made)
     # Heard by everyone who did not predict it, before the pellets fly.
@@ -148,9 +157,11 @@ def _author_heard_on_gun(ed, sound_var):
 def _author_server_reload(ed):
     g = _G(ed)
     event = g.keep(net.server_event(ed, SERVER_RELOAD))
-    flow = _count(g, AsksServed, [then(event)])
+    flow, allowed = author_allow(g, SERVER_RELOAD, [then(event)])
+    flow = _count(g, AsksServed, [flow])
+    go, _refused = g.branch(allowed, [flow])
     call = g.keep(_node(ed, RELOAD_NOW))
-    _connect(flow, _pin(call, "execute"))
+    _connect(go, _pin(call, "execute"))
     ed.add_comment_to_nodes(
         f"{SERVER_RELOAD} (shot.py): the owning client's R. Counted served, then the "
         "reload.", g.made)

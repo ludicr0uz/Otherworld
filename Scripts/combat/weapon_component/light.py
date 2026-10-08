@@ -38,6 +38,7 @@ and the take runs once, off Completed. Tuning is light_tuning.py.
 """
 
 from combat.chop_tuning import WOOD_CLASS_VAR
+from net.guard import author_guard
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.light_tuning import (
@@ -103,7 +104,8 @@ def author_light_event(ed):
     Before the Tick, which calls it by name."""
     g = _G(ed, ITEM_CLASS_PATH)
     event = g.keep(net.server_event(ed, SERVER_LIGHT))
-    alive = _author_alive(g, [then(event)])
+    go, _refused = author_guard(g, SERVER_LIGHT, [then(event)])
+    alive = _author_alive(g, [go])
     held = g.get(WV.Held)
     armed, _bare = g.branch(valid(g, held), alive)
     lighter, _other = g.branch(g.iget(held, LIGHTS_VAR), [armed])

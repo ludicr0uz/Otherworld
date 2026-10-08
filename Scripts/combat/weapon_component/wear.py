@@ -42,6 +42,7 @@ and ClothingSlot is a pure read off it. Worn is read only behind
 IsValidIndex: it starts empty and is grown by the first wear into a slot.
 """
 
+from net.guard import author_guard
 from uebp import net
 from uebp.graph import _connect, _loose_pin, _pin, _set, out, then
 from combat.ask_consts import ASK_TAKE_OFF, ASK_WEAR, FROM_PARAM, SLOT_PARAM, TO_PARAM
@@ -105,8 +106,9 @@ def author_wear_event(ed):
     the Tick, which calls it by name."""
     g = _G(ed, ITEM_CLASS_PATH)
     event = g.keep(net.server_event(ed, SERVER_WEAR, []))
+    go, _refused = author_guard(g, SERVER_WEAR, [then(event)])
     held = g.get(WV.Held)
-    there, _empty = g.branch(out(g.call(FN_IS_VALID, Object=held)), [then(event)])
+    there, _empty = g.branch(out(g.call(FN_IS_VALID, Object=held)), [go])
     garment, _other = g.branch(_is_garment(g, held), [there])
     ed.add_comment_to_nodes(
         f"{SERVER_WEAR} (wear.py): the owning client's fire key with a garment in "

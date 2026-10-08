@@ -93,11 +93,11 @@ def check_eating_spends_the_press():
     served = _reached(event) if event else []
     chain = [_title(n) for n in _exec_after(event)] if event else []
     after_send = [_title(n) for n in _exec_after(sends[0])] if len(sends) == 1 else []
-    check("...which refuses a Held that is not there, not Consumable or a garment "
-          "(three Branches), then sends the use event once, and only then destroys the item",
-          chain[:3] == ["Branch"] * 3 and len(sends) == 1 and "Destroy Actor" in after_send
+    check("...which asks the guard, refuses a Held that is not there, not Consumable or "
+          "a garment (three Branches), then sends the use event once, and only then destroys the item",
+          chain[:5] == ["Allow"] + ["Branch"] * 4 and len(sends) == 1 and "Destroy Actor" in after_send
           and sends[0] in served,
-          f"{chain[:5]} / {after_send}")
+          f"{chain[:6]} / {after_send}")
 
     if rearms:
         ands = _feeders(rearms[0], TRIGGER_SPENT)

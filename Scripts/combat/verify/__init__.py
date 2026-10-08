@@ -156,6 +156,10 @@ and it never relies on a variable another section left behind.
               calls, predicts for the sections whose nodes moved into a pair
   shot_hits   a shot's impacts told once (A4): the notes, FlushShotHits,
               Multicast_ShotHits and its loop over Fx_PelletHit
+  guard       the RPC guard (A5): the component and its numbers, the table and
+              the Server events in step, Allow at the head of each, and the
+              shot's AimAllowed; server_events, guard_of for the sections
+              whose events it now heads
   server_anim the one IsDedicatedServer branch of the player's and each
               wanderer's anim graph (A4), and what its server arm may hold
 """
@@ -163,6 +167,6 @@ and it never relies on a variable another section left behind.
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "interact", "slots", "record", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "glimmer", "heat",
+    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
 )

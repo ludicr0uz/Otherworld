@@ -24,6 +24,7 @@ held item stays held, as with a pick-up. Every refusal is the component's:
 the window only shows whether the bag is full.
 """
 
+from net.guard import author_guard
 from uebp.graph import _connect, _loose_pin, _palette, _pin, _set, out, then
 from uebp.g import _G
 from uebp.net import server_event
@@ -53,7 +54,8 @@ def author_loot_take(ed):
                                                     (INDEX_PARAM, INT),
                                                     (WANT_PARAM, cls(ACTOR_CLASS_PATH))]))
     body, index = out(event, BODY_PARAM), out(event, INDEX_PARAM)
-    alive, _ = g.branch(out(g.call(FN_NOT, A=g.get(OWNER_DEAD_VAR))), [then(event)])
+    go, _refused = author_guard(g, ASK_LOOT_TAKE, [then(event)])
+    alive, _ = g.branch(out(g.call(FN_NOT, A=g.get(OWNER_DEAD_VAR))), [go])
     there, _ = g.branch(out(g.call(FN_IS_VALID, Object=body)), [alive])
     # In reach on this machine: a client is not taken at its word.
     gap = g.call(FN_DISTANCE,

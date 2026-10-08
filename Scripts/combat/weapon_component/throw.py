@@ -58,6 +58,7 @@ key and the click: no key can be injected into a headless game
 game.
 """
 
+from net.guard import author_guard
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.paths import THROW_ARC_CLASS_PATH
@@ -355,7 +356,8 @@ def author_throw_event(ed):
     event = g.keep(net.server_event(ed, SERVER_THROW, THROW_PARAMS))
     start = out(event, START_PARAM)
     held = g.get(WV.Held)
-    armed, _empty = g.branch(valid(g, held), [then(event)])
+    go, _refused = author_guard(g, SERVER_THROW, [then(event)])
+    armed, _empty = g.branch(valid(g, held), [go])
     alive = _author_alive(g, [armed])
     idle = not_(g, valid(g, g.get(THROWN_VAR)))
     here = g.call(FN_ACTOR_LOC, self=out(g.call(FN_GET_OWNER)))

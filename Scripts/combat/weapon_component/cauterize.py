@@ -26,6 +26,7 @@ The blade stays hot: the press does not spend its heat. Held.Hot is read
 behind the Branch on UsePressed, which is false with empty hands (use.py).
 """
 
+from net.guard import author_guard
 from uebp import net
 from uebp.g import _G
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
@@ -81,7 +82,8 @@ def author_cauterize_event(ed):
     Before the Tick, which calls it by name."""
     g = _G(ed, ITEM_CLASS_PATH)
     event = g.keep(net.server_event(ed, SERVER_CAUTERIZE))
-    alive = _author_alive(g, [then(event)])
+    go, _refused = author_guard(g, SERVER_CAUTERIZE, [then(event)])
+    alive = _author_alive(g, [go])
     held = g.get(WV.Held)
     armed, _bare = g.branch(valid(g, held), alive)
     hot, _cold = g.branch(g.iget(held, HOT_VAR), [armed])

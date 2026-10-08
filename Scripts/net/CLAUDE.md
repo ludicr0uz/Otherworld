@@ -8,7 +8,8 @@ broken. Its code is what the builders share to keep one graph right in both mode
 (`__init__.py` maps it): `pause.py`, the session (`session_consts.py`,
 `game_instance.py`), where state lives (`state*.py`), who is nearby (`players*.py`) and
 whose keys a graph reads (`input_checks.py`) and the audit of every random draw
-(`random_consts.py`, `random_checks.py`).
+(`random_consts.py`, `random_checks.py`), and what a Server event checks before it runs
+(`guard_consts.py`, `guard.py`).
 
 ## The authority pattern
 
@@ -418,7 +419,10 @@ of them, plain data, one C++ struct on its own component (`combat/record_vars.py
   both `AskSlot`. In single player they are plain calls: nothing changed.
 - **Python cannot send a Blueprint Server event.** `call_method` on a client runs the
   event there (the engine routes only native functions from `ProcessEvent`; a Blueprint
-  one is routed by the VM, when a graph calls it). So a probe asks with `p.ask_slot(wc,
+  one is routed by the VM, when a graph calls it). A probe that has to send one as no
+  graph would (a wrong argument, two hundred in a second) uses
+  `unreal.OtherworldNetLibrary.send_server_event(wc, name, [each argument as text])`
+  (A5, `probe_net_guard.py`); an honest ask still goes through its door, below. So a probe asks with `p.ask_slot(wc,
   slot)`, `p.ask_move(wc, src, dst)` or `p.hold(wc, index)` (`probes/context.py`): the
   call itself with authority, and on a client a write of `SlotForced` or
   `MoveForcedFrom`/`MoveForcedTo`, which the component's Tick turns into the ask where
@@ -1436,6 +1440,62 @@ seconds both real players lie dead at once (`BP_ForestWandererAI_Zombie` 110–1
 `BP_ForestWandererAI_Wendigo` 32–48 a run); on a client, 16 `GetOwningPawn` reads by
 `BP_GraphicsMenuHUD` at each death, the frames between the pawn's death and the respawn. Neither
 happens with one living player, which is why no earlier probe met them.
+
+## Every Server event asks the guard first (A5, done)
+
+A C++ RPC has the engine's `_Validate` hook; a Blueprint one has nothing, so a Server
+event runs whatever arrives, as often as it arrives, unless its graph asks. Every Server
+event on the weapon component (21: the shot and the reload, the swings, the holds, the
+throw, the take, the look, the fire and heat four, the wear, the eating and the seven
+asks) asks first, one way:
+
+- **The guard is a component on the player**, `RpcGuard` (C++ `UOtherworldRpcGuard`,
+  `Source/Otherworld/Public/OtherworldRpcGuard.h`; added and given its numbers by
+  `combat/install.py`). Its table is `net/guard_consts.py`.
+- **The fragment is `net/guard.py`:** `allowed, refused = author_guard(g, NAME,
+  [then(event)])` is the first thing after `net.server_event(...)`, and the event's body
+  hangs off `allowed`. `Server_Fire` and `Server_Reload` use `author_allow` (the answer
+  and the exec apart) so that `AsksServed` is counted between the ask and its Branch: a
+  refused shot hands its round back like any other the server did not fire.
+- **`Allow(Name)` is a token bucket per event name per connection:** `RATES[Name]` a
+  second, `BURST_S` seconds of it held (what a hitch bunches up passes; a flood does
+  not). `Server_Fire` is the fastest gun's rate plus 20 % (13.3/s), the asks 10/s, the
+  look report 30/s, the rest 5/s. A refusal logs `RPC-REFUSED <name>`; more than
+  `KICK_REFUSALS` (100) in `KICK_S` (10 s) closes the connection
+  (`RPC-KICKED ClosedByRpcGuard` in the server's log; the close reason is
+  `ENetCloseResult::Extended` with that context). The state is the connection's, not the
+  character's: a respawn does not empty it.
+- **`AimAllowed(AimPoint)`** is `Server_Fire`'s second question: the point must lie in a
+  cone along the server's copy's view (`GetBaseAimRotation`), `AIM_CONE_DEG` (20°) wide,
+  opening from a disc 1.5 m across that stands 3 m behind its eyes (the camera's boom and
+  shoulder offset: a near point is off the eyes' own line), and within the reticle
+  trace's reach. **Not the gun's range:** an honest reticle rests on whatever the camera
+  sees, a kilometre out for the sky, and the pellets stop at the gun's range whatever the
+  point; a limit at the gun's range refused every shot at the sky.
+- **Only a remote connection is counted.** In single player, for a listen server's own
+  player and for a character the server drives (a load test's bot) both pass and count
+  nothing.
+- **A new Server event** gets a row in `RATES` and the fragment; `combat/verify/guard.py`
+  fails on an event with no row, a row with no event, a builder that makes a Server
+  event and does not name the fragment, and an event whose first node is not its own
+  `Allow` and Branch. A Server event on another Blueprint fails there too: the guard is
+  the player's, so its component would have to be reached first.
+- **What already checked itself still does:** `Server_Throw`'s start and speed,
+  `Server_Take`'s and `AskLootTake`'s reach, the cooldowns. The bucket is in front of
+  them, not in their place.
+- **The kicked client** is told only that its connection was lost (it returns to the
+  title with that). `uepy.py --net` forgives one client's lost connection for each
+  `RPC-KICKED` the server logged, and marks its row.
+- **Proof:** `probe_net_guard.py` (`--clients 2`): a `Server_Fire` at a point behind
+  client 1 spends nothing; the trigger held asks at the gun's rate with none refused;
+  50 `Server_Fire` in a frame get a burst through (14) and the rest refused; 200
+  `AskSlot` in a second get client 1 kicked, and client 2 plays on. In `--game` a shot
+  behind the player fires and 200 asks count nowhere. `probe_net_fire`, `probe_net_melee`
+  and `probe_net_take` are clean with `--lag 120`, with no `RPC-REFUSED` in any server
+  log.
+- **Not done here:** a gun made faster than the fastest built one on a running server's
+  GUN SETTINGS page is refused its extra rounds (the table is written at build time).
+  The guard does not rate-limit what the engine sends itself (movement).
 
 ## What the server spends on bodies it never draws (A4, 2026-10-08)
 

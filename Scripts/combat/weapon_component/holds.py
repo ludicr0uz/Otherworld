@@ -39,6 +39,7 @@ from combat.use_tuning import USING_VAR
 from combat.weapon_component import vars as WV
 from combat.weapon_component.record import authority
 from combat.weapon_component.slot_nodes import not_, op, valid
+from net.guard import author_guard
 from uebp import net
 from uebp.g import _G
 from uebp.graph import _connect, _node, _pin, out, then
@@ -55,7 +56,8 @@ def author_set_holds(ed):
     """The Server event: keep what the owning client reports."""
     g = _G(ed)
     event = g.keep(net.server_event(ed, SERVER_SET_HOLDS, HOLDS_PARAMS))
-    tail = g.put(AskGuard, out(event, GUARD_PARAM), [then(event)])
+    go, _refused = author_guard(g, SERVER_SET_HOLDS, [then(event)])
+    tail = g.put(AskGuard, out(event, GUARD_PARAM), [go])
     g.put(AskUse, out(event, USE_PARAM), [tail])
     ed.add_comment_to_nodes(
         f"{SERVER_SET_HOLDS} (holds.py): the owning client says whether it holds "

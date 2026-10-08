@@ -25,6 +25,7 @@ the walk is over nothing and the test is false. Held is read behind its own
 IsValid Branch in both halves: empty hands are offered nothing.
 """
 
+from net.guard import author_guard
 from uebp import net
 from uebp.g import _G
 from uebp.graph import _connect, _loose_pin, _node, _pin, _set, out, then
@@ -116,7 +117,8 @@ def author_heat_event(ed):
     g = _G(ed, ITEM_CLASS_PATH)
     event = g.keep(net.server_event(ed, SERVER_HEAT, HEAT_PARAMS))
     fire = out(event, FIRE_PARAM)
-    there, _gone = g.branch(valid(g, fire), [then(event)])
+    go, _refused = author_guard(g, SERVER_HEAT, [then(event)])
+    there, _gone = g.branch(valid(g, fire), [go])
     alive = _author_alive(g, [there])
     is_fire = g.call(FN_CLASS_IS_CHILD,
                      TestClass=out(g.call(FN_OBJECT_CLASS, Object=fire)),

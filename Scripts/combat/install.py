@@ -11,6 +11,7 @@ from Sound.sound_weapons import RETIRED_SOUNDS
 from combat.camera import aim_camera, face_the_camera
 from combat.log import _log
 from uebp import net
+from uebp.nodes.guard import GUARD_CLASS
 from uebp.graph import (
     BEL, _add_component, _assets, _component_object, _drop_components, _handles,
     _root_handle)
@@ -23,6 +24,7 @@ from combat.record_vars import (
     RECORD_COMPONENT, RECORD_COMPONENT_CLASS, RECORD_HAND_SLOT, RECORD_SOURCE, RECORD_VIEW)
 from combat.weapon_component.stance import allow_crouch
 from net import relevancy
+from net.guard_consts import GUARD_COMPONENT, NUMBERS, RATES
 from net.relevancy_consts import CHARACTER
 
 
@@ -62,6 +64,25 @@ def install_record(bp):
     template.set_editor_property(*RECORD_HAND_SLOT)
 
 
+def install_guard(bp):
+    """The component every Server event asks first (C++; task A5), given its
+    table: how often each event may be asked, when refusals close the
+    connection, and the aim a shot may name (net/guard_consts.py)."""
+    cls = unreal.load_class(None, GUARD_CLASS)
+    if not cls:
+        raise RuntimeError(f"{GUARD_CLASS} is not loaded: compile the Otherworld "
+                           "module (Source/CLAUDE.md)")
+    template = _component_object(_add_component(bp, _root_handle(bp), cls, GUARD_COMPONENT))
+    template.set_editor_property("rates", dict(RATES))
+    got = {str(k): float(v) for k, v in template.get_editor_property("rates").items()}
+    if got.keys() != RATES.keys() or any(abs(got[k] - RATES[k]) > 1e-4 for k in RATES):
+        raise RuntimeError(f"{GUARD_COMPONENT}.rates did not take the table: {got}")
+    for prop, value in NUMBERS.items():
+        template.set_editor_property(prop, value)
+        if abs(float(template.get_editor_property(prop)) - value) > 1e-3:
+            raise RuntimeError(f"{GUARD_COMPONENT}.{prop} did not take {value!r}")
+
+
 def install_on_character(health_bp, weapon_bp, footstep_bp):
     eas = _assets()
     bp = eas.load_asset(CHARACTER_BP_PATH)
@@ -71,7 +92,7 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     reparent_player(bp)
     _uninstall_old_shotgun(bp)
     _drop_components(bp, {"HealthComponent", "WeaponComponent", "FootstepComponent",
-                          RECORD_COMPONENT})
+                          RECORD_COMPONENT, GUARD_COMPONENT})
     handles = {}
     for name, source in (("HealthComponent", health_bp),
                          ("WeaponComponent", weapon_bp),
@@ -79,6 +100,7 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
         handles[name] = _add_component(bp, _root_handle(bp),
                                        BEL.generated_class(source), name)
     install_record(bp)
+    install_guard(bp)
     # Symmetry, and forward planning: the player carries health too, so anything
     # that shoots back later needs to be able to hit them -- and hit them in
     # the head. (The wanderers' punch is not a trace and stays a body hit.)
@@ -103,7 +125,7 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     eas.save_loaded_asset(bp)
     _log("player: HealthComponent + WeaponComponent + FootstepComponent + "
-         f"{RECORD_COMPONENT} installed")
+         f"{RECORD_COMPONENT} + {GUARD_COMPONENT} installed")
 
 
 def install_on_npc(health_bp, footstep_bp):

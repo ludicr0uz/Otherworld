@@ -58,6 +58,9 @@ def check_asks():
     for name, params in AC.INT_ASKS:
         event = _event(name)
         sets = _after(event)
+        if name in AC.SERVER_ASKS:
+            # The guard's Allow and its Branch head a Server event (verify/guard.py).
+            sets = sets[2:] if [_title(s) for s in sets[:2]] == ["Allow", "Branch"] else []
         got = [(_title(s), [str(PIN.get_pin_name(q)) for q in PIN.list_connected_pins(
             BEL.find_input_pin(s, var))]) for s, (var, _) in zip(sets, WRITES[name])]
         want = [(f"Set {var}", [param] if param in params else [])
@@ -77,7 +80,7 @@ def check_ask_loot_take():
              for g in [c, *_feeders(c, "A"), *_feeders(c, "Object"), *_feeders(c, "TargetArray")]}
     check(f"{AC.ASK_LOOT_TAKE} takes only for a living owner, from a valid body, with "
           f"room ({HAS_ROOM_VAR}) and something at that row of its {LOOT_VAR}",
-          len(gates) == 6 and {f"Get {OWNER_DEAD_VAR}", f"Get {HAS_ROOM_VAR}",
+          len(gates) == 7 and {f"Get {OWNER_DEAD_VAR}", f"Get {HAS_ROOM_VAR}",
                                f"Get {LOOT_VAR}"} <= reads,
           f"{len(gates)} gates reading {sorted(reads)}")
     reach = [pin_value(c, "B") for b in gates for c in _feeders(b, "Condition")

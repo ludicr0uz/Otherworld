@@ -31,6 +31,7 @@ a hidden one would stand in a late joiner's level as the level has it
 (item_world.py). In single player the same, to one machine.
 """
 
+from net.guard import author_guard
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from combat.paths import ITEM_CLASS_PATH
 from combat.slot_tuning import HAND, HAND_FROM_VAR, HAS_ROOM_VAR, SLOT_VAR, UNPLACED, WEAPON_KIND_VAR
@@ -140,7 +141,8 @@ def author_take_event(ed):
     g = _G(ed, ITEM_CLASS_PATH)
     event = g.keep(net.server_event(ed, SERVER_TAKE, TAKE_PARAMS))
     best = out(event, ITEM_PARAM)
-    there, _gone = g.branch(valid(g, best), [then(event)])
+    go, _refused = author_guard(g, SERVER_TAKE, [then(event)])
+    there, _gone = g.branch(valid(g, best), [go])
     alive = _author_alive(g, [there])
     here = g.call(FN_ACTOR_LOC, self=out(g.call(FN_GET_OWNER)))
     near = op(g, FN_LE_FF,

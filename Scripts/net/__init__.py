@@ -36,4 +36,9 @@ replication authoring).
                 often (A2): the cull distance and the update rates, one row
                 per kind (characters, items, campfires)
     relevancy.py  writes a row onto a class's defaults and reads it back
+    guard_consts.py  what a Server event may be asked (A5): each event's asks
+                a second, when refusals close a connection, the aim a shot
+                may name; the RPC guard's table
+    guard.py    the fragment at the head of every Server event: Allow, and
+                the shot's AimAllowed, asked of the player's guard component
 """

@@ -43,6 +43,7 @@ import dataclasses
 
 from combat.anim_blueprint import AIM_SLOT
 from combat.damage import hit as take_hit, owner_instigator
+from net.guard import author_guard
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat import item_vars as IV
@@ -232,7 +233,8 @@ def author_strike_event(ed, strike):
     g = _G(ed, ITEM_CLASS_PATH)
     event = g.keep(net.server_event(ed, strike.event))
     held = g.get(WV.Held)
-    armed, bare = g.branch(valid(g, held), [then(event)])
+    go, _refused = author_guard(g, strike.event, [then(event)])
+    armed, bare = g.branch(valid(g, held), [go])
     hand = [bare]
     if strike.armed:
         # Behind IsValid, as every read of Held is.

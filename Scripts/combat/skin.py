@@ -14,6 +14,7 @@ import dataclasses
 import unreal
 
 from asset_pipeline.gas_bridge_paths import PLAYER_FAMILY
+from asset_pipeline import lyra_paths as LYRA
 from asset_pipeline.mannequin_bind.paths import bound_asset_dir, bound_asset_name
 from asset_pipeline.metahuman_paths import ABP_RETARGET, BODY_MESH, FACE_MESH
 from asset_pipeline.player_body import PLAYER_NAME, PLAYER_RIG
@@ -115,8 +116,9 @@ class PlayerSkin:
     # clavicle / upperarm / forearm / hand / thigh / calf / foot as "<role>_l|_r".
     # The chest is aim_bones[-1].
     pose_bones: dict
-    # The empty-handed punch (weapon_component/punch.py): MM_Attack_01 on this
-    # rig, played into the upper-body slot.
+    # The empty-handed punch (weapon_component/punch.py), on this rig, played
+    # into the upper-body slot: the mannequin's MM_Attack_01, or on SKIN_GAS
+    # Lyra's melee (asset_pipeline/lyra_paths.PUNCH).
     punch: str
     # The head bone: hidden from the player's own view while the camera is on
     # a gun's sights, where the eye point is inside or beside the head
@@ -279,16 +281,19 @@ SKIN_METAHUMAN = dataclasses.replace(
 # mannequin's are (asset_pipeline/gas_player_mesh.py copies the sockets). A
 # clip belongs to one skeleton, so its clips are the mannequin's and
 # Quaternius's retargeted onto this one (asset_pipeline/retarget_to_uefn.py),
+# its punch Lyra's, retargeted the same way (asset_pipeline/import_lyra.py),
 # and its idle the sample's own.
 GAS_ANIMS = f"/Game/Sourced/Characters/Anims/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
 GAS_UAL_ANIMS = f"/Game/Sourced/Quaternius/UAL/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
+# The punch of a checkout that has no Lyra (_gas_skin): the mannequin's.
+GAS_PUNCH_WITHOUT_LYRA = f"{GAS_ANIMS}MM_Attack_01"
 SKIN_GAS = dataclasses.replace(
     SKIN_METAHUMAN, mesh=GAS.MESH, anim_bp=LAYERS_ABP, base_anim_bp=GAS.ABP_LOCOMOTION,
     layers_tag=LAYERS_TAG, retarget=GAS.ABP_RETARGET, gas=True,
     aim_rifle=f"{GAS_ANIMS}MF_Rifle_Idle_ADS",
     aim_pistol=f"{GAS_ANIMS}MF_Pistol_Idle_ADS",
     idle=GAS.IDLE,
-    punch=f"{GAS_ANIMS}MM_Attack_01",
+    punch=LYRA.uefn_clip(LYRA.PUNCH),
     crouch_idle=f"{GAS_UAL_ANIMS}UAL1_Crouch_Idle_Loop",
     crouch_walk=f"{GAS_UAL_ANIMS}UAL1_Crouch_Fwd_Loop",
     prone_crawl=f"{GAS_UAL_ANIMS}UAL1_Swim_Fwd_Loop",
@@ -335,12 +340,19 @@ def _gas_skin(eas):
                      (GAS.MESH, "build_gas_bridge.py"), (GAS.ABP_RETARGET, "build_gas_bridge.py"),
                      (SKIN_GAS.aim_rifle, "retarget_to_uefn.py"),
                      (SKIN_GAS.aim_pistol, "retarget_to_uefn.py"),
-                     (SKIN_GAS.punch, "retarget_to_uefn.py")):
+                     (GAS_PUNCH_WITHOUT_LYRA, "retarget_to_uefn.py")):
         if not eas.does_asset_exist(need):
             _log(f"note: GAS_LOCOMOTION is on and {need} is not here — wearing the "
                  f"mannequin. Run asset_pipeline/{by}.")
             return None
-    return _without_missing_clips(SKIN_GAS, eas, "the MetaHuman", "retarget_to_uefn.py")
+    skin = SKIN_GAS
+    if not eas.does_asset_exist(skin.punch):
+        # Lyra is a Fab pack the user adds by hand: a checkout without it
+        # keeps the motion matching and punches as it did before.
+        _log(f"note: {skin.punch} is not here — the punch is the mannequin's. Add Lyra "
+             f"({LYRA.CONTENT_DIR}) and run asset_pipeline/import_lyra.py.")
+        skin = dataclasses.replace(skin, punch=GAS_PUNCH_WITHOUT_LYRA)
+    return _without_missing_clips(skin, eas, "the MetaHuman", "retarget_to_uefn.py")
 
 
 def player_skin():

@@ -7,6 +7,9 @@ the sections that count the ready-pose plays, the traces, the fire gate and the
 hit's stamps set both melee attacks' nodes aside.
 """
 
+import unreal
+
+from asset_pipeline import lyra_paths as LYRA
 from combat.anim_blueprint import AIM_SLOT
 from combat.skin import player_skin
 from combat.tuning import COMBAT
@@ -21,6 +24,9 @@ from combat.weapon_component.punch import (
     NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR,
     PUNCH_QUEUED_VAR,
 )
+
+
+ANIM = unreal.AnimationLibrary
 
 
 def _title(n):
@@ -67,12 +73,50 @@ def is_punch_write(node, pin):
                for t in _feeders(b, "Hit"))
 
 
+def _reach(clip, bone, t):
+    """How far forward of the character (its mesh's +Y, cm) ``bone`` is,
+    ``t`` seconds into ``clip``."""
+    at = unreal.Transform()
+    for b in ANIM.find_bone_path_to_root(clip, bone):
+        at = at * ANIM.get_bone_pose_for_time(clip, b, t, False)
+    return at.translation.y
+
+
+def check_punch_clip(skin, clip):
+    """The blow is timed, not notified: its time has to be one the clip's
+    fist is out at."""
+    if skin.gas:
+        check("on the motion-matching skin the punch is Lyra's melee, retargeted "
+              "(asset_pipeline/import_lyra.py)",
+              skin.punch == LYRA.uefn_clip(LYRA.PUNCH)
+              and load(LYRA.PUNCH) is not None
+              and abs(clip.get_play_length() - load(LYRA.PUNCH).get_play_length()) < 0.05,
+              skin.punch)
+    check("...in place: a clip with root motion played into the slot would root the player",
+          not clip.get_editor_property("enable_root_motion"))
+    start, fist = COMBAT.punch_clip_start_s, skin.pose_bones["hand_r"]
+    check("...the swing starts inside the clip, and the clip outlasts the blow",
+          0.0 <= start and start + COMBAT.punch_impact_s < clip.get_play_length(),
+          f"{start} + {COMBAT.punch_impact_s} of {clip.get_play_length():.2f} s")
+    steps = int(COMBAT.punch_interval_s / 0.05) + 1
+    reach = [_reach(clip, fist, min(start + i * 0.05, clip.get_play_length()))
+             for i in range(steps)]
+    back, out_ = min(reach), max(reach)
+    at_blow = _reach(clip, fist, start + COMBAT.punch_impact_s)
+    check("...and the fist is out when the blow lands: at least 80% of the way from "
+          "where the swing draws it back to where it stops",
+          out_ - back > 30.0 and at_blow >= back + 0.8 * (out_ - back),
+          f"{at_blow:.0f} cm of {back:.0f}..{out_:.0f}")
+
+
 def check_punch_defaults():
     skin = player_skin()
     clip = w.get_editor_property(PUNCH_ANIM_VAR)
     want = load(skin.punch)
-    check(f"{PUNCH_ANIM_VAR} is the worn skin's MM_Attack_01",
+    check(f"{PUNCH_ANIM_VAR} is the worn skin's punch",
           clip is not None and clip == want, f"{clip} vs {skin.punch}")
+    if clip is not None:
+        check_punch_clip(skin, clip)
     worn = load(skin.mesh)
     check("...authored for the worn skeleton, or the slot would play nothing",
           clip is not None and worn is not None
@@ -134,6 +178,10 @@ def check_punch_swing():
     check(f"...into {AIM_SLOT}, the upper-body slot, once",
           all(pin_value(p, "SlotNodeName") == AIM_SLOT
               and int(float(pin_value(p, "LoopCount"))) == 1 for p in plays))
+    check("...from COMBAT.punch_clip_start_s into the clip, the wind-up the blow's time "
+          "has no room for skipped",
+          num_pin(plays[0], "InTimeToStartMontageAt") == COMBAT.punch_clip_start_s,
+          pin_value(plays[0], "InTimeToStartMontageAt"))
     # The two callers: the server's tell, and the client's prediction.
     plays = fxv.calls(FX.PUNCH) + fxv.predicts(FX.PUNCH)
 

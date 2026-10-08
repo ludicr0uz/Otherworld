@@ -126,7 +126,7 @@ _author_* fragment per concern, each in its own module:
               sounds, and an item's as a slot move handles it (HandledItem)
               or it is used up; Sound/sound_world.py: the listener at the
               character, the breath of a spent sprint
-  punch       empty hands: the fire key throws a punch (MM_Attack_01 into the
+  punch       empty hands: the fire key throws a punch (the skin's clip into the
               upper-body slot); the blow is a short sphere sweep a moment later.
               The swing and the blow are written once, for a Strike. The swing
               is a server request (Server_Punch / Server_Slash: the queue asks,

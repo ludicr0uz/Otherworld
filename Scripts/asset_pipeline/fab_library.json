@@ -7,6 +7,14 @@
       "license": "Standard",
       "added": "2026-09-30",
       "note": "Deadghost Interactive; Epic permanent free collection (Nov 2018); first-person weapon rigs"
+    },
+    {
+      "name": "Lyra Starter Game",
+      "content": "/Game/Sourced/Lyra",
+      "url": "https://www.fab.com/listings/lyra-starter-game",
+      "license": "",
+      "added": "2026-10-08",
+      "note": "unarmed punch, rifle and pistol hold sets, hit reacts"
     }
   ]
 }

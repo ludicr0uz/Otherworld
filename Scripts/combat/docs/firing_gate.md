@@ -33,8 +33,10 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   not blocking, not a spent press, off cooldown (`NextPunchTime`). It reads nothing off `Held`.
   - The press only sets `PunchQueued`; the swing stage consumes it, so a probe can punch
     without a key (`Scripts/probes/probe_punch.py`).
-  - The swing plays the worn skin's `MM_Attack_01` (`PlayerSkin.punch`, retargeted by
-    `build_retarget` as `MELEE_SOURCE`) into `DefaultSlot`, upper body only. A flinch or a
+  - The swing plays the worn skin's punch (`PlayerSkin.punch`: on the motion-matching
+    skin Lyra's `MM_Pistol_Melee`, retargeted by `asset_pipeline/import_lyra.py` and
+    played from `punch_clip_start_s`; on the older skins the mannequin's `MM_Attack_01`,
+    retargeted by `build_retarget` as `MELEE_SOURCE`) into `DefaultSlot`, upper body only. A flinch or a
     sprint re-equip stops it (same montage group, or the equip's `StopSlot`).
   - The blow lands `punch_impact_s` later (`PunchPending`/`PunchDueTime`): a sphere sweep from
     the chest along the actor's forward, then the same Health/LastDamageTime/DamagedByPlayer/

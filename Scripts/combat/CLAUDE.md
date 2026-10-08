@@ -808,9 +808,10 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
 - **A linked graph's tag is the graph node's `tag`**, not the inner struct's (`Tag` there
   is a deprecated field Python calls protected).
 - **A clip belongs to one skeleton**, so the layers' clips are copies on
-  `SK_UEFN_Mannequin` (`asset_pipeline/retarget_to_uefn.py`: the two ready poses, the
-  punch and the six flinches off the mannequin, the crouch, crawl, kneel and throw off
-  Quaternius's own rig; `SKIN_GAS` names them), and the poses the build keys (the hold
+  `SK_UEFN_Mannequin` (`asset_pipeline/retarget_to_uefn.py`: the two ready poses and
+  the six flinches off the mannequin, the crouch, crawl, kneel and throw off
+  Quaternius's own rig; `asset_pipeline/import_lyra.py`: the punch, Lyra's
+  `MM_Pistol_Melee`, since C1; `SKIN_GAS` names them), and the poses the build keys (the hold
   poses, the shotgun's, the throw's, the slash) are keyed on that skeleton from them and
   from the sample's idle.
 - **No clip played into a slot may have root motion** (`hold_pose.in_place`,
@@ -819,6 +820,15 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
   and a hold pose is a looping montage: with the knife or the axe out the player could
   not walk. The mannequin's punch has it on too (150 cm forward), so until G3 a punch
   carried the player forward; its copy here is in place, flag off.
+- **The punch is Lyra's pistol melee** (C1; `asset_pipeline/lyra_paths.PUNCH`, a straight
+  right: Lyra has no unarmed attack). Nothing about the strike changed: the blow is still
+  timed, `COMBAT.punch_impact_s` (0.3 s) after the swing, not notified, with the same
+  sweep and damage. The clip's fist is out 0.45-0.5 s in, so the swing plays it from
+  `COMBAT.punch_clip_start_s` (0.15 s; `Strike.clip_start_s`, the slot play's
+  `InTimeToStartMontageAt`), and `verify/punch.py` measures the fist's reach at the
+  blow's time off the clip (at least 80% of the swing's travel). Under the mannequin's
+  clip the blow landed 0.1 s before the fist was out. A checkout without Lyra punches
+  with the mannequin's clip (`skin._gas_skin`).
 - **The body is 10 cm shorter than the mannequin** and the ready poses are retargeted
   chain to chain, so the fist of a ready pose is 11-14 cm nearer and 14-19 cm lower in the
   capsule's frame (`carry_tuning.CARRY_GRIP`, re-measured) and the sights' view with it.
@@ -1039,8 +1049,9 @@ These are feel checks a headless run can't do:
   wendigo, the flat red of the axe's whole head by day (the overlay adds one colour, and
   the top of the haft inside the head glows with it), the glow and its light at night,
   and cauterising with no animation, sound or cost;
-- the punch's feel: whether the blow at `COMBAT.punch_impact_s` lines up with the fist in
-  `MM_Attack_01`, and whether a flinch cutting the swing short (same montage group) reads;
+- the punch's feel: Lyra's pistol melee with empty hands has not been seen played (its
+  right hand is closed on a grip that is not there, and the swing starts 0.15 s into the
+  clip, behind a 0.1 s blend), and whether a flinch cutting the swing short (same montage group) reads;
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100
   to 61);
 - the fitted hit bodies (`hit_bodies.py`): whether a shot that looks on the zombie ever misses

@@ -1,20 +1,23 @@
 """Empty hands punch: the swing plays its clip, and the blow lands on a
-wanderer in front of the player.
+zombie in front of the player.
 
 No key can be injected into a headless game, so the probe empties the hands
 (Held = None) and writes PunchQueued, which is all the press gate does
 (verify/punch.py checks the gate itself). Then a wanderer is put in front of
 the player and the swing is followed through: the cooldown and the blow are
-stamped, MM_Attack_01 plays in the upper-body slot, and the blow takes
-COMBAT.punch_damage off the wanderer and credits the player.
+stamped, the skin's punch (Lyra's melee on the motion-matching skin, played
+from COMBAT.punch_clip_start_s) plays in the upper-body slot, and the blow
+takes COMBAT.punch_damage off the wanderer and credits the player.
 """
 
 import unreal
 
+from asset_pipeline import lyra_paths as LYRA
 from combat.anim_blueprint import AIM_SLOT
 from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
+from combat.skin import skin_of_mesh
 from combat.slot_tuning import HAND_FROM_VAR
 from combat.tuning import COMBAT
 from combat.weapon_component.punch import (
@@ -33,7 +36,10 @@ def _wanderer(p):
     ctrls = unreal.GameplayStatics.get_all_actors_of_class(p.world(), unreal.AIController)
     pawns = [c.get_controlled_pawn() for c in ctrls
              if "ForestWandererAI" in c.get_class().get_name()]
-    return next((x for x in pawns if x is not None), None)
+    pawns = [x for x in pawns if x is not None]
+    # A zombie if there is one: the wendigo is the other creature.
+    return next((x for x in pawns if "Zombie" in x.get_class().get_name()),
+                pawns[0] if pawns else None)
 
 
 def _place(npc, player):
@@ -53,6 +59,14 @@ def probe(p):
         return
     p.check("the punch clip is set on the live component",
             p.get(wc, PUNCH_ANIM_VAR) is not None, str(p.get(wc, PUNCH_ANIM_VAR)))
+    skin = skin_of_mesh(player.get_editor_property("mesh").get_skeletal_mesh_asset().get_path_name())
+    if skin is not None and skin.gas:
+        got = p.get(wc, PUNCH_ANIM_VAR)
+        p.check("...Lyra's melee, retargeted onto the worn skeleton",
+                got is not None and got.get_path_name().split(".")[0]
+                == LYRA.uefn_clip(LYRA.PUNCH), str(got))
+    p.check("the wanderer punched is a zombie", "Zombie" in npc.get_class().get_name(),
+            npc.get_class().get_name())
 
     # Empty hands, the way the player empties them: the hand's item back to
     # its slot. (Held written to None is put back by the next equip, and a
@@ -78,6 +92,11 @@ def probe(p):
     p.check(f"...and plays the punch clip in {AIM_SLOT}",
             anim is not None and anim.is_playing_slot_animation(clip, AIM_SLOT),
             str(anim.get_current_active_montage() if anim else None))
+    montage = anim.get_current_active_montage() if anim else None
+    p.check("...from COMBAT.punch_clip_start_s in, so the fist is out for the blow",
+            montage is not None
+            and anim.montage_get_position(montage) >= COMBAT.punch_clip_start_s - 1e-3,
+            str(anim.montage_get_position(montage) if montage else None))
     p.check("...and stamps the cooldown",
             abs(p.get(wc, NEXT_PUNCH_VAR) - t0 - COMBAT.punch_interval_s) < 0.2,
             f"{p.get(wc, NEXT_PUNCH_VAR):.2f} at t0 {t0:.2f}")

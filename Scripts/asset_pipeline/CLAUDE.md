@@ -280,6 +280,42 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/check_gas_load.py   # in a fr
     (`net/input_checks.py`);
   - `LevelBlock` draws a random number no row of `net/random_consts.py` covers.
 
+## Lyra: the combat clips the sample lacks (2026-10-08)
+
+The Game Animation Sample has no punch, no weapon holds and no hit reactions; the Lyra
+Starter Game has. Its `Content/Characters` is under `Content/Sourced/Lyra` (698 packages,
+306 MB): a Fab pack, so **the user adds it by hand** (`fab_library.json`), and nothing of it
+is committed (`.gitignore`).
+
+```bash
+python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_lyra.py
+```
+
+- **It loads through a redirect,** as the sample does. The files name each other by Lyra's
+  `/Game/Characters/Heroes/...`; one `[CoreRedirects]` line (`lyra_paths.REDIRECTED`,
+  `dev/tests/test_lyra_import.py`) points that at `/Game/Sourced/Lyra/Characters/Heroes`.
+  Without it a clip loads with no skeleton ("Invalid USkeleton supplied"). **The redirects
+  are read when the editor starts**: an editor open before the line was added needs a restart.
+- **Only an AnimSequence is taken.** A clip references its skeleton and nothing else. Lyra's
+  montages (`AM_*`), anim blueprints and notifies name `/Script/LyraGame` classes, which
+  are not here.
+- **What the game plays is `lyra_paths.CLIPS`**, one row each, and `import_lyra.py`
+  retargets every row onto `SK_UEFN_Mannequin` into `/Game/Sourced/Lyra/UEFN_Player` as
+  `A_UEFN_Player_<clip>`: read off Lyra's `SKM_Manny` through a rig of the mannequin's
+  chain table (`Rig/IK_Lyra_Mannequin_Source`; Lyra's skeleton names its bones as ours
+  does), the plain retargeter, in place, root motion off. A new clip is a row and a re-run.
+- **The punch** (C1) is `MM_Pistol_Melee`. Lyra has no unarmed attack: its melee is one clip
+  per weapon, and the pistol's is the one that reads as a fist (a straight right; the
+  rifle's and the shotgun's are two-handed butt strokes). Its fist is out 0.45–0.5 s in,
+  1.53 s long; the game plays it from 0.15 s (`COMBAT.punch_clip_start_s`) so the blow's
+  time stays 0.3 s (`Scripts/combat/CLAUDE.md`).
+- **A checkout without Lyra** still wears the motion-matching skin: `combat/skin._gas_skin`
+  falls back to the mannequin's `MM_Attack_01` on the UEFN skeleton
+  (`retarget_to_uefn.py` still makes it) and says so in the build's log; the punch
+  verifier then fails its "is Lyra's melee" line.
+- **The licence is not recorded** (`fab_library.json`, the entry's `license` is empty): ask
+  the user before a build with it ships.
+
 ## The skeleton bridge: how the GAS clips reach the MetaHuman (2026-10-08)
 
 The sample's clips, databases and anim blueprint are on `SK_UEFN_Mannequin`; the player's

@@ -445,6 +445,22 @@ FAB = (
              "content may be used only in Unreal Engine projects.",
     ),
     AssetSource(
+        dest="Content/Sourced/Lyra",
+        kind="fab",
+        builders=("(manual) Fab: the Lyra Starter Game, UE 5.8; its "
+                  "Content/Characters to Content/Sourced/Lyra/Characters "
+                  "(scanned first: Scripts/asset_pipeline/fab_scan.py)",
+                  "Scripts/asset_pipeline/import_lyra.py"),
+        note="Epic's Lyra mannequin and its clips, of which the game plays "
+             "the rows of Scripts/asset_pipeline/lyra_paths.CLIPS (the "
+             "punch), retargeted onto the player's skeleton into "
+             "Sourced/Lyra/UEFN_Player by import_lyra.py; not committed "
+             "(.gitignore). Lyra's /Game/Characters/Heroes is "
+             "/Game/Sourced/Lyra/Characters/Heroes here, found through "
+             "[CoreRedirects] in DefaultEngine.ini. Epic's sample content may "
+             "be used only in Unreal Engine projects.",
+    ),
+    AssetSource(
         dest="Content/Fab",
         kind="fab",
         builders=("(manual) the Fab plugin in the editor -- see "

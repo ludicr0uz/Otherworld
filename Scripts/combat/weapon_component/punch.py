@@ -7,7 +7,7 @@ reads Held and none waits on a Delay (a component Tick cannot hold one):
           AND NOT TriggerSpent AND now >= NextPunchTime   --> PunchQueued
   swing   PunchQueued --> Server_Punch, which (empty hands, alive, not
           guarding, off cooldown) stamps NextPunchTime and PunchDueTime, sets
-          PunchPending and plays MM_Attack_01 (PunchAnim) into the upper-body
+          PunchPending and plays the skin's punch (PunchAnim) into the upper-body
           slot
   blow    PunchPending AND now >= PunchDueTime --> a sphere in front of the
           chest; a body with BP_HealthComponent loses COMBAT.punch_damage
@@ -101,12 +101,16 @@ class Strike:
     # the blow landing.
     fx: str = PUNCH_FX
     hit_fx: str = PUNCH_HIT
+    # How far into its clip the swing starts (the wind-up skipped), so the
+    # blow's time can stay where the game has it under a longer clip.
+    clip_start_s: float = 0.0
 
 
 PUNCH = Strike("punch", PUNCH_ANIM_VAR, PUNCH_QUEUED_VAR, PUNCH_PENDING_VAR,
                NEXT_PUNCH_VAR, PUNCH_DUE_VAR, COMBAT.punch_interval_s,
                COMBAT.punch_impact_s, COMBAT.punch_damage, COMBAT.punch_reach_cm,
-               COMBAT.punch_radius_cm, COMBAT.punch_chest_cm)
+               COMBAT.punch_radius_cm, COMBAT.punch_chest_cm,
+               clip_start_s=COMBAT.punch_clip_start_s)
 
 
 def _and(ed, a, b):
@@ -185,6 +189,8 @@ def _author_clip(ed, strike, exec_in):
     _set(play, "BlendOutTime", PUNCH_BLEND_S)
     _set(play, "InPlayRate", 1.0)
     _set(play, "LoopCount", 1)
+    if strike.clip_start_s:
+        _set(play, "InTimeToStartMontageAt", strike.clip_start_s)
     _connect(exec_in, _pin(play, "execute"))
     owner = _node(ed, FN_GET_OWNER)
     here = _node(ed, FN_ACTOR_LOC)

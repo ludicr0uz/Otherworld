@@ -23,6 +23,11 @@ Host-side (no ``unreal``):
                                 tests: dev/tests/test_gas_import.py)
     gas_paths.py                constants: where that copy lies, what comes
                                 across, what stays, and the redirects it loads by
+    import_lyra.py              entry point: Lyra's clips the game plays (the
+                                punch) retargeted onto the player's UEFN skeleton
+                                (tests: dev/tests/test_lyra_import.py)
+    lyra_paths.py               constants: where the user's copy of Lyra lies, the
+                                redirect it loads by, which of its clips are played
     bind_to_mannequin.py        entry point: bind cached bodies to the mannequin's
                                 skeleton -> assets/cache/meshy/<id>/bound/
     mannequin_bind/             the bind itself (its __init__.py is its module

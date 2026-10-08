@@ -169,13 +169,18 @@ class CombatConfig:
     block_half_angle_deg: float = 60.0
 
     # --- the punch: the fire key with empty hands (weapon_component/punch) ---
-    # One swing every punch_interval_s; the blow lands punch_impact_s into the
-    # clip (MM_Attack_01's fist is out by then), on the first body a sphere of
-    # punch_radius_cm meets within punch_reach_cm in front of the chest. Seven
-    # punches kill a 100 HP wanderer: a last resort, not a weapon.
+    # One swing every punch_interval_s; the blow lands punch_impact_s after
+    # the swing starts, on the first body a sphere of punch_radius_cm meets
+    # within punch_reach_cm in front of the chest. Seven punches kill a 100 HP
+    # wanderer: a last resort, not a weapon. The clip is Lyra's pistol melee
+    # (asset_pipeline/lyra_paths.PUNCH), whose fist is out 0.45-0.5 s in: it
+    # is played from punch_clip_start_s, so the blow's time is what it was
+    # under the mannequin's clip and the fist is there for it
+    # (verify/punch.py measures it).
     punch_damage: float = 15.0
     punch_interval_s: float = 0.8
     punch_impact_s: float = 0.3
+    punch_clip_start_s: float = 0.15
     punch_reach_cm: float = 130.0
     punch_radius_cm: float = 30.0
     punch_chest_cm: float = 30.0

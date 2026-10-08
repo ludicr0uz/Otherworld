@@ -65,6 +65,11 @@ Content/Python/__pycache__/
 # sample project by Scripts/asset_pipeline/import_gas.py, which puts it back.
 /Content/GAS/
 
+# Lyra's characters and clips, a Fab pack the user adds by hand
+# (Scripts/asset_pipeline/fab_library.json), and what
+# Scripts/asset_pipeline/import_lyra.py retargets from them.
+/Content/Sourced/Lyra/
+
 # Generator sidecars: megabytes apiece, and fully determined by the seed.
 Scripts/generated_levels/*/grass_*.json
 Scripts/generated_levels/*/*.obj

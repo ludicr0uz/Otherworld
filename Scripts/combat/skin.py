@@ -7,7 +7,9 @@ import dataclasses
 import unreal
 
 from asset_pipeline.mannequin_bind.paths import bound_asset_dir, bound_asset_name
+from asset_pipeline.metahuman_paths import ABP_RETARGET, BODY_MESH, FACE_MESH
 from asset_pipeline.player_body import PLAYER_NAME, PLAYER_RIG
+from combat import metahuman_body
 from combat.log import _log
 from uebp.graph import BEL, _assets, _component_object, _handles, _rot
 from combat.paths import CHARACTER_BP_PATH
@@ -128,6 +130,11 @@ class PlayerSkin:
     # library, played into the upper-body slot. None where the rig has none:
     # the item then leaves the hand on the click, with no clip.
     throw: str = None
+    # True when what is DRAWN is a MetaHuman hung under this mesh, which is
+    # then hidden (combat/metahuman_body.py). Everything above still names
+    # the mannequin: it is the mannequin that is animated, gripped, hit and
+    # ragdolled; the MetaHuman follows its pose through an IK retargeter.
+    metahuman: bool = False
 
     @property
     def stance_clips(self):
@@ -224,6 +231,29 @@ SKIN_BOUND = dataclasses.replace(
     search_kneel=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL1_Fixing_Kneeling",
     throw=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL2_OverhandThrow")
 
+# Epic's sample MetaHuman (asset_pipeline/import_metahuman.py), drawn under
+# a hidden mannequin that runs everything (combat/metahuman_body.py). The
+# mannequin is Manny, not Quinn: the retargeter reads the source pose off
+# whatever mesh the mannequin component wears, and a male MetaHuman body
+# retargets better from the male mannequin's proportions. Same skeleton, same
+# socket, same clips as SKIN_BOUND.
+SKIN_METAHUMAN = dataclasses.replace(
+    SKIN_BOUND,
+    mesh="/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple",
+    metahuman=True)
+
+
+# Every skin there is, most specific first: what a running game, which has no
+# asset subsystem to resolve player_skin() with, matches the worn mesh against.
+SKINS = (SKIN_METAHUMAN, SKIN_BOUND, SKIN_ADVENTURER, SKIN_QUINN)
+
+
+def skin_of_mesh(worn):
+    """The skin whose mesh is ``worn`` (a /Game path without the .Name), or
+    None. For probes: the mesh on the Character's own component."""
+    worn = str(worn).split(".")[0]
+    return next((s for s in SKINS if s.mesh == worn), None)
+
 
 def _without_missing_clips(skin, eas, who, builder):
     """``skin`` less the optional clips that are not built: the throw, and
@@ -249,7 +279,14 @@ def player_skin():
     anim BP compiles, runs, and stands in the reference pose forever.
     """
     eas = _assets()
-    if PLAYER_RIG == "mannequin":
+    if PLAYER_RIG == "metahuman":
+        if all(eas.does_asset_exist(p) for p in (BODY_MESH, FACE_MESH, ABP_RETARGET)):
+            return _without_missing_clips(SKIN_METAHUMAN, eas, "the MetaHuman",
+                                          "retarget_ual_to_mannequin.py")
+        _log(f"note: PLAYER_RIG is \"metahuman\" and {BODY_MESH} or {ABP_RETARGET} "
+             "is not built — wearing the bound body. Run "
+             "asset_pipeline/import_metahuman.py, then build_metahuman_retarget.py.")
+    if PLAYER_RIG in ("mannequin", "metahuman"):
         if eas.does_asset_exist(SKIN_BOUND.mesh):
             return _without_missing_clips(SKIN_BOUND, eas, "the bound body",
                                           "retarget_ual_to_mannequin.py")
@@ -268,6 +305,21 @@ def player_skin():
              f"{len(want)} assets missing, first {missing[0]}) — wearing the "
              "mannequin. Run Scripts/asset_pipeline to build it.")
     return SKIN_QUINN
+
+
+MANNEQUIN_COMPONENT = "Mesh"
+
+
+def mannequin_component(bp):
+    """(template, handle) of the Character's own mesh: the mannequin that is
+    animated, whatever is drawn."""
+    for handle, name in _handles(bp):
+        if name == MANNEQUIN_COMPONENT:
+            obj = _component_object(handle)
+            if not isinstance(obj, unreal.SkeletalMeshComponent):
+                raise RuntimeError(f"{bp.get_name()}.{name} is a {obj.get_class().get_name()}")
+            return obj, handle
+    raise RuntimeError(f"{bp.get_name()} has no {MANNEQUIN_COMPONENT} component")
 
 
 def wear_skin(skin=None):
@@ -297,14 +349,9 @@ def wear_skin(skin=None):
     if not anim_class:
         raise RuntimeError(f"{skin.anim_bp} has no generated class — it did not compile")
 
-    comp = None
-    for handle, _name in _handles(bp):
-        obj = _component_object(handle)
-        if isinstance(obj, unreal.SkeletalMeshComponent):
-            comp = obj
-            break
-    if comp is None:
-        raise RuntimeError(f"{CHARACTER_BP_PATH} has no SkeletalMeshComponent")
+    # By name, not "the first SkeletalMeshComponent": with a MetaHuman worn
+    # there are five, and the subobject list is not in tree order.
+    comp, mesh_handle = mannequin_component(bp)
 
     comp.set_editor_property("skeletal_mesh_asset", mesh_asset)
     comp.set_editor_property("anim_class", anim_class)
@@ -323,9 +370,19 @@ def wear_skin(skin=None):
     if got != mesh_asset or comp.get_editor_property("anim_class") != anim_class:
         raise RuntimeError(f"the skin did not stick: mesh={got}, "
                            f"anim={comp.get_editor_property('anim_class')}")
+    # A MetaHuman skin draws the MetaHuman and not the mannequin it hangs
+    # under. Hidden, not invisible: the mannequin's children draw on their
+    # own, and its pose still updates (the tick option above) for them to
+    # follow and for the weapon in its hand.
+    comp.set_editor_property("visible", not skin.metahuman)
+    if skin.metahuman:
+        metahuman_body.install(bp, mesh_handle)
+    else:
+        metahuman_body.remove(bp)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile after the skin")
     eas.save_loaded_asset(bp)
     _log(f"player: wearing {mesh_asset.get_name()} animated by "
-         f"{anim_class.get_name()}, weapon on {skin.grip}")
+         f"{anim_class.get_name()}, weapon on {skin.grip}"
+         + (" -- drawn as the MetaHuman" if skin.metahuman else ""))
     return skin

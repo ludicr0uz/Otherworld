@@ -30,7 +30,7 @@ from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
 from combat.seat_tuning import HEAD_HIDE_SEAT, SEAT_VAR, SIGHTS_FORCED_VAR
-from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
+from combat.skin import skin_of_mesh
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.sights import SIGHT_LINE_MIN_CM
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
@@ -80,7 +80,10 @@ class _Watch:
         self.nearest = float("inf")
 
     def hidden(self):
-        return self.mesh.is_bone_hidden_by_name(self.head)
+        """On the mannequin, and on every skinned mesh drawn under it (a
+        MetaHuman skin's body and face: weapon_component/body_parts.py)."""
+        return all(m.is_bone_hidden_by_name(self.head)
+                   for m in _skinned(self.mesh, self.head))
 
     def sample(self):
         seat = self.p.get(self.wc, SEAT_VAR)
@@ -92,6 +95,21 @@ class _Watch:
                    - self.mesh.get_socket_location(self.head)).length()
             self.nearest = min(self.nearest, gap)
         return seat
+
+
+def _skinned(mesh, head):
+    """The mannequin and the skinned meshes under it that have the head bone."""
+    return [mesh] + [c for c in mesh.get_children_components(True)
+                     if isinstance(c, unreal.SkinnedMeshComponent)
+                     and c.get_bone_index(head) >= 0]
+
+
+def _drawn(mesh):
+    """What is drawn: the mannequin, or the MetaHuman body hung under it
+    (combat/metahuman_body.py), which is then the one hidden from its owner."""
+    body = next((c for c in mesh.get_children_components(False)
+                 if c.get_name() == "Body"), None)
+    return body or mesh
 
 
 def probe(p):
@@ -126,8 +144,7 @@ def _run(p):
     cam = p.pawn().get_component_by_class(unreal.CameraComponent)
     # player_skin() asks the editor's asset subsystem, which a game has not.
     worn = mesh.get_skeletal_mesh_asset().get_path_name().split(".")[0]
-    head = next((s.head for s in (SKIN_ADVENTURER, SKIN_QUINN) if s.mesh == worn),
-                None)
+    head = getattr(skin_of_mesh(worn), "head", None)
     p.check("the player wears a known skin", head is not None, worn)
     if head is None:
         return
@@ -157,9 +174,9 @@ def _run(p):
         p.check(f"{gun}: ...and the rest of the body is "
                 + ("behind the scope's glass" if scoped else "still drawn: the "
                    "arms are the sight picture"),
-                mesh.get_editor_property("owner_no_see") == scoped
-                and mesh.is_visible(),
-                f"owner_no_see {mesh.get_editor_property('owner_no_see')}")
+                _drawn(mesh).get_editor_property("owner_no_see") == scoped
+                and _drawn(mesh).is_visible(),
+                f"owner_no_see {_drawn(mesh).get_editor_property('owner_no_see')}")
         back = _Watch(p, wc, mesh, cam, head)
         p.set(wc, SIGHTS_FORCED_VAR, False)
         yield lambda: back.sample() < HOME

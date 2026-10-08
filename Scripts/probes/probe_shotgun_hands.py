@@ -25,7 +25,7 @@ import unreal
 from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import SEAT_VAR, SIGHTS_FORCED_VAR
-from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
+from combat.skin import skin_of_mesh
 from combat.weapon_models import SHOTGUN_PUMP
 from combat.weapon_component import vars as WV
 
@@ -84,7 +84,7 @@ def probe(p):
     mesh = p.pawn().get_editor_property("mesh")
     # player_skin() asks the editor's asset subsystem, which a game has not.
     worn = mesh.get_skeletal_mesh_asset().get_path_name().split(".")[0]
-    skin = next((s for s in (SKIN_ADVENTURER, SKIN_QUINN) if s.mesh == worn), None)
+    skin = skin_of_mesh(worn)
     p.check("the player wears a known skin", skin is not None, worn)
     bag = [i.get_class().get_name() for i in p.get(wc, "Inventory")]
     p.check("the shotgun is issued", "BP_Shotgun_C" in bag, str(bag))

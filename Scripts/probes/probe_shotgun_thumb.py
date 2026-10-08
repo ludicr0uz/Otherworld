@@ -35,7 +35,7 @@ from combat.grip import part_placement
 from combat.paths import SHOTGUN_AIM_ANIM_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import SEAT_VAR, SIGHTS_FORCED_VAR
 from combat.shotgun_pose import THUMB_TIP_CM
-from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
+from combat.skin import skin_of_mesh
 from combat.weapon_models import SHOTGUN_WRIST, shotgun_outline
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
@@ -130,7 +130,7 @@ def _run(p):
     mesh = p.pawn().get_editor_property("mesh")
     # player_skin() asks the editor's asset subsystem, which a game has not.
     worn = mesh.get_skeletal_mesh_asset().get_path_name().split(".")[0]
-    skin = next((s for s in (SKIN_ADVENTURER, SKIN_QUINN) if s.mesh == worn), None)
+    skin = skin_of_mesh(worn)
     p.check("the player wears a known skin", skin is not None, worn)
     if skin is None:
         return

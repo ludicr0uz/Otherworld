@@ -465,11 +465,12 @@ def install_hit_reactions(bp, health_handle):
     mesh = None
     for handle, _name in _handles(bp):
         obj = _component_object(handle)
-        if isinstance(obj, unreal.SkeletalMeshComponent):
+        # The Character's own mesh, by name (see combat/skin.mannequin_component).
+        if _name == "Mesh" and isinstance(obj, unreal.SkeletalMeshComponent):
             mesh = obj
             break
     if mesh is None:
-        raise RuntimeError(f"{bp.get_name()} has no SkeletalMeshComponent")
+        raise RuntimeError(f"{bp.get_name()} has no Mesh component")
     clips = hit_reactions(mesh.get_editor_property("skeletal_mesh_asset"))
     comp = _component_object(health_handle)
     comp.set_editor_property(HIT_REACTIONS_VAR, clips)

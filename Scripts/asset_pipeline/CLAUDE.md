@@ -166,3 +166,42 @@ mannequin's is signed the same way, and worth one look.
   saves front views to `Saved/Screenshots/MacEditor/`.
 - The stage thumbnails Meshy returns are saved beside the model
   (`<id>_<stage>_thumbnail.png`): look at the preview's before paying for the rest.
+
+## The MetaHuman: Epic's Taro drawn over the hidden mannequin (2026-10-07)
+
+`player_body.PLAYER_RIG = "metahuman"`. The player's own mesh is still SK_Mannequin
+(SKM_Manny_Simple, hidden) running `ABP_Unarmed` with every slot, pose and clip as before;
+the MetaHuman body hangs under it and retargets its pose every frame. Nothing in the weapons
+build is keyed on the MetaHuman; `metahuman_paths.py` is the one place that names it.
+
+```bash
+python3 Scripts/asset_pipeline/import_metahuman.py            # host-side: Taro + his Common, 1.1 GB
+python3 Scripts/dev/uepy.py --cold Scripts/asset_pipeline/build_metahuman_retarget.py
+python3 Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py      # wears it
+python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_metahuman_body.py
+python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_metahuman_look.py  # pictures
+```
+
+- **The source is the sample project** (`~/Documents/Unreal Projects/MetaHumans 5.8`), which
+  mounts at the same `/Game/MetaHumans/...` paths: a file copy is the editor's Migrate.
+  `metahuman_manifest.txt` is BP_Taro's dependency closure (441 packages); `--manifest`
+  recomputes it on the sample. Plugins it needs are in the .uproject: RigLogic, HairStrands,
+  AlembicHairImporter, MetaHumanRuntime, LiveLink (Face_AnimBP has Live Link nodes).
+- **The bridge is an IK retargeter, not Copy Pose**: `IK_MetaHuman` is the mannequin's chain
+  table on `metahuman_base_skel` (same core bone names), `RTG_MetaHuman_from_Mannequin` maps
+  them exactly with no pose alignment (both A-pose), and `ABP_MetaHuman_Retarget` is the
+  sample's own retargeting anim BP duplicated and pointed at it (one Retarget Pose From Mesh
+  node reading the parent component). The sample's `RTG_MetaHuman_m_med_nrw` is
+  MetaHuman-to-MetaHuman and is not the bridge.
+- **The component tree is BP_Taro's** (`combat/metahuman_body.py`): Body under Mesh; Face,
+  Torso, Legs, Feet under Body; six grooms under Face; a MetaHumanComponentUE (finds Body and
+  Face by name, gives the jeans a leader pose and the hoodie and shoes their post-process
+  copy-pose anim BPs) and a LODSync. The garments tick only when rendered (the component sets
+  that at BeginPlay); a headless probe must set ALWAYS_TICK on them before measuring.
+- **Five skeletal meshes now, not in tree order**: anything that wants "the player's mesh"
+  takes the component named `Mesh` (`skin.mannequin_component`, `verify.common._mesh_asset`),
+  never the first SkeletalMeshComponent. Per-view hides (OwnerNoSee behind a scope, the head
+  down the sights, both back on death) reach the parts through
+  `weapon_component/body_parts.py`: a loop over OwnerMesh's children.
+- Measured (probe_metahuman_body): the MetaHuman's head, hands and feet land within 7 cm of
+  the mannequin's standing, falling and dead; the face and garments within 0 cm of the body.

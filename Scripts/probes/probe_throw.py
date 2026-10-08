@@ -22,7 +22,7 @@ import os
 
 import unreal
 
-from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
+from combat.skin import SKINS
 from combat.paths import ITEM_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.throw_arc import ARC_COMPONENT
 from combat.anim_blueprint import AIM_SLOT
@@ -62,7 +62,7 @@ def _shot(p):
 def _hand_z(player):
     """The throwing hand's height over the capsule's centre, in cm."""
     mesh = player.get_editor_property("mesh")
-    bone = next(s.pose_bones["hand_r"] for s in (SKIN_ADVENTURER, SKIN_QUINN)
+    bone = next(s.pose_bones["hand_r"] for s in SKINS
                 if mesh.get_bone_index(s.pose_bones["hand_r"]) >= 0)
     return mesh.get_socket_location(bone).z - player.get_actor_location().z
 

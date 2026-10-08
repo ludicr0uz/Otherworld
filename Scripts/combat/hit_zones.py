@@ -138,11 +138,13 @@ def install_hit_zones(bp, health_handle):
     mesh = None
     for handle, _name in _handles(bp):
         obj = _component_object(handle)
-        if isinstance(obj, unreal.SkeletalMeshComponent):
+        # The Character's own mesh, by name: a MetaHuman skin hangs four
+        # more skeletal meshes under it, and the list is not in tree order.
+        if _name == "Mesh" and isinstance(obj, unreal.SkeletalMeshComponent):
             mesh = obj
             break
     if mesh is None:
-        raise RuntimeError(f"{bp.get_name()} has no SkeletalMeshComponent to zone")
+        raise RuntimeError(f"{bp.get_name()} has no Mesh component to zone")
     # K2_LineTraceComponent walks the mesh's physics bodies, and a mesh with
     # collision off never creates them: every hit would be a body hit and
     # nothing would say so.

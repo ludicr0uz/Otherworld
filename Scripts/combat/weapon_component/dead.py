@@ -39,6 +39,7 @@ from combat.ask_consts import EXIT_PENDING_VAR
 from combat.nodes import CAMERA_CLASS_PATH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET
 from combat.paths import FIRE_WARD_VAR, HEALTH_CLASS_PATH
 from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR
+from combat.weapon_component.body_parts import author_parts_no_see
 from combat.weapon_component.head_hide import _author_head_shown
 from combat.weapon_component.shed import author_shed_gear
 from uebp.nodes.actor import (
@@ -163,8 +164,10 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     _connect(out(body, WV.OwnerMesh), _pin(shown, "self"))
     _set(shown, "bNewOwnerNoSee", False)
     _connect(then(level), _pin(shown, "execute"))
+    # ...with whatever is drawn under it (body_parts.py)...
+    parts_shown = author_parts_no_see(ed, keep, then(shown), no_see=False)
     # ...and the head the sights hid (head_hide.py).
-    headed = _author_head_shown(ed, keep, then(shown))
+    headed = _author_head_shown(ed, keep, parts_shown)
     armed = keep(ed.add_branch_node())
     _connect(armed_out, _pin(armed, "Condition"))
     _connect(headed, _pin(armed, "execute"))

@@ -139,7 +139,9 @@ def check_five_weapons():
         # to choose, so what is asserted there is the weaker true thing: the bone
         # is a clean frame for the grip solve to start from.
         _skin = player_skin()
-        _socketed = _skin is SKIN_QUINN
+        # Every skin on SK_Mannequin (Quinn, a bound body, the MetaHuman's
+        # hidden mannequin) grips by its socket.
+        _socketed = _skin.grip == SKIN_QUINN.grip
         for name, aim in (("rifle", _skin.aim_rifle), ("pistol", _skin.aim_pistol)):
             axes = socket_pose_axes(aim)
             if _socketed:

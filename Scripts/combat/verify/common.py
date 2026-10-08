@@ -126,6 +126,11 @@ def out_pins(node):
 
 
 def _mesh_asset(bp):
+    """What the Character's own mesh wears. By name first: with a MetaHuman
+    worn there are five skeletal meshes, and the list is not in tree order."""
+    t = component_template(bp, "Mesh")
+    if isinstance(t, unreal.SkeletalMeshComponent):
+        return t.get_editor_property("skeletal_mesh_asset")
     for name in components(bp):
         t = component_template(bp, name)
         if isinstance(t, unreal.SkeletalMeshComponent):

@@ -267,6 +267,19 @@ GENERATED = (
              "why this is where the per-body flow above is headed.",
     ),
     AssetSource(
+        dest="Content/Sourced/MetaHuman",
+        kind="generated",
+        builders=("Scripts/asset_pipeline/build_metahuman_retarget.py",),
+        note="What drives the MetaHuman body from the mannequin: IK_MetaHuman "
+             "(the mannequin's chain table on metahuman_base_skel), "
+             "RTG_MetaHuman_from_Mannequin, and ABP_MetaHuman_Retarget, an "
+             "anim blueprint on the MetaHuman skeleton whose whole graph is "
+             "Retarget Pose From Mesh off the component it is attached to. "
+             "Needs Content/MetaHumans (below) and the mannequin's IK rig "
+             "(build_retarget.py, or this builds it). Worn when "
+             "player_body.PLAYER_RIG says \"metahuman\" (combat/skin.py).",
+    ),
+    AssetSource(
         dest="Content/Sourced/Mixamo",
         kind="generated",
         builders=("Scripts/asset_pipeline/import_mixamo.py",),
@@ -394,6 +407,19 @@ CACHE = CACHE + (
 # those; sync_assets.py --status reports them one by one.
 FAB = (
     AssetSource(
+        dest="Content/MetaHumans",
+        kind="fab",
+        builders=("(manual) the Epic launcher: Samples > MetaHumans, UE 5.8, "
+                  "to ~/Documents/Unreal Projects/MetaHumans 5.8; then "
+                  "python3 Scripts/asset_pipeline/import_metahuman.py",),
+        note="Epic's sample MetaHuman Taro and the part of the sample's "
+             "Common he depends on: 441 packages, 1.1 GB, listed in "
+             "Scripts/asset_pipeline/metahuman_manifest.txt. Copied byte for "
+             "byte from the sample project, which mounts them at the same "
+             "/Game/MetaHumans paths. MetaHuman assets may be used only in "
+             "Unreal Engine projects.",
+    ),
+    AssetSource(
         dest="Content/Fab",
         kind="fab",
         builders=("(manual) the Fab plugin in the editor -- see "
@@ -473,6 +499,11 @@ RESTORE_ORDER = (
     # The player's crouch and crawl clips, now that the adventurer has an IK
     # rig; the weapons build then wears it with them, and the HUD follows.
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_quaternius.py",
+    # The MetaHuman the player wears (Content/MetaHumans is the sample's
+    # Taro, copied by hand-then-script; see FAB), and the rig that drives it
+    # from the mannequin.
+    "python3 Scripts/asset_pipeline/import_metahuman.py",
+    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/build_metahuman_retarget.py",
     "Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py",
     "Scripts/dev/uepy.py --cold Scripts/build_graphics_menu.py",
     "Scripts/dev/uepy.py --cold Scripts/build_npc_blueprints.py",

@@ -34,6 +34,7 @@ from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.nodes import CAMERA_CLASS_PATH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET
 from combat.seat_tuning import SEAT_HOLD, SEAT_VAR, SIGHT_SEAT_DEG
 from combat.tuning import COMBAT
+from combat.weapon_component.body_parts import author_parts_no_see
 from combat.weapon_component.common import _prop
 from combat.weapon_component.seat import _author_sight_seat, _author_unseat
 from uebp.nodes.actor import (
@@ -274,6 +275,8 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     _connect(out(body, WV.OwnerMesh), _pin(bare, "self"))
     _connect(out(behind_glass), _pin(bare, "bNewOwnerNoSee"))
     _connect(then(tuck), _pin(bare, "execute"))
+    # ...and whatever is drawn under it (body_parts.py: a MetaHuman skin).
+    bare_tail = author_parts_no_see(ed, keep, then(bare), no_see_out=out(behind_glass))
 
     # False arm: nothing to look down, so the camera goes home.
     home = keep(_node(ed, FN_COMP_SET_WORLD_LOC))
@@ -291,6 +294,7 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     _connect(out(body_home, WV.OwnerMesh), _pin(shown, "self"))
     _set(shown, "bNewOwnerNoSee", False)
     _connect(then(level), _pin(shown, "execute"))
+    shown_tail = author_parts_no_see(ed, keep, then(shown), no_see=False)
 
     ed.add_comment_to_nodes(
         "Down the sights: from the key, the camera eases (SightSeat, at the "
@@ -307,6 +311,7 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
         "path; with empty hands it goes straight home. A scoped "
         f"weapon hides past SightSeat {SCOPE_HIDE_BLEND:g}, out of its own "
         "scope's way, and the player's own body with it (OwnerNoSee), so the "
-        "arms' hold and recoil animation stay out of the glass.",
+        "arms' hold and recoil animation stay out of the glass. What is "
+        "drawn under the mannequin (a MetaHuman) goes with it both ways.",
         made)
-    return (then(bare), then(shown))
+    return (bare_tail, shown_tail)

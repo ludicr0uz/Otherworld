@@ -40,7 +40,13 @@ PLAYER_BODY = "adventurer_03"
 #                are.  Where the project is going; see mannequin_bind/.  Until
 #                import_bound.py has put the body in Content/, combat/skin.py
 #                says so and wears the "own" body.
-PLAYER_RIG = "mannequin"
+#   "metahuman"  Epic's sample MetaHuman (import_metahuman.py) drawn under
+#                the hidden mannequin, which still runs everything: its
+#                pose reaches the MetaHuman body through an IK retargeter
+#                every frame (build_metahuman_retarget.py, combat/
+#                metahuman_body.py).  PLAYER_BODY is then the garments'
+#                base only.  Where the project went on 2026-10-07.
+PLAYER_RIG = "metahuman"
 
 # The catalog id of the body the garments are drawn on (Scripts/clothing): the
 # player with every clothing slot empty.

@@ -43,7 +43,7 @@ def check_player_body():
     _mesh_comp = None
     for _h, _n in (_handles(char) if char else []):
         _o = _component_object(_h)
-        if isinstance(_o, unreal.SkeletalMeshComponent):
+        if _n == "Mesh" and isinstance(_o, unreal.SkeletalMeshComponent):
             _mesh_comp = _o
             break
     check("...animated by that skin's anim blueprint",

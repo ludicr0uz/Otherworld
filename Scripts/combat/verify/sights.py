@@ -265,7 +265,12 @@ def check_sight_camera():
           and any(abs((num_pin(n, "B") or 0.0) - SCOPE_HIDE_BLEND) < 1e-9
                   for n in _feeds(BEL.find_input_pin(tucked[0], "bNewHidden"))),
           str(sorted(up)))
-    no_see = [n for n in wg if "bNewOwnerNoSee" in in_pins(n)]
+    # On OwnerMesh itself; the same calls on the parts under it (a MetaHuman
+    # skin's, weapon_component/body_parts.py) hang off a cast in a loop.
+    no_see = [n for n in wg if "bNewOwnerNoSee" in in_pins(n)
+              and "Get OwnerMesh" in {_title(PIN.get_owning_node(q)) for q in
+                                      PIN.list_connected_pins(BEL.find_input_pin(n, "self"))}]
+    parts = [n for n in wg if "bNewOwnerNoSee" in in_pins(n) and n not in no_see]
     fed = [n for n in no_see
            if PIN.list_connected_pins(BEL.find_input_pin(n, "bNewOwnerNoSee"))]
     def _src(n, pin):
@@ -283,6 +288,15 @@ def check_sight_camera():
           len(no_see) == 2 and any(pin_value(n, "bNewOwnerNoSee") == "false"
                                    for n in no_see if n not in fed),
           str(len(no_see)))
+    check("...and what is drawn under the mannequin goes with it both ways "
+          "(body_parts.py: one call in a loop over its parts for each)",
+          len(parts) == 2
+          and sum(bool(PIN.list_connected_pins(BEL.find_input_pin(n, "bNewOwnerNoSee")))
+                  for n in parts) == 1
+          and all(pin_value(n, "bNewOwnerNoSee") in ("false", "")
+                  for n in parts
+                  if not PIN.list_connected_pins(BEL.find_input_pin(n, "bNewOwnerNoSee"))),
+          str(len(parts)))
     detaches = [n for n in wg if "detachfromactor" in _title(n).replace(" ", "").lower()]
     unhide = [PIN.get_owning_node(q) for d in detaches
               for q in PIN.list_connected_pins(BEL.find_then_pin(d))]

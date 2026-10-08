@@ -111,7 +111,9 @@ def _grip_socket():
     grip = player_skin().grip
     for handle, _name in _handles(bp):
         obj = _component_object(handle)
-        if isinstance(obj, unreal.SkeletalMeshComponent):
+        # The Character's own mesh, by name: a MetaHuman skin hangs four
+        # more skeletal meshes under it, and the list is not in tree order.
+        if _name == "Mesh" and isinstance(obj, unreal.SkeletalMeshComponent):
             skeletal = obj.get_editor_property("skeletal_mesh_asset")
             socket = skeletal.find_socket(grip)
             if not socket:

@@ -2,6 +2,7 @@
 
     if SightSeat > HEAD_HIDE_SEAT:  OwnerMesh.HideBoneByName(skin.head)
     else:                           OwnerMesh.UnHideBoneByName(skin.head)
+    ...and the same on every skinned mesh under OwnerMesh (body_parts.py)
 
 The sight camera sits at the held gun's eye point (sights.py), a few
 centimetres behind its rear sight. A gun at the shoulder has the head right
@@ -29,6 +30,7 @@ import unreal
 from uebp.graph import _assets, _connect, _node, _pin, _set, else_, out, then
 from combat.seat_tuning import HEAD_HIDE_SEAT, SEAT_VAR
 from combat.skin import player_skin
+from combat.weapon_component.body_parts import author_parts_bone
 from uebp.nodes.actor import FN_HIDE_BONE, FN_UNHIDE_BONE
 from uebp.nodes.math import FN_GREATER_FF
 from combat.weapon_component import vars as WV
@@ -63,7 +65,8 @@ def _author_head_shown(ed, keep, exec_in):
     _connect(out(body, WV.OwnerMesh), _pin(show, "self"))
     _set(show, "BoneName", head_bone())
     _connect(exec_in, _pin(show, "execute"))
-    return then(show)
+    # ...and on every skinned part under it (body_parts.py).
+    return author_parts_bone(ed, keep, then(show), FN_UNHIDE_BONE, head_bone())
 
 
 def _author_head_hide(ed, exec_ins):
@@ -89,6 +92,8 @@ def _author_head_hide(ed, exec_ins):
     _set(hide, "BoneName", head_bone())
     _set(hide, "PhysBodyOption", PHYS_BODY_OP)
     _connect(then(on_sights), _pin(hide, "execute"))
+    hidden = author_parts_bone(ed, keep, then(hide), FN_HIDE_BONE, head_bone(),
+                               phys_body_op=PHYS_BODY_OP)
     shown = _author_head_shown(ed, keep, else_(on_sights))
 
     ed.add_comment_to_nodes(
@@ -97,5 +102,7 @@ def _author_head_hide(ed, exec_ins):
         "the gun's eye point, inside or beside it, and it stood in the sight "
         "picture. Whatever gun is held, so no weapon needs an eye point that "
         "clears the head. Render only: the pose and the hit bodies stay. "
-        "Shown again the frame the camera is back off the gun.", made)
-    return (then(hide), shown)
+        "Shown again the frame the camera is back off the gun. A MetaHuman "
+        "skin's face and body under the mannequin: the same, by the same "
+        "bone name (body_parts.py).", made)
+    return (hidden, shown)

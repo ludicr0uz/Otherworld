@@ -34,7 +34,7 @@ from combat.paths import (
 )
 from graphics_menu import umg_consts as C
 from combat.body_pose import KNEEL_FROM_S, KNEEL_TIME, KNEEL_TO_S, POSE_KNEEL
-from combat.skin import SKIN_ADVENTURER
+from combat.skin import skin_of_mesh
 from combat.weapon_component.pose_weights import SEARCHING_VAR
 from graphics_menu.loot_consts import (
     LOOT_EMPTY, LOOT_KNEELING_VAR, LOOT_OPEN_VAR, LOOT_PANEL, LOOT_PROMPT, LOOT_ROWS_BOX,
@@ -149,7 +149,8 @@ def _hips(player):
     mesh = player.get_editor_property("mesh")
     capsule = player.get_component_by_class(unreal.CapsuleComponent)
     ground = player.get_actor_location().z - capsule.get_scaled_capsule_half_height()
-    return mesh.get_socket_location(SKIN_ADVENTURER.pose_bones["hips"]).z - ground
+    hips = skin_of_mesh(mesh.get_skeletal_mesh_asset().get_path_name()).pose_bones["hips"]
+    return mesh.get_socket_location(hips).z - ground
 
 
 def _check_kneel(p, hud, wc, stand_hips):
@@ -165,7 +166,8 @@ def _check_kneel(p, hud, wc, stand_hips):
             and pc.is_move_input_ignored(),
             f"searching={p.get(wc, SEARCHING_VAR)} ignored={pc.is_move_input_ignored()}")
     worn = mesh.get_skeletal_mesh_asset().get_path_name().split(".")[0]
-    if worn == SKIN_ADVENTURER.mesh:
+    kneels = getattr(skin_of_mesh(worn), "search_kneel", None) is not None
+    if kneels:
         yield lambda: p.get(anim, POSE_KNEEL) > 0.98
         yield SETTLE
         low, at = _hips(player), p.get(anim, KNEEL_TIME)
@@ -184,7 +186,7 @@ def _check_kneel(p, hud, wc, stand_hips):
     p.check("shut: no longer Searching, and the walk is given back",
             not p.get(hud, LOOT_KNEELING_VAR) and not pc.is_move_input_ignored(),
             f"ignored={pc.is_move_input_ignored()}")
-    if worn == SKIN_ADVENTURER.mesh:
+    if kneels:
         yield lambda: p.get(anim, POSE_KNEEL) < 0.02
         yield SETTLE
         up = _hips(player)

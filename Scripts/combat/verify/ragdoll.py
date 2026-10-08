@@ -10,7 +10,7 @@ from combat.ragdoll import (
     ragdoll_plan,
 )
 from combat.verify.common import (
-    cdo, check, component_template, components, load,
+    cdo, check, component_template, load,
 )
 
 
@@ -25,13 +25,10 @@ def check_ragdoll_bodies():
         bp = load(bp_path)
         if not bp:
             continue
-        mesh = None
-        for name in components(bp):
-            obj = component_template(bp, name)
-            if isinstance(obj, unreal.SkeletalMeshComponent):
-                mesh = obj
-                break
-        if mesh is None:
+        # The Character's own mesh ("Mesh"): a MetaHuman skin hangs four
+        # more skeletal meshes under it, and the list is not in tree order.
+        mesh = component_template(bp, "Mesh")
+        if not isinstance(mesh, unreal.SkeletalMeshComponent):
             mesh = cdo(bp).get_editor_property("mesh")
         asset = mesh.get_editor_property("skeletal_mesh_asset") if mesh else None
         pa = asset.get_editor_property("physics_asset") if asset else None

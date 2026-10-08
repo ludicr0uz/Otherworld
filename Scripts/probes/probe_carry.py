@@ -29,7 +29,7 @@ from combat.carry_tuning import (
     CARRY_GRIP, CARRY_RAISE_HOLD_S, LOWERED_VAR, RAISE_FORCED_VAR,
 )
 from combat.paths import ITEM_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
-from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
+from combat.skin import SKINS
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from graphics_menu.profile_consts import PROFILE_SLOT
 from combat import item_vars as IV
@@ -77,7 +77,7 @@ def _barrel_pitch(p, held):
 
 def _hand_z(player):
     mesh = player.get_editor_property("mesh")
-    bone = next(s.pose_bones["hand_r"] for s in (SKIN_ADVENTURER, SKIN_QUINN)
+    bone = next(s.pose_bones["hand_r"] for s in SKINS
                 if mesh.get_bone_index(s.pose_bones["hand_r"]) >= 0)
     return mesh.get_socket_location(bone).z - player.get_actor_location().z
 

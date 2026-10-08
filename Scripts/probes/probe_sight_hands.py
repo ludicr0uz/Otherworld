@@ -27,7 +27,7 @@ import unreal
 from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import LOOK_VAR, SEAT_VAR
-from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
+from combat.skin import SKINS
 from combat.support_hand import SUPPORT_HAND_VAR, SUPPORT_POINT_VAR
 from combat.sway_tuning import SWAY_TIME_VAR
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
@@ -69,7 +69,7 @@ def _run(p):
     wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
     mesh = p.get(wc, "OwnerMesh")
     # player_skin() needs the editor's asset subsystem; read the worn rig.
-    skin = next(s for s in (SKIN_ADVENTURER, SKIN_QUINN)
+    skin = next(s for s in SKINS
                 if mesh.get_bone_index(s.pose_bones["hand_r"]) >= 0)
     hands = (("right", skin.pose_bones["hand_r"]), ("left", skin.pose_bones["hand_l"]))
     anim = mesh.get_anim_instance()

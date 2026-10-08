@@ -17,12 +17,20 @@ from combat.verify.sights import _feeds, _title
 from combat.weapon_component.head_hide import PHYS_BODY_OP
 
 
-def _hides(nodes):
-    return by_pins(nodes, "BoneName", "PhysBodyOption")
+def _on_cast(node):
+    """Fed by a cast of a part under OwnerMesh (body_parts.py's loop)."""
+    return any(_title(n).startswith("Cast To")
+               for n in _feeds(BEL.find_input_pin(node, "self")))
 
 
-def _shows(nodes):
-    return [n for n in by_pins(nodes, "BoneName") if "PhysBodyOption" not in in_pins(n)]
+def _hides(nodes, parts=False):
+    return [n for n in by_pins(nodes, "BoneName", "PhysBodyOption")
+            if _on_cast(n) == parts]
+
+
+def _shows(nodes, parts=False):
+    return [n for n in by_pins(nodes, "BoneName")
+            if "PhysBodyOption" not in in_pins(n) and _on_cast(n) == parts]
 
 
 def _on_owner_mesh(node, head):
@@ -56,6 +64,12 @@ def check_head_hide():
           len(hides) == 1 and len(shows) == 1
           and all(_on_owner_mesh(n, head) for n in hides + shows),
           f"{len(hides)} hides, {len(shows)} shows")
+    parts_hide, parts_show = _hides(wg, parts=True), _shows(wg, parts=True)
+    check(f"...and {head} on every skinned part under it (body_parts.py: a "
+          "MetaHuman skin's face and body), hidden and shown with it",
+          len(parts_hide) == 1 and len(parts_show) == 1
+          and all(pin_value(n, "BoneName") == head for n in parts_hide + parts_show),
+          f"{len(parts_hide)} hides, {len(parts_show)} shows")
     if len(hides) != 1 or len(shows) != 1:
         return
     # A literal equal to its pin's default is not saved: "" once loaded.
@@ -81,10 +95,13 @@ def check_head_hide():
           and any(abs((num_pin(n, "B") or 0.0) - HEAD_HIDE_SEAT) < 1e-9
                   for n in fed if "B" in in_pins(n)),
           str(sorted(names)))
+    # Each arm ends in the OwnerNoSee call and then the loop that carries it
+    # to the parts under the mannequin (body_parts.py): the loop is what
+    # runs the gate.
     check(f"...after the sight camera has written {SEAT_VAR} this frame, on "
           "both of its arms (armed and empty-handed)",
           len(PIN.list_connected_pins(BEL.find_execute_pin(gate))) == 2
-          and all(set(in_pins(PIN.get_owning_node(q))) & {"bNewOwnerNoSee"}
+          and all(_title(PIN.get_owning_node(q)) == "For Each Loop"
                   for q in PIN.list_connected_pins(BEL.find_execute_pin(gate))),
           str([_title(PIN.get_owning_node(q))
                for q in PIN.list_connected_pins(BEL.find_execute_pin(gate))]))
@@ -97,6 +114,8 @@ def check_dead_shows_head():
           "the sights has its head",
           len(shows) == 1 and _on_owner_mesh(shows[0], head)
           and not _hides(wg_dead), f"{len(shows)} shows, {len(_hides(wg_dead))} hides")
+    check("...and the parts under the mannequin theirs",
+          len(_shows(wg_dead, parts=True)) == 1 and not _hides(wg_dead, parts=True))
 
 
 def run():

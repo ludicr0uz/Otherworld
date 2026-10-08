@@ -130,9 +130,12 @@ def check_dead_arm_lets_go():
     check("...and level with it again, off the gun's sight line",
           len(level) == 1 and len(sockets) == 1
           and pin_value(sockets[0], "InSocketName") == SPRING_ARM_SOCKET)
+    # OwnerMesh's own, and once more in a loop over the parts under it
+    # (weapon_component/body_parts.py): both false.
     body = by_pins(wg_dead, "bNewOwnerNoSee")
-    check("...the body a scope hid is shown",
-          len(body) == 1 and pin_value(body[0], "bNewOwnerNoSee") == "false")
+    check("...the body a scope hid is shown, and what is drawn under it",
+          len(body) == 2 and all(pin_value(n, "bNewOwnerNoSee") == "false" for n in body),
+          str(len(body)))
     gun = by_pins(wg_dead, "bNewHidden")
     armed = [d for g in gun for d in _next_back(g)]
     check("...and the gun too, behind a Branch on IsValid(Held)",

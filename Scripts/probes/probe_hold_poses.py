@@ -25,7 +25,7 @@ from combat.paths import (
     HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, ITEM_BP_PATH, WEAPON_COMP_BP_PATH,
     WEAPON_COMP_CLASS_PATH,
 )
-from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
+from combat.skin import SKINS
 from graphics_menu.profile_consts import PROFILE_SLOT
 from survival.paths import MUSHROOM_CLASS_PATH
 from combat import item_vars as IV
@@ -65,7 +65,7 @@ def _take(p, wc, index):
 def _hand_z(player):
     mesh = player.get_editor_property("mesh")
     # player_skin() needs the editor's asset subsystem; read the worn rig.
-    bone = next(s.pose_bones["hand_r"] for s in (SKIN_ADVENTURER, SKIN_QUINN)
+    bone = next(s.pose_bones["hand_r"] for s in SKINS
                 if mesh.get_bone_index(s.pose_bones["hand_r"]) >= 0)
     hand = mesh.get_socket_location(bone)
     return hand.z - player.get_actor_location().z

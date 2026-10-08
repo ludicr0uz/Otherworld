@@ -16,7 +16,7 @@ import unreal
 
 from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
-from combat.skin import SKIN_ADVENTURER
+from combat.skin import skin_of_mesh
 from combat.weapon_component import vars as WV
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, WV.Stance), (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)]
@@ -24,20 +24,26 @@ WRITABLE = [(WEAPON_COMP_BP_PATH, WV.Stance), (WEAPON_COMP_BP_PATH, RAISE_FORCED
 SETTLE_S = 0.6
 
 
+def _skin(player):
+    mesh = player.get_editor_property("mesh")
+    return skin_of_mesh(mesh.get_skeletal_mesh_asset().get_path_name())
+
+
 def _heights(player):
     """{bone: cm above the ground under the capsule}."""
     mesh = player.get_editor_property("mesh")
     capsule = player.get_component_by_class(unreal.CapsuleComponent)
     ground = player.get_actor_location().z - capsule.get_scaled_capsule_half_height()
-    b = SKIN_ADVENTURER.pose_bones
-    bones = {"head": "Head", "hips": b["hips"], "hand_l": b["hand_l"],
+    skin = _skin(player)
+    b = skin.pose_bones
+    bones = {"head": skin.head, "hips": b["hips"], "hand_l": b["hand_l"],
              "hand_r": b["hand_r"], "foot_l": b["foot_l"], "foot_r": b["foot_r"]}
     return {k: mesh.get_socket_location(v).z - ground for k, v in bones.items()}
 
 
 def _hand_gap(player):
     mesh = player.get_editor_property("mesh")
-    b = SKIN_ADVENTURER.pose_bones
+    b = _skin(player).pose_bones
     return (mesh.get_socket_location(b["hand_l"])
             - mesh.get_socket_location(b["hand_r"])).length()
 
@@ -53,9 +59,10 @@ def probe(p):
     wc = p.component(player, WEAPON_COMP_CLASS_PATH)
     mesh = player.get_editor_property("mesh")
     worn = mesh.get_skeletal_mesh_asset().get_path_name().split(".")[0]
-    p.check("the player wears the adventurer (the rig with the stance clips)",
-            wc is not None and worn == SKIN_ADVENTURER.mesh, worn)
-    if wc is None or worn != SKIN_ADVENTURER.mesh:
+    skin = skin_of_mesh(worn)
+    p.check("the player wears a rig with the stance clips",
+            wc is not None and skin is not None and skin.stance_clips, worn)
+    if wc is None or skin is None or not skin.stance_clips:
         return
     # A headless game renders nothing, and by default an unrendered mesh
     # never refreshes its bones.

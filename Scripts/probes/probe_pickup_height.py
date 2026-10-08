@@ -88,7 +88,10 @@ def _run(p):
     yield 0.05
     carried = len(p.get(wc, "Inventory"))
     yield from _press(p, wc)
+    # A taken level actor is destroyed and a fresh one of its class carried
+    # (task A2, pickup.py): the reference held here is gone.
     p.check("the same item at knee height 120 cm out is taken",
-            not item.get_editor_property("Dropped")
+            not unreal.SystemLibrary.is_valid(item)
             and len(p.get(wc, "Inventory")) == carried + 1,
-            f"{carried} -> {len(p.get(wc, 'Inventory'))} carried")
+            f"{carried} -> {len(p.get(wc, 'Inventory'))} carried, "
+            f"the level actor valid {unreal.SystemLibrary.is_valid(item)}")

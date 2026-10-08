@@ -122,6 +122,8 @@ and it never relies on a variable another section left behind.
               detaches it from what it was left in
   world_items an item in the world is the server's: the drop key asks, the
               server sets it down, and an item lying Dropped replicates
+  relevancy   what the server sends and how often (A2): the rows on the
+              class defaults, the item's dormancy and its wakes
   glimmer     the glimmer over an item on the ground: MPC_ItemGlimmer and
               M_ItemGlimmer, the sprite on the item and the ammo pickup, the
               Tick step on the base and on each child with its own Tick;
@@ -155,6 +157,6 @@ and it never relies on a variable another section left behind.
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "interact", "slots", "record", "shot", "strike", "fire", "pickup", "world_items", "glimmer", "heat",
+    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "interact", "slots", "record", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
 )

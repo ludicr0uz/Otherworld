@@ -26,6 +26,7 @@ numbers (knife.py, axe.py).
 
 import unreal
 
+from combat.item_world import author_wake
 from combat.log import _log
 from uebp.graph import (
     BEL, BGE, _add_component, _assets, _component_object, _connect, _drop_components,
@@ -165,12 +166,14 @@ def _author_cooling(ed, tick):
     cold = ed.add_set_member_variable_node(HOT_VAR)
     _set(cold, HOT_VAR, False)
     _connect(then(cooled), _pin(cold, "execute"))
+    # A blade cooling where it lies is dormant: sent once more (item_world.py).
+    woke = author_wake(ed, [then(cold)])
 
     # Read after the write above: a pure Get is pulled when its reader runs.
     hot = get(HOT_VAR)
     which = ed.add_branch_node()
     _connect(hot, _pin(which, "Condition"))
-    for e in (then(cold), else_(cooled)):
+    for e in (woke, else_(cooled)):
         _connect(e, _pin(which, "execute"))
     wear = _node(ed, FN_SET_OVERLAY)
     _connect(get(MODEL), _pin(wear, "self"))

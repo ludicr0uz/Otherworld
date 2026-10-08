@@ -43,7 +43,7 @@ import unreal
 
 from combat.log import _log
 from uebp.graph import (
-    BEL, BGE, _add_component, _apply_defaults, _component_object, _connect,
+    BEL, BGE, _add_component, _apply_defaults, _assets, _component_object, _connect,
     _create_blueprint, _declare, _drop_components, _events, _float_type, _loose_pin,
     _must_load, _node, _palette, _pin, _root_handle, _set, out, then)
 from uebp import net
@@ -58,7 +58,9 @@ from survival.tuning import (
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_HAS_AUTHORITY, FN_LIFESPAN
 from uebp.nodes.math import FN_ADD_FF, FN_DISTANCE, FN_FMIN, FN_LE_FF, FN_MUL_FF
 from uebp.nodes.palette import NODE_CAST_SURVIVAL
+from net import relevancy
 from net.players import each_living_player
+from net.relevancy_consts import CAMPFIRE
 
 
 CAMPFIRE_MESH = "/Game/Sourced/Quaternius/Survival/SM_Bonfire_Fire"
@@ -188,6 +190,17 @@ def build_campfire(rebuild=True):
     # Every client is sent the fire the server lit (class default: after the
     # compile).
     net.replicate_actor(bp)
+    # ...within 60 m of them, at an item's rates (task A2), and asleep from
+    # the spawn: a fire is sent once and changes nothing after; its destroy
+    # reaches a dormant copy as it does a live one.
+    relevancy.apply(bp, CAMPFIRE)
+    cdo = unreal.get_default_object(BEL.generated_class(bp))
+    cdo.set_editor_property("net_dormancy", unreal.NetDormancy.DORM_DORMANT_ALL)
+    if cdo.get_editor_property("net_dormancy") != unreal.NetDormancy.DORM_DORMANT_ALL:
+        raise RuntimeError(f"{CAMPFIRE_BP_PATH}.NetDormancy did not stick")
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError(f"{CAMPFIRE_BP_PATH} failed to recompile after the net defaults")
+    _assets().save_loaded_asset(bp)
     _log(f"built {CAMPFIRE_BP_PATH} (+{CAMPFIRE_WARM_PER_S:g} temperature/s within "
          f"{CAMPFIRE_WARM_RADIUS_CM:.0f} cm, burning {CAMPFIRE_BURN_S:.0f} s)")
     return bp

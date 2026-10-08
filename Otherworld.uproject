@@ -61,6 +61,10 @@
 		{
 			"Name": "MetaHumanCharacter",
 			"Enabled": true
+		},
+		{
+			"Name": "ReplicationGraph",
+			"Enabled": true
 		}
 	]
 }

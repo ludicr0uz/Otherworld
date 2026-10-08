@@ -32,6 +32,7 @@ from forest_generator.npc_agro import (
 from forest_generator.npc_placement import NPC_VARIANTS
 from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR, DEBUG_MODE_VAR
 from npc.paths import (
+    NPC_BP_PATH,
     AGGRO_REASON_VAR, AGGRO_VAR, AI_BP_PATH, CORPSE_LOG_PREFIX, CORPSE_VAR,
     NEXT_PATROL_VAR, PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR,
     HIT_DAMAGE_VAR, RUN_SPEED_VAR, STEP_CHASE, STEP_DRAWN, STEP_EVENT_PREFIX,
@@ -473,8 +474,22 @@ def check_player_guard(tag, nodes, spec):
           f"{told}")
 
 
+def check_relevancy():
+    """How far a wanderer is sent and how often (task A2): the body's class
+    defaults and each creature's own carry net/relevancy_consts.CHARACTER."""
+    from net import relevancy
+    from net.relevancy_consts import CHARACTER
+    for path in (NPC_BP_PATH, *(v.blueprint for v in NPC_VARIANTS)):
+        bp = unreal.EditorAssetLibrary.load_asset(path)
+        check(f"{path.rsplit('/', 1)[-1]} is sent within {CHARACTER.cull_m:g} m, at "
+              f"{CHARACTER.update_hz:g}/{CHARACTER.min_hz:g} Hz (net/relevancy_consts.py)",
+              bp is not None and relevancy.matches(bp, CHARACTER),
+              str(bp and relevancy.read(bp)))
+
+
 def run():
     check_settings()
+    check_relevancy()
     check_controller(AI_BP_PATH, NPC_VARIANTS[0].key)
     for variant in NPC_VARIANTS:
         check_controller(variant.ai_blueprint, variant.key)

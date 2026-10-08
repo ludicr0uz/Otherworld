@@ -311,7 +311,12 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
     replicated variables of `BP_WeaponItem`. Replication is never switched off (the
     generic driver would leave each client's copy standing): the take lowers
     `InWorld`, and a client's copy hides itself while it is false. That step is the
-    first of `glimmer.author_glimmer`, so every child's Tick has it.
+    first of `glimmer.author_glimmer`, so every child's Tick has it. A take of an item
+    placed in the level destroys the server's actor and spawns a fresh one of its class
+    into the bag (`TakeItem`), so a late joiner sees it gone (A2); the same step puts
+    the actor to sleep while it lies still or is carried (`NetDormancy`), and the graphs
+    that change a lying item's state wake it (`item_world.author_wake`;
+    `Scripts/net/CLAUDE.md`, "Relevancy, update rates and dormancy").
   - **Every other item in the world replicates by itself** (M23): the same step, on its
     authority arm, makes an item that lies `Dropped` and is not yet `InWorld` a
     replicated actor, on the server. So an item set down, placed in the level, left by a

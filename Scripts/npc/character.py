@@ -16,6 +16,8 @@ from npc.graph import _log, _mesh_object
 from uebp.graph import BEL, _assets, _create_blueprint, _resolve, _try_set
 from npc.controller import build_ai_controller_blueprint
 from Sound.sound_monsters import voices_of
+from net import relevancy
+from net.relevancy_consts import CHARACTER
 
 
 # ─── The character ──────────────────────────────────────────────────────────
@@ -118,6 +120,8 @@ def build_npc_blueprint(ai_bp):
     # pawn's yaw to the controller's every frame and fights the line above.
     # The third-person template turns it off for the same reason.
     cdo.set_editor_property("use_controller_rotation_yaw", False)
+    # How far a wanderer is sent, and how often (task A2).
+    relevancy.apply(bp, CHARACTER)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ForestWanderer failed to compile")
@@ -231,6 +235,8 @@ def build_variant_blueprint(base_bp, variant):
                             f"{variant.key} melee clip"),
         voices=voices_of(variant.key), reactions=variant.reactions, key=variant.key)
     cdo.set_editor_property("ai_controller_class", BEL.generated_class(ai_bp))
+    # Each creature's own copy of the body's row (task A2).
+    relevancy.apply(bp, CHARACTER)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{variant.blueprint} failed to compile")

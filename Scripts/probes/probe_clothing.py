@@ -93,9 +93,12 @@ def _bag(p, wc):
 
 
 def _pick_up(p, player, wc, item, yaw):
-    """Lay ``item`` 150 cm ahead and press E. True if it went into the bag."""
+    """Lay ``item`` 150 cm ahead and press E. The take of a level actor destroys
+    it and puts a fresh one of its class in the bag (task A2, pickup.py):
+    returns that one, or None if nothing of its kind arrived."""
     a = math.radians(yaw)
     here = player.get_actor_location()
+    before = list(_bag(p, wc))
     item.set_actor_location(
         here + unreal.Vector(RING_CM * math.cos(a), RING_CM * math.sin(a), -DOWN_CM),
         False, True)
@@ -103,7 +106,8 @@ def _pick_up(p, player, wc, item, yaw):
     p.set(wc, INTERACT_FORCED_VAR, True)
     yield lambda: not p.get(wc, INTERACT_FORCED_VAR)
     yield 0.05
-    return item in _bag(p, wc)
+    fresh = [b for b in _bag(p, wc) if b not in before and b.get_class() == item.get_class()]
+    return fresh[0] if fresh and not unreal.SystemLibrary.is_valid(item) else None
 
 
 def _hold(p, wc, item):
@@ -166,8 +170,12 @@ def _run(p):
     took = []
     for item in (hat, jacket, shirt):
         took.append((yield from _pick_up(p, player, wc, item, yaw)))
-    p.check("E picks a garment up into the bag, as any item", all(took), str(took))
+    p.check("E picks a garment up into the bag, as any item (the level's actor gone, a "
+            "fresh one of its kind carried)", all(took), str(took))
     p.check("...and wears nothing yet", not any(_worn(p, wc)), str(_worn(p, wc)))
+    if not all(took):
+        return
+    hat, jacket, shirt = took
 
     # Wear the hat.
     yield from _hold(p, wc, hat)

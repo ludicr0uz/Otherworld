@@ -99,6 +99,9 @@ HeadKillSounds = Var("HeadKillSounds", array(obj("/Script/Engine.SoundBase")))
 BreathSounds = Var("BreathSounds", array(obj("/Script/Engine.SoundBase")))
 BreathNextTime = Var("BreathNextTime", FLOAT, 0.0)
 HandledItem = Var("HandledItem", obj(ITEM_CLASS_PATH))
+# pickup.py: the item a take puts in the inventory, which is the one asked for,
+# or a fresh one of its class where that one was placed in the level (task A2).
+TakeItem = Var("TakeItem", obj(ITEM_CLASS_PATH))
 # local.py: this machine's controller of the owner, or none; whether this Tick
 # may read keys; and whether the first local frame's caches are taken.
 LocalPC = Var("LocalPC", obj("/Script/Engine.PlayerController"))
@@ -119,6 +122,6 @@ TABLE = (
     BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ReloadTake, ItemClass,
     BloodClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds, ThrowSounds, ThrowSharpSounds,
     PunchHitSounds, BladeHitSounds, LodgeSounds, HeadKillSounds, BreathSounds, BreathNextTime,
-    HandledItem, LocalPC, LocalInput, LocalReady, ExitPending, ExitAt, ExitStartedAt,
+    HandledItem, TakeItem, LocalPC, LocalInput, LocalReady, ExitPending, ExitAt, ExitStartedAt,
     ExitCalledOffAt, ExitDue,
 )

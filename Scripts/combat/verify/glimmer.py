@@ -143,17 +143,19 @@ def check_item_glimmer():
     nodes = graph(item).list_all_nodes()
     steps = _glimmer_steps(nodes)
     # Between the Tick and the step (item_world.py): a Branch on HasAuthority,
-    # whose true arm is the server's item entering the world (a Branch of its
-    # own: verify/world_items.py) and whose false arm is what a client's copy
-    # of a replicated item shows at all.
+    # whose true arm is the server's item entering the world and resting
+    # (Branches of their own: verify/world_items.py, verify/relevancy.py)
+    # and whose false arm is what a client's copy of a replicated item shows
+    # at all. The one such Branch is fed by the Tick alone.
     before = _feeders(steps[0], "execute") if len(steps) == 1 else []
-    enters = [f for f in before if _title(f) == "Branch"]
-    gate = [g for e in enters for g in _feeders(e, "execute") if _title(g) == "Branch"]
+    gate = [n for n in nodes if _title(n) == "Branch"
+            and any("HasAuthority" in _title(c).replace(" ", "")
+                    for c in _feeders(n, "Condition"))]
     check(f"BP_WeaponItem's Tick shows {GLIMMER} while the item is {IV.Dropped}, in one "
           "place: nothing that drops or takes an item is told",
           len(steps) == 1 and len(_wired_ticks(nodes)) == 1 and len(gate) == 1
           and [_title(f) for f in _feeders(gate[0], "execute")] == ["Event Tick"],
-          f"{len(steps)} step(s), {len(_wired_ticks(nodes))} Tick(s)")
+          f"{len(steps)} step(s), {len(_wired_ticks(nodes))} Tick(s), {len(gate)} gate(s)")
     hides = [f for f in before if "bNewHidden" in {
         str(PIN.get_pin_name(p)) for p in BEL.list_input_pins(f)}]
     check(f"...after a client's copy of a replicated item is hidden while it is not "

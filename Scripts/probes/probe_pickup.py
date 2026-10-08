@@ -89,13 +89,17 @@ def _one_press(p, player, wc, mine, label):
     p.check(f"{label}: the press takes exactly one item",
             len(took) == 1 and len(now) == len(carried) + 1,
             f"{len(took)} taken, {len(carried)} -> {len(now)} carried")
+    # A taken level actor is destroyed and a fresh one of its class carried
+    # (task A2, pickup.py): the nearest is gone, and the bag's new item is its kind.
     p.check(f"{label}: ...the one nearest the reticle's point",
-            took == [order[0]],
-            f"took {[i.get_name() for i in took]}, nearest {order[0].get_name()}")
-    left = [i for i in mine if i not in now]
+            len(took) == 1 and took[0].get_class() == order[0].get_class()
+            and not unreal.SystemLibrary.is_valid(order[0]),
+            f"took {[i.get_name() for i in took]}, nearest {order[0].get_name()} "
+            f"(still there: {unreal.SystemLibrary.is_valid(order[0])})")
+    left = [i for i in mine if i is not order[0]]
     p.check(f"{label}: ...and the others stay on the ground",
             all(i.get_editor_property("Dropped") for i in left)
-            and order[0].get_editor_property("Dropped") is False,
+            and not unreal.SystemLibrary.is_valid(order[0]),
             f"{len(_on_ground(p, left))} of {len(left)} still Dropped")
     return order[0]
 
@@ -161,9 +165,10 @@ def _run(p):
             second == behind, second.get_name() if second else "nothing")
 
     yield from _one_press(p, player, wc, mine, "the last one")
-    p.check("three presses took the three items, one each",
+    p.check("three presses took the three items, one each (each level actor gone, a "
+            "fresh one of its kind carried)",
             len(p.get(wc, "Inventory")) == start + 3
-            and all(i in list(p.get(wc, "Inventory")) for i in mine),
+            and not any(unreal.SystemLibrary.is_valid(i) for i in mine),
             f"{len(p.get(wc, 'Inventory'))} carried")
 
     carried = len(p.get(wc, "Inventory"))

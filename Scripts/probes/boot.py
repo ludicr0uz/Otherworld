@@ -188,12 +188,16 @@ def _ready(world, where):
             # The load test's bots (uepy.py --net --bots N): spawned as soon
             # as the level is up, whether or not a client has joined yet.
             bots.start(world)
-        return unreal.GameplayStatics.get_num_player_controllers(world) >= where.clients
+        # On the title (--title) each client joins when its probe does, so the
+        # server's probe starts with the first: a probe that joins late
+        # (probe_net_late_join.py) is joining a server whose probe is running.
+        wanted = 1 if TITLE else where.clients
+        return unreal.GameplayStatics.get_num_player_controllers(world) >= wanted
     return bool(unreal.GameplayStatics.get_player_pawn(world, 0))
 
 
 def _awaited(where):
-    return (f"{where.clients} joined player(s)" if where.role == SERVER
+    return (f"{1 if TITLE else where.clients} joined player(s)" if where.role == SERVER
             else "a player pawn")
 
 

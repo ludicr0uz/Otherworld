@@ -11,6 +11,10 @@ FN_ADD_WORLD_ROT = "/Script/Engine.Actor.K2_AddActorWorldRotation"
 FN_ATTACH = "/Script/Engine.Actor.K2_AttachToComponent"
 FN_DESTROY = "/Script/Engine.Actor.K2_DestroyActor"
 FN_DETACH = "/Script/Engine.Actor.K2_DetachFromActor"
+# Dormancy (task A2): an actor that lies still is replicated once and its channel
+# closed; a flush sends it again. Both do nothing without authority.
+FN_FLUSH_NET_DORMANCY = "/Script/Engine.Actor.FlushNetDormancy"
+FN_SET_NET_DORMANCY = "/Script/Engine.Actor.SetNetDormancy"
 # True on the machine that owns the actor's state: the server, and single player.
 FN_HAS_AUTHORITY = "/Script/Engine.Actor.HasAuthority"
 FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"

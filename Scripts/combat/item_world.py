@@ -23,8 +23,26 @@ gets there:
 An item placed in the level is loaded by every machine. The server's starts
 replicating on its first Tick, and the client's own copy of it becomes the
 server's (a level actor is named the same on both, so the engine joins them,
-not spawns a second): from then on its Dropped and InWorld are the server's,
-and a take hides it everywhere.
+not spawns a second): from then on its Dropped and InWorld are the server's.
+A take of one destroys the server's actor and puts a fresh one of its class
+in the inventory (weapon_component/pickup.py): the engine tells every client,
+and every client that joins later, of a destroyed level actor, where a
+hidden one would stand in a late joiner's level as the level has it (task
+A2). A take of a spawned item (set down, thrown, dropped by a kill) keeps the
+one actor, hidden on each client while it is not InWorld.
+
+The actor sleeps while the item lies still or is carried (task A2): its own
+Tick on the server sets NetDormancy DormantAll while Dropped or not InWorld,
+and Awake in flight (_author_rest; Dormant remembers which, so the engine is
+told on the change alone). A dormant actor is sent to a connection once, and
+its channel closed until it is woken: FlushNetDormancy, which author_wake
+authors, after each write of its replicated state while it lies there (into
+and out of the world here; a lying stick burning out, stick.py; a lying blade
+cooling, heat.py). The server's replication graph (Source/Otherworld/Public/
+OtherworldReplicationGraph.h) keeps a dormant actor in its grid cell as a
+still one, and relevance_item writes how far an item is sent and how often
+(net/relevancy_consts.py). In standalone a dormant actor still ticks and
+nothing is culled.
 
 Replication is never switched off again. This project replicates through the
 engine's generic driver (not Iris), where SetReplicates(false) leaves each
@@ -35,9 +53,8 @@ from the record's picture, not from this copy. The engine closes the channel
 of a hidden actor with no collision by itself, so a copy of an item in a bag
 is gone a few seconds on.
 
-Not here: a client that joins after a placed item was taken still has its
-own copy lying there (the server's is hidden, so it is not sent), and asks in
-vain for it; what a late joiner is told of the world is M31.
+Left for M31: what else a late joiner is told of (corpses, chopped trees),
+and a cleanup rule for what lies in a long-running world.
 """
 
 from combat import item_vars as IV
@@ -47,10 +64,16 @@ from combat.torch_tuning import LIT_VAR
 from uebp import net
 from uebp.g import _G
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
+from net import relevancy
+from net.relevancy_consts import ITEM
 from uebp.nodes.actor import (
-    FN_HAS_AUTHORITY, FN_SET_HIDDEN, FN_SET_REPLICATE_MOVEMENT, FN_SET_REPLICATES)
-from uebp.nodes.math import FN_AND, FN_NOT
+    FN_FLUSH_NET_DORMANCY, FN_HAS_AUTHORITY, FN_SET_HIDDEN, FN_SET_NET_DORMANCY,
+    FN_SET_REPLICATE_MOVEMENT, FN_SET_REPLICATES)
+from uebp.nodes.math import FN_AND, FN_NEQ_BB, FN_NOT, FN_OR
 from uebp.nodes.system import FN_IS_SERVER
+
+# The enum literals SetNetDormancy's pin takes.
+DORMANT, AWAKE = "DORM_DormantAll", "DORM_Awake"
 
 # Lit and Hot: a burning stick or a hot blade lying there is seen so by
 # everyone (task M25, combat/fire_vars.py).
@@ -63,6 +86,21 @@ def replicate_item(bp):
     replicate: an item starts when it enters the world."""
     for var in REPLICATED:
         net.replicate(bp, var)
+
+
+def relevance_item(bp):
+    """How far an item in the world is sent, and how often: the ITEM row of
+    net/relevancy_consts.py, on the class defaults. After a compile."""
+    relevancy.apply(bp, ITEM)
+
+
+def author_wake(ed, exec_ins, item=None):
+    """With authority: ``item`` (this actor, given none) is sent once more
+    though dormant (FlushNetDormancy). After a write of its replicated state
+    while it lies in the world. Returns the exec pin after it."""
+    g = _G(ed, ITEM_CLASS_PATH)
+    woke = g.call(FN_FLUSH_NET_DORMANCY, exec_ins, **({"self": item} if item is not None else {}))
+    return then(woke)
 
 
 def author_into_world(ed, item, exec_ins):
@@ -84,7 +122,10 @@ def author_out_of_world(ed, item, exec_ins):
     world. Each client's copy of it hides itself. Returns the exec pin after
     it."""
     g = _G(ed, ITEM_CLASS_PATH)
-    return g.iput(item, IV.InWorld, "false", exec_ins)
+    flow = g.iput(item, IV.InWorld, "false", exec_ins)
+    # The item lay dormant: the lowered InWorld is sent, or no client would
+    # ever hide its copy.
+    return author_wake(ed, [flow], item)
 
 
 def _author_enter_world(ed, exec_in):
@@ -113,12 +154,41 @@ def _author_enter_world(ed, exec_in):
     sent = _node(ed, FN_SET_REPLICATES)
     _set(sent, "bInReplicates", True)
     _connect(then(moves), _pin(sent, "execute"))
+    # Set down again after a carry, it is where it lies now, not where it
+    # went dormant: sent once more.
+    woke = _node(ed, FN_FLUSH_NET_DORMANCY)
+    _connect(then(sent), _pin(woke, "execute"))
     ed.add_comment_to_nodes(
         "An item lying Dropped is the world's (item_world.py): on the server, "
         "the first Tick it is found so makes it InWorld and a replicated actor, "
         "however it came to lie there (set down, placed in the level, left by a "
-        "kill).", [lying, kept, here, enter, flag, moves, sent])
-    return (else_(enter), then(sent))
+        "kill), and sends it once more if it lay dormant.",
+        [lying, kept, here, enter, flag, moves, sent, woke])
+    return (else_(enter), then(woke))
+
+
+def _author_rest(ed, exec_ins):
+    """In the item's own Tick, with authority: the actor sleeps (NetDormancy
+    DormantAll) while the item lies still or is carried, and is awake in
+    flight: Dropped, or not InWorld. Dormant remembers what was last set, so
+    the engine is told on the change alone. Returns the exec pins to carry
+    on from."""
+    g = _G(ed, ITEM_CLASS_PATH)
+    still = out(g.call(FN_OR, A=g.get(IV.Dropped),
+                       B=out(g.call(FN_NOT, A=g.get(IV.InWorld)))))
+    changed, same = g.branch(out(g.call(FN_NEQ_BB, A=still, B=g.get(IV.Dormant))), exec_ins)
+    rest, wake = g.branch(still, [changed])
+    sleep = g.call(FN_SET_NET_DORMANCY, [rest], NewDormancy=DORMANT)
+    asleep = g.put(IV.Dormant, "true", [then(sleep)])
+    up = g.call(FN_SET_NET_DORMANCY, [wake], NewDormancy=AWAKE)
+    awake = g.put(IV.Dormant, "false", [then(up)])
+    ed.add_comment_to_nodes(
+        f"The actor sleeps while the item lies still or is carried ({IV.Dropped}, "
+        f"or not {IV.InWorld}): NetDormancy {DORMANT}, so it is sent to a client "
+        f"once and its channel closed until a graph wakes it (item_world.py). In "
+        f"flight it is {AWAKE}. {IV.Dormant} remembers which, so the engine is "
+        "told on the change alone.", g.made)
+    return (same, asleep, awake)
 
 
 def author_world_view(ed, exec_ins):
@@ -140,4 +210,4 @@ def author_world_view(ed, exec_ins):
         "A client's copy of a replicated item (item_world.py) is shown only "
         "while the item is InWorld: carried, the hand that holds it is drawn "
         "from the record's picture, not from this copy.", [owns, gate, carried, hide])
-    return _author_enter_world(ed, then(gate)) + (then(hide),)
+    return _author_rest(ed, list(_author_enter_world(ed, then(gate)))) + (then(hide),)

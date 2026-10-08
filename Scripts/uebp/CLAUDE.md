@@ -89,5 +89,12 @@ offline copy of a graph.
   them behind the authority switch.
 - **Reliable is for what must arrive** (a shot fired, a death). An effect that repeats goes
   unreliable: a full reliable buffer disconnects the client.
+- **Dormancy is a Blueprint call, not a flag** (`FN_SET_NET_DORMANCY`,
+  `FN_FLUSH_NET_DORMANCY` in `uebp.nodes.actor`; both do nothing without authority). A
+  dormant actor is sent once and its channel closed, so every write of its replicated state
+  while it is dormant needs a flush after it, or no client hears. `combat/item_world.py`
+  owns the item's rule and its wakes; an actor whose state never changes after its spawn
+  (the campfire) is `DormantAll` from its class default. The engine still sends a dormant
+  actor's destroy, and tells a late joiner of a destroyed level actor.
 - **Flags that hold in the authoring editor prove nothing about the wire.** This check
   proves the flags are compiled and saved; whether an RPC arrives takes two processes.

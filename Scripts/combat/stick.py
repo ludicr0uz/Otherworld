@@ -34,6 +34,7 @@ mesh's origin, in A_HoldTorch (hold_pose.py).
 
 import unreal
 
+from combat.item_world import author_wake
 from combat.chop_tuning import CHOPS_VAR
 from combat.glimmer import author_glimmer
 from combat.log import _log
@@ -142,13 +143,15 @@ def _author_burn(ed, tick):
     dark = ed.add_set_member_variable_node(LIT_VAR)
     _set(dark, LIT_VAR, False)
     _connect(then(burnt), _pin(dark, "execute"))
+    # A stick burning out where it lies is dormant: sent once more (item_world.py).
+    woke = author_wake(ed, [then(dark)])
 
     # Read after the write above: a pure Get is pulled when its reader runs.
     lit = get(LIT_VAR)
     unlit = _node(ed, FN_NOT)
     _connect(lit, _pin(unlit, "A"))
     made = [burnt, dark]
-    prev = (then(dark), else_(burnt))
+    prev = (woke, else_(burnt))
     for name, shown in ((MODEL, out(unlit)), (FLAME, lit), (GLOW, lit)):
         show = _node(ed, FN_SET_VISIBILITY)
         _connect(get(name), _pin(show, "self"))

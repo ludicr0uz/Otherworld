@@ -41,6 +41,7 @@ from combat.paths import (
 from combat.record_vars import DropForced
 from combat.slot_tuning import SLOT_VAR
 from combat.strike_vars import SERVER_TAKE
+from loot.consts import LOOT_RADIUS
 from combat.tuning import INTERACT_RADIUS
 from combat.weapon_component import vars as WV
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
@@ -253,12 +254,19 @@ def _server_items(p, pawns, wcs):
     p.post("go-hat")
     yield from _both(p, "hat-got", 20.0)
     yield 0.3
-    holds = [hat in list(p.get(wc, WV.Inventory)) for wc in wcs]
+    # The hat was the level's: the take destroyed it and put a fresh hat of its
+    # class in the winner's bag (task A2, pickup.py), which is the one actor the
+    # rest of this step follows.
+    fresh = [[i for i in p.get(wc, WV.Inventory) if i.get_class().get_name() == HAT
+              and not unreal.OtherworldNetLibrary.is_level_actor(i)] for wc in wcs]
+    holds = [bool(c) for c in fresh]
     p.check("both clients press E on the hat at once: on the server one of them "
-            "carries it, and it is out of the world",
-            sorted(holds) == [False, True] and not p.get(hat, IV.Dropped)
-            and not p.get(hat, IV.InWorld) and len(_lying(p)) == 0,
-            f"carried by {holds}, Dropped {p.get(hat, IV.Dropped)}")
+            "carries a fresh hat of its class, the level's actor is gone, and none lies "
+            "in the world",
+            sorted(holds) == [False, True] and len(_lying(p)) == 0
+            and len([a for a in _lying(p) if a == hat]) == 0,
+            f"carried by {holds}, {len(_lying(p))} lying")
+    hat = next((c[0] for c in fresh if c), hat)
     p.check("...and the clients agree: one has a hat, the other none",
             sorted(v or 0 for v in _posts(p, "hat-got")) == [0, 1], str(_posts(p, "hat-got")))
     if sorted(holds) != [False, True]:
@@ -356,6 +364,14 @@ def _client_loot(p, wc):
     p.post("rest", _vec(rest))
     yield from _await(lambda: p.posted("server", "beside") is not None
                       and p.get(hud, LOOT_TARGET_VAR) == body)
+    # Where the two stand when the window is asked: a miss here has been
+    # intermittent (2 of 4 runs on 2026-10-07), so the distance is on record.
+    _pawn_at = p.pawn().get_actor_location()
+    _mesh_at = body.get_owner().get_component_by_class(
+        unreal.SkeletalMeshComponent).get_world_location()
+    p.note(f"{p.where} stands {(_pawn_at - _mesh_at).length():.0f} cm from the body's mesh "
+           f"(reach {LOOT_RADIUS:.0f}); mesh z {_mesh_at.z:.0f}, rest z {rest.z:.0f}; "
+           f"LootTarget {p.get(hud, LOOT_TARGET_VAR)}")
     p.check(f"stood beside it, {p.where}'s loot window finds the body",
             p.get(hud, LOOT_TARGET_VAR) == body, str(p.get(hud, LOOT_TARGET_VAR)))
     had = _carried(p, wc)

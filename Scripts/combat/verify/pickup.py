@@ -6,6 +6,10 @@ Lodged goes back into empty hands.
 
 How the target is chosen is verify/interact.py's. That a pick-up joins the
 inventory without switching to it is verify/weapon_inputs.py's.
+
+What the take puts in the inventory is TakeItem (task A2): the item asked
+for, or, where it was placed in the level, a fresh one of its class, the
+level's destroyed.
 """
 
 from combat import item_vars as IV
@@ -32,9 +36,14 @@ def _event_item(node, pin):
     return event is not None and _sources(node, pin) == [event]
 
 
+def _taken_item(node, pin):
+    """Is ``pin`` fed by TakeItem, what the take puts in the inventory?"""
+    return _reads(node, pin, WV.TakeItem) and len(_sources(node, pin)) == 1
+
+
 def check_pickup_takes_once():
     adds = by_pins(wg, "TargetArray", "NewItem")
-    takes = [a for a in adds if _event_item(a, "NewItem")]
+    takes = [a for a in adds if _taken_item(a, "NewItem")]
     # (The loot take adds the item it has just spawned: verify/asks.py.)
     looped = [a for a in adds if a not in takes
               and any("Cast" in _title(s) and not any(
@@ -47,34 +56,74 @@ def check_pickup_takes_once():
     if len(takes) != 1:
         return
 
-    # Backwards from the add: Detach <- Set InWorld <- Set Dropped <- Branch(free).
+    # Backwards from the add: Detach <- FlushNetDormancy <- Set InWorld <- Set Dropped
+    # <- Set TakeItem (the item, or a fresh one) <- Branch(IsLevelActor) <- Branch(free).
     looses = [n for n, _pin in _exec_from(takes[0])]
     check("the taken item is detached from whatever it was left in (a body a "
           "thrown blade struck), staying where it is",
           len(looses) == 1 and "detachfromactor" in _title(looses[0]).replace(" ", "").lower()
-          and _event_item(looses[0], "self")
+          and _taken_item(looses[0], "self")
           and all(pin_value(looses[0], r) == "KeepWorld"
                   for r in ("LocationRule", "RotationRule", "ScaleRule")),
           ", ".join(_title(n) for n in looses))
     if len(looses) != 1:
         return
-    worlds = [n for n, _pin in _exec_from(looses[0])]
+    wakes = [n for n, _pin in _exec_from(looses[0])]
+    check("the taken item, dormant where it lay, is sent once more (FlushNetDormancy)",
+          len(wakes) == 1 and _title(wakes[0]).replace(" ", "") == "FlushNetDormancy"
+          and _taken_item(wakes[0], "self"), ", ".join(_title(n) for n in wakes))
+    if len(wakes) != 1:
+        return
+    worlds = [n for n, _pin in _exec_from(wakes[0])]
     check(f"the taken item is out of the world ({IV.InWorld} lowered: each client's "
           "copy of it goes)",
           len(worlds) == 1 and _title(worlds[0]) == f"Set {IV.InWorld}"
           and pin_value(worlds[0], IV.InWorld) in ("false", "")
-          and _event_item(worlds[0], "self"), ", ".join(_title(n) for n in worlds))
+          and _taken_item(worlds[0], "self"), ", ".join(_title(n) for n in worlds))
     if len(worlds) != 1:
         return
     flags = [n for n, _pin in _exec_from(worlds[0])]
     check("the taken item stops being Dropped",
           len(flags) == 1 and _title(flags[0]) == "Set Dropped"
           and pin_value(flags[0], "Dropped") in ("false", "")
-          and _event_item(flags[0], "self"),
+          and _taken_item(flags[0], "self"),
           ", ".join(_title(n) for n in flags))
     if len(flags) != 1:
         return
-    rooms = _exec_from(flags[0])
+    writes = [n for n, _pin in _exec_from(flags[0])]
+    kept = [n for n in writes if _title(n) == f"Set {WV.TakeItem}" and _event_item(n, WV.TakeItem)]
+    fresh = [n for n in writes if _title(n) == f"Set {WV.TakeItem}" and n not in kept]
+    check(f"{WV.TakeItem} is written twice before that: the item asked for, or a fresh one",
+          len(writes) == 2 and len(kept) == 1 and len(fresh) == 1,
+          ", ".join(_title(n) for n in writes))
+    if len(kept) != 1 or len(fresh) != 1:
+        return
+    # The fresh one: Set TakeItem <- DestroyActor(the level's) <- Cast <- SpawnActor(its class,
+    # where it lies) <- Branch(IsLevelActor).then; the kept one off its else.
+    gone = [n for n, _pin in _exec_from(fresh[0])]
+    spawned = [n for n, _pin in _exec_from(gone[0])] if len(gone) == 1 else []
+    spawns = [n for n, _pin in _exec_from(spawned[0])] if len(spawned) == 1 else []
+    check("the fresh one is spawned of the level item's class where it lies, and the "
+          "level's destroyed: the engine tells every client, late joiners too (A2)",
+          len(gone) == 1 and "destroyactor" in _title(gone[0]).replace(" ", "").lower()
+          and _event_item(gone[0], "self")
+          and len(spawned) == 1 and "Cast" in _title(spawned[0])
+          and len(spawns) == 1 and "SpawnTransform" in in_pins(spawns[0])
+          and any(_title(s).replace(" ", "") == "GetClass" and _event_item(s, "Object")
+                  for s in _sources(spawns[0], "Class"))
+          and any(_event_item(s, "self") for s in _sources(spawns[0], "SpawnTransform")),
+          " <- ".join(_title(n) for n in gone + spawned + spawns))
+    levels = _exec_from(spawns[0]) if len(spawns) == 1 else []
+    kept_from = _exec_from(kept[0])
+    check("...off a Branch on IsLevelActor(Item): then the fresh one, else the item itself",
+          len(levels) == 1 and levels[0][1] == "then" and len(kept_from) == 1
+          and kept_from[0][1] == "else" and levels[0][0] == kept_from[0][0]
+          and any(_title(c).replace(" ", "") == "IsLevelActor" and _event_item(c, "Actor")
+                  for c in _sources(levels[0][0], "Condition")),
+          str([pin for _n, pin in levels + kept_from]))
+    if len(levels) != 1:
+        return
+    rooms = _exec_from(levels[0][0])
     behind = (_feeds(BEL.find_input_pin(rooms[0][0], "Condition"))
               if len(rooms) == 1 else [])
     names = {_title(n) for n in behind}
@@ -126,7 +175,7 @@ def check_lodged_to_hand():
     """A blade taken back out of a tree or a body goes to empty hands."""
     hands = [n for n in wg if _title(n) == f"Set {SLOT_VAR}"
              and pin_value(n, SLOT_VAR) in (str(HAND), "")
-             and not _sources(n, SLOT_VAR) and _event_item(n, "self")]
+             and not _sources(n, SLOT_VAR) and _taken_item(n, "self")]
     check("the take puts the item in the hand in one place",
           len(hands) == 1, f"{len(hands)} Set {SLOT_VAR} = HAND on the target")
     if len(hands) != 1:
@@ -144,7 +193,7 @@ def check_lodged_to_hand():
     check(f"...the item no longer {IV.Lodged}",
           len(lowers) == 1 and _title(lowers[0][0]) == f"Set {IV.Lodged}"
           and pin_value(lowers[0][0], IV.Lodged) in ("false", "")
-          and _event_item(lowers[0][0], "self"),
+          and _taken_item(lowers[0][0], "self"),
           ", ".join(_title(n) for n, _pin in lowers))
     if len(lowers) != 1:
         return

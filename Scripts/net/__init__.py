@@ -32,4 +32,8 @@ replication authoring).
     random_consts.py  the audit of every random draw a graph makes: state (the
                 server's, rolled once) or cosmetic (each machine's own)
     random_checks.py  the verifiers' check that no builder draws outside it
+    relevancy_consts.py  what a server sends about each kind of actor and how
+                often (A2): the cull distance and the update rates, one row
+                per kind (characters, items, campfires)
+    relevancy.py  writes a row onto a class's defaults and reads it back
 """

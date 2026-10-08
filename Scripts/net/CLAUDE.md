@@ -590,9 +590,9 @@ setting one down is a reliable Server event on the weapon component.
   itself. A probe's door is `DropForced` (`p.ask_drop(wc, slot)`).
 - **In single player** each is a plain call, served the same frame, and
   `SetReplicates(true)` sends the item to no one.
-- **Not here:** a client that joins after a placed item was taken
-  still shows its own copy of it, and asks for it in vain (M31). A body's loot is still
-  classes, so a looted gun is a fresh one. Eating a mushroom is "Survival"; the campfire and the wood's chop are "Fire and heat",
+- **A late joiner** sees no placed item that was taken: the take destroys a level actor
+  and puts a fresh one of its class in the bag ("Relevancy, update rates and dormancy",
+  below, A2). A body's loot is still classes, so a looted gun is a fresh one. Eating a mushroom is "Survival"; the campfire and the wood's chop are "Fire and heat",
   below.
 - `combat/verify/world_items.py`, `verify/asks.py` and `graphics_menu/loot_checks.py`
   are the wiring. Proof: `uepy.py --net --clients 2 --probe-timeout 300 --probe
@@ -694,8 +694,8 @@ What changes the world happens once, on the server, and everyone sees it.
 - **The probes' doors** are the keys' stand-ins that already existed: `FireForced` (the
   strike), `SightsForced` (the use key: kindle, cauterise) and `InteractForced` (heat).
 - **In single player** each is a plain call, and `IsServer` is true: nothing changed.
-- **Not here:** a client that joins after a fire was lit is sent it like any replicated actor, but
-  what a late joiner is told of the items is M31.
+- **A late joiner** is sent the fire like any replicated actor, dormant since its spawn
+  ("Relevancy, update rates and dormancy", below, A2).
 - `combat/verify/fire.py` checks the events and how `Lit` and `Hot` travel;
   `verify/light.py`, `torch.py` and `heat.py` what each event asks first;
   `survival/verify/campfire.py` the fire. Proof: `uepy.py --net --clients 2
@@ -1127,7 +1127,7 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 | health | **Fixed (M14): "Health and damage", above.** Health written on the server (100 to 40) stayed 100 on both clients: nothing replicates it. Damage is the weapon writing `Health` directly, not `ApplyDamage` (which does nothing in this game) | measured; the fix measured (`probe_net_health.py`) | M14 done |
 | firing and ammo | A shot fired on client 1 spent a round there (5 to 4); the server and client 2 still had 5 and saw no shot. The trace and the damage ran on the client alone | measured | done for the shot, its round and its damage (M19: the server's); what others see and hear of it is M21 |
 | the loadout and held items | **Fixed (M18): "The inventory", above.** Every process spawned its own copy of each character's six items (not replicated, each with local authority), so the three worlds started alike and parted at the first change | measured; the fix measured (`probe_net_inventory.py`) | M18 done |
-| items on the ground | **Fixed (M23)** for players who are there: an item lying `Dropped` replicates from its own Tick on the server, a client's copy of a placed one becomes the server's, and the take and the drop are the server's (measured: `probe_net_take.py`). A client that joins after one was taken still has its own copy of it (M31). Before: the 24 mushrooms and the test garments are level actors whose classes do not replicate (`BP_Mushroom`, `BP_Hat`: read off the class defaults): each process has its own, and a pick-up on a client removes it nowhere else | measured (the counts, the defaults), read (the pick-up) | M23, M31 |
+| items on the ground | **Fixed (M23)** for players who are there: an item lying `Dropped` replicates from its own Tick on the server, a client's copy of a placed one becomes the server's, and the take and the drop are the server's (measured: `probe_net_take.py`). A client that joins after a placed one was taken sees none: the take destroys the level actor (A2, `probe_net_late_join.py`). Before: the 24 mushrooms and the test garments are level actors whose classes do not replicate (`BP_Mushroom`, `BP_Hat`: read off the class defaults): each process has its own, and a pick-up on a client removes it nowhere else | measured (the counts, the defaults), read (the pick-up) | M23, M31 |
 | day and night | Each process rolls its own start time: in one run it was day on the server and client 2 and night on client 1 | measured | M30 |
 | walk speed, sprint, stance | The weapon component wrote `MaxWalkSpeed` every tick in every process from its own unreplicated state. **Since M10 only the local player's copy writes it** (the sprint and the aim are behind the local gate), so the server's copy keeps the speed the character was built with. Sprint, crouch and prone are keys read on the client, so the server would correct a sprinting client. **Fixed (M12): "Movement states are predicted", above** | the write measured; the fix measured (`probe_net_move_states.py`, 137 ms) | M12 done |
 | input | **Fixed (M10): "Input", above.** The weapon component polled keys in its Tick on every copy of every character, the server's included, and on `GetPlayerController(0)`, so a client's press drove every character it could see | read; the fix measured (`probe_net_local_input.py`, headless and `--windowed`) | M10 done |
@@ -1158,6 +1158,78 @@ contradicts it, this is what holds):
   not replicated actors ("The inventory").
 - **Any probe:** "client 1" is not the server's player 0, and no actor name is shared
   between processes (above).
+
+## Relevancy, update rates and dormancy; the late joiner (A2, done)
+
+Before this nothing was configured: every replicated actor was considered for every
+connection every frame at the engine's defaults (a 150 m cull distance that the generic
+driver applies, 100 Hz), and a placed item that was taken was hidden, so a client joining
+later still had its own copy lying there. Now the server sends each client what it can see
+or owns, at the rate each thing needs, and a late joiner's world is the server's.
+
+- **One table:** `net/relevancy_consts.py` (`Relevancy(cull_m, update_hz, min_hz)`:
+  characters 150 m at 30/5 Hz, items and campfires 60 m at 10/1 Hz). `net/relevancy.py`
+  writes a row onto a class's defaults (`NetCullDistanceSquared`, `NetUpdateFrequency`,
+  `MinNetUpdateFrequency`) and reads it back; the builders call it after a compile:
+  `combat/install.py` (the player's character, and the wanderer's body again),
+  `npc/character.py` (the body and each creature's child), `combat/item_world.py`
+  `relevance_item` (`BP_WeaponItem`, which every item inherits), `survival/campfire.py`.
+  The GameState and the PlayerStates keep the engine's defaults. A component has no row of
+  its own: it travels with its actor.
+- **The replication graph** (`Source/Otherworld/Public/OtherworldReplicationGraph.h`, the
+  `ReplicationGraph` plugin, named for the `IpNetDriver` in `Config/DefaultEngine.ini`):
+  a grid-spatialisation node (100 m cells) for everything with a place in the world
+  (characters, items, campfires), an always-relevant list for `bAlwaysRelevant` actors (the
+  GameState, the PlayerStates), and a node per connection for its own controller, pawn and
+  PlayerState. Controllers are routed nowhere (each is its connection's own). Every class's
+  cull distance and period come from its CDO, so the graph holds no game logic. Standalone
+  has no net driver: single player is untouched.
+- **Dormancy:** an item's own Tick, on the server, sets `NetDormancy` `DORM_DormantAll`
+  while the item lies still or is carried (`Dropped`, or not `InWorld`) and `DORM_Awake` in
+  flight, on the change alone (`Dormant` remembers; `item_world._author_rest`). A dormant
+  actor is sent to a connection once and its channel closed; the graph keeps it in its cell
+  as a still one. The graphs that change a lying item's replicated state wake it with
+  `FlushNetDormancy` (`item_world.author_wake`): entering the world (set down again after a
+  carry: it is where it lies now), the take (`InWorld` lowered, or no client would hide its
+  copy), a lying stick burning out (`combat/stick.py`), a lying blade cooling
+  (`combat/heat.py`). A campfire is `DormantAll` from its class default: lit once, it changes
+  nothing after, and its destroy reaches a dormant copy as the engine's destruction info.
+- **The take of a level actor:** `Server_Take` asks `IsLevelActor` (C++,
+  `UOtherworldNetLibrary`, `uebp/nodes/level.py`: `AActor::IsNetStartupActor`, which
+  Blueprint cannot ask) and, for one, spawns a fresh item of its class where it lay,
+  destroys the level's, and puts the fresh one in the bag (`TakeItem`, `pickup.py`
+  `_author_fresh_item`). The engine tells every client of a destroyed startup actor, the
+  ones that join later too (`DestroyedStartupOrDormantActors`, sent as a late joiner comes
+  within the graph's destruction-info distance, 150 m). A dropped or thrown item stays one
+  actor, as before. In single player the same happens to one machine.
+- **The harness:** with `--title` the server's probe now starts with the first player
+  (`probes/boot.py`), since each client joins when its probe says.
+- **Proof:** `uepy.py --net --title --clients 2 --probe-timeout 420 --probe
+  Scripts/probes/probe_net_late_join.py` (client 1 joins; the server has its character
+  take the level's hat, cut wood at a trunk with three `Server_Slash`, and light a campfire;
+  client 2 joins 20 s later and is stood by the fire: no hat in its world, one fire where the
+  server put it, client 1's character). `probe_net_see_each_other.py`,
+  `probe_net_take.py`, `probe_net_campfire.py`, `probe_net_clothing.py` and the other M20–M25
+  probes still pass. `combat/verify/relevancy.py`, `verify/pickup.py`,
+  `survival/verify/campfire.py` and `npc/verify.py` `check_relevancy` are the wiring. A
+  probe that held the level actor across a take (`probe_net_take.py`, `probe_pickup.py`,
+  `probe_pickup_height.py`, `probe_clothing.py`) now follows the fresh one: the level's is
+  invalid after the take, and the bag's new item is its class.
+- **Measured (A1's harness, N = 32 bots, 2 `-nullrhi` clients, 90 s, `Lvl_Forest_200m`):**
+
+  | | server world tick ms mean / p99 | server Hz | bytes out per client | actor channels per client |
+  |---|---|---|---|---|
+  | before (2026-10-07, the generic driver) | 26.4 / 67.2 | 27.8 | 14.1 KB/s | 119 |
+  | after (2026-10-07, the graph, the rows, dormancy) | 26.9 / 55.6 | 28.2 | 7.1 KB/s | 90 |
+
+  The server sends each client half the bytes it did (14.1 → 7.1 KB/s) over a quarter fewer
+  channels (119 → 90: the items lying still and carried are dormant, and the far bodies are
+  culled on the 200 m map), and the same game thread: the world tick is the bodies' and the
+  wanderers' (A1's three largest costs), not replication's, so the frame does not move.
+  The gain in bytes grows with the players a server has, since each is sent only its
+  neighbourhood; the cost that remains is what A3 onwards measures against.
+- **Left for M31:** corpses, chopped trees and a cleanup rule (a lifetime, a cap) for what
+  lies in a long-running world.
 
 ## Memory (measured, the editor binary; `serversupportsysdesign.md` 5 has the table)
 

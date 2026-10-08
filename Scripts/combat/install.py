@@ -20,6 +20,8 @@ from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH, NPC_CLASS_PATH
 from combat.player_move import reparent_player, set_move_numbers
 from combat.player_pace import set_jog_speed
 from combat.weapon_component.stance import allow_crouch
+from net import relevancy
+from net.relevancy_consts import CHARACTER
 
 
 # ─── Installing on the characters ────────────────────────────────────────────
@@ -75,6 +77,8 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     # template's default, written after a compile.
     net.replicate_component(bp, "WeaponComponent")
     net.replicate_component(bp, "HealthComponent")
+    # How far a player's character is sent, and how often (task A2).
+    relevancy.apply(bp, CHARACTER)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     eas.save_loaded_asset(bp)
@@ -132,6 +136,9 @@ def install_on_npc(health_bp, footstep_bp):
     # Its health replicates as the player's does (damage.py): a template's
     # default, written after a compile.
     net.replicate_component(bp, "HealthComponent")
+    # How far a wanderer is sent, and how often (task A2): on the body here as
+    # npc/character.py writes it, so either build leaves it in place.
+    relevancy.apply(bp, CHARACTER)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ForestWanderer failed to compile")
     eas.save_loaded_asset(bp)

@@ -22,6 +22,13 @@ Where a taken item goes is the slot sync's (UNPLACED: a weapon to a free
 weapon slot of its kind, anything else to the bag), but for one case: a blade
 taken back out of what it was thrown into (the item is Lodged), with empty
 hands, goes to the hand (_author_to_hand).
+
+What goes into the inventory is TakeItem (task A2): the item asked for, or,
+where that one was placed in the level, a fresh one of its class spawned
+where it lay, the level's destroyed (_author_fresh_item). The engine tells
+every client, and every client that joins later, of a destroyed level actor;
+a hidden one would stand in a late joiner's level as the level has it
+(item_world.py). In single player the same, to one machine.
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
@@ -33,12 +40,13 @@ from combat.strike_vars import ITEM_PARAM, SERVER_TAKE, TAKE_PARAMS, TAKE_REACH_
 from combat.weapon_component.shot import _author_alive
 from combat.weapon_component.slot_nodes import op, valid
 from uebp import net
-from uebp.nodes.actor import FN_ACTOR_LOC, FN_DETACH, FN_GET_OWNER
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_DESTROY, FN_DETACH, FN_GET_OWNER, FN_GET_TRANSFORM
 from uebp.nodes.array import FN_ARR_ADD
 from uebp.g import _G
+from uebp.nodes.level import FN_IS_LEVEL_ACTOR
 from uebp.nodes.math import FN_AND, FN_DISTANCE, FN_LE_FF, FN_NOT
-from uebp.nodes.palette import MACRO_FOR_EACH
-from uebp.nodes.system import FN_IS_VALID
+from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_ITEM, NODE_SPAWN
+from uebp.nodes.system import FN_IS_VALID, FN_OBJECT_CLASS
 from uebp.nodes.system import FN_ALL_ACTORS
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
@@ -141,31 +149,54 @@ def author_take_event(ed):
     free = op(g, FN_AND, op(g, FN_AND, g.iget(best, IV.Dropped), near), g.get(HAS_ROOM_VAR))
     take, _refused = g.branch(free, alive)
 
-    flow = g.iput(best, IV.Dropped, "false", [take])
+    # TakeItem: the one asked for, or a fresh one where it was the level's.
+    placed, spawned = g.branch(out(g.call(FN_IS_LEVEL_ACTOR, Actor=best)), [take])
+    fresh = _author_fresh_item(ed, g, best, placed)
+    kept = g.put(WV.TakeItem, best, [spawned])
+    item = g.get(WV.TakeItem)
+    flow = g.iput(item, IV.Dropped, "false", [fresh, kept])
     # Out of the world: each client's copy of it goes (item_world.py).
-    flow = author_out_of_world(ed, best, [flow])
+    flow = author_out_of_world(ed, item, [flow])
     # Off whatever it was left attached to (a blade thrown into a body),
     # staying where it is: the equip puts it in the hand, or hides it.
-    loose = g.call(FN_DETACH, [flow], self=best)
+    loose = g.call(FN_DETACH, [flow], self=item)
     for rule in ("LocationRule", "RotationRule", "ScaleRule"):
         _set(loose, rule, "KeepWorld")
-    add = g.call(FN_ARR_ADD, [then(loose)], TargetArray=g.get(WV.Inventory), NewItem=best)
+    add = g.call(FN_ARR_ADD, [then(loose)], TargetArray=g.get(WV.Inventory), NewItem=item)
     # Where it goes is the slot sync's (slot_sync.py): UNPLACED, it takes
     # the first free bag slot, or the hand if the bag is full. Whatever is
     # in hand stays there.
-    flow = g.iput(best, SLOT_VAR, str(UNPLACED), [then(add)])
-    taken, hand_nodes = _author_to_hand(ed, best, flow)
+    flow = g.iput(item, SLOT_VAR, str(UNPLACED), [then(add)])
+    taken, hand_nodes = _author_to_hand(ed, item, flow)
     g.put(WV.NeedsRefresh, "true", taken)
     ed.add_comment_to_nodes(
         f"{SERVER_TAKE} (pickup.py): the owning client's E on an item. Refused "
         "unless the item is there and Dropped, the taker alive and within "
         f"{TAKE_REACH_CM:g} cm of it on this machine, and a bag slot or the hand "
-        "free. Then it is taken: detached from whatever it was left in, into "
-        "Inventory UNPLACED (the slot sync puts a weapon in a free weapon slot "
-        "of its kind, anything else in the bag, or in empty hands when the bag "
-        "is full). A blade taken back out of what it was thrown into (Lodged) "
-        "with empty hands goes to the hand instead.",
+        f"free. Then it is taken ({WV.TakeItem}: the item, or a fresh one of its "
+        "class where the item was the level's, which is destroyed): detached from "
+        "whatever it was left in, into Inventory UNPLACED (the slot sync puts a "
+        "weapon in a free weapon slot of its kind, anything else in the bag, or "
+        "in empty hands when the bag is full). A blade taken back out of what it "
+        "was thrown into (Lodged) with empty hands goes to the hand instead.",
         g.made + hand_nodes)
+
+
+def _author_fresh_item(ed, g, best, exec_in):
+    """``best`` was placed in the level: a fresh actor of its class is
+    spawned where it lies and becomes TakeItem, and the level's is
+    destroyed, which the engine tells every client of, the ones that join
+    later too. Returns the exec pin after the write."""
+    spawn = g.keep(_palette(ed, NODE_SPAWN))
+    _connect(out(g.call(FN_OBJECT_CLASS, Object=best)), _pin(spawn, "Class"))
+    _connect(out(g.call(FN_GET_TRANSFORM, self=best)), _pin(spawn, "SpawnTransform"))
+    _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
+    _connect(exec_in, _pin(spawn, "execute"))
+    cast = g.keep(_palette(ed, NODE_CAST_ITEM))
+    _connect(out(spawn), _pin(cast, "Object"))
+    _connect(then(spawn), _pin(cast, "execute"))
+    gone = g.call(FN_DESTROY, [then(cast)], self=best)
+    return g.put(WV.TakeItem, _loose_pin(cast, "AsBPWeaponItem", is_input=False), [then(gone)])
 
 
 def _author_to_hand(ed, item, exec_in):

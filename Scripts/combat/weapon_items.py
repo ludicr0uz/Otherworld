@@ -24,7 +24,7 @@ from Sound.sound_weapons import DRY_FIRE
 from combat.chop_tuning import CHOPS_VAR
 from combat.glimmer import add_glimmer, author_glimmer
 from combat.glimmer_tuning import GLIMMER
-from combat.item_world import replicate_item
+from combat.item_world import relevance_item, replicate_item
 from combat.light_tuning import LIGHTS_VAR
 from combat.log import _log
 from uebp.graph import (
@@ -209,6 +209,9 @@ def build_weapon_item():
                          THROW_GRIP_VAR: False,
                          THROW_GRIP_LOC_VAR: unreal.Vector(0.0, 0.0, 0.0),
                          THROW_GRIP_ROT_VAR: unreal.Rotator(0.0, 0.0, 0.0)})
+    # How far an item in the world is sent, and how often (task A2): a class
+    # default, after the compile _apply_defaults ends with; every child's.
+    relevance_item(bp)
     _assets().save_loaded_asset(bp)
     _log(f"built {ITEM_BP_PATH}")
     return bp

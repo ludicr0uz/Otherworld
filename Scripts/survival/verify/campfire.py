@@ -10,7 +10,9 @@ from combat.paths import WEAPON_COMP_BP_PATH
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, component_template, graph, load, num_pin,
 )
+from net import relevancy
 from net.players_consts import LIVING_TITLE
+from net.relevancy_consts import CAMPFIRE as CAMPFIRE_ROW
 from uebp import net
 from Sound.sound_items import CAMPFIRE, CRACKLE_COMP
 from survival.campfire import (
@@ -113,6 +115,12 @@ def _owned(node, event):
 def check_replicates(bp):
     check("it replicates: the fire the server lit is sent to every client (M25)",
           net.replicates(bp), str(net.replicates(bp)))
+    check(f"...within {CAMPFIRE_ROW.cull_m:g} m of them, at {CAMPFIRE_ROW.update_hz:g}/"
+          f"{CAMPFIRE_ROW.min_hz:g} Hz (net/relevancy_consts.py, A2)",
+          relevancy.matches(bp, CAMPFIRE_ROW), str(relevancy.read(bp)))
+    dormancy = cdo(bp).get_editor_property("net_dormancy")
+    check("...and dormant from its spawn: sent once, its channel closed, its destroy "
+          "told", dormancy == unreal.NetDormancy.DORM_DORMANT_ALL, str(dormancy))
 
 
 def check_warmth(bp):

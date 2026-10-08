@@ -2,7 +2,8 @@
 
 Two modules and four targets. The runtime module, `Otherworld`, holds what multiplayer
 needs and a Blueprint cannot do (`serversupportsysdesign.md` 4.3): the player's
-predicted movement states (M12) and the lag compensation of shots (M22). The editor-only
+predicted movement states (M12), the lag compensation of shots (M22) and the server's
+replication graph (A2). The editor-only
 module, `OtherworldEditor`, holds what the Python builders need and Python cannot reach.
 Everything else stays in the Python builders.
 
@@ -11,7 +12,7 @@ Everything else stays in the Python builders.
 | `Otherworld.Target.cs` | the game target (single player and the listen side; what packaging builds) |
 | `OtherworldEditor.Target.cs` | the editor target: the only one day-to-day work compiles |
 | `OtherworldClient.Target.cs`, `OtherworldServer.Target.cs` | the client and dedicated-server targets: **source engine only** (below) |
-| `Otherworld/Otherworld.Build.cs` | the module's dependencies (`Core`, `CoreUObject`, `Engine`) |
+| `Otherworld/Otherworld.Build.cs` | the module's dependencies (`Core`, `CoreUObject`, `Engine`, `NetCore`, `ReplicationGraph`: the engine plugin, enabled in `Otherworld.uproject`) |
 | `Otherworld/Otherworld.cpp` | `IMPLEMENT_PRIMARY_GAME_MODULE`, nothing else |
 | `Otherworld/Public/OtherworldCharacterMovement.h`, `Private/….cpp` | `UOtherworldCharacterMovement`: sprint, prone and the aim-walk as saved-move flags (`FLAG_Custom_0..2`), the speed of each state (`GetMaxSpeed`), the sprint's rules (the stamina latch, the forward cone) and the stamina, all stepped in `UpdateCharacterStateBeforeMovement` with the move's own delta time, so the owning client predicts them and the server makes the same ones. See "Predicted movement" below |
 | `Otherworld/Public/OtherworldCharacter.h`, `Private/….cpp` | `AOtherworldCharacter`: a Character whose movement component is that class, and `bProne`, the one fact a simulated copy needs beside the engine's replicated crouch to stand as the server has it (M13, below). `BP_ThirdPersonCharacter` is reparented onto it by `Scripts/combat/player_move.py` |
@@ -20,6 +21,8 @@ Everything else stays in the Python builders.
 | `Otherworld/Public/OtherworldShotLibrary.h`, `Private/….cpp` | `UOtherworldShotLibrary` (Python: `unreal.OtherworldShotLibrary`): `ShotTrace`, the pellet's one trace node (`Scripts/uebp/nodes/shot.py`), the rewind a shooter gets, and what the history did, for the probes |
 | `OtherworldEditor/OtherworldEditor.Build.cs` | the editor module's dependencies (adds `UnrealEd`, `BlueprintGraph`); only the Editor target lists it, so no game or server build carries it |
 | `Otherworld/Public/OtherworldLoadLibrary.h`, `Private/….cpp` | `UOtherworldLoadLibrary` (Python: `unreal.OtherworldLoadLibrary`): what the load test reads off a server or a client (A1, `Scripts/probes/probe_net_load.py`): each connection's bytes and packets in and out, open actor channels and lag (`FOtherworldConnectionStats`, read with `get_editor_property`), the frame and world-tick times sampled between `StartFrameTiming` and `StopFrameTiming`, and the hit history's characters and samples |
+| `Otherworld/Public/OtherworldReplicationGraph.h`, `Private/….cpp` | `UOtherworldReplicationGraph` (A2, `Scripts/net/CLAUDE.md` "Relevancy, update rates and dormancy"): the server's replication driver, named for the `IpNetDriver` in `Config/DefaultEngine.ini`. A grid-spatialisation node for everything with a place in the world, an always-relevant list for `bAlwaysRelevant` actors, and `UOtherworldReplicationGraphNode_ForConnection` per connection (the engine's viewer and view target, plus the viewer's PlayerState). Each class's cull distance and period are read off its CDO, which the builders write from `Scripts/net/relevancy_consts.py`; `CellSizeCm` is its one config value |
+| `Otherworld/Public/OtherworldNetLibrary.h`, `Private/….cpp` | `UOtherworldNetLibrary` (Python: `unreal.OtherworldNetLibrary`): `IsLevelActor`, whether an actor was placed in the level (`AActor::IsNetStartupActor`, not Blueprint-callable), which the take asks before destroying one (`Scripts/uebp/nodes/level.py`) |
 | `OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h`, `Private/….cpp` | `UOtherworldBlueprintNetLibrary` (Python: `unreal.OtherworldBlueprintNetLibrary`): a custom event's net flags and parameters, a variable's replication and OnRep graph, and the same read back off a compiled class. Wrapped by `Scripts/uebp/net.py`; checked by `Scripts/dev/check_net_authoring.py` |
 
 They began as the packaging step's generated files in `Intermediate/Source`; both modules
@@ -134,6 +137,9 @@ numbers, which the fire graph hands `ShotTrace` as pin literals.
   (`ServerCheckClientError`, `OnClientCorrectionReceived`: the `UPrimitiveComponent*` ones).
   Override the `FMovementBaseInterfaceData*` one and add `using Super::<name>;`, or the
   override hides the other.
+- **The replication graph class is not exposed to Python** (`hasattr(unreal,
+  "OtherworldReplicationGraph")` is False): the net driver loads it by path. Prove it is
+  in use from a server's log (`LogReplicationGraph`), not from Python.
 - **A function for Python is a `BlueprintCallable` static of a `UBlueprintFunctionLibrary`.**
   Python names it in snake case, turns `bool` plus out-parameters into a return of `None` or
   the tuple of outs, and an `enum class` into `unreal.<Enum>.<UPPER_SNAKE>`. Change one and

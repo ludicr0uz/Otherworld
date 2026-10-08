@@ -73,6 +73,9 @@ Lodged = Var("Lodged", BOOL)
 # leaves a hand for it and lowered by the take (item_world.py). Replicated: a
 # client's copy of the item is shown only while it is.
 InWorld = Var("InWorld", BOOL, False)
+# Whether the server has put the actor to sleep (NetDormancy DormantAll): an item
+# lying still, or carried. Its own Tick decides (item_world.py); not replicated.
+Dormant = Var("Dormant", BOOL, False)
 InfiniteReserve = Var("InfiniteReserve")
 Loaded = Var("Loaded")
 MagazineSize = Var("MagazineSize")
@@ -89,5 +92,5 @@ TABLE = (
     Damage, SpreadDegrees, WeaponRange, FireInterval, NextFireTime, ReloadSeconds,
     MuzzleOffset, SightOffset, SightAim, GripLocation, GripRotation, SlotColor, Icon,
     FireSound, DryFireSound, ReloadSound, HandleSounds, UseSounds, AimPose, TwoHanded, AdsZoom, Scoped, ShotVolume,
-    Lodged, InWorld,
+    Lodged, InWorld, Dormant,
 )

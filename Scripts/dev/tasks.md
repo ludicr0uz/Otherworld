@@ -980,3 +980,150 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 - [ ] A4. What the dedicated server spends on bodies it never draws. `combat/server_pose.py` makes every body on a dedicated server evaluate its full animation and refresh its bones every frame, so that hit bodies and muzzles are where clients see them; at 64 players and the wanderers this is likely the server's largest single cost (A1 says). Measure it first with A1 at N = 32 (`stat anim`, the Insights trace), then: enable Update Rate Optimization for skeletal meshes on the dedicated server (`bEnableUpdateRateOptimizations`, with `AnimUpdateRateParams` tuned so a body more than 30 m from every player is posed at 10 Hz and interpolated, and a body nobody is near at 2 Hz) while the hit history interpolates between samples, which it already does; move `UOtherworldHitHistory` to a ring buffer of fixed capacity per character (no allocation per frame), a `TMap` from character to history, and a capsule test from the sample before any body transform is blended (`SampleAt` currently blends every body first); batch `Multicast_PelletHit` into one `Multicast_ShotHits` per shot carrying an array of impacts. Write the before/after numbers in `Scripts/net/CLAUDE.md`. Proof: `probe_net_lag_hits.py` with and without `--lag 150` still lands 6/8 and 7/8 or better; `probe_net_fx.py` counts the same impacts on client 2; `probe_headshot` and `probe_ads_hit` in `--game`. Design goal: the server poses and remembers bodies at the rate the game needs to judge a shot, not at the rate a screen needs to draw one; the per-pellet and per-frame costs become per-shot and per-sample costs. Big picture: this is task A4 of 5 in the multiplayer architecture pass, between phase 4 and phase 5 of the multiplayer project (the aim and the strategy are as A1 states: `serversupportsysdesign.md` 1, 4.1, 4.3, 4.8, 7). Both modes: single player renders its bodies and records no history, so nothing here runs there; the `--game` probes stay green. Local only: use no GCP or other cloud resource. Never run gcloud, gsutil or anything in `Scripts/server/gcp`; if the task seems to need one, stop and report instead. effort: high
 
 - [ ] A5. Every Server event checks what it is told and how often. The server traces `Server_Fire` from its own muzzle to whatever `AimPoint` the client sends, so a client can fire behind itself; no Server event is rate-limited, so a client can flood the reliable channel; and Blueprint RPCs cannot use the engine's `_Validate` hook. Add `UOtherworldRpcGuard` to the `Otherworld` C++ module, a component on the player (added by `combat/install.py`) with two Blueprint-callable checks every Server event on the weapon component calls first, through a shared fragment `net/guard.py` (`author_guard(g, name, execs)`): `Allow(name)`, a token bucket per event name per connection (`net/guard_consts.py`: fire at the fastest gun's rate plus 20 %, the asks at 10/s, the look report at 30/s, everything else at 5/s) that logs `RPC-REFUSED <name>` and, past a threshold in 10 s, kicks the connection with `ClosedByRpcGuard`; and `AimAllowed(AimPoint)`, which refuses an `AimPoint` more than `AIM_CONE_DEG` (20°) off the server's copy's control rotation (`GetBaseAimRotation`) or more than the gun's range away. `Server_Throw`'s start and speed and `Server_Take`'s reach already check themselves; keep those and add the bucket. In standalone both checks pass without counting. `combat/verify/guard.py` fails on a Server event without the fragment, and `random_checks`' pattern is the model for keeping the table and the events in step. Proof: `probe_net_guard.py` (client 1 sends an `AimPoint` behind itself and the round goes nowhere; `FireForced` held at 50/s sends the SMG's rate and no more; 200 `AskSlot` in a second get client 1 kicked, logged on the server) and every M14–M26 `--net` probe clean with `--lag 120`. Design goal: the server trusts a client's request no further than physics allows and never lets one client's traffic cost the others; this is the validation layer the engine's C++ RPCs get for free and Blueprint ones do not. Big picture: this is task A5 of 5 in the multiplayer architecture pass, between phase 4 and phase 5 of the multiplayer project (the aim and the strategy are as A1 states: `serversupportsysdesign.md` 1, 4.1, 4.3, 4.7, 4.8, 7). Anti-cheat proper (EAC, phase 8) sits on top of this, not in place of it. Both modes: a standalone game has one connection and the guard counts nothing; the `--game` probes stay green. Local only: use no GCP or other cloud resource. Never run gcloud, gsutil or anything in `Scripts/server/gcp`; if the task seems to need one, stop and report instead. effort: high
+
+## Player animation: Game Animation Sample locomotion, then the clips it lacks
+## (plan: metahumanAnimationPlan.md Tasks 2 and 3; Task 1, Taro as the body, is done).
+## Each item ends with the game playable, its probe clean and a commit; the next item
+## starts from that commit. Local only: both sample projects are on this Mac.
+
+- [ ] G1. Import the Game Animation Sample (GAS) into the project, no game change. Write
+      `Scripts/asset_pipeline/import_gas.py` (host side, the shape of `import_metahuman.py`
+      with a manifest) copying from `~/Documents/Unreal Projects/GameAnimationSample` the
+      UEFN mannequin (`Content/Characters/UEFN_Mannequin`: Meshes, Rigs, Animations, with
+      MotionMatchingData, the PoseSearch databases and their `CHT_PoseSearchDatabases*`
+      choosers), `Content/Blueprints/SandboxCharacter_CMC_ABP` and whatever that AnimBP's
+      dependency closure needs (the `AC_*` components, `BPI_SandboxCharacter_ABP`,
+      `Blueprints/Data`, AnimNotifies, AnimModifiers; find the closure with a cold run against
+      the sample as `import_metahuman.py` did, results to a file, not `print`). Leave out the
+      Mover variant, SmartObjects, IsolatedExamples, Echo, Paragon, Kellan and the
+      UE5_Mannequins. Register it in `Scripts/forest_generator/asset_sources.py` as a FAB-kind
+      entry with dest `Content/GAS`, untracked like `Content/MetaHumans`. Enable in
+      `Otherworld.uproject` the plugins GAS has and we lack: PoseSearch, Chooser,
+      AnimationWarping, MotionWarping, AnimationLocomotionLibrary, AnimationLayering (check the
+      sample's uproject for any other the closure loads). Done when a cold run loads
+      `SandboxCharacter_CMC_ABP` and every PoseSearch database without a missing-asset warning,
+      the size and package count are in `Scripts/asset_pipeline/CLAUDE.md` next to the
+      MetaHuman's, and the full verifier sweep is unchanged. Design goal: the clips and the
+      motion-matching graph are in the project before anything uses them, so the later items
+      are about wiring, not about copying. Big picture: this is item G1 of 5 (G1–G5) giving
+      the player GAS motion matching, after which C1–C5 replace the combat clips GAS lacks.
+      effort: medium
+
+- [ ] G2. The skeleton bridge: decide how GAS clips reach the player's hidden mannequin, and
+      prove one idle. The GAS clips are on `SK_UEFN_Mannequin`'s skeleton; the player's hidden
+      mesh is SK_Mannequin running ABP_Unarmed, and Taro follows it through
+      `/Game/Sourced/MetaHuman/ABP_MetaHuman_Retarget` (IK retargeter RTG_MetaHuman_from_Mannequin,
+      built by `Scripts/asset_pipeline/build_metahuman_retarget.py`). Two candidate bridges:
+      (a) the hidden mesh becomes SK_UEFN_Mannequin, and the MetaHuman retargeter's source is
+      rebuilt from the UEFN skeleton; (b) the hidden mesh stays SK_Mannequin and the GAS
+      databases are retargeted to it. Try (a) first: it keeps GAS's graph and databases as
+      shipped. Measure what each breaks: the weapon hand sockets and the bone names that
+      `combat/` scripts set by name (grep for `hand_r`, `head`, `spine_05`, `pelvis` and the
+      socket names in `combat/grip.py`, `hit_zones.py`, `hit_bodies.py`); ragdoll and hit
+      bodies are the mannequin's physics asset today. Pick, record the choice and its costs
+      in `Scripts/asset_pipeline/CLAUDE.md`, and implement only enough to prove it: the
+      hidden mesh plays one GAS idle (`M_Neutral_Idle_Loop` or the sample's equivalent) through
+      a minimal anim blueprint, and Taro follows it. Proof: `probe_metahuman_body.py` standing
+      checks still within their tolerances; a new `probe_gas_idle.py` reads the hidden mesh's
+      current animation name and the body's follow gap. Do not wire motion matching yet and do
+      not touch the weapon layers. Design goal: the one open question of the whole GAS move is
+      settled on its own, with a probe, before locomotion work depends on it. Big picture:
+      item G2 of 5 (G1–G5) giving the player GAS motion matching.
+      effort: high
+
+- [ ] G3. Unarmed locomotion from GAS, weapons off. Replace the locomotion half of the player's
+      base AnimBP (authored by `Scripts/combat/anim_blueprint.py`, with
+      `body_pose.py`/`aim_pitch.py` on top) with GAS's `SandboxCharacter_CMC_ABP` graph and
+      its `CHT_PoseSearchDatabases` chooser on the bridge from G2, driven by our
+      CharacterMovementComponent: idle and idle breaks, turn in place, walk/jog/run/sprint in
+      all directions with starts, stops and pivots, jump start/apex/land. Keep crouch, slide
+      and traversal out (G5). Our movement speeds, the stamina-gated sprint and the walk
+      toggle stay the game's; GAS's `AC_PreCMCTick`/`AC_PostABPTick` come across only where the
+      graph needs them, as components `combat/install.py` adds. The weapon, hold, aim and
+      hit-reaction layers are disconnected for this item (feature-flag them off in the
+      builder, not deleted). Done when `probe_metahuman_look.py`'s empty-hands pictures show
+      GAS walking, running and sidestepping, the right-strafe picture is a strafe and not a
+      turned walk (the complaint that started this), `probe_metahuman_body.py` passes
+      standing, falling, landed and dead, `probe_npc_strafe.py` is unchanged (NPCs keep
+      ABP_Unarmed), and footstep notifies still fire (`combat/verify/footsteps` or the probe
+      that covers them). Design goal: the player's base movement is Epic's shipped motion
+      matching, authored by our builder from the imported graph, with nothing hand-animated
+      left in locomotion. Big picture: item G3 of 5 (G1–G5) giving the player GAS motion
+      matching.
+      effort: high
+
+- [ ] G4. The weapon layers back on top of GAS. Re-attach, as linked anim layers over the G3
+      base, everything the flag in G3 turned off: hold poses (`combat/hold_pose.py`,
+      `knife_anim.py`), the aim offsets (`aim_pitch.py`; GAS ships stand and crouch aim
+      offsets, use them where they fit), ADS and shoulder aim, the shotgun pose, hit reactions
+      (`hit_reaction.py`), the throw, the search kneel and the prone crawl (the last three keep
+      their Quaternius clips, as the plan's table says). Upper-body layering goes through
+      GAS's AnimationLayering where it has a slot for it, otherwise a layered-blend-per-bone
+      from `spine_01` as today. Done when the full combat verifier suite
+      (`Scripts/combat/verify`) is green, `probe_metahuman_look.py` with the axe and down the
+      rifle's sights looks as it did before G3, the first-person head hide and the scope hide
+      (`combat/weapon_component/body_parts.py`) still hide the MetaHuman's parts, and the
+      `--game` smoke run of `Lvl_Forest_200m` is clean. Remove the G3 flag. Design goal: every
+      combat animation the game already had sits on the new base unchanged, so G3's locomotion
+      gain costs no combat behaviour. Big picture: item G4 of 5 (G1–G5) giving the player
+      GAS motion matching; C1–C5 then replace the clips one at a time.
+      effort: high
+
+- [ ] G5. Crouch, slide and traversal from GAS (optional; skip if G4 ran late). Wire GAS's
+      crouch set to our crouch input and `CharacterMovementComponent` crouch, the slide to
+      sprint+crouch, and `AC_TraversalLogic` (mantle, vault, hurdle) to jump against an
+      obstacle, each behind its own constant in `combat/` tuning so one can be off. Done when
+      a new `probe_gas_traversal.py` crouches, slides and mantles a 1 m block in
+      `Lvl_Forest_200m`, `probe_metahuman_body.py` passes, and the verifier suite is green.
+      Design goal: the movement set GAS ships for free is in the game where our inputs already
+      exist, nothing more. Big picture: item G5 of 5 (G1–G5), the last of the GAS move.
+      effort: medium
+
+- [ ] C1. Unarmed punch from Lyra. Replace `MM_Attack_01` (the unarmed attack montage) with
+      Lyra's unarmed melee clip on the mannequin skeleton, through the import script and an
+      asset_sources entry (`Content/Sourced/Lyra`, FAB kind, untracked), retargeted onto the
+      G2 bridge's skeleton if it is not SK_Mannequin. Hit timing notify and damage window as
+      the montage has today. Done when the melee verifier (`combat/verify/knife.py` and
+      whichever covers the unarmed attack) is green and a `--game` punch at a zombie lands.
+      Design goal: one hand-rolled or placeholder clip replaced by a shipped one, in the same
+      shape every C item follows: one source, one import entry, one builder change, one
+      verifier. Big picture: item C1 of 5 (C1–C5) replacing the combat clips GAS lacks, after
+      G1–G5.
+      fab: Lyra Starter Game | url: https://www.fab.com/listings/lyra-starter-game | at: /Game/Sourced/Lyra | why: unarmed punch, rifle and pistol hold sets, hit reacts
+      effort: medium
+
+- [ ] C2. Melee swings: axe, knife and stick. Today they are built from poses
+      (`combat/hold_pose.py`, `knife_anim.py`, `axe.py`). Replace them with clips from a
+      Mixamo melee set imported through the existing Mixamo import script (the one the zombie
+      packs used), one swing and one ready pose per weapon class. If the clips are not in
+      `~/Downloads`, stop before any editor work and end the report asking for them by name.
+      Done when `combat/verify/axe.py`, `knife.py`, `chop.py` and `hold_pose.py` are green and
+      `probe_metahuman_look.py` with the axe shows the clip, not the pose. Design goal: no
+      pose-built swing remains. Big picture: item C2 of 5 (C1–C5) replacing the combat clips
+      GAS lacks.
+      effort: medium
+
+- [ ] C3. Rifle, pistol and shotgun holds and ADS from Lyra. Replace `MF_*_Idle_ADS` and the
+      hand-built `shotgun_pose.py` with Lyra's rifle and pistol hold, aim and ADS sets (the
+      shotgun uses the rifle set with the grip offset the shotgun verifier expects), through
+      the C1 import entry. GAS's aim offsets stay for pitch. Done when `combat/verify/aiming.py`,
+      `aim_pitch.py`, `grip_fit.py`, `shotgun_pose` (its verifier) and `head_hide.py` are
+      green, `probe_ads_hit` and `probe_headshot` in `--game` land as before, and the sights
+      picture in `probe_metahuman_look.py` is on the barrel. Design goal: every gun pose is a
+      shipped clip. Big picture: item C3 of 5 (C1–C5) replacing the combat clips GAS lacks.
+      effort: high
+
+- [ ] C4. Hit reactions. The six `MM_HitReact` montages (`combat/hit_reaction.py`) stay unless
+      Lyra's or GAS's shove-receive set gives a better front/back/left/right spread on the
+      new base: compare on the bridge skeleton, pick one set, and delete the other's import.
+      Done when `combat/verify/hit_reactions.py` is green and `probe_hit_react` (or the
+      verifier's `--game` partner) shows a reaction from each side. Design goal: a decision,
+      recorded in `combat/CLAUDE.md`, not a rewrite. Big picture: item C4 of 5 (C1–C5).
+      effort: low
+
+- [ ] C5. Prone crawl from Mixamo. Replace the Quaternius `Swim_Fwd_Loop` stand-in with a
+      Mixamo crawl loop through the Mixamo import script; same `~/Downloads` rule as C2.
+      Done when the prone verifier and `probe_metahuman_body.py` are green and a prone
+      `--game` move shows the crawl. Design goal: the last placeholder clip gone. Big
+      picture: item C5 of 5 (C1–C5), the end of the player animation move.
+      effort: low

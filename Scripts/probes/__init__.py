@@ -35,5 +35,8 @@ Scripts/net/CLAUDE.md has the conventions and the traps.
   title       working the real title menu (uepy.py --title): its rows and mode
               pages taken, the session read, what the menu shows; shared by
               probe_title_single, probe_join_dead_address and probe_net_title
+  metahuman_follow  how far the MetaHuman stands from the hidden mesh it follows,
+              and its face and garments from it; shared by probe_metahuman_body
+              and probe_gas_idle
   probe_*     the probes themselves, one behaviour each
 """

@@ -64,6 +64,18 @@ Editor-side, in pipeline order:
                                 sample's Mover character answers, so they compile
     check_gas_load.py           entry point: load everything under /Game/GAS and
                                 read the editor's log back for what was missing
+    build_gas_bridge.py         entry point: the skeleton bridge from the GAS clips
+                                to the MetaHuman, as far as one idle: a source IK
+                                rig on SK_UEFN_Mannequin, its retargeter and anim
+                                blueprint, and ABP_GasIdle
+    gas_bridge_paths.py         constants: what the hidden mesh becomes, the idle,
+                                and what that build writes
+    gas_idle_abp.py             ABP_GasIdle: one sequence player on the UEFN skeleton
+    metahuman_retarget.py       a retargeter between two rigs and the retargeting
+                                anim blueprint pointed at it (the mannequin's
+                                bridge, build_metahuman_retarget.py, and the UEFN's)
+    measure_gas_bridge.py       entry point: what the UEFN mannequin lacks that the
+                                game names on SK_Mannequin (Saved/gas_bridge.txt)
     import_bound.py             entry point: bound GLBs -> /Game/Sourced/Bound on
                                 SK_Mannequin, and the checks only an editor can make
     retarget_ual_to_mannequin.py  entry point: the Quaternius clips onto SK_Mannequin,

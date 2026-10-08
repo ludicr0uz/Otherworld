@@ -270,3 +270,85 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/check_gas_load.py   # in a fr
   - `SandboxCharacter_CMC_ABP`'s `Debug_ExperimentalStateMachine` asks for a player by index
     (`net/input_checks.py`);
   - `LevelBlock` draws a random number no row of `net/random_consts.py` covers.
+
+## The skeleton bridge: how the GAS clips reach the MetaHuman (2026-10-08)
+
+The sample's clips, databases and anim blueprint are on `SK_UEFN_Mannequin`; the player's
+hidden mesh is `SK_Mannequin`. **The choice: the hidden mesh becomes `SKM_UEFN_Mannequin`**
+(bridge (a)), and the MetaHuman follows it through a second retargeter whose source rig is on
+that skeleton. The sample then plays as it shipped: nothing of its 2355 packages is
+retargeted, copied or re-pointed. Proven on one idle; **the game does not wear it yet**.
+
+```bash
+python3 Scripts/dev/uepy.py Scripts/asset_pipeline/build_gas_bridge.py
+python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_gas_idle.py
+python3 Scripts/dev/uepy.py Scripts/asset_pipeline/measure_gas_bridge.py   # Saved/gas_bridge.txt
+```
+
+- **What is built** (`gas_bridge_paths.py`, under `/Game/Sourced/MetaHuman`, beside the
+  mannequin's bridge and touching none of it): `IK_UEFN_Mannequin_Source` (the mannequin's
+  chain table, `rig_chains.CHAINS_MANNEQUIN`, on the UEFN mesh: every chain bone has the
+  same name there, so the map onto `IK_MetaHuman` is exact), `RTG_MetaHuman_from_UEFN`,
+  `ABP_MetaHuman_Retarget_UEFN` (what the Body component wears over a UEFN parent) and
+  `ABP_GasIdle` (one sequence player of `M_Neutral_Stand_Idle_Loop`; the sample has no
+  `M_Neutral_Idle_Loop`).
+- **The proof is a probe that wears it for one run**: `probe_gas_idle.py` puts the UEFN
+  mesh and `ABP_GasIdle` on the live player's Mesh component and the UEFN retarget blueprint
+  on Body, checks them, and puts the mannequin back. Measured: the hidden mesh's pose is
+  0.06 cm from a frame of the clip; the MetaHuman follows within 4.1 cm (head 4.1, hands
+  3.7, feet 2.5, fingertips 5.7), against 6.6 cm on the mannequin, by the same measure and
+  the same 12 cm tolerance as `probe_metahuman_body` (`probes/metahuman_follow.py`).
+- **This retargeter aligns its retarget pose; the mannequin's does not.** The UEFN
+  mannequin rests with its arms at another angle (its hand is 20.7° and 12.5 cm from
+  Manny's in the reference pose). Unaligned, the MetaHuman's hands hung 11.5 cm off the
+  idle's; with `auto_align_all_bones(TARGET, CHAIN_TO_CHAIN)` they are 3.7 cm
+  (`metahuman_retarget.build_retargeter(align=True)`). The fingers were measured at their
+  tips, not looked at: a windowed look is owed when the game wears this.
+- **A sequence player's clip is not a Python property.** `ABP_GasIdle`'s node comes from the
+  palette entry `Animation|Sequences|Play'<clip name>'`, which exists only while the clip is
+  loaded; the clip is read back out of the node's `export_text()` (`gas_idle_abp.playing`).
+  A running anim instance does not say what it plays either, so the probe reads the graph
+  and then proves the pose against the clip's frames.
+
+What bridge (a) costs, measured (`measure_gas_bridge.py`), for the task that makes the game
+wear it:
+
+- **Bones: nothing the game names is missing.** The UEFN skeleton has 93 bones to the
+  mannequin's 89 and lacks only `center_of_mass`, `interaction` and `thigh_twist_02_l/r`,
+  none of which a script names. Every bone `combat/` sets by name (`hand_r`, `head`,
+  `spine_01/03/05`, `pelvis`, `neck_01`, the arms, the legs) is there, as is every retarget
+  chain end. It adds `weapon_l/r`, `attach`, `prop_01` and `props_root`.
+- **Sockets: every one the game uses is missing.** The mannequin has `HandGrip_R`,
+  `HandGrip_L`, `weapon_r_muzzle`, `foot_l/r_Socket`; the UEFN has `palm_l/r_Socket`,
+  `RagdollTrace`, `prop_01_Socket`. `HandGrip_R` (`skin.grip`, where every held item
+  attaches; in the probe's run the held gun has no socket to hold to) has to be added to a
+  skeleton that is an uncommitted byte copy, so by a patch script and a row in
+  `gas_paths.PATCHED`, as the two notifies are; `grip._BoneGrip` is the fallback that
+  needs no socket. The hand's rest rotation differs by 20.7°, so the socket's offset is
+  measured again, not copied.
+- **Every clip the player has today stops playing.** Neither skeleton lists the other as
+  compatible, so `ABP_Unarmed` and what it plays (41 clips and a blend space on
+  `SK_Mannequin` reached from the player's blueprint, the Quaternius library retargeted
+  onto the mannequin, the seven poses the weapons build keys on the worn skeleton) do not
+  run on the UEFN mesh. The weapon layers, the stances, the throw and the hit reactions
+  each need retargeting onto `SK_UEFN_Mannequin` (the rig built here is a ready target:
+  same chain table) or a compatible-skeleton declaration, which was not tried.
+- **Ragdoll and hit bodies: another physics asset, same body names.** `PA_UEFN_Mannequin`
+  has the mannequin's 22 bodies plus `spine_01`, so `HeadBones`/`LimbBones` and the bone a
+  thrown blade lodges in carry over by name; the capsules are the sample's, fitted to a
+  body 10 cm shorter at the head (152 against 162.6 cm) and never run through
+  `combat/hit_bodies.fit_hit_bodies`. The sample's change to the `Ragdoll` collision
+  profile was not carried (G1).
+- **Whatever matches the worn mesh by path.** `skin.SKINS` / `skin_of_mesh` and the
+  verifiers that read `SKIN_METAHUMAN.mesh` know `SKM_Manny_Simple`; a UEFN skin is a new
+  row, and `combat/server_pose.py` poses "the mesh the game runs on", which this becomes.
+
+What bridge (b) would have cost (the hidden mesh stays `SK_Mannequin`, the databases are
+retargeted to it): not tried, since (a) held. It keeps every item above as it is, and pays
+on the other side: the clips behind 155 databases retargeted onto a body 10 cm taller with
+its arms at another rest angle, on disk; the databases, their schemas (which name the
+skeleton) and the four choosers duplicated and re-pointed; `SandboxCharacter_CMC_ABP`
+copied onto the other skeleton; and all of it redone whenever the sample is re-imported.
+The motion-matching features (foot positions, trajectories) would be searched on retargeted
+poses, which is where a retarget shows first. It is the fallback if the weapon layers
+cannot be brought onto the UEFN skeleton.

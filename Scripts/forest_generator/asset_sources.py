@@ -269,7 +269,8 @@ GENERATED = (
     AssetSource(
         dest="Content/Sourced/MetaHuman",
         kind="generated",
-        builders=("Scripts/asset_pipeline/build_metahuman_retarget.py",),
+        builders=("Scripts/asset_pipeline/build_metahuman_retarget.py",
+                  "Scripts/asset_pipeline/build_gas_bridge.py"),
         note="What drives the MetaHuman body from the mannequin: IK_MetaHuman "
              "(the mannequin's chain table on metahuman_base_skel), "
              "RTG_MetaHuman_from_Mannequin, and ABP_MetaHuman_Retarget, an "

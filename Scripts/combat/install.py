@@ -20,7 +20,7 @@ from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH, NPC_CLASS_PATH
 from combat.player_move import reparent_player, set_move_numbers
 from combat.player_pace import set_jog_speed
 from combat.record_vars import (
-    RECORD_COMPONENT, RECORD_COMPONENT_CLASS, RECORD_HAND_SLOT, RECORD_MIRROR, RECORD_SOURCE)
+    RECORD_COMPONENT, RECORD_COMPONENT_CLASS, RECORD_HAND_SLOT, RECORD_SOURCE, RECORD_VIEW)
 from combat.weapon_component.stance import allow_crouch
 from net import relevancy
 from net.relevancy_consts import CHARACTER
@@ -48,14 +48,14 @@ def _uninstall_old_shotgun(bp):
 
 def install_record(bp):
     """The component that holds the inventory's record (C++; task A3a), beside
-    the weapon component it reads, told the names it reads by and mirrors to
-    (combat/record_vars.py). It replicates by its own constructor."""
+    the weapon component it reads, told the names it reads by and the one it
+    raises on a client when a record arrives (combat/record_vars.py). It replicates by its own constructor."""
     cls = unreal.load_class(None, RECORD_COMPONENT_CLASS)
     if not cls:
         raise RuntimeError(f"{RECORD_COMPONENT_CLASS} is not loaded: compile the "
                            "Otherworld module (Source/CLAUDE.md)")
     template = _component_object(_add_component(bp, _root_handle(bp), cls, RECORD_COMPONENT))
-    for prop, name in {**RECORD_SOURCE, **RECORD_MIRROR}.items():
+    for prop, name in {**RECORD_SOURCE, **RECORD_VIEW}.items():
         template.set_editor_property(prop, name)
         if str(template.get_editor_property(prop)) != name:
             raise RuntimeError(f"{RECORD_COMPONENT}.{prop} did not take {name!r}")

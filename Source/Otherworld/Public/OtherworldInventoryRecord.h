@@ -14,10 +14,15 @@
 // Everyone but the owner is told what the hand holds: HandClass, HandLit and
 // HandHot.
 //
-// Until the client's view reads the record (task A3b) the component also
-// writes the weapon component's own Inv* arrays, WornClass and Hand*
-// variables from it, in the same frame: those still replicate, and
-// Scripts/combat/weapon_component/view.py still reads them.
+// A client's item actors are a picture of the record (task A3b): the one
+// RepNotify raises the weapon component's ViewDirty, and its view
+// (Scripts/combat/weapon_component/view.py) reads the rows through
+// UOtherworldInventoryLibrary: InventoryRow, WornRow, HandRow. No Blueprint
+// variable holds a copy.
+//
+// The record is also what a save writes: ToBytes and FromBytes, a version
+// first, classes by path, into a USaveGame's byte array
+// (UOtherworldRecordSave is the one the probe round-trips through).
 //
 // In single player the component holds the record and nothing travels.
 #pragma once
@@ -25,6 +30,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Engine/EngineBaseTypes.h"
+#include "GameFramework/SaveGame.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Templates/SubclassOf.h"
@@ -89,6 +95,24 @@ struct OTHERWORLD_API FOtherworldInventoryRecord
 
 	bool NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess);
 
+	/** The first field of the saved form. A change to the layout below it is a new number, and a reader of the old one. */
+	static constexpr uint32 SaveVersion = 1;
+
+	/**
+	 * The record as a save holds it: SaveVersion, then the rows and the worn
+	 * slots, each class by its path (a save outlives the session that knew
+	 * the class by a net id). Little-endian, whatever the machine.
+	 */
+	void ToBytes(TArray<uint8>& OutBytes) const;
+
+	/**
+	 * The record read back. False, and the record left as it was, for bytes
+	 * of a version this build does not read, cut short, or with anything
+	 * after their end. A row whose class no longer exists is dropped, and a
+	 * worn slot whose class does not is empty: a save outlives an item.
+	 */
+	bool FromBytes(const TArray<uint8>& Bytes);
+
 	/** For the log and the probes: "Class@slot loaded/reserve[ lit][ hot], ... | worn, ...". */
 	FString Describe() const;
 };
@@ -135,13 +159,13 @@ public:
 	FOtherworldInventoryRecord Record;
 
 	/** To everyone but the owner: what the hand holds, or none; whether it burns; whether it glows. */
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Otherworld|Inventory")
+	UPROPERTY(ReplicatedUsing = OnRep_Hand, BlueprintReadOnly, Category = "Otherworld|Inventory")
 	TSubclassOf<AActor> HandClass;
 
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Otherworld|Inventory")
+	UPROPERTY(ReplicatedUsing = OnRep_Hand, BlueprintReadOnly, Category = "Otherworld|Inventory")
 	bool HandLit = false;
 
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Otherworld|Inventory")
+	UPROPERTY(ReplicatedUsing = OnRep_Hand, BlueprintReadOnly, Category = "Otherworld|Inventory")
 	bool HandHot = false;
 
 	/** A client's: a record arrived. */
@@ -178,31 +202,19 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|Source")
 	FName ItemHotVar = TEXT("Hot");
 
-	// Where it is also written until task A3b: the same component's
-	// variables the old view reads. A name of None is not written.
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|Mirror")
-	FName MirrorClassVar = TEXT("InvClass");
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|Mirror")
-	FName MirrorSlotVar = TEXT("InvSlot");
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|Mirror")
-	FName MirrorLoadedVar = TEXT("InvLoaded");
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|Mirror")
-	FName MirrorReserveVar = TEXT("InvReserve");
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|Mirror")
-	FName MirrorLitVar = TEXT("InvLit");
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|Mirror")
-	FName MirrorHotVar = TEXT("InvHot");
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|Mirror")
-	FName MirrorWornVar = TEXT("WornClass");
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|Mirror")
-	FName MirrorHandClassVar = TEXT("HandClass");
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|Mirror")
-	FName MirrorHandLitVar = TEXT("HandLit");
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|Mirror")
-	FName MirrorHandHotVar = TEXT("HandHot");
+	/**
+	 * A client's: the bool variable of that same component raised when a
+	 * record, or what another player's hand holds, arrives: its view remakes
+	 * the item actors on its next Tick. None raises nothing.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Otherworld|Inventory|View")
+	FName ViewDirtyVar = TEXT("ViewDirty");
+
+	/** The record component of Carrier: the character, or one of its components. */
+	static UOtherworldInventoryRecordComponent* Of(const UObject* Carrier);
 
 	bool IsDirty() const { return bDirty; }
-	/** The record written off the item actors, the mirror with it. */
+	/** The record written off the item actors. */
 	void Write();
 	/** With nothing marked: is the record what the item actors say? If not, logged, counted and written. */
 	void Audit();
@@ -213,11 +225,17 @@ private:
 	UFUNCTION()
 	void OnRep_Record();
 
+	/** What another player's hand holds arrived (each of the three calls it). */
+	UFUNCTION()
+	void OnRep_Hand();
+
+	/** ViewDirtyVar raised on the weapon component. */
+	void RaiseViewDirty();
+
 	/** The component on the same actor whose class has InventoryVar. */
 	UActorComponent* Source();
 	void Read(UActorComponent* From, FOtherworldInventoryRecord& OutRecord, TSubclassOf<AActor>& OutHand,
 		bool& bOutLit, bool& bOutHot) const;
-	void WriteMirror(UActorComponent* To) const;
 
 	TWeakObjectPtr<UActorComponent> CachedSource;
 	bool bDirty = false;
@@ -268,6 +286,58 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Otherworld|Inventory", meta = (DefaultToSelf = "Item"))
 	static void MarkCarriedItemDirty(AActor* Item);
 
+	// The view's reads (Scripts/combat/weapon_component/view.py), each off
+	// the record as this machine holds it. Carrier is the character or one
+	// of its components. Kind types the Class pin for the graph: the class
+	// every carried item is a child of. Pure: read again at every use.
+
+	/** The rows of Carrier's record: its own player's on the owning client, none on anyone else's. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Inventory")
+	static int32 InventoryRowCount(const UObject* Carrier);
+
+	/** Row Index of Carrier's record. No such row: no class, slot -1. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Inventory",
+		meta = (DeterminesOutputType = "Kind", DynamicOutputParam = "Class"))
+	static void InventoryRow(const UObject* Carrier, int32 Index, TSubclassOf<AActor> Kind,
+		TSubclassOf<AActor>& Class, int32& Slot, int32& Loaded, int32& Reserve, bool& Lit, bool& Hot);
+
+	/** The worn slots of Carrier's record. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Inventory")
+	static int32 WornRowCount(const UObject* Carrier);
+
+	/** The class worn in Slot, or none. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Inventory",
+		meta = (DeterminesOutputType = "Kind", DynamicOutputParam = "Class"))
+	static void WornRow(const UObject* Carrier, int32 Slot, TSubclassOf<AActor> Kind, TSubclassOf<AActor>& Class);
+
+	/** What Carrier's hand holds, as everyone but its owner is told it. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Inventory",
+		meta = (DeterminesOutputType = "Kind", DynamicOutputParam = "Class"))
+	static void HandRow(const UObject* Carrier, TSubclassOf<AActor> Kind, TSubclassOf<AActor>& Class, bool& Lit,
+		bool& Hot);
+
+	// The save's (task M35 writes them into the profile), and the probes'.
+
+	/** Carrier's record as this machine holds it. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Inventory")
+	static FOtherworldInventoryRecord InventoryRecordOf(const UObject* Carrier);
+
+	/** Record as a save holds it (FOtherworldInventoryRecord::ToBytes). */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Inventory")
+	static TArray<uint8> InventoryRecordToBytes(const FOtherworldInventoryRecord& Record);
+
+	/** The record a save held. False for bytes this build does not read (FromBytes). */
+	UFUNCTION(BlueprintCallable, Category = "Otherworld|Inventory")
+	static bool InventoryRecordFromBytes(const TArray<uint8>& Bytes, FOtherworldInventoryRecord& Record);
+
+	/** The version ToBytes writes first. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Inventory")
+	static int32 InventoryRecordSaveVersion();
+
+	/** A record as text: "Class@slot loaded/reserve[ lit][ hot], ... | worn, ...". */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Inventory")
+	static FString DescribeRecord(const FOtherworldInventoryRecord& Record);
+
 	/** For the probes: the record as text, and what the hand holds as everyone else is told it. */
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Inventory")
 	static FString DescribeInventoryRecord(const AActor* Carrier);
@@ -291,4 +361,20 @@ public:
 	/** For the probes: the engine's Push Model is compiled in and switched on. */
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Inventory")
 	static bool IsPushModelOn();
+};
+
+/**
+ * A save that holds one record as bytes: the shape the character's save
+ * takes in task M35, and what the probe round-trips through a slot
+ * (Scripts/probes/probe_record_bytes.py).
+ */
+UCLASS()
+class OTHERWORLD_API UOtherworldRecordSave : public USaveGame
+{
+	GENERATED_BODY()
+
+public:
+	/** FOtherworldInventoryRecord::ToBytes. */
+	UPROPERTY(BlueprintReadWrite, Category = "Otherworld|Inventory")
+	TArray<uint8> Record;
 };

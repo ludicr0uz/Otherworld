@@ -1,24 +1,23 @@
 """The weapon component's part in the inventory's record
-(combat/record_vars.py says what it is): the variables the old view still
-reads, marked to replicate, each a RepNotify that raises ViewDirty.
+(combat/record_vars.py says what it is): the test of authority every graph
+that asks the server shares, and the RepNotify that raises ViewDirty.
 
-The record is no longer written here. The C++ component beside this one on
-the character holds it and writes it, with these variables as its mirror, on
-a frame something marked (combat/dirty.py: every node that changes what is
-carried is followed by MarkInventoryDirty); the Tick's own rewrite, an Add per
-column per item every frame, went with task A3a. The shed needs no clear of
-its own either: it empties Inventory and Worn, which marks.
-
-Task A3b takes these variables away, with the mirror.
+The record is not written here, nor held: the C++ component beside this one
+on the character holds it and writes it on a frame something marked
+(combat/dirty.py: every node that changes what is carried is followed by
+MarkInventoryDirty), and its own RepNotify raises ViewDirty on a client. The
+variables that mirrored it for the old view went with task A3b. rep_dirty is
+what is left for a variable of this component whose arrival the view must
+answer: AsksServed (shot.py).
 """
 
 import unreal
 
 from uebp import net
 from uebp.g import _G
-from uebp.graph import out
+from uebp.graph import BEL, out
 from uebp.layout import arrange
-from combat.record_vars import HAND as HAND_VARS, REPLICATED, ViewDirty
+from combat.record_vars import RETIRED_VARS, ViewDirty
 from uebp.nodes.actor import FN_GET_OWNER, FN_HAS_AUTHORITY
 
 
@@ -30,7 +29,7 @@ def authority(g):
 
 def rep_dirty(bp, var, condition):
     """``var`` is a RepNotify whose arrival raises ViewDirty (shot.py's
-    AsksServed is one too)."""
+    AsksServed)."""
     ed = net.rep_notify(bp, var, condition)
     stale = [n for n in ed.list_all_nodes()
              if not isinstance(n, unreal.K2Node_FunctionEntry)]
@@ -45,10 +44,12 @@ def rep_dirty(bp, var, condition):
     arrange(ed)
 
 
-def replicate_record(bp):
-    """Mark what travels and author each OnRep (ViewDirty := true). After
-    every declare, which drops the flags, and before the compile."""
-    for var in REPLICATED:
-        condition = (unreal.LifetimeCondition.COND_SKIP_OWNER if var in HAND_VARS
-                     else unreal.LifetimeCondition.COND_OWNER_ONLY)
-        rep_dirty(bp, var, condition)
+def retire_mirror(bp, ed):
+    """The variables that mirrored the record, and each one's OnRep graph,
+    taken off a component built before task A3b."""
+    for name in RETIRED_VARS:
+        ed.remove_member_variable(name)
+        BEL.remove_function_graph(bp, f"OnRep_{name}")
+    left = [n for n in RETIRED_VARS if BEL.find_graph(bp, f"OnRep_{n}")]
+    if left:
+        raise RuntimeError(f"the retired record's OnRep graphs are still there: {left}")

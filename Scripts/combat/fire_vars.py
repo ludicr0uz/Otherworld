@@ -30,7 +30,7 @@ word:
 
     an item in the world        Lit and Hot replicate on the actor
                                 (item_world.py)
-    an item its owner carries   the record's InvLit and InvHot columns
+    an item its owner carries   its row of the record, lit and hot
                                 (record_vars.py), which the picture is made
                                 from (view.py)
     the item in another         HandLit and HandHot, beside HandClass

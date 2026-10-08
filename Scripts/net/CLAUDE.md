@@ -197,7 +197,7 @@ first by **the mirror** (`combat/weapon_component/look.py`), from the few facts 
   (`SetAimWalk`); tying the cloud to that is still to do.
 - **`HandPose` is what the equip plays,** not `Held.AimPose`: where the keys are the equip
   takes it off `Held`; on a remote copy `Held` is not read for the pose. The item in a
-  remote copy's hand is the server's since M18 (`HandClass`, "The inventory", below).
+  remote copy's hand is the server's since M18 (the record component's `HandClass`, "The inventory", below).
 - **The guard is mirrored since M20** (`Blocking`, replicated to everyone but the owner:
   "Melee, the guard, the throw and the take", below).
 - **Not mirrored** (not asked for, and each is a later task's): the kneel, the support
@@ -302,25 +302,45 @@ says who struck it. `combat/damage.py` is the whole of it.
 
 What a player carries is the server's. The server keeps the item actors every graph already
 works on (`Inventory`, each item's `Slot`, `Loaded`, `Reserve`); what travels is a **record**
-of them, plain data (`combat/record_vars.py`):
+of them, plain data, one C++ struct on its own component (`combat/record_vars.py`,
+`Source/Otherworld/Public/OtherworldInventoryRecord.h`):
 
-| variable | holds | replicates to |
+| on `UOtherworldInventoryRecordComponent` | holds | replicates to |
 |---|---|---|
-| `InvClass[i]`, `InvSlot[i]`, `InvLoaded[i]`, `InvReserve[i]` | a row per carried item, in `Inventory`'s order: its class, its slot code, its rounds | the owning client (`COND_OWNER_ONLY`) |
-| `HandClass` | the class in hand, or none | everyone else (`COND_SKIP_OWNER`) |
+| `Record` (`FOtherworldInventoryRecord`): `Items[i]` (class, slot code, loaded, reserve, lit, hot), `Worn[slot]` (class or none) | a row per carried item, in `Inventory`'s order, and a class per worn slot | the owning client (`COND_OwnerOnly`), whole, with one RepNotify |
+| `HandClass`, `HandLit`, `HandHot` | the class in hand, or none; whether it burns or glows | everyone else (`COND_SkipOwner`), each a RepNotify |
 
-- **It can be saved as it stands:** classes and ints, nothing that points into a running
-  world. A load is one `SpawnActor` per row. The character's save and a body's loot
-  should hold rows of it, not a second form (a body still holds classes: a looted gun is
-  a fresh one).
-- **The record is one C++ struct, written on a frame that changed it** (A3a):
-  `FOtherworldInventoryRecord` (a row per item: class, slot, loaded, reserve, lit, hot;
-  and a class per worn slot), held by `UOtherworldInventoryRecordComponent` on the
-  character beside the weapon component (`combat/install.py`), sent to the owning client
-  whole (its own `NetSerialize`: a client never holds half of one), with `HandClass`,
-  `HandLit` and `HandHot` for everyone else. Nothing writes it every Tick. The table's
-  variables above are its **mirror** until A3b: the component writes them from the
-  struct in the same frame, they still replicate, and `view.py` still reads them.
+- **One atomic, versioned, serialisable record, sent only when it changes** (A3a, A3b).
+  It travels whole (its own `NetSerialize`), so no client ever holds half an inventory;
+  it is written on a frame that changed it, never every Tick; and no Blueprint variable
+  holds a copy: the six `Inv*` arrays, `WornClass` and the weapon component's own
+  `HandClass`, `HandLit` and `HandHot` that mirrored it went with A3b (the weapon build
+  takes them, and their OnRep graphs, off a component built before:
+  `weapon_component/record.py` `retire_mirror`). `combat/verify/record.py` fails on a
+  weapon component that has one again, and on any `.py` under `Scripts/` that names one
+  of the six arrays.
+- **It is what a save writes** (A3b): `FOtherworldInventoryRecord::ToBytes` and
+  `FromBytes`, into a `USaveGame`'s byte array. The layout
+  (`Source/Otherworld/Private/OtherworldInventoryBytes.cpp`): a `uint32` version first
+  (`SaveVersion`, 1), a `uint16` count of rows, each a class path, three `int32` (slot,
+  loaded, reserve) and a flags byte (1 lit, 2 hot), a `uint16` count of worn slots, each
+  a class path (empty: nothing worn); little-endian, a path as its UTF-8 length
+  (`uint16`) and bytes. Classes go by path, since a save outlives the session that knew
+  them by net id. `FromBytes` refuses another version, bytes cut short and bytes with
+  more after them, and leaves the record as it was; a row whose class no longer exists
+  is dropped and a worn slot of one is empty (a save outlives an item). A changed layout
+  is a new `SaveVersion` and a reader of the old one. A load is one `SpawnActor` per
+  row. **M35 saves it as it stands**: `InventoryRecordOf(character)`,
+  `InventoryRecordToBytes`, `InventoryRecordFromBytes` (`uebp/nodes/inventory.py`), and
+  `UOtherworldRecordSave` is a `USaveGame` with the one byte array. Until then the
+  single-player profile is `BP_Profile`, unchanged. A body's loot should hold rows of it
+  too, not a second form (a body still holds classes: a looted gun is a fresh one).
+  Proof: `uepy.py --game --probe Scripts/probes/probe_record_bytes.py` (a pistol with
+  five rounds, a burning stick and a worn hat: the version in the first four bytes, the
+  same bytes back out of a save slot, the same record out of them, the six refusals, and
+  bytes written by hand in the layout above).
+- **The server writes it on a frame that changed it** (A3a): the component sits on the
+  character beside the weapon component (`combat/install.py`).
   - **A change site marks, and no graph does it by hand.** A node that writes
     `Inventory` or `Worn`, or Sets an item's `Slot`, `Loaded`, `Reserve`, `Lit` or
     `Hot`, is a change site. `combat/dirty.py`'s `mark_change_sites(ed, own)` finds them
@@ -339,22 +359,49 @@ of them, plain data (`combat/record_vars.py`):
     `probes/boot.py` sets for every probe run, each unmarked record is compared with the
     item actors every frame, and a difference is an `INVENTORY-RECORD-STALE` log line
     naming both. `uepy.py --game` and `--net` count them (the "stale records" column)
-    and fail the run. A probe's own `p.set` of an item's state marks for itself.
+    and fail the run. A probe's own `p.set` of an item's state marks for itself; a
+    probe that writes `Inventory` or `Worn` itself does not (`probe_net_death.py` writes
+    `Worn` on the frame it kills, and the shed marks).
   - **Push Model is on for the record alone** (`Config/DefaultEngine.ini`):
     `net.IsPushModelEnabled=1` and `Net.MakeBpPropertiesPushModel=0`. With the second
     left at the engine's default every Blueprint variable becomes push-based, marked by
-    Blueprint Set nodes only, and one written any other way (the mirror, by reflection;
-    a probe, from Python) is silently never sent: that broke the client's whole view
-    until it was set.
-  - **`HandClass` on the component has no RepNotify** (the record's is the one): A3b's
-    view of another player's hand needs its own signal.
+    Blueprint Set nodes only, and one written any other way (by reflection; a probe,
+    from Python) is silently never sent.
+- **A client reads it through the library, a row at a time** (A3b,
+  `uebp/nodes/inventory.py`): `InventoryRowCount(carrier)`, `InventoryRow(carrier,
+  index, Kind)` (class, slot, loaded, reserve, lit, hot), `WornRowCount`, `WornRow` and
+  `HandRow(carrier, Kind)` (class, lit, hot), pure nodes over the record as that machine
+  holds it. `Kind` is a class pin whose literal types the `Class` output
+  (`DeterminesOutputType`): the record is of `AActor` classes, a C++ module knowing no
+  Blueprint, and `ViewRow`'s `Class` is `BP_WeaponItem`'s.
+  - **The component's RepNotifies raise `ViewDirty`** on the weapon component, by name
+    (`ViewDirtyVar`, written by `combat/install.py`): `OnRep_Record` for the owner,
+    `OnRep_Hand` for each of the hand's three on everyone else's machine.
+  - **What a change costs the wire** (`uepy.py --net --clients 1 --probe
+    Scripts/probes/probe_net_record_cost.py`: the server moves client 1's axe between
+    two bag slots 80 times in 20 s, the smallest change there is, against an idle 20 s
+    before it; 2026-10-08, the same machine, the A3a build and assets put back for the
+    first row):
+
+    | | bytes out in the 80 changes' 20 s | in the idle 20 s | bytes a change |
+    |---|---|---|---|
+    | before (A3a: the struct and its mirror, six arrays' deltas) | 93 992 | 79 559 | 180 |
+    | after (A3b: the struct alone), two runs | 90 850, 90 899 | 79 451, 82 270 | 143, 108 |
+
+    The moving window is steady run to run and 3.1 KB lighter, about 39 bytes a change;
+    the idle window wanders by 3 KB, which is the spread in the last column.
+  - **The load test does not see it.** A1's harness at N = 32, 2 clients, 90 s, the
+    same day: 6.5 and 6.6 KB/s out per client over 89 actor channels before, 6.9 and
+    7.0 KB/s over 92 after; world tick 26.6 against 25.2 ms. Not fewer: its clients
+    stand still, so what they carry changes only when they die, and three more bodies
+    in view outweigh every record sent. The record's own cost is the table above.
 - **A client holds no inventory of its own.** BeginPlay issues the loadout with authority
   only. A client's item actors are a **picture** of the record, local and unreplicated
-  (`weapon_component/view.py`): each replicated variable is a RepNotify that raises
+  (`weapon_component/view.py`): the record component's RepNotify raises
   `ViewDirty`, and the next Tick's upkeep, without authority, calls `ViewRow` per row
   (the actor at that index kept if it is of the row's class, else destroyed and one
   spawned; then its slot and rounds) and `ViewTrim`. Its own player's from the rows;
-  another player's character from `HandClass` alone, one actor, in the hand. The slot
+  another player's character from `HandRow` alone, one actor, in the hand. The slot
   sync and the equip run after it on every copy, so nothing below knows whether its
   actors are the server's or a picture.
 - **The picture is remade only when a record arrives.** What a client changes itself
@@ -380,10 +427,12 @@ of them, plain data (`combat/record_vars.py`):
   `BlockForced`, the use key's `SightsForced`, the throw's `ThrowKeyForced` and
   `ThrowClickForced` and the take's `InteractForced` (M20); the next Server event
   needs one of the same kind.
-- **A burning stick and a hot blade are in it** (M25, "Fire and heat", below): two
-  more columns, `InvLit` and `InvHot`, and `HandLit` and `HandHot` beside `HandClass`.
+- **A burning stick and a hot blade are in it** (M25, "Fire and heat", below): a
+  row's `bLit` and `bHot`, and `HandLit` and `HandHot` beside `HandClass`.
   The dev-all-guns cheat still spawns on the machine it is pressed on.
-- `combat/verify/record.py` checks the flags and the wiring. Proof: `uepy.py --net
+- `combat/verify/record.py` checks the wiring. Proof (clean with `--lag 120`, as
+  `probe_net_fire.py`, `probe_net_clothing.py` and `probe_net_death.py` are, each run by
+  itself: the death and inventory probes start from a fresh loadout): `uepy.py --net
   --clients 2 --probe Scripts/probes/probe_net_inventory.py` (client 1 moves the axe to
   another bag slot, brings the pistol to hand and asks for a move no rule allows; the
   server's copy and its record agree after each, the refused one moved nothing, and
@@ -672,15 +721,16 @@ and the owning client's `Worn` is a picture of the record.
 | `AskTakeOff(Slot, To)` (Enter or a click on a worn slot, a drag off one) | a garment is worn there, and there is room | into `Inventory`, on `To` if that is the hand or a bag slot, else the bag's first free one |
 | `AskDrop(SLOT_COUNT + slot)` (a worn garment dragged out of the inventory: M23's ask) | a garment is worn there | set down on the ground, `Dropped`: a replicated actor from its next Tick |
 
-- **The record is one more array, `WornClass`** (`combat/record_vars.py`): a row per slot
-  of `Worn`, the garment's class or none, written by the record component with the
-  inventory's rows on a frame that changed either (the struct's `Worn`; "The inventory",
-  above) and emptied with them at the shed. Plain data, as the rows are: the character's
+- **What is worn is the record's `Worn`** (`combat/record_vars.py`): a row per slot
+  of the server's `Worn`, the garment's class or none, written by the record component
+  with the inventory's rows on a frame that changed either ("The inventory", above) and
+  emptied with them at the shed. Plain data, as the rows are: the character's
   save writes it as it stands.
 - **It replicates to the owning client alone** (`COND_OWNER_ONLY`), as the task asked:
   nothing is drawn worn yet, so nobody else has anything to draw. **The task that draws
-  a garment on the body changes the condition** (everyone must see it, as `HandClass`
-  is seen) and draws from `WornClass` in its RepNotify; nothing else has to change.
+  a garment on the body gives everyone what is worn** (as `HandClass` is given: a
+  `COND_SkipOwner` property of the record component beside it, the record itself
+  staying the owner's) and draws from it in its RepNotify; nothing else has to change.
 - **A client's `Worn` is a picture of it** (`weapon_component/view_worn.py`, `ViewWorn`):
   in the view's dirty arm, a local actor per worn slot, hidden and not `Dropped`, so the
   I panel, which reads `Worn`'s actors, draws a client's worn slots as it draws single
@@ -701,7 +751,7 @@ and the owning client's `Worn` is a picture of the record.
   Proof: `uepy.py --net --clients 2 --probe Scripts/probes/probe_net_clothing.py`
   (client 1 wears the hat by the key and the jacket by a drag, is refused an axe and an
   empty slot, takes the jacket off and drags the hat out onto the ground; after each the
-  server's `Worn`, its `WornClass` and client 1's own `Worn` agree, and client 2 is told
+  server's `Worn`, its record's `Worn` and client 1's own `Worn` agree, and client 2 is told
   none of it); clean with `--lag 120`; `--game` runs its standalone arm. Single player's
   are `probe_clothing` (with `probe_clothing_drag`), `probe_inventory_drag` and
   `probe_asks`.
@@ -732,7 +782,7 @@ What changes the world happens once, on the server, and everyone sees it.
   authority over, and would otherwise put itself out by its own clock (its
   `BurnOutTime` is 0). A client is told, three ways:
   - an item in the world: `Lit` and `Hot` replicate on the actor (`item_world.REPLICATED`);
-  - an item its owner carries: the record's `InvLit` and `InvHot`, which `ViewRow` writes
+  - an item its owner carries: its row of the record (`bLit`, `bHot`), which `ViewRow` writes
     onto the picture;
   - the item in another player's hand: `HandLit` and `HandHot` (`COND_SKIP_OWNER`),
     written when either changes.

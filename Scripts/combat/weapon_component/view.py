@@ -2,14 +2,18 @@
 item actors are a picture of what the server says is carried, remade when a
 record arrives. Never run with authority.
 
+The record is the C++ component's, one struct that arrives whole; the graph
+reads it through the inventory library (uebp/nodes/inventory.py), a row at a
+time, and keeps no copy. The component's RepNotify raises ViewDirty.
+
     upkeep, without authority, when ViewDirty:
         the record has rows (this machine's own player: only the owner is
-        sent them) --> ViewRow(i, InvClass[i], InvSlot[i], InvLoaded[i],
-                               InvReserve[i]) for each, ViewTrim(rows)
+        sent them) --> ViewRow(i, InventoryRow(owner, i)) for each,
+                       ViewTrim(rows)
         it has none (another player's character, or an owner carrying
-        nothing) --> HandClass set: ViewRow(0, HandClass, HAND, unknown ammo),
-                                    ViewTrim(1)
-                     HandClass none: ViewTrim(0)
+        nothing) --> HandRow(owner) has a class: ViewRow(0, that class, HAND,
+                                    unknown ammo), ViewTrim(1)
+                     none: ViewTrim(0)
 
     ViewRow(Index, Class, Slot, Loaded, Reserve)
         Inventory[Index] is an actor of Class --> kept
@@ -17,7 +21,7 @@ record arrives. Never run with authority.
                       place (a local actor, never replicated), NeedsRefresh
         its Slot, and its Loaded and Reserve unless Loaded < 0
         a kept one whose Slot changed is HandledItem: it is heard
-    what is worn, before the rows: view_worn.py (WornClass --> Worn)
+    what is worn, before the rows: view_worn.py (WornRow --> Worn)
 
     ViewTrim(Count)
         every actor of Inventory from Count on destroyed, Inventory cut to
@@ -45,9 +49,7 @@ from uebp.net import custom_event
 from combat import item_vars as IV
 from combat.paths import ITEM_CLASS_PATH
 from combat.record_vars import (
-    AMMO_UNKNOWN, HandClass, HandHot, HandLit, InvClass, InvHot, InvLit, InvLoaded,
-    InvReserve, InvSlot, RECORD, ROW_PARAMS, TRIM_PARAMS, VIEW_ROW, VIEW_TRIM, ViewDirty,
-    ViewItem)
+    AMMO_UNKNOWN, ROW_PARAMS, TRIM_PARAMS, VIEW_ROW, VIEW_TRIM, ViewDirty, ViewItem)
 from combat.heat_tuning import HOT_VAR
 from combat.torch_tuning import LIT_VAR
 from combat.shot_vars import AsksSent, AsksServed
@@ -57,9 +59,12 @@ from combat.weapon_component.slot_nodes import for_each, not_, op, valid
 from combat.weapon_component.view_worn import author_view_worn
 from Sound.sound_items import author_handled
 from uebp.nodes.actor import FN_DESTROY, FN_GET_OWNER, FN_GET_TRANSFORM
-from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN, FN_ARR_RESIZE, FN_ARR_SET, FN_ARR_VALID
-from uebp.nodes.math import FN_AND, FN_EQ_CC, FN_EQ_II, FN_GE_II, FN_GREATER_II, FN_NEQ_II, FN_OR, FN_SELECT_II
-from uebp.nodes.palette import NODE_SPAWN
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_RESIZE, FN_ARR_SET, FN_ARR_VALID
+from uebp.nodes.inventory import FN_HAND_ROW, FN_INVENTORY_ROW, FN_INVENTORY_ROW_COUNT
+from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_SPAWN
+from uebp.nodes.math import (
+    FN_AND, FN_EQ_CC, FN_EQ_II, FN_GE_II, FN_GREATER_II, FN_NEQ_II, FN_OR, FN_SELECT_II,
+    FN_SUB_II)
 from uebp.nodes.system import FN_IS_VALID_CLASS, FN_OBJECT_CLASS
 
 
@@ -68,8 +73,24 @@ def _at(g, var, index):
     return _loose_pin(n, "Item", is_input=False)
 
 
-def _length(g, var):
-    return out(g.call(FN_ARR_LEN, TargetArray=g.get(var)))
+def carrier(g):
+    """Whose record: the component's owner, as the marks name it (dirty.py)."""
+    return out(g.call(FN_GET_OWNER))
+
+
+def rows_loop(g, count, execs):
+    """ForLoop over 0..count-1, ``count`` a pin: (index, body, completed)."""
+    loop = g.ed.add_macro_node(MACRO_FOR_LOOP)
+    if not loop:
+        raise RuntimeError("could not create the ForLoop macro node")
+    g.keep(loop)
+    _set(loop, "FirstIndex", 0)
+    _connect(op(g, FN_SUB_II, count, 1), _pin(loop, "LastIndex"))
+    for e in execs:
+        _connect(e, _pin(loop, "execute"))
+    return (_loose_pin(loop, "Index", is_input=False),
+            _loose_pin(loop, "LoopBody", is_input=False),
+            _loose_pin(loop, "Completed", is_input=False))
 
 
 def _call(g, name, execs, **params):
@@ -166,37 +187,35 @@ def _author_view(ed, in_execs):
     flow = g.put(ViewDirty, "false", [dirty])
     # What is worn first (view_worn.py): the owner's alone, as the rows are.
     flow = author_view_worn(g, [flow])
-    rows = _length(g, InvClass)
+    rows = out(g.call(FN_INVENTORY_ROW_COUNT, Carrier=carrier(g)))
     own, other = g.branch(op(g, FN_GREATER_II, rows, 0), [flow])
-    # Arrays of one length: the server writes them in one frame.
-    whole = None
-    for var in RECORD[1:]:
-        same = op(g, FN_EQ_II, _length(g, var), rows)
-        whole = same if whole is None else op(g, FN_AND, whole, same)
-    sound, torn = g.branch(whole, [own])
-    cls, i, body, done = for_each(g, g.get(InvClass), [sound])
+    i, body, done = rows_loop(g, rows, [own])
+    # One record, so one length: no row can be half of one.
+    row = g.call(FN_INVENTORY_ROW, Carrier=carrier(g), Index=i, Kind=ITEM_CLASS_PATH)
     # The rounds are taken only once the server has answered every shot and
     # reload this client asked for (shot_vars.py): until then the record is
     # older than the client's own count, and taking it would hand back rounds
     # already fired. AsksServed's own arrival raises ViewDirty, so the answer
     # to the last ask is always taken.
     settled = op(g, FN_GE_II, g.get(AsksServed), g.get(AsksSent))
-    loaded = out(g.call(FN_SELECT_II, A=_at(g, InvLoaded, i), B=AMMO_UNKNOWN,
-                        bPickA=settled))
-    _call(g, VIEW_ROW, [body], Index=i, Class=cls, Slot=_at(g, InvSlot, i),
-          Loaded=loaded, Reserve=_at(g, InvReserve, i), Lit=_at(g, InvLit, i),
-          Hot=_at(g, InvHot, i))
+    loaded = out(g.call(FN_SELECT_II, A=out(row, "Loaded"), B=AMMO_UNKNOWN, bPickA=settled))
+    _call(g, VIEW_ROW, [body], Index=i, Class=out(row, "Class"), Slot=out(row, "Slot"),
+          Loaded=loaded, Reserve=out(row, "Reserve"), Lit=out(row, "Lit"),
+          Hot=out(row, "Hot"))
     trimmed = _call(g, VIEW_TRIM, [done], Count=rows)
 
-    armed, bare = g.branch(out(g.call(FN_IS_VALID_CLASS, Class=g.get(HandClass))), [other])
-    one = _call(g, VIEW_ROW, [armed], Index=0, Class=g.get(HandClass), Slot=HAND,
-                Loaded=AMMO_UNKNOWN, Reserve=AMMO_UNKNOWN, Lit=g.get(HandLit),
-                Hot=g.get(HandHot))
+    hand = g.call(FN_HAND_ROW, Carrier=carrier(g), Kind=ITEM_CLASS_PATH)
+    held = out(hand, "Class")
+    armed, bare = g.branch(out(g.call(FN_IS_VALID_CLASS, Class=held)), [other])
+    one = _call(g, VIEW_ROW, [armed], Index=0, Class=held, Slot=HAND,
+                Loaded=AMMO_UNKNOWN, Reserve=AMMO_UNKNOWN, Lit=out(hand, "Lit"),
+                Hot=out(hand, "Hot"))
     one = _call(g, VIEW_TRIM, [one], Count=1)
     none = _call(g, VIEW_TRIM, [bare], Count=0)
     tails = author_handled(g, [trimmed, one, none])
     ed.add_comment_to_nodes(
         "A client's inventory is a picture of the server's record (view.py): remade "
-        "when one arrives (ViewDirty). Its own player's from the rows; another "
-        "player's is the one item in their hand (HandClass, HandLit, HandHot).", g.made[:4])
-    return tails + [clean, torn]
+        "when one arrives (ViewDirty), read off the record component row by row. Its "
+        "own player's from the rows; another player's is the one item in their hand "
+        "(HandRow).", g.made[:4])
+    return tails + [clean]

@@ -468,7 +468,7 @@ def _client_one(p, mine, wc):
     yield from _press(p, wc, SIGHTS_FORCED_VAR)
     p.post("use lit")
     yield _await(lambda: bool(p.get(p.get(wc, "Held"), LIT_VAR)), 10.0)
-    p.check("client 1's own stick burns: its picture is told by the record (InvLit)",
+    p.check("client 1's own stick burns: its picture is told by its row of the record (lit)",
             _name(p.get(wc, "Held")) == STICK and bool(p.get(p.get(wc, "Held"), LIT_VAR)),
             _name(p.get(wc, "Held")))
     if not (yield from _told(p, "stick lit", "server")):
@@ -482,7 +482,7 @@ def _client_one(p, mine, wc):
     p.set(wc, INTERACT_FORCED_VAR, True)
     p.post("heat")
     yield _await(lambda: bool(p.get(p.get(wc, "Held"), HOT_VAR)), 10.0)
-    p.check("client 1's own knife glows: its picture is told by the record (InvHot)",
+    p.check("client 1's own knife glows: its picture is told by its row of the record (hot)",
             _name(p.get(wc, "Held")) == KNIFE and bool(p.get(p.get(wc, "Held"), HOT_VAR)),
             _name(p.get(wc, "Held")))
     if not (yield from _told(p, "knife hot", "server")):

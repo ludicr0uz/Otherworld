@@ -1,8 +1,9 @@
-"""A client's worn garments: a picture of WornClass (combat/record_vars.py),
-as its bag is of the record's rows (view.py). Never run with authority.
+"""A client's worn garments: a picture of the record's worn slots
+(combat/record_vars.py; read with WornRow, uebp/nodes/inventory.py), as its
+bag is of the record's rows (view.py). Never run with authority.
 
     the view, when a record arrived (view.py calls this while ViewDirty):
-        ViewWorn(slot, WornClass[slot]) for each row
+        ViewWorn(slot, WornRow(owner, slot)) for each slot of the record
         every actor of Worn past the rows destroyed, Worn cut to their count
 
     ViewWorn(Slot, Class)
@@ -14,9 +15,9 @@ as its bag is of the record's rows (view.py). Never run with authority.
 
 The I panel reads Worn's actors (graphics_menu/wear_draw.py, inv_drag.py), so
 with these it draws a client's worn slots as it draws single player's. Only
-the owner is sent WornClass: another player's character has no rows and so
-nothing in Worn. The shed empties Worn on every copy (shed.py) and the server
-its WornClass, so a dead player's picture is nothing.
+the owner is sent the record: another player's character has no rows and so
+nothing in Worn. The shed empties Worn on every copy (shed.py), and the
+server's record with it, so a dead player's picture is nothing.
 """
 
 from uebp.g import _G
@@ -24,13 +25,14 @@ from uebp.graph import _connect, _loose_pin, _palette, _pin, _set, out, then
 from uebp.net import custom_event
 from combat import item_vars as IV
 from combat.paths import ITEM_CLASS_PATH
-from combat.record_vars import VIEW_WORN, WORN_PARAMS, WornClass
+from combat.record_vars import VIEW_WORN, WORN_PARAMS
 from combat.slot_tuning import SLOT_VAR, UNPLACED
 from combat.wear_tuning import WORN_VAR
 from combat.weapon_component.slot_nodes import for_each, op, valid
 from combat.weapon_component.slot_moves import _ask
 from uebp.nodes.actor import FN_DESTROY, FN_GET_OWNER, FN_GET_TRANSFORM, FN_SET_HIDDEN
-from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN, FN_ARR_RESIZE, FN_ARR_SET, FN_ARR_VALID
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_RESIZE, FN_ARR_SET, FN_ARR_VALID
+from uebp.nodes.inventory import FN_WORN_ROW, FN_WORN_ROW_COUNT
 from uebp.nodes.math import FN_EQ_CC, FN_GE_II
 from uebp.nodes.palette import NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID_CLASS, FN_OBJECT_CLASS
@@ -71,17 +73,20 @@ def author_view_worn_event(ed):
     _set(off, "bSizeToFit", True)
     ed.add_comment_to_nodes(
         f"{VIEW_WORN} (view_worn.py), a client's: Worn[Slot] is made to be the "
-        "server's WornClass row. A garment of the right class is kept; anything else "
+        "record's row for it. A garment of the right class is kept; anything else "
         "is destroyed, and a local actor of the class spawned there, hidden and not "
         "Dropped, or the slot emptied.", g.made)
 
 
 def author_view_worn(g, execs):
-    """The worn slots remade off WornClass (see the module docstring), in the
-    view's dirty arm. Returns the exec tail."""
-    rows = out(g.call(FN_ARR_LEN, TargetArray=g.get(WornClass)))
-    cls, i, body, done = for_each(g, g.get(WornClass), execs)
-    _ask(g, VIEW_WORN, [body], Slot=i, Class=cls)
+    """The worn slots remade off the record (see the module docstring), in
+    the view's dirty arm. Returns the exec tail."""
+    # Here, not at the top: view.py imports this module.
+    from combat.weapon_component.view import carrier, rows_loop
+    rows = out(g.call(FN_WORN_ROW_COUNT, Carrier=carrier(g)))
+    i, body, done = rows_loop(g, rows, execs)
+    worn = g.call(FN_WORN_ROW, Carrier=carrier(g), Slot=i, Kind=ITEM_CLASS_PATH)
+    _ask(g, VIEW_WORN, [body], Slot=i, Class=out(worn, "Class"))
     item, j, each, trimmed = for_each(g, g.get(WORN_VAR), [done])
     extra, _ = g.branch(op(g, FN_GE_II, j, rows), [each])
     real, _ = g.branch(valid(g, item), [extra])

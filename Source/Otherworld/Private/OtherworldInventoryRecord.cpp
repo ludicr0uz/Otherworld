@@ -96,29 +96,6 @@ namespace
 		const FBoolProperty* Property = FindFProperty<FBoolProperty>(Object->GetClass(), Name);
 		return Property && Property->GetPropertyValue_InContainer(Object);
 	}
-
-	/** An array variable of Object made Count rows long, each written by Fill(inner property, row's memory, index). */
-	template <typename InnerType, typename FillType>
-	void WriteArray(UObject* Object, FName Name, int32 Count, FillType Fill)
-	{
-		const FArrayProperty* Array = ArrayOf(Object, Name);
-		const InnerType* Inner = Array ? CastField<InnerType>(Array->Inner) : nullptr;
-		if (!Inner)
-		{
-			return;
-		}
-		FScriptArrayHelper Helper(Array, Array->ContainerPtrToValuePtr<void>(Object));
-		Helper.EmptyAndAddValues(Count);
-		for (int32 Index = 0; Index < Count; ++Index)
-		{
-			Fill(Inner, Helper.GetRawPtr(Index), Index);
-		}
-	}
-
-	UOtherworldInventoryRecordComponent* RecordOf(const AActor* Carrier)
-	{
-		return Carrier ? Carrier->FindComponentByClass<UOtherworldInventoryRecordComponent>() : nullptr;
-	}
 }
 
 // ─── The record ──────────────────────────────────────────────────────────────
@@ -239,6 +216,13 @@ void UOtherworldInventoryRecordComponent::MarkDirty()
 	}
 }
 
+UOtherworldInventoryRecordComponent* UOtherworldInventoryRecordComponent::Of(const UObject* Carrier)
+{
+	const UActorComponent* Part = Cast<UActorComponent>(Carrier);
+	const AActor* Actor = Part ? Part->GetOwner() : Cast<AActor>(Carrier);
+	return Actor ? Actor->FindComponentByClass<UOtherworldInventoryRecordComponent>() : nullptr;
+}
+
 UActorComponent* UOtherworldInventoryRecordComponent::Source()
 {
 	if (UActorComponent* Known = CachedSource.Get())
@@ -330,41 +314,6 @@ void UOtherworldInventoryRecordComponent::Write()
 		HandHot = bHot;
 		MARK_PROPERTY_DIRTY_FROM_NAME(UOtherworldInventoryRecordComponent, HandHot, this);
 	}
-	WriteMirror(From);
-}
-
-void UOtherworldInventoryRecordComponent::WriteMirror(UActorComponent* To) const
-{
-	const TArray<FOtherworldItemRow>& Rows = Record.Items;
-	WriteArray<FObjectPropertyBase>(To, MirrorClassVar, Rows.Num(),
-		[&Rows](const FObjectPropertyBase* Inner, void* At, int32 Index) { Inner->SetObjectPropertyValue(At, Rows[Index].Class.Get()); });
-	WriteArray<FIntProperty>(To, MirrorSlotVar, Rows.Num(),
-		[&Rows](const FIntProperty* Inner, void* At, int32 Index) { Inner->SetPropertyValue(At, Rows[Index].Slot); });
-	WriteArray<FIntProperty>(To, MirrorLoadedVar, Rows.Num(),
-		[&Rows](const FIntProperty* Inner, void* At, int32 Index) { Inner->SetPropertyValue(At, Rows[Index].Loaded); });
-	WriteArray<FIntProperty>(To, MirrorReserveVar, Rows.Num(),
-		[&Rows](const FIntProperty* Inner, void* At, int32 Index) { Inner->SetPropertyValue(At, Rows[Index].Reserve); });
-	WriteArray<FBoolProperty>(To, MirrorLitVar, Rows.Num(),
-		[&Rows](const FBoolProperty* Inner, void* At, int32 Index) { Inner->SetPropertyValue(At, Rows[Index].bLit); });
-	WriteArray<FBoolProperty>(To, MirrorHotVar, Rows.Num(),
-		[&Rows](const FBoolProperty* Inner, void* At, int32 Index) { Inner->SetPropertyValue(At, Rows[Index].bHot); });
-	const TArray<TSubclassOf<AActor>>& Garments = Record.Worn;
-	WriteArray<FObjectPropertyBase>(To, MirrorWornVar, Garments.Num(),
-		[&Garments](const FObjectPropertyBase* Inner, void* At, int32 Index) { Inner->SetObjectPropertyValue(At, Garments[Index].Get()); });
-
-	const UClass* Class = To->GetClass();
-	if (const FObjectPropertyBase* Property = FindFProperty<FObjectPropertyBase>(Class, MirrorHandClassVar))
-	{
-		Property->SetObjectPropertyValue_InContainer(To, HandClass.Get());
-	}
-	if (const FBoolProperty* Property = FindFProperty<FBoolProperty>(Class, MirrorHandLitVar))
-	{
-		Property->SetPropertyValue_InContainer(To, HandLit);
-	}
-	if (const FBoolProperty* Property = FindFProperty<FBoolProperty>(Class, MirrorHandHotVar))
-	{
-		Property->SetPropertyValue_InContainer(To, HandHot);
-	}
 }
 
 void UOtherworldInventoryRecordComponent::Audit()
@@ -409,7 +358,24 @@ bool UOtherworldInventoryRecordComponent::Carries(const AActor* Item) const
 void UOtherworldInventoryRecordComponent::OnRep_Record()
 {
 	++Writes;
+	RaiseViewDirty();
 	OnRecordChanged.Broadcast();
+}
+
+void UOtherworldInventoryRecordComponent::OnRep_Hand()
+{
+	RaiseViewDirty();
+}
+
+void UOtherworldInventoryRecordComponent::RaiseViewDirty()
+{
+	UActorComponent* View = Source();
+	const FBoolProperty* Property = View && !ViewDirtyVar.IsNone()
+		? FindFProperty<FBoolProperty>(View->GetClass(), ViewDirtyVar) : nullptr;
+	if (Property)
+	{
+		Property->SetPropertyValue_InContainer(View, true);
+	}
 }
 
 // ─── The frame's one write ───────────────────────────────────────────────────
@@ -473,62 +439,4 @@ void UOtherworldInventoryRecords::OnPostActorTick(UWorld* World, ELevelTick Tick
 			Component->Audit();
 		}
 	}
-}
-
-// ─── For the graphs and the probes ───────────────────────────────────────────
-
-void UOtherworldInventoryLibrary::MarkInventoryDirty(UObject* Carrier)
-{
-	const UActorComponent* Part = Cast<UActorComponent>(Carrier);
-	const AActor* Actor = Part ? Part->GetOwner() : Cast<AActor>(Carrier);
-	if (UOtherworldInventoryRecordComponent* Component = RecordOf(Actor))
-	{
-		Component->MarkDirty();
-	}
-}
-
-void UOtherworldInventoryLibrary::MarkCarriedItemDirty(AActor* Item)
-{
-	UWorld* World = Item ? Item->GetWorld() : nullptr;
-	if (!World || !Item->HasAuthority())
-	{
-		return;
-	}
-	if (UOtherworldInventoryRecords* Records = World->GetSubsystem<UOtherworldInventoryRecords>())
-	{
-		Records->MarkCarrierOf(Item);
-	}
-}
-
-FString UOtherworldInventoryLibrary::DescribeInventoryRecord(const AActor* Carrier)
-{
-	const UOtherworldInventoryRecordComponent* Component = RecordOf(Carrier);
-	if (!Component)
-	{
-		return FString();
-	}
-	return FString::Printf(TEXT("%s || hand %s%s%s"), *Component->Record.Describe(), *ClassName(Component->HandClass),
-		Component->HandLit ? TEXT(" lit") : TEXT(""), Component->HandHot ? TEXT(" hot") : TEXT(""));
-}
-
-int32 UOtherworldInventoryLibrary::InventoryRecordWrites(const AActor* Carrier)
-{
-	const UOtherworldInventoryRecordComponent* Component = RecordOf(Carrier);
-	return Component ? Component->Writes : -1;
-}
-
-int32 UOtherworldInventoryLibrary::InventoryRecordStale(const AActor* Carrier)
-{
-	const UOtherworldInventoryRecordComponent* Component = RecordOf(Carrier);
-	return Component ? Component->Stale : -1;
-}
-
-void UOtherworldInventoryLibrary::SetInventoryRecordAudit(bool bOn)
-{
-	CVarInventoryRecordAudit->Set(bOn ? 1 : 0, ECVF_SetByCode);
-}
-
-bool UOtherworldInventoryLibrary::IsPushModelOn()
-{
-	return IS_PUSH_MODEL_ENABLED();
 }

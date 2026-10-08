@@ -6,7 +6,7 @@ of it (M24).
 Wearing and taking off are Server events on the weapon component
 (combat/weapon_component/wear.py, wear_drag.py: Server_Wear, AskWear,
 AskTakeOff); what is worn is the server's item actors, written down as
-WornClass (combat/record_vars.py), which replicates to the owning client and
+the record (combat/record_vars.py), which goes to the owning client and
 which that client's Worn is made from (view_worn.py).
 
     the server  gives client 1's character the level's hat and jacket (its own
@@ -36,7 +36,7 @@ import unreal
 from combat import item_vars as IV
 from combat.ask_consts import ASK_DROP, ASK_TAKE_OFF, ASK_WEAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
-from combat.record_vars import FORCED, WornClass
+from combat.record_vars import FORCED
 from combat.slot_tuning import BAG_FIRST, BAG_LAST, SLOT_COUNT, SLOT_VAR, UNPLACED
 from combat.strike_vars import SERVER_TAKE
 from combat.wear_tuning import SERVER_WEAR, WEAR_SLOTS, WORN_VAR
@@ -89,7 +89,8 @@ def _worn(p, wc):
 
 
 def _worn_record(p, wc):
-    return _row(_name(c) for c in p.get(wc, WornClass))
+    part = wc.get_owner().get_component_by_class(unreal.OtherworldInventoryRecordComponent)
+    return _row(_name(c) for c in part.get_editor_property("record").get_editor_property("worn"))
 
 
 def _want(step):

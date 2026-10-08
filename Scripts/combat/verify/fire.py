@@ -11,7 +11,7 @@ probes/probe_net_campfire.py is the two-client proof.
 from uebp import net
 from combat.fire_vars import FIRE_PARAM, SERVER_EVENTS, SERVER_HEAT
 from combat.heat_tuning import HOT_VAR
-from combat.record_vars import RECORD_COMPONENT, VIEW_ROW, HandHot, HandLit, InvHot, InvLit
+from combat.record_vars import RECORD_COMPONENT, VIEW_ROW
 from combat.torch_tuning import LIT_VAR
 from combat.verify.common import BEL, PIN, by_pins, check, component_template, out_pins
 from combat.verify.fixtures import _is_exec, char, wc, wg
@@ -45,21 +45,20 @@ def check_events():
 
 def check_told():
     row = _event(VIEW_ROW)
-    for var, column, hand in ((LIT_VAR, InvLit, HandLit), (HOT_VAR, InvHot, HandHot)):
+    for var in (LIT_VAR, HOT_VAR):
         fed = [n for n in wg if _title(n) == f"Set {var}" and _feeders(n, var)]
         check(f"a client's picture of an item is told its {var} by its row "
               f"({VIEW_ROW}), and writes it nowhere else",
               len(fed) == 1 and row is not None and _feeders(fed[0], var) == [row]
               and row in _upstream(fed[0]), str(len(fed)))
-        # The record is the C++ component's (verify/record.py): it reads
-        # the item's flag and mirrors it to these two by name.
+        # The record is the C++ component's (verify/record.py): it reads the
+        # item's flag by name, into the item's row and, for the item in
+        # hand, into what everyone but its owner is told.
         part = component_template(char, RECORD_COMPONENT)
-        names = {k: str(part.get_editor_property(k)) for k in (
-            f"Item{var}Var", f"Mirror{var}Var", f"MirrorHand{var}Var")} if part else {}
-        check(f"the record's {column} is the server's item's {var}, a row per item, and "
-              f"{hand} the hand's, for everyone but its owner: the record component "
-              "reads the one and writes the other two",
-              list(names.values()) == [var, str(column), str(hand)], str(names))
+        name = str(part.get_editor_property(f"Item{var}Var")) if part else None
+        check(f"the record's row has the server's item's {var}, and Hand{var} the "
+              "hand's, for everyone but its owner: the record component reads the "
+              "item's flag by its name", name == var, str(name))
 
 
 def run():

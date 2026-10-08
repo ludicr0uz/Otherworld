@@ -98,11 +98,13 @@ _author_* fragment per concern, each in its own module:
               Server events; the serve, with authority: the request (the hand's
               item home, the asked one up) and the HUD's drag (MoveFrom/To)
   record      the weapon component's part in the inventory's record
-              (record_vars.py): the variables the old view reads, marked to
-              replicate with their OnReps. The record itself is C++ and is
+              (record_vars.py): the authority test, the RepNotify that
+              raises ViewDirty (AsksServed's) and the retiring of the
+              variables that mirrored the record. The record itself is C++,
               written when something marked it (combat/dirty.py), not here
   view        a client's half: its item actors made from the record when one
-              arrives (ViewRow, ViewTrim); another player's from HandClass;
+              arrives (ViewRow, ViewTrim), read off the record component
+              row by row; another player's from its HandRow;
               the rounds only once every ask is answered (shot_vars.py)
   slot_sync   last before the refresh: SlotItems rebuilt from each item's
               Slot, UNPLACED items placed (a weapon in its weapon slot
@@ -184,7 +186,7 @@ _author_* fragment per concern, each in its own module:
               with authority: a slot's garment is worn from wherever it is
               carried
   view_worn   a client's worn garments: Worn made a picture of the record's
-              WornClass (ViewWorn), called by view
+              worn slots (WornRow, ViewWorn), called by view
   drop_request  the drop: the drop key and a probe's DropForced ask (AskDrop,
               a Server event), and DropRequest served with authority (the
               key's, or the I panel's drag released outside the inventory):

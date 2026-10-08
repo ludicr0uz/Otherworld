@@ -92,7 +92,7 @@ from combat.weapon_component.asks import author_asks
 from combat.weapon_component.look import author_set_look, replicate_look
 from combat.weapon_component.look_vars import TABLE as LOOK_TABLE
 from combat.record_vars import TABLE as RECORD_TABLE
-from combat.weapon_component.record import replicate_record
+from combat.weapon_component.record import retire_mirror
 from combat.dirty import CARRIER, mark_change_sites
 from combat.weapon_component.view import author_view_events
 from combat.weapon_component.view_worn import author_view_worn_event
@@ -169,9 +169,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # The look (look.py): declared, then replicated, on every build.
     declare(ed, LOOK_TABLE)
     replicate_look(bp)
-    # The inventory's record (record.py): the same, with its OnReps.
+    # The view of the inventory's record and the probes' asks (record_vars.py):
+    # nothing of it replicates here, the record is its own component's.
     declare(ed, RECORD_TABLE)
-    replicate_record(bp)
+    retire_mirror(bp, ed)
     # The shot's and the reload's asks (shot.py): the counters that reconcile
     # a client's predicted rounds.
     declare(ed, SHOT_TABLE)

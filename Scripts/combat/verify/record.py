@@ -1,29 +1,35 @@
 """verify.record -- the inventory's record (combat/record_vars.py,
-combat/dirty.py, weapon_component/record.py, view.py): what replicates and to
-whom, that the server alone issues the loadout and serves the slots, that the
-record is held by its own component on the character and written by no graph
-(the Tick's rewrite is gone), that every node which changes what is carried
-is followed by the mark that has it written, and that a client's item actors
-are made only by the view's two events.
+combat/dirty.py, weapon_component/record.py, view.py): that the record is
+held by its own component on the character and by nothing else (no Blueprint
+variable mirrors it, no graph writes it, no builder names the arrays that
+did), that the server alone issues the loadout and serves the slots, that
+every node which changes what is carried is followed by the mark that has it
+written, and that a client's item actors are made only by the view's two
+events, from rows read off the record.
 
 Checked on the compiled class and the wiring; probes/probe_net_inventory.py
 moves an item on a client of a server and reads the server's copy.
 """
 
+import os
+import re
+
 from uebp import net
 from graphics_menu.umg_consts import HUD_BP_PATH
 from combat.paths import AMMO_BP_PATH, AXE_BP_PATH, KNIFE_BP_PATH, STICK_BP_PATH
 from combat.record_vars import (
-    CARRIED_ARRAYS, HAND, ITEM_STATE, RECORD, RECORD_COMPONENT, RECORD_COMPONENT_CLASS,
-    RECORD_HAND_SLOT, RECORD_MIRROR, RECORD_SOURCE, REPLICATED, VIEW_ROW, VIEW_TRIM, VIEW_WORN,
-    ViewDirty, WornClass)
+    CARRIED_ARRAYS, ITEM_STATE, RECORD_COMPONENT, RECORD_COMPONENT_CLASS, RECORD_HAND_SLOT,
+    RECORD_SOURCE, RECORD_VIEW, RETIRED_ARRAYS, RETIRED_VARS, VIEW_ROW, VIEW_TRIM, VIEW_WORN,
+    ViewDirty)
 from combat.slot_tuning import SLOT_WANT_VAR
 from combat.verify.common import (
     BEL, PIN, by_pins, check, component_template, graph, in_pins, load)
 from combat.verify.fixtures import _is_exec, char, wc, wc_cdo, wg
 from combat.weapon_component.inventory import STARTER_CLASS_VARS
 
-OWNER_ONLY, SKIP_OWNER = "COND_OWNER_ONLY", "COND_SKIP_OWNER"
+SCRIPTS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# The view's reads of the record (uebp/nodes/inventory.py), as a node is titled.
+ROW_READ, HAND_READ, WORN_READ = "InventoryRow", "HandRow", "WornRow"
 MARK_CARRIER, MARK_ITEM = "MarkInventoryDirty", "MarkCarriedItemDirty"
 # Every other Blueprint whose graph changes what a player carries, and what
 # of it: the items' own clocks, the rounds a pick-up hands a carried gun, and
@@ -77,29 +83,49 @@ def _authority_branches():
         "HasAuthority" in _title(c).replace(" ", "") for c in _feeders(n, "Condition"))]
 
 
-def check_replication():
-    declared = {str(v): net.variable_replication(wc, str(v)) for v in REPLICATED}
-    want = {str(v): (net.REP_NOTIFY, f"OnRep_{v}",
-                     SKIP_OWNER if v in HAND else OWNER_ONLY) for v in REPLICATED}
-    check("the record's arrays and the worn slots' classes replicate to the owning "
-          "client alone, and the class in hand, with whether it burns or is hot, to "
-          "everyone else; each is a RepNotify",
-          {k: (a, b, c.upper()) for k, (a, b, c) in declared.items()} == want, str(declared))
-    compiled = {str(v): net.compiled_replication(wc, str(v)) for v in REPLICATED}
-    check("...and compiled so", all(k == (net.REP_NOTIFY, f"OnRep_{v}")
-                                    for v, k in compiled.items()), str(compiled))
-    lone = {}
-    for v in REPLICATED:
-        nodes = [n for n in graph(wc, f"OnRep_{v}").list_all_nodes()
-                 if "FunctionEntry" not in type(n).__name__]
-        lone[str(v)] = [_title(n) for n in nodes if "Comment" not in type(n).__name__]
-    check(f"each OnRep only raises {ViewDirty}",
-          all(t == [f"Set {ViewDirty}"] for t in lone.values()), str(lone))
-    check(f"{ViewDirty} starts true (a first record may arrive before BeginPlay), and "
-          "the record empty", wc_cdo.get_editor_property(str(ViewDirty)) is True
-          and all(len(wc_cdo.get_editor_property(str(v))) == 0
-                  for v in RECORD + (WornClass,)))
+def _reads(node, pin, read):
+    """``pin`` of ``node`` is fed by the library's ``read`` of the owner's
+    record, and by nothing else."""
+    fed = _feeders(node, pin)
+    return (len(fed) == 1 and _title(fed[0]).replace(" ", "") == read
+            and [_title(f).replace(" ", "") for f in _feeders(fed[0], "Carrier")] == ["GetOwner"])
+
+
+def check_no_mirror():
+    held = []
+    for v in RETIRED_VARS:
+        try:
+            wc_cdo.get_editor_property(v)
+            held.append(v)
+        except Exception:
+            pass
+    graphs = [v for v in RETIRED_VARS if BEL.find_graph(wc, f"OnRep_{v}")]
+    check("the weapon component holds no copy of the record: the six arrays, the worn "
+          "slots' classes and the hand's three are gone, each with its OnRep",
+          not held and not graphs, f"variables {held}, graphs {graphs}")
+    check(f"{ViewDirty} starts true (a first record may arrive before BeginPlay)",
+          wc_cdo.get_editor_property(str(ViewDirty)) is True)
     check("the weapon component replicates", net.replicates(wc))
+
+
+def check_no_array_named():
+    """Every Python source under Scripts, this package's builders and
+    everyone else's, comments and all: a name that comes back is a builder
+    reading a mirror that no longer exists."""
+    word = re.compile(r"\b(" + "|".join(RETIRED_ARRAYS) + r")\b")
+    named = []
+    for folder, _dirs, files in os.walk(SCRIPTS):
+        for name in files:
+            if not name.endswith(".py"):
+                continue
+            path = os.path.join(folder, name)
+            with open(path, encoding="utf-8", errors="replace") as f:
+                hits = sorted(set(word.findall(f.read())))
+            if hits:
+                named.append(f"{os.path.relpath(path, SCRIPTS)}: {', '.join(hits)}")
+    check("no builder names one of the record's old arrays "
+          f"({', '.join(RETIRED_ARRAYS)}): the record is read off its component",
+          not named, str(named))
 
 
 def check_server_owns():
@@ -151,27 +177,29 @@ def check_record_component():
           and bool(part.get_editor_property("replicates")), str(cls))
     if not part:
         return
-    names = {k: str(part.get_editor_property(k)) for k in {**RECORD_SOURCE, **RECORD_MIRROR}}
+    want = {**RECORD_SOURCE, **RECORD_VIEW}
+    names = {k: str(part.get_editor_property(k)) for k in want}
     check("it reads the weapon component's arrays and each item's variables by the "
-          "builders' own names, and mirrors to the variables the old view reads",
-          names == {**RECORD_SOURCE, **RECORD_MIRROR}
+          f"builders' own names, and raises {ViewDirty} on a client when a record arrives",
+          names == want
           and part.get_editor_property(RECORD_HAND_SLOT[0]) == RECORD_HAND_SLOT[1],
-          str({k: v for k, v in names.items()
-               if v != {**RECORD_SOURCE, **RECORD_MIRROR}[k]}))
+          str({k: v for k, v in names.items() if v != want[k]}))
 
 
 def check_no_rewrite():
     every = list(graph(wc).list_all_nodes())
-    mirror = {str(v) for v in REPLICATED}
+    mirror = set(RETIRED_VARS)
     sets = [_title(n) for n in every if "VariableSet" in type(n).__name__
             and any(_title(n).startswith("Set") and _title(n).endswith(f" {v}") for v in mirror)]
     writes = [_title(n) for n in every if "TargetArray" in in_pins(n)
               and any(_is_exec(p) for p in BEL.list_output_pins(n))
               and any(_title(f) in {f"Get {v}" for v in mirror}
                       for f in _feeders(n, "TargetArray"))]
-    check("no graph of the weapon component writes the record: the Tick's rewrite (an "
-          "Add per column per item, every frame) is gone, and so is the shed's clear",
-          not sets and not writes, f"{sets + writes}")
+    reads = [_title(n) for n in every if _title(n) in {f"Get {v}" for v in mirror}]
+    check("no graph of the weapon component writes the record, or reads a copy of it: "
+          "the Tick's rewrite (an Add per column per item, every frame) is gone, and so "
+          "are the shed's clear and the mirror",
+          not sets and not writes and not reads, f"{sets + writes + reads}")
     lone = [n for n in every if _title(n).replace(" ", "") in (MARK_CARRIER, MARK_ITEM)
             and any("EventTick" in _title(f).replace(" ", "") for f in _feeders(n, "execute"))]
     check("...and no mark hangs straight off the Tick event: the record is written "
@@ -221,6 +249,17 @@ def check_view():
           and all(dirty[0] in _upstream(c) for c in calls)
           and any(_arm(dirty[0], g) == "else" for g in gates),
           f"{len(calls)} call(s), {len(dirty)} gate(s)")
+    rows = [n for n in calls if _title(n).replace(" ", "") == VIEW_ROW]
+    read = sorted(_title(f).replace(" ", "") for n in rows for f in _feeders(n, "Class"))
+    check(f"each {VIEW_ROW} is handed a row read off the owner's record: the rows "
+          f"themselves ({ROW_READ}: class, slot, reserve, lit, hot; the rounds through "
+          f"the reconciling select), and another player's hand ({HAND_READ})",
+          read == [HAND_READ, ROW_READ]
+          and all(_reads(n, "Class", ROW_READ) and _reads(n, "Slot", ROW_READ)
+                  and _reads(n, "Reserve", ROW_READ) and _reads(n, "Lit", ROW_READ)
+                  and _reads(n, "Hot", ROW_READ)
+                  or _reads(n, "Class", HAND_READ) and _reads(n, "Lit", HAND_READ)
+                  and _reads(n, "Hot", HAND_READ) for n in rows), str(read))
     made = [n for n in by_pins(wg, "Class", "SpawnTransform")
             if events[VIEW_ROW] in _feeders(n, "Class")]
     check(f"a client's item actors are spawned in {VIEW_ROW}, of the row's class",
@@ -241,12 +280,11 @@ def check_view_worn():
     calls = [n for n in wg if _title(n).replace(" ", "") == VIEW_WORN and "self" in in_pins(n)]
     dirty = [n for n in wg if _title(n) == "Branch"
              and any(_title(c) == f"Get {ViewDirty}" for c in _feeders(n, "Condition"))]
-    check(f"a client's worn slots are remade off {WornClass} only without authority, "
-          f"when a record arrived ({ViewDirty})",
+    check(f"a client's worn slots are remade off the record ({WORN_READ} of the owner's) "
+          f"only without authority, when a record arrived ({ViewDirty})",
           len(calls) == 1 and len(dirty) == 1 and dirty[0] in _upstream(calls[0])
           and any(_arm(dirty[0], g) == "else" for g in gates)
-          and any(_title(f) == f"Get {WornClass}" for up in _upstream(calls[0])
-                  for f in _feeders(up, "Array")), f"{len(calls)} call(s)")
+          and _reads(calls[0], "Class", WORN_READ), f"{len(calls)} call(s)")
     made = [n for n in by_pins(wg, "Class", "SpawnTransform") if event in _feeders(n, "Class")]
     after = [_title(n) for m in made for n in wg if m in _upstream(n)]
     check(f"...a garment spawned in {VIEW_WORN}, of the row's class, hidden and not "
@@ -256,7 +294,8 @@ def check_view_worn():
 
 def run():
     check_view_worn()
-    check_replication()
+    check_no_mirror()
+    check_no_array_named()
     check_server_owns()
     check_record_component()
     check_no_rewrite()

@@ -1,0 +1,150 @@
+{
+  "level_name": "Lvl_Probe_50m",
+  "world_size_m": 50.0,
+  "all_passed": true,
+  "checks": [
+    {
+      "name": "OBJ File Valid",
+      "passed": true,
+      "message": "578 vertices, 1152 faces, 578 normals",
+      "details": []
+    },
+    {
+      "name": "Terrain Bounds",
+      "passed": true,
+      "message": "X span: 5000 cm, Y span: 5000 cm (expected 5000 cm)",
+      "details": []
+    },
+    {
+      "name": "Center Spawn Flat",
+      "passed": true,
+      "message": "Max |Z| in spawn zone: 0.00 cm (threshold: 1.0 cm)",
+      "details": [
+        "(0, 0) \u2192 Z=0.00",
+        "(250, 0) \u2192 Z=0.00",
+        "(-250, 0) \u2192 Z=0.00",
+        "(0, 250) \u2192 Z=0.00",
+        "(0, -250) \u2192 Z=0.00"
+      ]
+    },
+    {
+      "name": "Top Normals Upward",
+      "passed": true,
+      "message": "Checked 578 normals, 0 bad top-surface normals",
+      "details": []
+    },
+    {
+      "name": "Barycentric Consistency",
+      "passed": true,
+      "message": "Max barycentric error at grid vertices: 0.0000 cm",
+      "details": []
+    },
+    {
+      "name": "Tree Count / Density",
+      "passed": true,
+      "message": "18 trees on 0.2 ha = 72.0 trees/ha",
+      "details": []
+    },
+    {
+      "name": "Trees Within Bounds",
+      "passed": true,
+      "message": "All trees within map bounds",
+      "details": []
+    },
+    {
+      "name": "Trees Not Floating",
+      "passed": true,
+      "message": "All trees at or below terrain",
+      "details": []
+    },
+    {
+      "name": "Trees Not Over-Buried",
+      "passed": true,
+      "message": "All sinks within 200 cm",
+      "details": []
+    },
+    {
+      "name": "Trees Vertical",
+      "passed": true,
+      "message": "All trees placed with pitch=0, roll=0 (vertical)",
+      "details": []
+    },
+    {
+      "name": "Tree Spacing (>100cm)",
+      "passed": true,
+      "message": "Min spacing: 178 cm, 0 overlaps",
+      "details": []
+    },
+    {
+      "name": "Spawn Zone Clear",
+      "passed": true,
+      "message": "Spawn zone (5m radius) clear",
+      "details": []
+    },
+    {
+      "name": "Foliage Meshes",
+      "passed": true,
+      "message": "2 grass patches, 2 bushes, within budget",
+      "details": [
+        "SM_GrassPatch_A: 1600 tris, 53 cm tall, 147 cm wide",
+        "SM_GrassPatch_B: 1614 tris, 61 cm tall, 137 cm wide",
+        "SM_Bush_Round: 3462 tris, 121 cm tall, 166 cm wide",
+        "SM_Bush_Tall: 3126 tris, 167 cm tall, 131 cm wide"
+      ]
+    },
+    {
+      "name": "NPC Count",
+      "passed": true,
+      "message": "10 wanderer(s) placed",
+      "details": []
+    },
+    {
+      "name": "NPC Spawn Band",
+      "passed": true,
+      "message": "18.2-19.7 m from the player start, band 17.9-19.9 m (clamped from 75-100 m by the navigable radius)",
+      "details": []
+    },
+    {
+      "name": "NPC Separation",
+      "passed": true,
+      "message": "closest pair (NPC 3, NPC 10) 6.4 m apart (minimum 6.0 m)",
+      "details": []
+    },
+    {
+      "name": "NPC Within Bounds",
+      "passed": true,
+      "message": "all 10 inside +/-2000 cm",
+      "details": []
+    },
+    {
+      "name": "NPC Clear Of Trees",
+      "passed": true,
+      "message": "tightest spawn has 249 cm to the nearest trunk (minimum 220 cm)",
+      "details": []
+    },
+    {
+      "name": "NPC Grounded",
+      "passed": true,
+      "message": "all 10 capsule centres 88 cm above the exact mesh Z",
+      "details": []
+    },
+    {
+      "name": "NPC Route Is Obstructed",
+      "passed": true,
+      "message": "7/10 routes cross a trunk; the rest walk straight. Raise tree density or re-run with a different --seed to exercise the detour behaviour",
+      "details": []
+    },
+    {
+      "name": "Nav Bounds Sane",
+      "passed": true,
+      "message": "+/-2500 cm XY covering +/-2500 cm of terrain, 1446 cm vertical span (terrain -47..999)",
+      "details": []
+    },
+    {
+      "name": "NPC Inside Nav Bounds",
+      "passed": true,
+      "message": "all 10 stand inside +/-2500 cm XY, feet within -247..1199",
+      "details": []
+    }
+  ]
+}

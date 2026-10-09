@@ -51,8 +51,10 @@ class _Grid:
 
 def forage_counts(width_cm, depth_cm):
     hectares = (width_cm / 100.0) * (depth_cm / 100.0) / 10000.0
-    return (min(MAX_MUSHROOMS, round(MUSHROOMS_PER_HECTARE * hectares)),
-            min(MAX_CANTEENS, round(CANTEENS_PER_HECTARE * hectares)))
+    # At least one of each, so a probe's 50 m level (a quarter of a hectare)
+    # still has a mushroom and a canteen to find.
+    return (max(1, min(MAX_MUSHROOMS, round(MUSHROOMS_PER_HECTARE * hectares))),
+            max(1, min(MAX_CANTEENS, round(CANTEENS_PER_HECTARE * hectares))))
 
 
 def scatter_forage(x_range, y_range, trunks, start_xy, seed=FORAGE_SEED):
@@ -62,8 +64,12 @@ def scatter_forage(x_range, y_range, trunks, start_xy, seed=FORAGE_SEED):
     (x, y) tree positions; start_xy is the player start.
     """
     rng = random.Random(seed)
-    x0, x1 = x_range[0] + FORAGE_EDGE_MARGIN_CM, x_range[1] - FORAGE_EDGE_MARGIN_CM
-    y0, y1 = y_range[0] + FORAGE_EDGE_MARGIN_CM, y_range[1] - FORAGE_EDGE_MARGIN_CM
+    side = min(x_range[1] - x_range[0], y_range[1] - y_range[0])
+    # The margins shrink on a map under 150 m a side (a 200 m one is unchanged).
+    margin = min(FORAGE_EDGE_MARGIN_CM, 0.1 * side)
+    start_clear = min(FORAGE_START_CLEAR_CM, 0.12 * side)
+    x0, x1 = x_range[0] + margin, x_range[1] - margin
+    y0, y1 = y_range[0] + margin, y_range[1] - margin
     if x1 <= x0 or y1 <= y0:
         raise ValueError("terrain is smaller than twice the edge margin")
     n_mush, n_can = forage_counts(x_range[1] - x_range[0], y_range[1] - y_range[0])
@@ -77,7 +83,7 @@ def scatter_forage(x_range, y_range, trunks, start_xy, seed=FORAGE_SEED):
     def free(x, y, trunk_clear):
         if not (x0 <= x <= x1 and y0 <= y <= y1):
             return False
-        if math.hypot(x - start_xy[0], y - start_xy[1]) < FORAGE_START_CLEAR_CM:
+        if math.hypot(x - start_xy[0], y - start_xy[1]) < start_clear:
             return False
         if placed_grid.near(x, y, FORAGE_MIN_SPACING_CM):
             return False

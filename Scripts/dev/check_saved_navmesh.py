@@ -15,7 +15,7 @@ import os
 import sys
 
 MAPS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
-                    "Content", "Maps", "Lvl_Forest_*.umap")
+                    "Content", "Maps", "Lvl_*.umap")
 MARK = b"RecastNavMesh-Default"
 
 

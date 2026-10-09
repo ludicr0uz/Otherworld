@@ -42,6 +42,9 @@ are listed under `Modules` in `Otherworld.uproject` (`OtherworldEditor` as type 
     -project="/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Otherworld.uproject" -waitmutex
 ```
 
+- **One command:** `python3 Scripts/dev/uepy.py --compile` closes this project's editors, waits for them,
+  runs the line above, rewrites `UnrealEditor.modules` if it names an older dylib, boots the serve
+  editor (`$UEPY_SERVE`) and proves `unreal.OtherworldMovementLibrary` exists (`uepylib/compile.py`).
 - **Time** (M-series Mac, 10 cores, 16 GB): **27 s** from nothing for the runtime module alone (5 actions: the shared PCH,
   two sources, the link, the metadata), **12 s** to add the editor module to that (7 actions),
   **3 s** when nothing changed.

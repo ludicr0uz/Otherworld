@@ -52,6 +52,7 @@ import sys
 import time
 
 from uepylib import cold, detach, editors, game, inbox, net, net_plan, probe_level, probe_map, remote, server, warm
+from uepylib import compile as compile_cpp
 from uepylib.paths import (
     editor_inbox, engine_dir, game_inbox, log, saved_uepy, serve_inbox, set_project,
 )
@@ -154,6 +155,9 @@ def parse_args():
                     help="with --probes-for: print the launches, run nothing")
     ap.add_argument("--close-editors", action="store_true",
                     help="save and quit (or kill) this project's editors, then exit")
+    ap.add_argument("--compile", action="store_true",
+                    help="close this project's editors, build the C++, fix UnrealEditor.modules, "
+                         "boot the serve editor ($UEPY_SERVE) and prove the module loads")
     ap.add_argument("--game", action="store_true",
                     help="headless -game run instead of a script")
     ap.add_argument("--net", action="store_true",
@@ -287,7 +291,11 @@ def main():
         print(run, flush=True)
         log(f"detached; collect with: uepy.py --wait {run}")
         return 0
-    if args.close_editors:
+    if args.compile:
+        if compile_cpp.run(engine, serve_inbox(), server.stop):
+            return 1
+        args.code = [compile_cpp.PROVE]
+    elif args.close_editors:
         _closed, left = editors.close_editors()
         return 1 if left else 0
     if args.net and args.game:

@@ -219,12 +219,17 @@ SHOTGUN_MODEL = (
 # The end of the barrel, on its axis.
 SHOTGUN_MUZZLE = (77.5, 0.0, 3.9)
 
-# How far the index may rest off the TriggerGuard (verify/grip_fit; the other
-# guns are held to 2.5). The ready pose is a pistol grip's: its index lies
+# How far the index's outer joints may rest off the trigger guard (cm).
+TRIGGER_REACH_CM = 2.5
+# How far the shotgun's may (verify/grip_fit). The ready pose is a pistol grip's: its index lies
 # 4.5 cm above the fist's centre. This gun has a straight stock and its guard
 # hangs under the wrist, so the index lies along the receiver, 4.1 cm above
 # the guard; putting it in the guard would hang the fist 3 cm under the wood.
 SHOTGUN_TRIGGER_REACH_CM = 4.5
+# Lyra's pistol ready pose lays the index straight along the frame, above
+# the guard, not on the trigger: 3.9 cm from the pistol's guard, 3.5 from the
+# SMG's (verify/grip_fit.py; the pose until C3 had it 1.7 off).
+PISTOL_POSE_TRIGGER_REACH_CM = 4.5
 
 # The sight line: a shotgun has no rear sight, so the line skims the
 # receiver's hump (a fin 6.83 high at x 3.7) a millimetre over it and ends on
@@ -237,7 +242,7 @@ SHOTGUN_SIGHT = _eye_behind(SHOTGUN_SIGHT_REAR, SHOTGUN_SIGHT_FRONT, -12.0)
 
 
 # The stock's wrist, where the right hand closes: its min and max corners,
-# measured. The thumb goes over its top (shotgun_pose.py).
+# measured.
 SHOTGUN_WRIST = ((-4.6, -1.5, -5.4), (1.4, 1.5, 2.4))
 
 # The pump, where the left hand closes: the wood round the magazine tube,

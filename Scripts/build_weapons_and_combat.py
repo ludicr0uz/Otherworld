@@ -40,7 +40,6 @@ WHAT THIS BUILDS
                       swing and ready pose, baked from Mixamo's (combat/melee_clips.py)
   Anims/A_HoldItem, A_HoldTorch, A_WardTorch  how food and the stick are held (combat/hold_pose.py)
   Anims/A_ThrowReady  the arm cocked while a throw is aimed (combat/throw_pose.py)
-  Anims/A_AimShotgun             the shotgun's ready pose: the thumb over the stock (combat/shotgun_pose.py)
   BP_HealthComponent  Health/MaxHealth + death, despawn and respawn
   BP_WeaponComponent  inventory of 5, equip/switch/fire/drop/pick up
   BP_BloodSplash    short-lived red burst spawned at each impact on a body
@@ -87,7 +86,7 @@ from combat.knife import build_knife                              # noqa: E402
 from combat.melee_clips import build_melee_clips                  # noqa: E402
 from combat.paths import KNIFE_ANIM_PATH                          # noqa: E402
 from combat.hold_pose import build_hold_poses                     # noqa: E402
-from combat.shotgun_pose import build_shotgun_pose                # noqa: E402
+from combat.shotgun_hold import retire_keyed_pose                 # noqa: E402
 from combat.install import (                                      # noqa: E402
     install_on_character, install_on_npc, retire_old_assets,
 )
@@ -163,15 +162,14 @@ def main():
         # The base holds the layers' class, which every patch above recompiled.
         resave_gas_locomotion()
 
-    # Before the weapons: the shotgun's row names it, and its grip is solved
-    # in it.
-    build_shotgun_pose(skin)
     # Before the items: the base one carries the sprite it is drawn on.
     build_glimmer_material()
     item_bp = build_weapon_item()
     weapons = {}
     for spec in _weapon_specs():
         weapons[spec["display"]] = build_weapon(spec, item_bp)
+    # The shotgun's Blueprint no longer names its keyed pose (C3).
+    retire_keyed_pose()
     # Before the knife and the consumables, whose grips are solved in them.
     build_hold_poses(skin)
     # The knife's and the axe's ready pose and swing: Mixamo's clips.

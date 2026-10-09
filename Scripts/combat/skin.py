@@ -97,15 +97,15 @@ class PlayerSkin:
     # way and is not in; the index's outer joints rest on the trigger.
     grip_fingers: tuple
     # The grip hand's thumb, its three joints from the palm out. The rifle
-    # ready pose lays it forward along a pistol grip's side; shotgun_pose.py
-    # turns it over a straight stock's wrist...
+    # ready pose lays it forward along a pistol grip's side, and so it lies
+    # on the shotgun's straight stock...
     grip_thumb: tuple
     # ...and the other hand's, the one under the fore-end, which the rifle
     # pose stands up beside the barrel.
     support_thumb: tuple
     # That hand's four closing fingers, index first, as grip_fingers: the
-    # rifle pose cups a deep handguard with them, and shotgun_pose.py closes
-    # them on a pump.
+    # rifle pose cups a deep handguard with them, and shotgun_hold.py moves
+    # the hand to where they sit on a pump.
     support_fingers: tuple
     # The two spine joints that pitch the upper body onto the aim down the
     # sights, lower first; each takes half (aim_pitch.py). Everything above
@@ -142,6 +142,10 @@ class PlayerSkin:
     # library, played into the upper-body slot. None where the rig has none:
     # the item then leaves the hand on the click, with no clip.
     throw: str = None
+    # A carried item's hand is closed as the pistol pose closes it
+    # (hold_pose.closed_fist). Where that pose does not close the index, the
+    # ready pose its index is taken from instead; None where it does.
+    fist_index: str = None
     # True when what is DRAWN is a MetaHuman hung under this mesh, which is
     # then hidden (combat/metahuman_body.py). Everything above still names
     # the mannequin: it is the mannequin that is animated, gripped, hit and
@@ -281,17 +285,25 @@ SKIN_METAHUMAN = dataclasses.replace(
 # mannequin's are (asset_pipeline/gas_player_mesh.py copies the sockets). A
 # clip belongs to one skeleton, so its clips are the mannequin's and
 # Quaternius's retargeted onto this one (asset_pipeline/retarget_to_uefn.py),
-# its punch Lyra's, retargeted the same way (asset_pipeline/import_lyra.py),
+# its punch and its two ready poses Lyra's, retargeted the same way
+# (asset_pipeline/import_lyra.py),
 # and its idle the sample's own.
 GAS_ANIMS = f"/Game/Sourced/Characters/Anims/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
 GAS_UAL_ANIMS = f"/Game/Sourced/Quaternius/UAL/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
-# The punch of a checkout that has no Lyra (_gas_skin): the mannequin's.
+# The punch and the two ready poses of a checkout that has no Lyra
+# (_gas_skin): the mannequin's.
 GAS_PUNCH_WITHOUT_LYRA = f"{GAS_ANIMS}MM_Attack_01"
+GAS_AIM_WITHOUT_LYRA = dict(aim_rifle=f"{GAS_ANIMS}MF_Rifle_Idle_ADS",
+                            aim_pistol=f"{GAS_ANIMS}MF_Pistol_Idle_ADS")
 SKIN_GAS = dataclasses.replace(
     SKIN_METAHUMAN, mesh=GAS.MESH, anim_bp=LAYERS_ABP, base_anim_bp=GAS.ABP_LOCOMOTION,
     layers_tag=LAYERS_TAG, retarget=GAS.ABP_RETARGET, gas=True,
-    aim_rifle=f"{GAS_ANIMS}MF_Rifle_Idle_ADS",
-    aim_pistol=f"{GAS_ANIMS}MF_Pistol_Idle_ADS",
+    aim_rifle=LYRA.uefn_clip(LYRA.AIM_RIFLE),
+    aim_pistol=LYRA.uefn_clip(LYRA.AIM_PISTOL),
+    # Lyra's pistol pose lays the trigger finger straight along the frame: a
+    # knife or a mushroom held in that fist would be pointed at. Its rifle
+    # pose has the finger closed, on the trigger.
+    fist_index=LYRA.uefn_clip(LYRA.AIM_RIFLE),
     idle=GAS.IDLE,
     punch=LYRA.uefn_clip(LYRA.PUNCH),
     crouch_idle=f"{GAS_UAL_ANIMS}UAL1_Crouch_Idle_Loop",
@@ -338,8 +350,8 @@ def _gas_skin(eas):
         return None
     for need, by in ((GAS.ABP_LOCOMOTION, "import_gas.py"), (GAS.CHOOSER, "import_gas.py"),
                      (GAS.MESH, "build_gas_bridge.py"), (GAS.ABP_RETARGET, "build_gas_bridge.py"),
-                     (SKIN_GAS.aim_rifle, "retarget_to_uefn.py"),
-                     (SKIN_GAS.aim_pistol, "retarget_to_uefn.py"),
+                     (GAS_AIM_WITHOUT_LYRA["aim_rifle"], "retarget_to_uefn.py"),
+                     (GAS_AIM_WITHOUT_LYRA["aim_pistol"], "retarget_to_uefn.py"),
                      (GAS_PUNCH_WITHOUT_LYRA, "retarget_to_uefn.py")):
         if not eas.does_asset_exist(need):
             _log(f"note: GAS_LOCOMOTION is on and {need} is not here — wearing the "
@@ -352,6 +364,11 @@ def _gas_skin(eas):
         _log(f"note: {skin.punch} is not here — the punch is the mannequin's. Add Lyra "
              f"({LYRA.CONTENT_DIR}) and run asset_pipeline/import_lyra.py.")
         skin = dataclasses.replace(skin, punch=GAS_PUNCH_WITHOUT_LYRA)
+    if not all(eas.does_asset_exist(p) for p in (skin.aim_rifle, skin.aim_pistol)):
+        _log(f"note: {skin.aim_rifle} or the pistol's is not here — the guns are held "
+             "in the mannequin's ready poses. Add Lyra and run asset_pipeline/"
+             "import_lyra.py.")
+        skin = dataclasses.replace(skin, fist_index=None, **GAS_AIM_WITHOUT_LYRA)
     return _without_missing_clips(skin, eas, "the MetaHuman", "retarget_to_uefn.py")
 
 

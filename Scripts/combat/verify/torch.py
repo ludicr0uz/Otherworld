@@ -7,7 +7,6 @@ light at a campfire, FireWard, and the raised pose's swap.
 
 import unreal
 
-from combat.grip import fist_in_socket
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
 from combat.paths import (
     FIRE_WARD_VAR, HOLD_KNIFE_ANIM_PATH, HOLD_TORCH_ANIM_PATH, ITEM_BP_PATH,
@@ -16,6 +15,7 @@ from combat.paths import (
 from combat.seat_tuning import HAS_SIGHTS_VAR, SIGHTS_FORCED_VAR
 from combat.strike_vars import AskUse
 from combat.skin import player_skin
+from combat.verify.grip_fit import fist_off
 from combat.stick import (
     FLAME, GLOW, MODEL, STICK_DISPLAY, STICK_LIT_MESH, STICK_MESH, STICK_SCALE,
     stick_outline,
@@ -181,8 +181,7 @@ def check_torch_poses():
           hand_r[1] > WARD_REACH_CM and hand_r[1] > hand_c[1] + WARD_OVER_CARRY_REACH_CM
           and hand_r[2] > TORCH_HEIGHT_CM,
           f"right hand {tuple(round(v, 1) for v in hand_r)} from the hips")
-    fist = fist_in_socket(skin.aim_pistol)[0]
-    off = {p.rsplit("/", 1)[-1]: round((fist_in_socket(p)[0] - fist).length(), 2)
+    off = {p.rsplit("/", 1)[-1]: round(fist_off(skin, p), 2)
            for p in (HOLD_TORCH_ANIM_PATH, WARD_TORCH_ANIM_PATH)}
     check("...and both close the right hand as the pistol pose does, so the one grip "
           "holds in either (fist within 0.5 cm)",

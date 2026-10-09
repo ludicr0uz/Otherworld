@@ -147,11 +147,11 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     keyed off the idle
   throw_pose        A_ThrowReady: the arm cocked while a throw is aimed, the
                     skin's throw clip stopped where its hand is furthest back
-  shotgun_pose      A_AimShotgun: the shotgun's ready pose, the rifle's with
-                    the right thumb over the stock's wrist, the left along
-                    the pump (SHOTGUN_THUMBS), and the left hand under the
-                    pump with its fingers closed on it (SUPPORT_PALM,
-                    SUPPORT_FINGERS), keyed off the rifle pose
+  shotgun_hold      the shotgun's hold (C3): the rifle's ready pose, a
+                    shipped clip, with the left hand's SupportPoint moved
+                    onto the pump, the thumb under the barrel's top
+                    (support_point); nothing keyed. Deletes the pose keyed
+                    for it until C3 (retire_keyed_pose)
 
 SHARED AUTHORING HELPERS
   (uebp)            node/pin/connect/set, out/then, variables, components,
@@ -256,7 +256,7 @@ BP_HealthComponent (health_component wires the fragments together)
   hit_bodies        the physics bodies fitted to each model (fit_hit_bodies),
                     and body_coverage(): bodies against the mesh, ray by ray
   pump_seat         pure: the move that closes the left hand's fingers on the
-                    shotgun's pump, for whatever hand is worn (shotgun_pose)
+                    shotgun's pump, for whatever hand is worn (shotgun_hold)
   capsule_fit       pure geometry for hit_bodies: a cloud of vertices to its
                     long axis and one to four capsules along it
   ragdoll           joint limits and tune_ragdolls()

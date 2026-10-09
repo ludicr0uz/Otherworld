@@ -240,6 +240,11 @@ def _curl_centre(a, b, c):
     return a + (n.cross(ab) * ac.dot(ac) + ac.cross(n) * ab.dot(ab)) * (0.5 / nn)
 
 
+# A closed finger's three joints lie on a circle of 2 to 6 cm; a finger on a
+# wider one than this is not closing on anything.
+CURL_MAX_RADIUS_CM = 10.0
+
+
 def fist_in_socket(aim_pose_path):
     """(fist centre, [[joint, joint, joint] per finger]) in the grip socket's
     frame during a given pose -- the frame GripLocation is written in.
@@ -267,6 +272,13 @@ def fist_in_socket(aim_pose_path):
     fingers = [[unreal.MathLibrary.transform_location(into_socket, at(b).translation)
                 for b in joints] for joints in player_skin().grip_fingers]
     centres = [_curl_centre(*joints) for joints in fingers]
+    # A finger laid all but straight wraps nothing: Lyra's pistol pose has
+    # the trigger finger along the frame, on a circle 44 cm across, which
+    # put the fist's middle 10 cm out of the hand.
+    centres = [c for c, joints in zip(centres, fingers)
+               if (c - joints[0]).length() < CURL_MAX_RADIUS_CM]
+    if len(centres) < 3:
+        raise RuntimeError(f"{aim_pose_path}: fewer than three fingers are closed")
     fist = unreal.Vector(0.0, 0.0, 0.0)
     for c in centres:
         fist = fist + c

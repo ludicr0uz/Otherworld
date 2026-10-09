@@ -17,7 +17,9 @@ each into the game's own asset, frame for frame, with two changes:
                closed round a grip. Mixamo's hand is posed for a prop the game
                does not have, and the items are seated in the pistol's fist
                (grip.py): the hand keeps the clip's place and turn, and the
-               handle stays in it through the swing.
+               handle stays in it through the swing. (Where the pistol pose
+               leaves the index straight, the index is another pose's:
+               hold_pose.closed_fist.)
     the cut    a swing starts ``COMBAT.knife_impact_s`` before the moment its
                clip lands (MeleeClip.hit_s, read off the hand's path), so the
                blow, which is timed and not notified (weapon_component/
@@ -37,7 +39,7 @@ import unreal
 
 from asset_pipeline.mixamo_paths import player_clip
 from asset_pipeline.rig_util import mesh_ref_pose
-from combat.hold_pose import _below, _copy_of, _shown
+from combat.hold_pose import _below, _copy_of, _shown, closed_fist
 from combat.log import _log
 from combat.paths import (
     AXE_ANIM_PATH, HOLD_AXE_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, KNIFE_ANIM_PATH,
@@ -137,11 +139,10 @@ def build_melee_clips(skin):
     """Bake every row of MELEE_CLIPS for ``skin``'s body; returns
     {path: clip}."""
     mesh = _assets().load_asset(skin.mesh)
-    pistol = _assets().load_asset(skin.aim_pistol)
-    if mesh is None or pistol is None:
-        raise RuntimeError(f"could not load {skin.mesh} or {skin.aim_pistol}")
+    if mesh is None:
+        raise RuntimeError(f"could not load {skin.mesh}")
     ref = mesh_ref_pose(mesh)
-    fist = _shown(pistol, mesh, ref)
+    fist = closed_fist(skin, mesh, ref)
     hand = skin.pose_bones["hand_r"]
     fingers = {b for b in ref if _below(ref, b, hand)}
     return {row.path: _bake(skin, row, fist, fingers) for row in MELEE_CLIPS}

@@ -22,7 +22,9 @@ pose's orientation in the body and its fingers, closed round a grip: the item
 stands upright and faces ahead in the fist, and grip._grip_rotation and
 _grip_location solve against these poses to the pistol's own answer (a hand
 left on the turned forearm rolled the fist ~90 deg and put the canteen's neck
-across the fingers).
+across the fingers). Where the pistol pose leaves the index finger straight
+(Lyra's lays it along the frame), the index is taken from the pose
+PlayerSkin.fist_index names instead: closed_fist().
 
     A_HoldItem   the right upper arm hangs, the forearm comes forward at the
                  waist: an item carried in front, the left arm at the side
@@ -156,12 +158,29 @@ def _below(ref, bone, ancestor):
     return False
 
 
-def _local_rotations(skin, dirs, idle, pistol):
+def closed_fist(skin, mesh, ref):
+    """The pose a carried item's right hand is closed in, as _shown gives
+    one: the pistol's ready pose, and where that leaves the index straight
+    (``skin.fist_index``) the index's joints as that pose has them."""
+    pistol = _assets().load_asset(skin.aim_pistol)
+    if pistol is None:
+        raise RuntimeError(f"could not load {skin.aim_pistol}")
+    fist = _shown(pistol, mesh, ref)
+    if skin.fist_index:
+        other = _assets().load_asset(skin.fist_index)
+        if other is None:
+            raise RuntimeError(f"could not load {skin.fist_index}")
+        index = _shown(other, mesh, ref)
+        fist.update({bone: index[bone] for bone in skin.grip_fingers[0]})
+    return fist
+
+
+def _local_rotations(skin, dirs, idle):
     """{bone: local Transform}: the idle's tracks, the turned arms, and the
-    right hand's fingers as the pistol pose shows them."""
+    right hand's fingers as closed_fist() shows them."""
     mesh = _assets().load_asset(skin.mesh)
     ref = mesh_ref_pose(mesh)
-    comp, fist = _shown(idle, mesh, ref), _shown(pistol, mesh, ref)
+    comp, fist = _shown(idle, mesh, ref), closed_fist(skin, mesh, ref)
     turned = hold_rotations(skin, dirs, comp)
     hand = skin.pose_bones["hand_r"]
     # The hand keeps the pistol pose's orientation in the body: whatever it
@@ -223,10 +242,9 @@ def _key_constant(clip, xfs):
 
 def _build_one(skin, path, dirs):
     idle = _assets().load_asset(skin.idle)
-    pistol = _assets().load_asset(skin.aim_pistol)
-    if idle is None or pistol is None:
-        raise RuntimeError(f"could not load {skin.idle} or {skin.aim_pistol}")
-    rots = _local_rotations(skin, dirs, idle, pistol)
+    if idle is None:
+        raise RuntimeError(f"could not load {skin.idle}")
+    rots = _local_rotations(skin, dirs, idle)
     clip = _copy_of(skin.idle, path)
     _key_constant(clip, rots)
     _log(f"built {path} ({len(rots)} tracks off {skin.idle.rsplit('/', 1)[-1]}, "

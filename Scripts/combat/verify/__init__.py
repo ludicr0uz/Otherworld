@@ -101,8 +101,8 @@ and it never relies on a variable another section left behind.
   melee_clips the knife's and the axe's ready pose and swing: Mixamo's clips
               frame for frame, in place, the right fist the pistol's, the
               hand out at the blow's time
-  shotgun_pose  A_AimShotgun: the rifle pose but for the thumbs, where they
-              point and sit on the shotgun, the grip unchanged
+  shotgun_pose  the shotgun's hold: the rifle's ready pose, a shipped clip, the
+              grip solved in it, the left hand's point moved onto the pump
   interact    the interact key: its idle state, the probe's press, the reach,
               the ranking by AimPoint, a walk that only remembers
   record      the inventory's record (M18, A3a): what replicates and to whom,

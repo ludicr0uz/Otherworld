@@ -58,9 +58,9 @@ HOLD_TORCH_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldTorch"
 WARD_TORCH_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_WardTorch"
 # The arm cocked while a throw is aimed (combat/throw_pose.py).
 THROW_READY_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_ThrowReady"
-# The shotgun's ready pose (combat/shotgun_pose.py): the rifle's, with the
-# thumb over a straight stock's wrist.
-SHOTGUN_AIM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_AimShotgun"
+# Until C3 the shotgun's keyed ready pose; the weapons build deletes one a
+# checkout still has (it is held in the rifle's now: combat/shotgun_hold.py).
+RETIRED_SHOTGUN_AIM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_AimShotgun"
 HEALTH_BP_PATH = f"{WEAPON_DIR}/BP_HealthComponent"
 WEAPON_COMP_BP_PATH = f"{WEAPON_DIR}/BP_WeaponComponent"
 FOOTSTEP_BP_PATH = f"{WEAPON_DIR}/BP_FootstepComponent"

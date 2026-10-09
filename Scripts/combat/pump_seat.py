@@ -1,13 +1,12 @@
 """Where the left hand sits on the shotgun's pump: the move that closes its
 fingers on the wood, found for whatever hand the worn body has.
 
-Pure (no ``unreal``); shotgun_pose.py calls it and verify/shotgun_pose.py
+Pure (no ``unreal``); shotgun_hold.py calls it and verify/shotgun_pose.py
 measures the result with the same pump_distance(). Tests:
 dev/tests/test_pump_seat.py.
 
-The shotgun pose turns the left hand under the pump and points each finger
-joint where its table says (shotgun_pose.SUPPORT_PALM, SUPPORT_FINGERS). That
-fixes the hand's SHAPE; where the hand IS used to be the rifle pose's wrist,
+The hand's SHAPE is the ready pose's (since C3 the rifle clip's own; until
+then a pose keyed for the shotgun); where the hand IS used to be the rifle pose's wrist,
 and whether the fingers then met the wood depended on how big the hand was
 and where the retargeted wrist happened to be. On the dressed adventurer they
 did. On the one in boxers (shorter fingers, the wrist 3 cm off) the middle

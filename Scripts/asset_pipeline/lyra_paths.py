@@ -44,6 +44,7 @@ SKELETON = f"{MANNEQUIN}/Meshes/SK_Mannequin"
 # and a mesh's reference pose is not its skeleton's.
 SOURCE_MESH = f"{MANNEQUIN}/Meshes/SKM_Manny"
 ACTIONS = f"{MANNEQUIN}/Animations/Actions"
+LOCOMOTION = f"{MANNEQUIN}/Animations/Locomotion"
 
 # Written by import_lyra.py, beside the pack and as little committed as it.
 RIG_DIR = f"{GAME_ROOT}/Rig"
@@ -57,8 +58,18 @@ UEFN_PREFIX = f"A_{PLAYER_FAMILY}_"
 # straight right, the other hand off the gun).
 PUNCH = f"{ACTIONS}/MM_Pistol_Melee"
 
+# A gun's ready pose (C3): what it is held in for an aim, down the sights, a
+# shot, a reload and the guard.  Lyra's own ADS idles, one per kind of gun: a
+# breathing loop with the gun at the shoulder and the eye behind its sights.
+# The rifle's is the sniper's and the shotgun's too, the pistol's the SMG's (a
+# machine pistol).  Lyra has an MM_Shotgun_Idle_ADS, and it is the rifle's
+# with the left hand 2 cm further back: further from our shotgun's pump, so
+# it is not taken (combat/shotgun_hold.py seats the hand).
+AIM_RIFLE = f"{LOCOMOTION}/Rifle/MM_Rifle_Idle_ADS"
+AIM_PISTOL = f"{LOCOMOTION}/Pistol/MM_Pistol_Idle_ADS"
+
 # Every Lyra clip the game plays.  A later one is a row here and a re-run.
-CLIPS = (PUNCH,)
+CLIPS = (PUNCH, AIM_RIFLE, AIM_PISTOL)
 
 
 def uefn_clip(source):

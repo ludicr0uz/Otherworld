@@ -18,7 +18,7 @@ from combat.hit_reaction import hit_reactions
 from combat.hold_pose import ROOT_MOTION
 from combat.paths import (
     HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, HOLD_TORCH_ANIM_PATH, KNIFE_ANIM_PATH,
-    SHOTGUN_AIM_ANIM_PATH, THROW_READY_ANIM_PATH, WARD_TORCH_ANIM_PATH,
+    THROW_READY_ANIM_PATH, WARD_TORCH_ANIM_PATH,
 )
 from combat.player_gait import GROUND_SPEED
 from combat.skin import player_skin
@@ -85,7 +85,7 @@ def check_clips_in_place(skin):
     over: a pose held in one holds the player still (hold_pose.in_place)."""
     mesh = load(skin.mesh)
     clips = [load(p) for p in (
-        skin.aim_rifle, skin.aim_pistol, skin.punch, skin.throw, SHOTGUN_AIM_ANIM_PATH,
+        skin.aim_rifle, skin.aim_pistol, skin.punch, skin.throw,
         HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, HOLD_TORCH_ANIM_PATH,
         WARD_TORCH_ANIM_PATH, THROW_READY_ANIM_PATH, KNIFE_ANIM_PATH) if p]
     clips += list(hit_reactions(mesh))

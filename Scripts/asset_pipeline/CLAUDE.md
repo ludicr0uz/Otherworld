@@ -130,12 +130,13 @@ Back to the per-body skeleton: `PLAYER_RIG = "own"` and `swap_player_body.py adv
     pump, one 2.9 cm off it against 2.5 allowed, the fist 1 cm from the stock): the pose
     is solved for the body and lands 1-2 cm off on this one;
   - the throw's ready pose 5 cm from the clip's own frame;
-  - `calf_l`/`calf_r` of `A_AimShotgun` not the rifle pose's. Not understood yet.
+  - `calf_l`/`calf_r` of `A_AimShotgun` not the rifle pose's. Not understood yet (the
+    pose is gone since C3).
 
 Things the first runs found, all fixed: the importer names a mesh after its FILE; a pelvis
 left on Meshy's high Hips joint floats the body in every clip (`mannequin_bind/fit.py`);
 the mannequin's own clips key corrective bones its simple mesh does not have
-(`combat/hold_pose.py`, `shotgun_pose.py` leave those tracks out).
+(`combat/hold_pose.py` leaves those tracks out).
 
 Not done:
 
@@ -309,6 +310,12 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_lyra.py
   rifle's and the shotgun's are two-handed butt strokes). Its fist is out 0.45–0.5 s in,
   1.53 s long; the game plays it from 0.15 s (`COMBAT.punch_clip_start_s`) so the blow's
   time stays 0.3 s (`Scripts/combat/CLAUDE.md`).
+- **The guns' ready poses** (C3) are `Locomotion/Rifle/MM_Rifle_Idle_ADS` (the rifle, the
+  sniper and the shotgun) and `Locomotion/Pistol/MM_Pistol_Idle_ADS` (the pistol and the
+  SMG): `lyra_paths.AIM_RIFLE`, `AIM_PISTOL`. The pistol's lays the trigger finger straight
+  along the frame, and the poses lean in to the sights (`Scripts/combat/CLAUDE.md`, "The
+  gun poses"). Without Lyra the guns are held in the mannequin's poses
+  (`skin.GAS_AIM_WITHOUT_LYRA`).
 - **A checkout without Lyra** still wears the motion-matching skin: `combat/skin._gas_skin`
   falls back to the mannequin's `MM_Attack_01` on the UEFN skeleton
   (`retarget_to_uefn.py` still makes it) and says so in the build's log; the punch
@@ -406,7 +413,7 @@ wear it:
   move. What is not re-measured is the smaller hand. G4 put a gun back into an aimed
   hand and looked: the grips solve against the retargeted ready poses as they did against
   the mannequin's (`combat/verify/grip_fit.py` is green), and only the shotgun's grip
-  thumb needed laying again for this hand (`combat/shotgun_pose.SHOTGUN_THUMBS`).
+  thumb needed laying again for this hand (in the pose keyed for it until C3).
 - **Every clip the player has today stops playing** (as reasoned in G2; in G3 the worn
   graph's one montage slot is out of the pose line, so whether a mannequin clip would
   play on the UEFN mesh by bone name was not put to the test). Neither skeleton lists the other as

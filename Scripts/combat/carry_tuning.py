@@ -20,14 +20,15 @@ CARRY_RAISE_HOLD_S = 1.5
 # in 47 cm low, through its capsule). They start where the muzzle is about to
 # be instead: this point, the fist of the ready pose in the body's frame
 # (forward, right, up of the capsule's centre, cm), plus Held's MuzzleOffset.
-# Measured standing (probes/probe_carry.py) on the body worn since G4, the
-# UEFN mannequin, 10 cm shorter than the one before it and its ready poses
-# retargeted: the shotgun's fist is at (15, 14, 38) and the pistol's at
-# (44, 10, 41). (On the mannequin they were (27, 18, 52) and (55, 14, 60).)
+# Measured standing (probes/probe_carry.py) on the UEFN mannequin in Lyra's
+# ready poses (C3), which lean in to the sights: the shotgun's fist is at
+# (28, 11, 39) and the pistol's at (55, 4, 45). (In the mannequin's poses
+# retargeted, until C3, (15, 14, 38) and (44, 10, 41); on the mannequin
+# itself (27, 18, 52) and (55, 14, 60).)
 # The nearer of the two is used, so the start is never past the real muzzle:
 # a start 13 cm too far forward was inside a wanderer stood 150 cm away, and
 # a trace that starts inside its target does not stop on it.
-CARRY_GRIP = (15.0, 12.0, 39.0)
+CARRY_GRIP = (28.0, 10.0, 40.0)
 
 # BP_WeaponComponent's variables. Lowered is what the ready pose should
 # reflect this frame: sprinting, or a gun nothing is holding up. PoseLowered

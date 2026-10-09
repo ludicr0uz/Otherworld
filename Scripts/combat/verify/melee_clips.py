@@ -8,11 +8,11 @@ the timed blow lands and ends in its ready pose.
 import unreal
 
 from asset_pipeline.mixamo_paths import player_clip
-from combat.grip import fist_in_socket
 from combat.melee_clips import (
     AXE_READY, AXE_SWING, FPS, KNIFE_READY, KNIFE_SWING, MELEE_CLIPS, frame_count,
 )
 from combat.skin import player_skin
+from combat.verify.grip_fit import fist_off
 from combat.tuning import COMBAT
 from combat.verify.common import check, load
 
@@ -69,8 +69,7 @@ def check_melee_clip(row, skin):
                 for bone in bones for t in times)
     check("...frame for frame: the chest and both arms turn as Mixamo's do, nothing keyed",
           worst < SAME_RAD, f"worst {worst:.4f} rad")
-    fist = fist_in_socket(skin.aim_pistol)[0]
-    off = (fist_in_socket(row.path)[0] - fist).length()
+    off = fist_off(skin, row.path)
     finger = skin.grip_fingers[1][1]
     still = max(_turn(clip, finger, t).angular_distance(_turn(clip, finger, 0.0))
                 for t in times)

@@ -17,6 +17,7 @@ import unreal
 from combat.grip import (
     box_distance, fist_in_socket, placed_part, wrapping_joints,
 )
+from combat.weapon_models import TRIGGER_REACH_CM
 from combat.weapon_specs import _weapon_specs
 from combat.verify.common import cdo, check, load
 
@@ -29,8 +30,9 @@ JOINT_SINK_CM = 0.5
 # How far a wrapping joint may sit off the box: a centimetre of finger and a
 # little air. Measured at most 2.9 cm; before the solve it was 9-17 cm.
 JOINT_REACH_CM = 3.5
-# The index's two outer joints, to the trigger guard. Measured 0.5-1.9 cm.
-TRIGGER_REACH_CM = 2.5
+# The index's two outer joints, to the trigger guard: TRIGGER_REACH_CM
+# (weapon_models.py). Measured 0.3-1.9 cm; a row whose pose rests the index
+# elsewhere says how far (trigger_reach).
 
 
 def grip_fit(bp, aim, parts, part, trigger=None):
@@ -55,6 +57,17 @@ def grip_fit(bp, aim, parts, part, trigger=None):
         on_trigger = min(box_distance(into_guard, guard_half, j) for j in index[1:])
     return dict(miss=(handle.translation - fist).length(),
                 sink=-min(wrap), reach=max(wrap), trigger=on_trigger)
+
+
+def fist_off(skin, pose):
+    """How far (cm) the worst right finger joint of ``pose`` is, in the grip
+    socket's frame, from where a carried item's fist has it
+    (hold_pose.closed_fist): the pistol pose's fingers, the index
+    ``skin.fist_index``'s where that is named."""
+    got, pistol = fist_in_socket(pose)[1], fist_in_socket(skin.aim_pistol)[1]
+    want = ([fist_in_socket(skin.fist_index)[1][0]] if skin.fist_index
+            else pistol[:1]) + pistol[1:]
+    return max((g - w).length() for a, b in zip(got, want) for g, w in zip(a, b))
 
 
 def check_handles_in_fist(items):

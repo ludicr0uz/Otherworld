@@ -38,7 +38,7 @@ from combat.anim_blueprint import AIM_SLOT
 from combat.body_pose import POSE_CROUCH, POSE_PRONE
 from combat.carry_tuning import LOWERED_VAR, RAISE_FORCED_VAR
 from combat.paths import (
-    HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, ITEM_BP_PATH, RIFLE_BP_PATH, SHOTGUN_AIM_ANIM_PATH,
+    HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, ITEM_BP_PATH, RIFLE_BP_PATH,
     WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH)
 from combat.seat_tuning import SIGHTS_FORCED_VAR
 from combat.tuning import COMBAT
@@ -63,8 +63,7 @@ PITCH_DEG = 30.0     # the view up, then down, on the sights
 PITCH_NEAR_DEG = 5.0
 HEIGHT_NEAR_CM = 1.5
 STANDING_CM = 90.0   # the standing capsule's half height, least
-POSES = {"knife": HOLD_KNIFE_ANIM_PATH, "matches": HOLD_ITEM_ANIM_PATH,
-         "shotgun": SHOTGUN_AIM_ANIM_PATH}
+POSES = {"knife": HOLD_KNIFE_ANIM_PATH, "matches": HOLD_ITEM_ANIM_PATH}
 
 
 def _await(ready, seconds=WAIT):
@@ -228,8 +227,10 @@ def _act(p, pawn, wc, other):
             and held.get("an item (the matches), raised") == POSES["matches"].rsplit("/", 1)[1],
             str({k: v for k, v in held.items() if k.startswith("a")}))
     rifle = held.get("a rifle's ready pose, raised")
-    p.check("...and the rifle's is not the pistol's nor the shotgun's",
-            rifle not in (held["a pistol, raised"], held["standing"], None),
+    p.check("...and the rifle's is the shotgun's (one ready pose for the long "
+            "guns), not the pistol's",
+            rifle is not None and rifle == held["standing"]
+            and rifle != held["a pistol, raised"],
             f"rifle {rifle}, pistol {held['a pistol, raised']}, shotgun {held['standing']}")
     p.post("steps", done)
     p.post("done")

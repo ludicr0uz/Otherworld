@@ -339,37 +339,29 @@ in game `probes/probe_carry.py`.
     the receiver 4.1 cm above the guard. Its row carries `trigger_reach` 4.5 for that check
     (`SHOTGUN_TRIGGER_REACH_CM`); the others keep 2.5. The pistol (`Pistol_1`) fits like the
     rest: 2.9 cm, index 1.7 cm off.
-- **The shotgun has a ready pose of its own, `A_AimShotgun`** (`shotgun_pose.py`): the rifle
-  pose with both thumbs re-keyed, built before the weapons.
-  - **Why:** the rifle pose lays the right thumb forward along a pistol grip and stands the
-    left one up the handguard, both far under the AK's and the Val's sight lines (14 cm above
-    the grip). The shotgun's line skims the receiver 7 cm above it: down its sights the left
-    thumb's last joint stood 3 cm ABOVE the line, a finger beside the bead, and the right
-    thumb came up from the bottom of the view, 5-15 cm from the eye.
-  - **What it holds:** the right thumb over the top of the stock's wrist and down its left
-    side; the left along the pump's left side, under the barrel's top. Each joint's line is
-    swung onto a direction in the WEAPON's frame (`SHOTGUN_THUMBS`), so the numbers read
-    against `shotgun_outline()` whatever body is worn.
-  - **The left hand lies under the pump.** The rifle pose cups a handguard as deep as the
-    AK's, palm on edge. The pump is a 5 cm bar (`weapon_models.SHOTGUN_PUMP`): the index's and
-    the middle's knuckles stood 2 cm inside it, and the fingers came out of its right side and
-    stood 3-5 cm off it. The hand is turned about its own wrist (`SUPPORT_PALM`: the wrist to
-    the middle knuckle, and the line across the knuckles) and each finger joint swung onto a
-    direction (`SUPPORT_FINGERS`): under the wood, up its right side, the tip in at the
-    barrel. The wrist does not move, so the support hand's IK point is the rifle pose's and
-    the anim BP needed no third point. `probes/probe_shotgun_hands.py` reads the live joints
-    against the pump at the hip and down the sights; with `--windowed` and `OW_GRIP_SHOTS=1`
-    it saves pictures of both hands from round the gun (its view target is a spare item
-    from the bag: a game cannot spawn a camera from Python, and moving the pawn's own
-    detached camera changes nothing).
-  - **Everything else is the rifle pose,** re-keyed from it on every build, so the grip's
-    solve, the fist and the support hand's point are the same against either
-    (`verify/shotgun_pose.py`). `weapon_specs.two_handed_poses()` is what "held in both
-    hands" means now: `TwoHanded` no longer follows `aim == rifle pose` alone.
-  - **Another long gun with a low sight line** takes the same pose, or a pose of its own
-    from the same module with its own directions.
+- **The shotgun is held in the rifle's ready pose** (C3; until then a pose keyed for it,
+  `A_AimShotgun`), and its left hand has a point of its own (`shotgun_hold.py`).
+  - **Why:** the rifle pose stands the left thumb up the handguard, far under the AK's and
+    the Val's sight lines (14 cm above the grip). The shotgun's line skims the receiver
+    6.4 cm above it: as the clip has it the thumb's tip is 3.7 cm ABOVE the line, a finger
+    beside the bead, and the hand is at the pump's back end (a 5 cm bar,
+    `weapon_models.SHOTGUN_PUMP`), one joint 1.3 cm inside the wood.
+  - **What moves:** the shotgun's `SupportPoint` (the IK's point, in the right hand's
+    space) is the pose's moved by `support_move()`: straight down until the thumb is under
+    the barrel's top, then `pump_seat.seat`'s descent to where the fingers' joints fit the
+    pump best. The hand is moved as one piece; its shape is the clip's.
+  - **Only down the sights** (`SupportHand` is `SightBlend`): at the hip and on the
+    shoulder the hand is the clip's own. `probes/probe_shotgun_hands.py` reads the live
+    joints against the pump both ways; with `--windowed` and `OW_GRIP_SHOTS=1` it saves
+    pictures of both hands from round the gun (its view target is a spare item from the
+    bag: a game cannot spawn a camera from Python, and moving the pawn's own detached
+    camera changes nothing).
+  - **The right hand is the rifle pose's**, so the grip's solve and the fist are the
+    rifle's (`verify/shotgun_pose.py`); its thumb lies forward along the top of the
+    stock's wrist, 4 cm under the sight line.
   - `probes/probe_shotgun_thumb.py` reads the live thumbs down the sights (and the rifle's,
-    left alone); with `--windowed` and `OW_SIGHT_SHOTS=1` it saves the sight picture.
+    left where the clip has them); with `--windowed` and `OW_SIGHT_SHOTS=1` it saves the
+    sight picture.
   - **Trap:** a headless editor (the warm one, `UnrealEditor-Cmd`) never ticks its world, so
     a SkeletalMesh or PoseableMesh spawned there stays in the reference pose and a
     SceneCapture of it shows nothing of a clip. Look at a pose in a `--windowed` game.

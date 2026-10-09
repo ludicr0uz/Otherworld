@@ -10,7 +10,7 @@ import unreal
 from combat.aim_pitch import IK_CLASS
 from combat.skin import player_skin
 from combat.support_hand import (
-    SUPPORT_HAND_VAR, SUPPORT_POINT_VAR, support_at, target_bone,
+    SUPPORT_HAND_VAR, SUPPORT_POINT_VAR, target_bone,
 )
 from combat.verify.aim_pitch import _feeds, _title
 from combat.verify.common import BEL, PIN, cdo, check, graph, load
@@ -18,7 +18,7 @@ from combat.verify.fixtures import wg
 from combat.weapon_component.pose_weights import (
     HELD_SUPPORT_POINT, HELD_TWO_HANDED,
 )
-from combat.weapon_specs import _weapon_specs, two_handed_poses
+from combat.weapon_specs import _weapon_specs, support_point_of, two_handed_poses
 
 BONE_SPACE = unreal.BoneControlSpace.BCS_BONE_SPACE
 
@@ -70,9 +70,9 @@ def check_anim_bp_support_hand():
           fed == {f"Get {SUPPORT_POINT_VAR}"}, str(sorted(fed)))
     for spec in _weapon_specs():
         got = cdo(load(spec["path"])).get_editor_property(SUPPORT_POINT_VAR)
-        want = support_at(skin, spec["aim"])
+        want = support_point_of(skin, spec, quiet=True)
         check(f"...{spec['display']}'s is where its ready pose holds the left hand "
-              "at its start, re-measured",
+              "at its start (the shotgun's, that point moved onto its pump), re-measured",
               max(abs(g - w) for g, w in zip(got.to_tuple(), want)) < 0.01,
               f"{got.to_tuple()} against {want}")
     after = PIN.list_connected_pins(BEL.find_output_pin(ik, "Pose"))

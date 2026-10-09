@@ -2,7 +2,8 @@
 (the HUD's X round the reticle, graphics_menu/hit_marker.py); one in its
 chest does not.
 
-A wanderer is stood in front of the player, who holds the pistol. A round is
+A wanderer is stood in front of the player, its controller taken off it, and
+the player holds the pistol. A round is
 put in its chest first (a second or third if the hip's cloud sends one past
 it): it hurts, and HeadshotTime stays where a level
 starts it (HEADSHOT_NEVER, so no X is drawn at the start). Then rounds are
@@ -35,7 +36,11 @@ WRITABLE = [(WEAPON_COMP_BP_PATH, v) for v in
             (FIRE_FORCED_VAR, WV.EquippedIndex, WV.NeedsRefresh)] + [
     (HEALTH_BP_PATH, HV.Health)]
 
-IN_FRONT_CM = 150.0
+# Far enough that a hip round's line from the muzzle to the reticle's point
+# goes on into the body: at 150 cm the point is on the capsule 35 cm ahead of
+# the muzzle and 50 cm to its side (the camera is over the shoulder), and two
+# rounds in three left through the capsule's side.
+IN_FRONT_CM = 300.0
 AIM_NEAR_CM = 40.0       # the reticle is on the capsule in front of the bone
 HEAD_ROUNDS = 5          # the hip's cloud: a round or two may pass the head
 BODY_ROUNDS = 3          # ...or, in a rendered run, the chest
@@ -92,6 +97,9 @@ def _run(p):
 
     health = p.component(npc, HEALTH_CLASS_PATH)
     p.set(health, "Health", 5000.0)    # it must outlive the rounds
+    # Its tree would have it swing at the player, who was dead before the
+    # last round one run in two.
+    npc.get_controller().un_possess()
     _look(p, 0.0)
     spot = player.get_actor_location() + player.get_actor_forward_vector() * IN_FRONT_CM
 

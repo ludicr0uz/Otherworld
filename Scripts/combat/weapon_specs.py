@@ -11,11 +11,12 @@ from combat.gun_tuning import read_table
 from combat.grip import _grip_location, _grip_rotation
 from combat.paths import (
     PISTOL_BP_PATH,
-    RIFLE_BP_PATH, SHOTGUN_AIM_ANIM_PATH, SHOTGUN_BP_PATH, SMG_BP_PATH, SNIPER_BP_PATH,
+    RIFLE_BP_PATH, SHOTGUN_BP_PATH, SMG_BP_PATH, SNIPER_BP_PATH,
     UI_ART_DIR,
 )
 from combat.skin import player_skin
 from Sound.sound_weapons import fire_sound, reload_sound
+from combat.shotgun_hold import support_point
 from combat.support_hand import support_at
 from item_icons.items import icon_name
 from combat.sway_tuning import SWAY_RATE, SWAY_RATE_COLUMN
@@ -25,7 +26,7 @@ from combat.weapon_models import (
     PISTOL_SIGHT_REAR, RIFLE_MODEL, RIFLE_MUZZLE, RIFLE_SIGHT,
     RIFLE_SIGHT_FRONT, RIFLE_SIGHT_REAR, SHOTGUN_MODEL, SHOTGUN_MUZZLE,
     SHOTGUN_SIGHT, SHOTGUN_SIGHT_FRONT, SHOTGUN_SIGHT_REAR,
-    SHOTGUN_TRIGGER_REACH_CM, SMG_MODEL, SMG_MUZZLE, SMG_SIGHT,
+    SHOTGUN_TRIGGER_REACH_CM, PISTOL_POSE_TRIGGER_REACH_CM, TRIGGER_REACH_CM, SMG_MODEL, SMG_MUZZLE, SMG_SIGHT,
     SMG_SIGHT_FRONT, SMG_SIGHT_REAR, SNIPER_MODEL, SNIPER_MUZZLE, SNIPER_SIGHT,
     SNIPER_SIGHT_FRONT, SNIPER_SIGHT_REAR, pistol_outline, rifle_outline,
     shotgun_outline, smg_outline, sniper_outline,
@@ -179,8 +180,10 @@ def _weapon_specs():
     """
     skin = player_skin()
     AIM_RIFLE, AIM_PISTOL = skin.aim_rifle, skin.aim_pistol
-    # The rifle's pose with the thumb over a straight stock (shotgun_pose.py).
-    AIM_SHOTGUN = SHOTGUN_AIM_ANIM_PATH
+    # Where the pistol pose keeps the index off the trigger (PlayerSkin.fist_index).
+    PISTOL_REACH = PISTOL_POSE_TRIGGER_REACH_CM if skin.fist_index else TRIGGER_REACH_CM
+    # The rifle's pose: the left hand's point is its own (shotgun_hold.py).
+    AIM_SHOTGUN = AIM_RIFLE
     specs = (
         dict(path=SHOTGUN_BP_PATH, parts=shotgun_outline(), model=SHOTGUN_MODEL, muzzle=SHOTGUN_MUZZLE, sight=SHOTGUN_SIGHT,
              sight_rear=SHOTGUN_SIGHT_REAR, sight_front=SHOTGUN_SIGHT_FRONT,
@@ -194,7 +197,7 @@ def _weapon_specs():
              sight_rear=PISTOL_SIGHT_REAR, sight_front=PISTOL_SIGHT_FRONT,
              display="Pistol", automatic=False, damage=26.0, pellets=1, range=6000.0,
              sound=fire_sound(PISTOL_BP_PATH), reload_sound=reload_sound(PISTOL_BP_PATH), aim=AIM_PISTOL,
-             grip_rot=_grip_rotation(AIM_PISTOL),
+             grip_rot=_grip_rotation(AIM_PISTOL), trigger_reach=PISTOL_REACH,
              uses_ammo=True, magazine=PISTOL_MAGAZINE, reserve=0, infinite_reserve=True,
              interval=PISTOL_FIRE_INTERVAL, reload_s=PISTOL_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["Pistol"]),
@@ -206,7 +209,7 @@ def _weapon_specs():
              sight_rear=SMG_SIGHT_REAR, sight_front=SMG_SIGHT_FRONT,
              display="SMG", automatic=True, damage=12.0, pellets=1, range=4500.0,
              sound=fire_sound(SMG_BP_PATH), reload_sound=reload_sound(SMG_BP_PATH), aim=AIM_PISTOL,
-             grip_rot=_grip_rotation(AIM_PISTOL),
+             grip_rot=_grip_rotation(AIM_PISTOL), trigger_reach=PISTOL_REACH,
              uses_ammo=True, magazine=SMG_MAGAZINE, reserve=SMG_RESERVE,
              interval=SMG_FIRE_INTERVAL, reload_s=SMG_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["SMG"]),
@@ -244,20 +247,29 @@ def _weapon_specs():
         spec.setdefault(THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG)
         spec.setdefault(SWAY_RATE_COLUMN, SWAY_RATE)
         spec.update(tuned.get(spec["display"], {}))
-        # Held in both hands is what the rifle ready pose does, and the
-        # shotgun's, which is the rifle's but for a thumb; the guard pose
-        # (body_pose.py) picks fists or the gun across the body on it.
+        # Held in both hands is what the rifle ready pose does (the shotgun
+        # is held in it too); the guard pose (body_pose.py) picks fists or
+        # the gun across the body on it.
         spec["two_handed"] = spec["aim"] in two_handed_poses(skin)
         spec["grip_loc"] = _grip_location(spec["aim"], spec["grip_rot"], spec["parts"])
         # Where its own ready pose has the left hand: held there down the
         # sights (support_hand.py).
-        spec["support_point"] = support_at(skin, spec["aim"])
+        spec["support_point"] = support_point_of(skin, spec)
     return specs
+
+
+def support_point_of(skin, spec, quiet=False):
+    """Where ``spec``'s gun has the left hand down the sights, in the right
+    hand's bone space: where its ready pose has it, and for the shotgun that
+    point moved onto its pump (shotgun_hold.py)."""
+    if spec["path"] == SHOTGUN_BP_PATH:
+        return support_point(skin, quiet)
+    return support_at(skin, spec["aim"])
 
 
 def two_handed_poses(skin):
     """The ready poses that hold a gun in both hands."""
-    return (skin.aim_rifle, SHOTGUN_AIM_ANIM_PATH)
+    return (skin.aim_rifle,)
 
 
 # Which of the five a killed wanderer can be carrying, in loot-table order. The

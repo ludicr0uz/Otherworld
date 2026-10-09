@@ -9,13 +9,12 @@ import math
 
 import unreal
 
-from combat.grip import fist_in_socket
 from combat.hold_pose import CHILD, HOLD_POSES
 from combat.knife import knife_outline
 from combat.paths import HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, KNIFE_BP_PATH
 from combat.skin import player_skin
 from combat.verify.common import cdo, check, load
-from combat.verify.grip_fit import check_handles_in_fist
+from combat.verify.grip_fit import check_handles_in_fist, fist_off
 from combat.weapon_specs import _weapon_specs
 
 # Where the hands must land, cm, in the body frame (+Y forward, +Z up),
@@ -83,8 +82,7 @@ def check_hands_placed():
           f"right hand {tuple(round(v, 1) for v in hand_c)} from the hips")
     check("...with the left arm left hanging",
           c(b["hand_l"])[2] < c(b["forearm_l"])[2] < c(b["upperarm_l"])[2])
-    fist = fist_in_socket(skin.aim_pistol)[0]
-    off = round((fist_in_socket(HOLD_ITEM_ANIM_PATH)[0] - fist).length(), 2)
+    off = round(fist_off(skin, HOLD_ITEM_ANIM_PATH), 2)
     check("...and the right hand closed as the pistol pose closes it (fist within 0.5 cm)",
           off < FIST_SAME_CM, f"{off} cm")
 

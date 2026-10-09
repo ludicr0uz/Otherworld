@@ -73,13 +73,10 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   (zips in `assets/cache/quaternius/`). The pack is at no one size, so each row's model
   carries its scale to real size (0.18 and 0.11: 104 cm and 20 cm). Static meshes have no
   muzzle socket: the muzzles are the barrels' ends, measured. The shotgun's index can't reach
-  its guard from the rifle's ready pose (`docs/aiming.md`). The shotgun is held in a pose of
-  its own, `A_AimShotgun` (`shotgun_pose.py`): the rifle's, with the right thumb over the
-  stock's wrist and the left along the pump, out of its low sight line, and the left hand
-  turned under the pump with its fingers closed on the wood (the rifle pose cups a deep
-  handguard: its knuckles stood inside the pump and its fingers out to the right), and
-  moved, with the arm, to where its own fingers fit the pump (`pump_seat.py`: the rifle
-  pose's wrist is right only by the accident of one body's hands).
+  its guard from the rifle's ready pose (`docs/aiming.md`). The shotgun is held in the
+  rifle's ready pose, a shipped clip, and down the sights its left hand is held on a point
+  of its own, on the pump with the thumb under the barrel's top (`shotgun_hold.py`,
+  `pump_seat.py`; "The gun poses" below).
 - **The SMG, the rifle and the sniper are Fab models** (`weapon_models.py`): the FPS Weapon
   Bundle's SMG11 (`SK_SMG11_X`, a MAC-11 with its wire stock folded), AK 47 (`SK_KA47_X`) and
   AS Val (`SK_KA_Val_X`) with its 25x56 scope, under `/Game/FPS_Weapon_Bundle`.
@@ -831,7 +828,6 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
 - **The body is 10 cm shorter than the mannequin** and the ready poses are retargeted
   chain to chain, so the fist of a ready pose is 11-14 cm nearer and 14-19 cm lower in the
   capsule's frame (`carry_tuning.CARRY_GRIP`, re-measured) and the sights' view with it.
-  The shotgun's grip thumb is laid for this hand (`shotgun_pose.SHOTGUN_THUMBS`).
 - **A body on another skeleton re-creates the hold poses** (`A_HoldItem` and the rest
   are deleted and keyed again: `hold_pose._copy_of`), and every item Blueprint outside
   this package that names one is left holding nothing: run `build_survival.py` and
@@ -846,6 +842,53 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
 - **`probe_sight_align` fails one check of 186** (the rifle, looking up 25°: the shot's
   point 0.37° off the sight line). The view is still and the point is a hit 7.7 m away,
   5 cm off the line: the aim trace grazing a branch from the lower eye point, not the pose.
+
+## The gun poses (C3, 2026-10-08)
+
+Every gun's ready pose (what it is held in for an aim, down the sights, a shot, a reload
+and the guard) is a shipped clip: Lyra's ADS idles, retargeted onto the UEFN skeleton by
+`asset_pipeline/import_lyra.py` (`lyra_paths.AIM_RIFLE`, `AIM_PISTOL`; `SKIN_GAS.aim_rifle`,
+`aim_pistol`). The rifle's is the sniper's and the shotgun's, the pistol's the SMG's.
+Nothing is keyed: `shotgun_pose.py` and `A_AimShotgun` are gone (the weapons build deletes
+the asset from a checkout that has it).
+
+- **Still one ready pose per gun.** Lyra's hipfire idles are not played: the game has no
+  hip pose (a gun not held up is carried in the locomotion's hand, `docs/aiming.md`, "The
+  carry"), and a second pose would need a second grip solve. The pitch is still the spine's
+  (`aim_pitch.py`); no aim offset asset is used.
+- **The shotgun is the rifle's clip with one offset** (`shotgun_hold.py`): its
+  `SupportPoint`, the point the support hand's IK holds the left wrist on down the sights,
+  is the pose's point moved onto the pump (4 cm forward, 5 down on the worn hand), found
+  by `pump_seat.seat` with the thumb kept under the barrel's top. Unmoved, the thumb's tip
+  is 3.7 cm above the shotgun's sight line. The hand's shape is the clip's, so its joints
+  ride up to 3.8 cm off the wood (`verify/shotgun_pose.PUMP_REACH_CM`), and the point
+  holds only down the sights: at the hip the hand is where the clip has it. Lyra's own
+  `MM_Shotgun_Idle_ADS` is the rifle's with the left hand 2 cm further back, further from
+  this pump, so it is not taken.
+- **Lyra's pistol pose lays the trigger finger straight along the frame.** Three things
+  follow. `grip.fist_in_socket` leaves a finger on a circle wider than
+  `CURL_MAX_RADIUS_CM` out of the fist's middle (the index's was 44 cm, which put the
+  middle 10 cm out of the hand and every grip with it). The pistol's and the SMG's rows
+  carry `trigger_reach` 4.5 (`weapon_models.PISTOL_POSE_TRIGGER_REACH_CM`): the index
+  rests 3.5 to 3.9 cm above the guard, not on the trigger. And a carried item's fist
+  (`hold_pose.closed_fist`: the hold poses, the knife's and the axe's clips) is the
+  pistol pose's with the index taken from the rifle pose (`PlayerSkin.fist_index`),
+  where it is closed: a knife held in the pistol's own fist would be pointed at.
+  `verify/grip_fit.fist_off` checks that fist joint by joint.
+- **A changed fist leaves the items outside this package seated in the old one**: the
+  mushroom's and the canteen's grips are solved against `A_HoldItem` by their own
+  builders. Run `build_survival.py` and `build_clothing.py` after a weapons build that
+  changed a ready pose (`verify_survival.py` says so: "the Stem is in the middle of the
+  fist").
+- **The poses lean in to the sights**: the fist is 11 to 13 cm further forward than in
+  the mannequin's poses, so `carry_tuning.CARRY_GRIP` was re-measured ((28, 10, 40)).
+- **A checkout without Lyra** holds the guns in the mannequin's `MF_*_Idle_ADS`,
+  retargeted (`skin.GAS_AIM_WITHOUT_LYRA`, as the punch falls back); the shotgun
+  verifier then fails its "is Lyra's" line.
+- **`probe_headshot` was unreliable before this** and is not the poses': its wanderer
+  swung at the player, who was dead before the last round one run in two, and at 150 cm
+  a hip round's line from the muzzle to the reticle's point left through the capsule's
+  side. The wanderer's controller is taken off it now and it stands at 300 cm.
 
 ## The melee clips (C2, 2026-10-08)
 
@@ -1120,15 +1163,14 @@ These are feel checks a headless run can't do:
   wrapped over the right hand's (the support hand's pose, hidden at 14 cm); and anything
   the 2 cm near plane (`NEAR_CLIP_CM`) shows that 10 cm hid (the player's own body with
   the boom pulled in against a wall);
-- the shotgun's thumbs (`shotgun_pose.SHOTGUN_THUMBS`): how the right thumb reads over the
-  stock's wrist from behind and at the hip (its base joint is inside the wood, as the rifle
-  pose's was), whether the left one closes on the pump or hovers (its base is 5 cm off the
-  wood), and both on the mannequin fallback, where only the directions were carried over;
-- the shotgun's left hand (`shotgun_pose.SUPPORT_PALM`, `SUPPORT_FINGERS`): how the wrist
-  reads now the hand is turned 16° down under the pump on the rifle pose's forearm, the
-  fingertips leaning forward up the pump's right side, and the right hand, left as the rifle
-  pose has it (a pistol grip's fist on a straight stock: its fingers run into the receiver's
-  belly and the guard);
+- the shotgun in the rifle's pose (`shotgun_hold.py`): down the sights, how the left hand
+  reads cupped under the pump (its joints 0.5 to 3.8 cm off the wood) and its thumb beside
+  the receiver, just under the sight line; at the hip and on the shoulder, where the hand
+  is the clip's own (at the pump's back end, the thumb up); the right thumb along the top
+  of the stock's wrist; and the right hand, a pistol grip's fist on a straight stock (its
+  fingers run into the receiver's belly and the guard);
+- the pistol's and the SMG's trigger finger, laid straight along the frame as Lyra's pose
+  has it (3.5 to 3.9 cm above the guard), and a shot fired from there  belly and the guard);
 - the head leaving the view on the way onto the sights (`HEAD_HIDE_SEAT` 0.8): whether it is
   seen to go, from behind, in the last of the camera's travel, and whether the headless
   shadow is noticed with the sun behind the player;

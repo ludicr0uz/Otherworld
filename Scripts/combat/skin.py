@@ -15,6 +15,7 @@ import unreal
 
 from asset_pipeline.gas_bridge_paths import PLAYER_FAMILY
 from asset_pipeline import lyra_paths as LYRA
+from asset_pipeline import mixamo_paths as MIXAMO
 from asset_pipeline.mannequin_bind.paths import bound_asset_dir, bound_asset_name
 from asset_pipeline.metahuman_paths import ABP_RETARGET, BODY_MESH, FACE_MESH
 from asset_pipeline.player_body import PLAYER_NAME, PLAYER_RIG
@@ -308,7 +309,7 @@ SKIN_GAS = dataclasses.replace(
     punch=LYRA.uefn_clip(LYRA.PUNCH),
     crouch_idle=f"{GAS_UAL_ANIMS}UAL1_Crouch_Idle_Loop",
     crouch_walk=f"{GAS_UAL_ANIMS}UAL1_Crouch_Fwd_Loop",
-    prone_crawl=f"{GAS_UAL_ANIMS}UAL1_Swim_Fwd_Loop",
+    prone_crawl=MIXAMO.player_clip("prone_crawl"),
     search_kneel=f"{GAS_UAL_ANIMS}UAL1_Fixing_Kneeling",
     throw=f"{GAS_UAL_ANIMS}UAL2_OverhandThrow")
 

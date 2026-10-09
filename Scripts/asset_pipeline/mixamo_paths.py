@@ -121,7 +121,8 @@ RATE_SCALE_RANGE = (0.5, 2.0)
 # which has no X Bot of its own and needs none: every Mixamo download is on
 # the one skeleton.
 PLAYER_PACKS = (("Pro Melee Axe Pack", "MeleeAxe"),
-                ("Knife", "Knife"))
+                ("Knife", "Knife"),
+                ("Scary Zombie Pack", "Scary"))
 
 # {role: (pack's short name, clip stem)}.  A new clip in a role is an edit
 # here, a re-run of import_mixamo.py and the weapons build.
@@ -130,6 +131,9 @@ PLAYER_CLIPS = {
     "knife_swing": ("Knife", "Stabbing"),
     "axe_ready": ("MeleeAxe", "StandingIdle"),
     "axe_swing": ("MeleeAxe", "StandingMeleeAttackDownward"),
+    # The prone crawl (C5): the Scary pack's face-down crawl, the one clip of
+    # it the player wears (the creatures' packs are imported as before).
+    "prone_crawl": ("Scary", "ZombieCrawl"),
 }
 
 

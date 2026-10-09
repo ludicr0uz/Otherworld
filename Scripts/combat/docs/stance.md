@@ -142,8 +142,10 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   Library (CC0; `asset_pipeline/import_quaternius.py` retargets every UAL clip onto the
   adventurer, into `/Game/Sourced/Quaternius/UAL/Adventurer01`). `PlayerSkin` names four (the fourth is `search_kneel`, below):
   `crouch_idle` (`Crouch_Idle_Loop`), `crouch_walk` (`Crouch_Fwd_Loop`) and `prone_crawl`. The
-  packs have no crawl and no prone idle: the crawl is the face-down `Swim_Fwd_Loop` (a two-armed
-  pull and a frog kick), and lying still is that clip held at 0.5 s (arms ahead, legs straight).
+  Quaternius packs have no crawl: on the player (C5) it is Mixamo's `zombie crawl` from the Scary
+  Zombie Pack (`mixamo_paths.PLAYER_CLIPS["prone_crawl"]`, retargeted by `import_mixamo_player.py`;
+  its hips bob about 7 cm, so the verifier allows `CRAWL_BOB_CM`), and lying still is that clip held
+  at 0.96 s (`PRONE_REST_S`, hips mid-bob). The older skins still use `Swim_Fwd_Loop`.
 - **Where:** between the locomotion state machine and both its readers (the aim slot and the
   upper-body layered blend's base): `TwoWayBlend(PoseCrouch)` then `TwoWayBlend(PoseProne)`,
   each B a still/walking `TwoWayBlend` by `Move = clamp(GroundSpeed / 60, 0, 1)`. The aim

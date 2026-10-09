@@ -73,8 +73,9 @@ OWN_CLASSES = (BLEND_CLASS, PLAYER_CLASS, EVALUATOR_CLASS)
 # 120 / 80.
 CROUCH_WALK_RATE = 2.0
 PRONE_CRAWL_RATE = 1.5
-# The crawl's still frame: the arms reaching ahead, the legs straight behind.
-PRONE_REST_S = 0.5
+# The crawl's still frame (Mixamo's zombie crawl): a frame of the stroke with
+# the hips at the middle of their bob, so lying still they are PRONE_HIPS_CM up.
+PRONE_REST_S = 0.96
 
 
 def _mine(ed):

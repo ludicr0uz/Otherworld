@@ -34,6 +34,8 @@ PRONE_TOP_CM = 80.0
 # How far a bone of the lying body may sit under the ground: a centimetre or
 # two of a knee or a foot pressed into grass.
 SINK_CM = 3.0
+# Mixamo's crawl rocks the hips about 7 cm either side of their middle.
+CRAWL_BOB_CM = 8.0
 # The kneel's knee on the ground: its joint sits this far under it at most on
 # the adventurer's shorter shin (measured 3.9), where the clip's own rig rests
 # the kneecap on the ground.
@@ -209,9 +211,9 @@ def check_crawl_on_ground():
     clip_z = crawl_hips_z(skin)
     rest_lift = PRONE_HIPS_CM - clip_z
     hips_z = [p[hips].z for p in _samples(crawl, [hips])]
-    check(f"the crawl's hips stay within 1 cm of where body_pose lifts them "
+    check(f"the crawl's hips stay within {CRAWL_BOB_CM:g} cm of where body_pose lifts them "
           f"from ({clip_z:g} cm, measured off this body's clip)",
-          all(abs(z - clip_z) < 1.0 for z in hips_z),
+          all(abs(z - clip_z) < CRAWL_BOB_CM for z in hips_z),
           f"{min(hips_z):.1f}..{max(hips_z):.1f}")
 
     length = crawl.get_editor_property("sequence_length")

@@ -110,6 +110,8 @@ def _author_slots(ed):
         slot = _name_slot(_palette(ed, NODE_SLOT_DEFAULT), name)
         blend = _palette(ed, NODE_LAYERED_BLEND)
         # One pose output drives both: the blend's base and the slot's source.
+        # As plain links here, for the builders that follow; server_anim.py,
+        # the last of them, makes each a cached pose (uebp/pose_share.py).
         _connect(pose, _pin(blend, "BasePose"))
         _connect(pose, _pin(slot, "Source"))
         _connect(out(slot, "Pose"), _pin(blend, "BlendPoses_0"))

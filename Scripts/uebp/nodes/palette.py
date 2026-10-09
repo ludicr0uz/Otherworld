@@ -43,6 +43,10 @@ NODE_SLOT_DEFAULT = "Animation|Montage|Slot'DefaultSlot'"
 # "Animation|LinkedAnimGraphs|<Blueprint>-LinkedAnimGraph", there while that
 # Blueprint is loaded and on the same skeleton.
 NODE_INPUT_POSE = "Animation|LinkedAnimGraphs|InputPose"
+# Save cached pose: the one way a pose may reach two inputs (uebp/pose_share.py).
+# The node that reads one is named for the cache it reads, so it has no row
+# here: pose_share.use_path(name), there once a Save node has that name.
+NODE_SAVE_POSE = "Animation|CachedPoses|NewSavecachedpose..."
 
 NODE_BREAK_HIT = "Collision|BreakHitResult"
 

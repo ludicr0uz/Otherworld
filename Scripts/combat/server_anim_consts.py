@@ -35,11 +35,12 @@ and none of what is for the eye:
 WHY THE TWO SLOTS STAY. The flinch was skipped at first too. It is back for
 a reason the hit probe cannot put a number on (its own spread, 4 to 8 rounds
 of 8 from run to run, on the build before this task as well, is wider than a
-flinch could show in it), and for one of wiring: a blend's output in these
-graphs feeds the next blend's base AND that blend's slot, the engine updates
-a node once per link that reaches it, so an arm that left a blend out would
-update the locomotion under it fewer times a frame than a client's does
-(server_anim.py, "The branch").
+flinch could show in it). There was one of wiring too, gone since: a blend's
+output in these graphs feeds the next blend's base AND that blend's slot, and
+linked plainly the engine updated the locomotion under it once per link, so
+an arm that left a blend out played it at another speed than a client's. Each
+such pose is a cached pose now (uebp/pose_share.py; server_anim.py, "The
+branch").
 
 The player's graph is two since G4: the motion-matching base, whose own
 branch skips the feet's ground traces (gas_locomotion.py), and the weapon

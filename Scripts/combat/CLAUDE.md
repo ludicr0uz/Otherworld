@@ -780,6 +780,17 @@ into the motion-matching one by a Linked Anim Graph node after Remap Curves.
 the link, `weapon_layers_consts.py` holds the picture and the names,
 `verify/weapon_layers.py` and `verify/gas_locomotion.py` check them.
 
+- **No pose in it is linked to two inputs** once it is built. Each upper-body blend takes
+  one pose as its base and as its slot's source; linked plainly, the engine updated the
+  Input Pose (the whole motion matching behind it) once per link, four times a frame, and
+  every clip of the run, the jump and the crouch played four times too fast (3.4 with the
+  play rate the motion matching picks; measured by `probes/probe_gas_anim_speed.py`).
+  `server_anim.py`, the last patch, makes each such pose a cached pose
+  (`uebp/pose_share.py`), and takes them out again before the builders walk the graph.
+  The wanderers' graphs had the same two places and get the same patch, so their walk
+  and run play at their clips' own rates now (`mixamo_locomotion.py`'s), and the crawl
+  and the crouch walk at `stance_clips.py`'s. A probe that waited on a clip (a run's
+  start, a stop) may have been timed against the old speed.
 - **Its graph has `ABP_Unarmed`'s shape, with an Input Pose where the state machine was**,
   so `aim_pitch.py`, `body_pose.py`, `support_hand.py`, `stance_clips.py` and
   `server_anim.py` run on it as written, each on `skin.anim_bp`, and so do their

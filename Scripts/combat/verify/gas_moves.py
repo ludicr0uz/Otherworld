@@ -33,6 +33,7 @@ from combat.weapon_component.stance import CROUCH_FORCED_VAR
 from uebp import net
 from uebp.graph import BEL, BGE, PIN, _assets
 from uebp.nodes.guard import GUARD_CLASS
+from uebp.pose_share import fed as linked
 
 
 def _class(node):
@@ -48,12 +49,12 @@ def _flat(node):
 
 
 def _up(pin):
-    return [PIN.get_owning_node(q) for q in PIN.list_connected_pins(pin)]
+    return [PIN.get_owning_node(q) for q in linked(pin)]
 
 
 def _down(node, pin="then"):
     return [PIN.get_owning_node(q)
-            for q in PIN.list_connected_pins(BEL.find_output_pin(node, pin))]
+            for q in linked(BEL.find_output_pin(node, pin))]
 
 
 def check_crouch():
@@ -149,7 +150,7 @@ def check_traversal_component():
     tries = BGE.get_graph_editor_by_name(bp, T.TRY_GRAPH)
     sources = properties_sources(events) + properties_sources(tries)
     fed = [sorted(str(PIN.get_pin_name(p)).split("_")[0]
-                  for p in BEL.list_input_pins(src) if PIN.list_connected_pins(p))
+                  for p in BEL.list_input_pins(src) if linked(p))
            for _put, src in sources if src is not None]
     messages = [n for ed in (events, tries) for n in ed.list_all_nodes()
                 if _class(n) == "K2Node_Message" and T.PROPERTIES_MESSAGE in _title(n)]

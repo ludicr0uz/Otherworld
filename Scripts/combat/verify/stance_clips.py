@@ -28,6 +28,7 @@ from combat.stance_clips import (
     PRONE_CRAWL_RATE, PRONE_REST_S,
 )
 from combat.verify.common import BEL, PIN, check, graph, load, num_pin
+from uebp.pose_share import fed as linked
 
 # The prone capsule is 40 cm half-height: nothing of a lying body above it.
 PRONE_TOP_CM = 80.0
@@ -47,14 +48,14 @@ def _title(n):
 
 
 def _up(node, pin):
-    fed = PIN.list_connected_pins(BEL.find_input_pin(node, pin))
+    fed = linked(BEL.find_input_pin(node, pin))
     return PIN.get_owning_node(fed[0]) if fed else None
 
 
 def _feeds(node, pin, limit=12):
     seen, stack = [], [BEL.find_input_pin(node, pin)]
     while stack and len(seen) < limit:
-        for q in PIN.list_connected_pins(stack.pop()):
+        for q in linked(stack.pop()):
             n = PIN.get_owning_node(q)
             if n not in seen:
                 seen.append(n)
@@ -134,7 +135,7 @@ def check_stance_graph():
                                and _title(_up(low, "Alpha")) == f"Get {POSE_CROUCH}"))
           and _cls(loco) == (INPUT_CLASS if skin.layers_tag else "AnimGraphNode_StateMachine"),
           f"{_cls(lying)} <- {_cls(low)} <- {_cls(loco)}")
-    feeds = PIN.list_connected_pins(BEL.find_output_pin(down, "Pose")) if down else []
+    feeds = linked(BEL.find_output_pin(down, "Pose")) if down else []
     check("...and so does the upper-body layered blend's base (the aim layer "
           "rides on the crouched, lying or kneeling body)",
           sorted(_cls(PIN.get_owning_node(p)) for p in feeds)

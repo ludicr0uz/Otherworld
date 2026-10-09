@@ -30,6 +30,7 @@ from uebp.graph import BEL, PIN, _connect, _palette, _pin, _set, out
 from uebp.nodes.actor import FN_GET_COMP
 from uebp.nodes.palette import NODE_BLEND_BY_BOOL
 from uebp.nodes.system import FN_IS_VALID
+from uebp.pose_share import fed
 
 TRAVERSAL_CLASS = f"{TRAVERSAL_BP}.{TRAVERSAL_BP.rsplit('/', 1)[1]}_C"
 TRUE_PIN, FALSE_PIN = "BlendPose_0", "BlendPose_1"
@@ -38,7 +39,9 @@ SLOT_IN_S, SLOT_OUT_S = 0.0, 0.25
 
 
 def _fed(pin):
-    return list(PIN.list_connected_pins(pin))
+    # Read through a cached pose: a verifier calls these walks on the graph
+    # as it is worn (uebp/pose_share.py).
+    return fed(pin)
 
 
 def traversal_branches(ed):

@@ -12,6 +12,10 @@
              Replicated and RepNotify variables, actors and components that
              replicate (through Source/OtherworldEditor; CLAUDE.md is the guide)
   props.py   engine properties and components read through a variable node
+  pose_share.py  an anim graph's pose that feeds two inputs: share(ed) puts a
+             cached pose there (a pose linked twice is updated twice a frame
+             and plays everything under it at double speed), unshare(ed)
+             takes it back out for the builders, fed(pin) reads through it
   nodes/     the one catalog of node paths (FN_*, NODE_*, MACRO_*), a module
              per engine library; its own __init__ maps them
 """

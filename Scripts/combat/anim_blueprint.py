@@ -296,9 +296,10 @@ def patch_anim_blueprint():
         loco = PIN.get_owning_node(feeding[0])
 
         aim_blend = _palette(ed, "Animation|Blends|Layeredblendperbone")
-        # A pose output legally drives more than one input here, so the
-        # locomotion pose reaches both the blend's base and the slot's source
-        # without needing a cached-pose pair.
+        # The locomotion pose reaches both the blend's base and the slot's
+        # source. Linked like this it compiles, and the engine updates the
+        # locomotion once per link: server_anim.py, the last patch, makes each
+        # such pose a cached pose (uebp/pose_share.py).
         _connect(out(loco, "Pose"), _pin(aim_blend, "BasePose"))
         PIN.break_pin_links(_pin(rig, "Source"))
         _connect(out(aim_slot, "Pose"), _pin(aim_blend, "BlendPoses_0"))

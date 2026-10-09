@@ -19,6 +19,7 @@ from combat.server_anim_consts import (
     SERVER_ARM_CLASSES, SERVER_PIN, SERVER_POSE_VAR, SERVER_SLOTS, SLOT_CLASS, WANDERER,
 )
 from uebp.graph import BEL, BGE, PIN, _assets
+from uebp.pose_share import fanouts, fed as linked
 
 ANIM_NODE = "AnimGraphNode_"
 
@@ -34,7 +35,7 @@ def _title(node):
 def _sources(node, pin=None):
     """The nodes linked into ``node``'s input ``pin`` (every input with None)."""
     pins = [BEL.find_input_pin(node, pin)] if pin else BEL.list_input_pins(node)
-    return [PIN.get_owning_node(q) for p in pins if p for q in PIN.list_connected_pins(p)]
+    return [PIN.get_owning_node(q) for p in pins if p for q in linked(p)]
 
 
 def arm(root, take):
@@ -78,7 +79,7 @@ def support_hand_held_at_zero(weapon_graph_nodes, var):
         return False
     cur = writes[0]
     for _ in range(4):
-        pins = PIN.list_connected_pins(BEL.find_input_pin(cur, "execute"))
+        pins = linked(BEL.find_input_pin(cur, "execute"))
         if len(pins) != 1:
             return False
         owner = PIN.get_owning_node(pins[0])
@@ -87,6 +88,16 @@ def support_hand_held_at_zero(weapon_graph_nodes, var):
             return asked == ["IsDedicatedServer"] and str(PIN.get_pin_name(pins[0])) == "else"
         cur = owner
     return False
+
+
+def check_no_fanout(check, name, ed):
+    """No pose of a worn anim graph is linked to two inputs."""
+    twice = [f"{_title(PIN.get_owning_node(pin))} -> "
+             f"{sorted(_title(PIN.get_owning_node(q)) for q in links)}"
+             for pin, links in (fanouts(ed) if ed else [])]
+    check(f"{name}: no pose is linked to two inputs (the engine updates what is under "
+          "such a pose once per link, and plays it that many times too fast: each is a "
+          "cached pose, uebp/pose_share.py)", ed is not None and not twice, str(twice))
 
 
 def check_graph(check, anim_bp, kind, ik_held_at_zero=None):
@@ -98,6 +109,7 @@ def check_graph(check, anim_bp, kind, ik_held_at_zero=None):
     nodes = list(ed.list_all_nodes()) if ed else []
     branches = [n for n in nodes if _class(n) == BRANCH_CLASS]
     roots = [n for n in nodes if _class(n) == "AnimGraphNode_Root"]
+    check_no_fanout(check, name, ed)
     check(f"{name} has ONE branch on what a dedicated server needs of it (a Blend "
           "Poses by bool)", len(branches) == 1 and len(roots) == 1, f"{len(branches)} branch(es)")
     if len(branches) != 1 or len(roots) != 1:

@@ -22,12 +22,12 @@ frame) and FullBodySlot. The aim's and the flinch's blends are on both arms,
 for two reasons (server_anim_consts.py has both at length):
 
   * each moves a hit box a shooter is aiming at;
-  * these graphs fan a pose out (a blend's output feeds the next blend's base
-    AND that blend's slot), and the engine updates a node once per link that
-    reaches it (FPoseLinkBase::Update has no guard). An arm that left out one
-    of the blends would update the locomotion under it fewer times a frame
-    than a client does, and play it at another speed. The branch therefore
-    sits after the last fan-out.
+  * it was once a matter of wiring too: these graphs feed a blend's output to
+    the next blend's base AND to that blend's slot, the engine updates a node
+    once per link that reaches it, and so an arm that left a blend out played
+    the locomotion under it at another speed than a client's. That is gone:
+    such a pose is a cached pose now, updated once a frame however many read
+    it (uebp/pose_share.py), which this patch puts in as its last step.
 
 It is where the next thing for the eye goes: a node put on the client arm is
 never run on a server, and verify/server_anim.py fails a server arm that
@@ -46,7 +46,11 @@ ORDER
 -----
 Last of the anim graph's patches, and unpatch_server_anim first of them: the
 other builders (anim_blueprint.py, aim_pitch.py, body_pose.py,
-stance_clips.py) then meet the chain they were written against. The later
+stance_clips.py) then meet the chain they were written against. The cached
+poses go the same way: the unpatch takes them out (pose_share.unshare), so
+the builders follow plain links, and the patch puts them back before its
+compile (pose_share.share), which is the last one before a body runs the
+graph. The later
 animation tasks rebuild these graphs; whatever they put in goes on the
 client arm, and verify/server_anim.py must stay green.
 """
@@ -61,6 +65,7 @@ from uebp.graph import BEL, BGE, PIN, _assets, _connect, _declare, _node, _palet
 from uebp.layout import arrange
 from uebp.nodes.palette import NODE_BLEND_BY_BOOL
 from uebp.nodes.system import FN_IS_DEDICATED_SERVER
+from uebp.pose_share import share, unshare
 from uebp.vars import BOOL
 
 INIT_EVENT = "BlueprintInitializeAnimation"
@@ -91,8 +96,10 @@ def _flag_writes(events):
 
 
 def _remove(ed, events):
-    """Take the branch and the flag's write out, joining what each split.
-    Returns how many branches there were."""
+    """Take the branch and the flag's write out, joining what each split,
+    and the cached poses with them (the plain links back). Returns how many
+    branches there were."""
+    unshare(ed)
     branches = [n for n in ed.list_all_nodes() if _class(n) == BRANCH_CLASS]
     for branch in branches:
         client = _fed(_pin(branch, CLIENT_PIN))
@@ -227,6 +234,8 @@ def patch_server_anim(anim_bp, kind):
         "bodies and the gun. A machine with a screen takes the other arm. A new node "
         "for the eye goes on that arm. See Scripts/combat/server_anim.py.", [branch, flag])
     _author_flag(events)
+    # Last, over the whole graph: no pose is left linked to two inputs.
+    shared = share(ed)
 
     arrange(ed)
     arrange(events)
@@ -234,5 +243,6 @@ def patch_server_anim(anim_bp, kind):
         raise RuntimeError(f"{anim_bp} failed to compile after the server branch")
     _assets().save_loaded_asset(bp)
     _log(f"{bp.get_name()}: a dedicated server plays {list(SERVER_SLOTS[kind]) or 'no slot'} "
-         f"and skips the chain's last {_class(last)[len('AnimGraphNode_'):]}")
+         f"and skips the chain's last {_class(last)[len('AnimGraphNode_'):]}; "
+         f"{shared} cached pose(s) where a pose feeds two inputs")
     return bp

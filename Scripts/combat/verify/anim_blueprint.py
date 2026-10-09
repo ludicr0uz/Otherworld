@@ -8,6 +8,7 @@ from combat.anim_blueprint import (
 from combat.paths import ABP_PATH
 from combat.skin import player_skin
 from combat.verify.common import BEL, PIN, check, graph, load
+from uebp.pose_share import fed as linked
 
 
 # ─── The AnimGraph patch ─────────────────────────────────────────────────────
@@ -40,7 +41,7 @@ def check_anim_graph_patch():
 
     def _fed_blend(slot_node):
         """The LayeredBoneBlend a Slot node's pose runs into, or None."""
-        fed = PIN.list_connected_pins(BEL.find_output_pin(slot_node, "Pose"))
+        fed = linked(BEL.find_output_pin(slot_node, "Pose"))
         if not fed:
             return None
         owner = PIN.get_owning_node(fed[0])
@@ -77,7 +78,7 @@ def check_anim_graph_patch():
               blend.get_editor_property("node").get_editor_property(
                   "mesh_space_rotation_blend"))
         base_src = [PIN.get_owning_node(q).get_class().get_name()
-                    for q in PIN.list_connected_pins(
+                    for q in linked(
                         BEL.find_input_pin(blend, "BasePose"))]
         check(f"the {label} blend's base pose comes from {want_base}",
               base_src == [want_base], str(base_src))
@@ -86,9 +87,9 @@ def check_anim_graph_patch():
     # blend's base. That is what makes the second blend free at rest -- both inputs
     # are the same pose, so its weight cannot matter until a montage is playing.
     if hit_blend is not None:
-        src = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        src = [PIN.get_owning_node(q) for q in linked(
             BEL.find_input_pin(slot_names[HIT_SLOT], "Source"))]
-        base = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        base = [PIN.get_owning_node(q) for q in linked(
             BEL.find_input_pin(hit_blend, "BasePose"))]
         check(f"{HIT_SLOT} passes through the same pose its blend uses as a base, "
               f"so the insertion is a no-op until something is hit",
@@ -98,7 +99,7 @@ def check_anim_graph_patch():
     # ...and the flinch is DOWNSTREAM of the aim pose, not upstream: a reaction has
     # to win over the ready pose for its second, not be overwritten by it.
     if aim_blend is not None and hit_blend is not None:
-        onward = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        onward = [PIN.get_owning_node(q) for q in linked(
             BEL.find_output_pin(aim_blend, "Pose"))]
         check(f"the aim blend feeds the hit blend, so {HIT_SLOT} overrides the "
               f"ready pose rather than the other way round",
@@ -107,17 +108,17 @@ def check_anim_graph_patch():
     # the upper body like the other two and whatever plays into it reaches the chest
     # only.
     if FULL_BODY_SLOT in slot_names and rigs:
-        feeding = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        feeding = [PIN.get_owning_node(q) for q in linked(
             BEL.find_input_pin(rigs[0], "Source"))]
         # Through the server branch (server_anim.py), on its client pin: a
         # dedicated server takes the pose from before the slot.
         if len(feeding) == 1 and feeding[0].get_class().get_name() == BRANCH_CLASS:
-            feeding = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+            feeding = [PIN.get_owning_node(q) for q in linked(
                 BEL.find_input_pin(feeding[0], CLIENT_PIN))]
         check(f"{FULL_BODY_SLOT} feeds the ControlRig, downstream of both blends",
               feeding == [slot_names[FULL_BODY_SLOT]],
               str([n.get_class().get_name() for n in feeding]))
-        behind = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        behind = [PIN.get_owning_node(q) for q in linked(
             BEL.find_input_pin(slot_names[FULL_BODY_SLOT], "Source"))]
         check(f"the hit blend -- the last one -- feeds {FULL_BODY_SLOT}",
               behind == [hit_blend],

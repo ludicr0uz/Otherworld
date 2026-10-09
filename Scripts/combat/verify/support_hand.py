@@ -19,6 +19,7 @@ from combat.weapon_component.pose_weights import (
     HELD_SUPPORT_POINT, HELD_TWO_HANDED,
 )
 from combat.weapon_specs import _weapon_specs, support_point_of, two_handed_poses
+from uebp.pose_share import fed as linked
 
 BONE_SPACE = unreal.BoneControlSpace.BCS_BONE_SPACE
 
@@ -55,7 +56,7 @@ def check_anim_bp_support_hand():
           inner.get_editor_property("joint_target_location_space") == BONE_SPACE
           and target_bone(inner, "joint_target") == bones["forearm_l"]
           and inner.get_editor_property("joint_target_location").length() == 0.0
-          and not PIN.list_connected_pins(BEL.find_input_pin(ik, "JointTargetLocation")),
+          and not linked(BEL.find_input_pin(ik, "JointTargetLocation")),
           target_bone(inner, "joint_target"))
     check("...the arm never stretched and the hand's turn left to the pose",
           not inner.get_editor_property("allow_stretching")
@@ -75,7 +76,7 @@ def check_anim_bp_support_hand():
               "at its start (the shotgun's, that point moved onto its pump), re-measured",
               max(abs(g - w) for g, w in zip(got.to_tuple(), want)) < 0.01,
               f"{got.to_tuple()} against {want}")
-    after = PIN.list_connected_pins(BEL.find_output_pin(ik, "Pose"))
+    after = linked(BEL.find_output_pin(ik, "Pose"))
     check("it is the last thing done to the pose: it feeds the ComponentToLocal",
           len(after) == 1 and PIN.get_owning_node(after[0]).get_class().get_name()
           == "AnimGraphNode_ComponentToLocalSpace")

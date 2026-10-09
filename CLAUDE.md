@@ -494,6 +494,16 @@ editor.
   - `delete_subobject` doesn't cascade, so delete the whole subtree.
   - `rename_subobject` fails silently, so assert the name.
   - Handles go stale after any sibling delete, so re-gather after each one.
+- **Anim graphs: a pose linked to two inputs plays everything under it twice as fast.**
+  Python can link one pose output to two inputs (a blend's base and its slot's source) and
+  the compile accepts it, but the engine updates and evaluates the node behind it once per
+  link, each with the whole frame's time. Two such places in a row are four times: the
+  player's run, jump and crouch played 3.4 times too fast until they were found. The
+  builders still link plainly; `uebp/pose_share.py` `share(ed)` turns each into a cached
+  pose before the last compile (`server_anim.py`, `gas_locomotion.py`), `unshare(ed)`
+  takes them out before a builder walks the graph, and a verifier follows links with its
+  `fed(pin)`. `verify/server_anim.check_no_fanout` fails a worn graph that has one;
+  `probes/probe_gas_anim_speed.py` measures the legs against the ground.
 - **Tick:** `bCanEverTick` isn't settable, but compiling turns it on when the Tick event's exec pin
   is **connected**. Leave Tick wired.
 - **Rebuilds:** a builder whose "already authored, reusing" guard has no escape hatch never

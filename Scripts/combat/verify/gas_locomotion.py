@@ -25,15 +25,18 @@ from combat.weapon_layers import layers_class_path
 from combat.weapon_layers_consts import BEFORE_LINK_CLASS, LAYERS_ABP, LAYERS_TAG, MAIN_MONTAGES
 from combat.verify.common import _mesh_asset, check, component_template, components
 from combat.verify.fixtures import char
-from combat.verify.server_anim import _class, _flag_written_once, _sources, _title
+from combat.verify.server_anim import (
+    _class, _flag_written_once, _sources, _title, check_no_fanout,
+)
 from uebp.graph import BEL, PIN, _assets
+from uebp.pose_share import fed as linked
 
 FEET = ("AnimGraphNode_FootPlacement", "AnimGraphNode_LegIK")
 SEARCH = "AnimGraphNode_MotionMatching"
 
 
 def _linked(pin):
-    return bool(PIN.list_connected_pins(pin))
+    return bool(linked(pin))
 
 
 def check_properties(bp, ed):
@@ -57,7 +60,7 @@ def check_properties(bp, ed):
     paces = [n for n in nodes if _title(n).replace(" ", "") == "GetMaxSpeed"]
     limits = {float(PIN.get_pin_value(BEL.find_input_pin(c, "B")) or 0.0)
               for p in paces for c in (PIN.get_owning_node(q)
-                                       for q in PIN.list_connected_pins(
+                                       for q in linked(
                                            BEL.find_output_pin(p, "ReturnValue")))}
     check("...the gait is read off the game's own movement: Sprint while the C++ "
           f"movement sprints, Walk under {WALK_BELOW_CMS:g} cm/s of pace",
@@ -88,6 +91,7 @@ def check_anim_graph(bp, anim):
               "of the pose line: the slots that play are the weapon layers'",
               not slot_in_line(anim), f"in line: {slot_in_line(anim)}")
     roots = [n for n in anim.list_all_nodes() if _class(n) == "AnimGraphNode_Root"]
+    check_no_fanout(check, bp.get_name(), anim)
     check_link(roots, anim)
     branches = server_branches(anim)
     check("the motion-matching graph has ONE branch on what a dedicated server needs "
@@ -166,8 +170,8 @@ def arm_of(root, branch, take):
 def feet_start_at_server_pose(branch):
     """Whether the client arm, walked back through the feet's nodes, ends on
     the node the server arm is taken from."""
-    server = PIN.list_connected_pins(BEL.find_input_pin(branch, SERVER_PIN))
-    client = PIN.list_connected_pins(BEL.find_input_pin(branch, CLIENT_PIN))
+    server = linked(BEL.find_input_pin(branch, SERVER_PIN))
+    client = linked(BEL.find_input_pin(branch, CLIENT_PIN))
     if not server or not client:
         return False
     pin, walked = client[0], 0
@@ -175,7 +179,7 @@ def feet_start_at_server_pose(branch):
         node = PIN.get_owning_node(pin)
         source = next(p for p in BEL.list_input_pins(node)
                       if str(PIN.get_pin_name(p)) in ("ComponentPose", "LocalPose"))
-        pin, walked = PIN.list_connected_pins(source)[0], walked + 1
+        pin, walked = linked(source)[0], walked + 1
     return (PIN.get_owning_node(pin) == PIN.get_owning_node(server[0])
             and walked == len(EYE_CLASSES))
 

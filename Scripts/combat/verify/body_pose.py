@@ -26,6 +26,7 @@ from combat.verify.fixtures import w, wg
 from combat.weapon_component.pose_weights import HELD_TWO_HANDED, SEARCHING_VAR
 from combat.weapon_component.stance import CROUCH, PRONE
 from combat.weapon_specs import _weapon_specs
+from uebp.pose_share import fed as linked
 
 
 def _title(n):
@@ -33,14 +34,14 @@ def _title(n):
 
 
 def _source(pin):
-    fed = PIN.list_connected_pins(pin)
+    fed = linked(pin)
     return PIN.get_owning_node(fed[0]) if fed else None
 
 
 def _feeds(pin, limit=60):
     seen, stack = [], [pin]
     while stack and len(seen) < limit:
-        for q in PIN.list_connected_pins(stack.pop()):
+        for q in linked(stack.pop()):
             node = PIN.get_owning_node(q)
             if node not in seen:
                 seen.append(node)
@@ -56,10 +57,10 @@ def _chain(nodes):
     out = []
     pose = BEL.find_output_pin(to_cs[0], "ComponentPose") if len(to_cs) == 1 else None
     while pose is not None and len(out) < 64:
-        nxt = PIN.list_connected_pins(pose)
+        nxt = linked(pose)
         node = PIN.get_owning_node(nxt[0]) if len(nxt) == 1 else None
         if (node is None or node.get_class().get_name() != MODIFY_BONE_CLASS
-                or not PIN.list_connected_pins(BEL.find_input_pin(node, "Alpha"))):
+                or not linked(BEL.find_input_pin(node, "Alpha"))):
             break
         out.append(node)
         pose = BEL.find_output_pin(node, "Pose")
@@ -98,12 +99,12 @@ def check_anim_bp_poses():
     plan = pose_plan(skin, _ref(abp.get_editor_property("target_skeleton")))
     chain = _chain(nodes)
     driven = [n for n in nodes if n.get_class().get_name() == MODIFY_BONE_CLASS
-              and PIN.list_connected_pins(BEL.find_input_pin(n, "Alpha"))]
+              and linked(BEL.find_input_pin(n, "Alpha"))]
     check("the body poses are one unbroken chain out of LocalToComponent, one "
           "ModifyBone per step of pose_plan, and a rerun stacked none",
           len(chain) == len(plan) == len(driven), f"{len(chain)} {len(plan)} {len(driven)}")
     after = BEL.find_output_pin(chain[-1], "Pose") if chain else None
-    nxt = PIN.list_connected_pins(after) if after else []
+    nxt = linked(after) if after else []
     check("...and it runs into the aim pitch, which turns whatever it made",
           len(nxt) == 1 and PIN.get_owning_node(nxt[0]).get_class().get_name()
           == MODIFY_BONE_CLASS)

@@ -134,7 +134,9 @@ def _legs(r):
     p.set(wc, RAISE_FORCED_VAR, True)
     yield from held(1.0)
     seen = []
-    yield from held(2.0, fwd=1.0, each=lambda: seen.append(picked()))
+    # Four seconds: the run's start is a clip of its own, about two seconds
+    # at the speed it was captured at, and the loop is picked after it.
+    yield from held(4.0, fwd=1.0, each=lambda: seen.append(picked()))
     p.check("with the gun raised (its ready pose playing in a slot) the motion matching "
             "still picks the run: the pose is the upper body's alone",
             inst.get_current_active_montage() is not None

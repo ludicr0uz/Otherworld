@@ -1560,9 +1560,9 @@ harness (`uepy.py --net --clients 2 --bots N --probe Scripts/probes/probe_net_lo
   and never gives the support hand's IK a weight (`weapon_component/support_hand.py`).
   It keeps the aim's blend (DefaultSlot: the arms' hit bodies and the muzzle) and the
   flinch's (HitSlot), on the player and on the wanderers: each moves a hit box a shooter
-  is aiming at, and these graphs fan a pose out to a blend's base and its slot, so an
-  arm that left a blend out would update the locomotion under it fewer times a frame
-  than a client's does. **A new node for the eye goes on the client arm**; the verifier
+  is aiming at. (A blend's base and its slot take one pose: a cached pose, updated once
+  a frame on either arm, `uebp/pose_share.py`. Linked plainly it was updated once per
+  link, and played everything under it that many times too fast.) **A new node for the eye goes on the client arm**; the verifier
   fails a server arm that holds a slot, a blend or a node class the table does not list.
   - **The player's worn graph is the motion matching's since G3**, and has the same one
     branch, authored by `combat/gas_locomotion.py` and checked by

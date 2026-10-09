@@ -25,6 +25,7 @@ from combat.skin import player_skin
 from combat.verify.common import BEL, PIN, check, graph, load
 from combat.verify.fixtures import _wg_all
 from combat.weapon_layers_consts import INPUT_CLASS, LAYERS_TAG
+from uebp.pose_share import fed as linked
 
 LINKED_CALL = "GetLinkedAnimGraphInstanceByTag"
 MAIN_CALL = "GetAnimInstance"
@@ -43,7 +44,7 @@ def _title(node):
 
 def _fed_by(node, pin):
     return [PIN.get_owning_node(q)
-            for q in PIN.list_connected_pins(BEL.find_input_pin(node, pin))]
+            for q in linked(BEL.find_input_pin(node, pin))]
 
 
 def check_layer_graph(skin):

@@ -44,6 +44,7 @@ WRITABLE = [(WEAPON_COMP_BP_PATH, v) for v in
 
 SETTLE_S = 0.4          # the ready pose's blend, and a little
 JOG_S = 0.6
+STOP_S = 1.2            # the motion matching's stop out of a jog, played out
 LOWERED_DEG = 35.0      # the barrel hangs at least this far below the horizon
 RAISED_DEG = 20.0       # ...and raised, sits within this of it
 ORIGIN_NEAR_CM = 32.0    # the stand-in muzzle against the raised gun's own
@@ -141,6 +142,9 @@ def _gun(p, player, wc, anim, label, index):
             and fastest[0] > 100.0 and median < -LOWERED_DEG,
             f"{fastest[0]:.0f} cm/s, median {median:+.1f} deg")
     yield _until(lambda: player.get_velocity().length() < 5.0)
+    # The stop is a clip of its own (the body leans back out of the run), and
+    # the muzzle is measured standing.
+    yield STOP_S
 
     # An aim key (its stand-in) raises it, and letting go lowers it.
     p.set(wc, RAISE_FORCED_VAR, True)

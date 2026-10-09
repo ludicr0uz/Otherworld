@@ -9,6 +9,7 @@ from combat.aim_pitch import AIM_PITCH_VAR, IK_CLASS, MODIFY_BONE_CLASS, ROLL_PE
 from combat.skin import player_skin
 from combat.verify.common import BEL, PIN, cdo, check, graph, load, num_pin
 from combat.verify.fixtures import wg
+from uebp.pose_share import fed as linked
 
 
 def _title(n):
@@ -19,7 +20,7 @@ def _feeds(pin, limit=100):
     """Every node feeding this pin through data links."""
     seen, stack = [], [pin]
     while stack and len(seen) < limit:
-        for q in PIN.list_connected_pins(stack.pop()):
+        for q in linked(stack.pop()):
             node = PIN.get_owning_node(q)
             if node not in seen:
                 seen.append(node)
@@ -30,11 +31,11 @@ def _feeds(pin, limit=100):
 
 def _driven(node):
     """A body-pose ModifyBone (body_pose.py): its Alpha is wired to a weight."""
-    return bool(PIN.list_connected_pins(BEL.find_input_pin(node, "Alpha")))
+    return bool(linked(BEL.find_input_pin(node, "Alpha")))
 
 
 def _pose_source(node, pin_name):
-    fed = PIN.list_connected_pins(BEL.find_input_pin(node, pin_name))
+    fed = linked(BEL.find_input_pin(node, pin_name))
     return PIN.get_owning_node(fed[0]) if fed else None
 
 

@@ -83,6 +83,7 @@ from uebp.nodes.math import FN_AND, FN_EQ_II, FN_GREATER_FF, FN_LESS_FF, FN_NOT,
 from uebp.nodes.move import FN_GET_STANCE, FN_IS_SPRINTING
 from uebp.nodes.palette import NODE_BLEND_BY_BOOL, NODE_BREAK_HIT, NODE_CAST_CHARACTER
 from uebp.nodes.system import FN_IS_DEDICATED_SERVER, FN_TIME_SECONDS
+from uebp.pose_share import fed, share, unshare
 from uebp.vars import BOOL, declare, defaults
 
 CMC = "/Script/Engine.CharacterMovementComponent"
@@ -95,7 +96,9 @@ def _class(node):
 
 
 def _fed(pin):
-    return list(PIN.list_connected_pins(pin))
+    # Read through a cached pose: a verifier calls these walks on the graph
+    # as it is worn (uebp/pose_share.py).
+    return fed(pin)
 
 
 def _field(make, name):
@@ -450,6 +453,9 @@ def build_gas_locomotion():
         raise RuntimeError(f"{ABP_LOCOMOTION} is not here: run asset_pipeline/import_gas.py")
     bp = eas.load_asset(ABP_LOCOMOTION)
     anim, events, properties = graphs(bp)
+    # The plain links back first: the fragments below find their places by
+    # following them.
+    unshare(anim)
     _remove_server_branch(anim, events)
     _remove_link(anim)
     remove_traversal_slot(anim, _slot(anim))
@@ -462,6 +468,10 @@ def build_gas_locomotion():
         author_traversal_slot(anim, _slot(anim))
     _author_link(anim)
     _author_server_branch(anim, events)
+    # The traversal's slot and the server branch each take one pose on both
+    # arms: a cached pose each, or the motion matching under them is updated
+    # twice a frame while a blend has both arms in (uebp/pose_share.py).
+    share(anim)
     for ed in (anim, events, properties):
         arrange(ed)
     if not BEL.compile_blueprint(bp):

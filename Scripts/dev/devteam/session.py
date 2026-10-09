@@ -28,7 +28,9 @@ way the project verifies things before you finish.{commit}
 {progress}
 Every earlier turn is re-read on each new one, so keep what you pull in lean: \
 grep -n and sed -n ranges for a file of more than a few hundred lines, and \
-whole files only when you need all of them.
+whole files only when you need all of them. Grep Scripts/dev/symbols.txt \
+first to find where a symbol lives, and batch independent reads into one \
+command rather than one per turn.
 
 In this session uepy.py runs scripts in a headless editor of this session's \
 own (UEPY_SERVE): the first call boots it (20-40 s), later calls reuse it, so \

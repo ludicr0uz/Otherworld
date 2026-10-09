@@ -29,6 +29,11 @@ files=$(git diff --cached --name-only --diff-filter=AM -z | tr '\0' '\n')
 
 [ -z "$files" ] && exit 0
 
+# Keep the symbol index current (Scripts/dev/symbols.py) and in this commit.
+if python3 Scripts/dev/symbols.py 2>/dev/null; then
+    git add Scripts/dev/symbols.txt
+fi
+
 printf '%s\n' "$files" | while IFS= read -r f; do
     [ -z "$f" ] && continue
     [ -f "$f" ] || continue

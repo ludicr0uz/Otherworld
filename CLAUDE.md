@@ -89,8 +89,10 @@ sessions tens of millions of tokens.
   another section left behind.
 
 **Working in it:**
-- Find the owner from the `__init__` map. `grep -rn '^def \|^[A-Z_]* =' Scripts/combat` is a
-  cheap symbol index.
+- Find the owner from the `__init__` map. `grep -n <name> Scripts/dev/symbols.txt` is the
+  symbol index (every def, class and constant under `Scripts/`, every UCLASS/UFUNCTION under
+  `Source/`; the pre-commit hook refreshes it). Grep it first, and batch independent reads
+  into one command.
 - **Moving code:** move it verbatim, then check that the verifier reports the same count and the
   same check lines as before.
 

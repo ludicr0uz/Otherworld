@@ -29,4 +29,6 @@ Entry point: Scripts/build_day_night.py. Checks: Scripts/verify_day_night.py
                        MPC_ItemGlimmer, the switch of every item's glimmer
   level_placement      tag each level's static sky, place the cycle actor
   verify/              the verifier's sections
+
+  level_save  Saving a generated level from the editor, without its navmesh
 """

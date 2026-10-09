@@ -59,4 +59,6 @@ and the bars are graphics_menu/survival_bars.py.
 Dependency direction: survival imports combat, never the reverse (combat only
 knows the tag names and the bleed's numbers, in combat.tuning). npc imports
 survival's on_hit and on_hit_graph; survival never imports npc.
+
+  terrain_heights  Terrain height at a point, from the terrain mesh's own triangles
 """

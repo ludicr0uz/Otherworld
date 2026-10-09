@@ -81,7 +81,9 @@ sessions tens of millions of tokens.
   it owns: one Blueprint, one graph concern, or one constants table (`tuning.py`, `paths.py`,
   `<blueprint>_vars.py`). Constants modules stay separate from the modules that author graphs.
 - **The map:** the package's `__init__.py` docstring lists every module in one line each. Keep it
-  current. Each module's docstring says what it owns and why.
+  current (the dev unit tests fail a map that misses a module or names one that is gone;
+  `python3 Scripts/dev/package_map.py --fix <package>` appends what is missing). Each module's
+  docstring says what it owns and why.
 - **Explicit imports only.** No `import *` and no re-exporting facades.
 - **No import cycles.** Imports flow constants → `uebp` → builders → entry point.
 - **Verifiers mirror builders.** `verify/<area>.py` holds self-contained `check_*` functions.

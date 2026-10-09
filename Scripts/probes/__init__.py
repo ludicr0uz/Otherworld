@@ -43,4 +43,6 @@ Scripts/net/CLAUDE.md has the conventions and the traps.
               (probe_gas_traversal: the crouch, the slide and a mantle, G5;
               probe_net_slide: the slide predicted under lag)
   probe_*     the probes themselves, one behaviour each
+
+  systems  The systems a probe may declare in its SYSTEMS tuple
 """

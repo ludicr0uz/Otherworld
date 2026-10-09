@@ -17,4 +17,7 @@ dev-team itself is the thin CLI (argument parsing and the per-task loop):
   fab         Fab assets: fab: hints and FAB-REQUIRED reports, asked of the user
 
 Unit-tested in Scripts/dev/tests (everything but the process launching).
+
+  baseline_cache  The before-sweep's result kept on disk, so it survives across dev-team runs
+  probe_gate      The probe half of the gate: a named probe set (Scripts/probes/sets.py), run beside the verifier sweep
 """

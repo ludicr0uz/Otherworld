@@ -21,4 +21,8 @@ uepy.py is the thin CLI; everything it does lives here:
 The modules that do not start processes (summary, targets, net_plan,
 net_report, and the parsing halves of net_memory, game, cold and editors) are unit-tested
 in Scripts/dev/tests.
+
+  compile      `uepy.py --compile`: the C++ cycle as one command (Source/CLAUDE.md, "Compile")
+  probe_level  Which level a probe runs on
+  probe_map    Which probes a change can affect: a path maps to systems, systems to probes
 """

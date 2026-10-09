@@ -293,4 +293,6 @@ lets the reticle promise only hits the shot can actually make.
 This is hitscan: the pellets resolve in the frame they are fired. A projectile
 version would use the identical aim resolve and fire a velocity along
 (AimPoint - muzzle) instead of tracing it.
+
+  body_parts  Whatever is drawn under the player's mannequin gets what the mannequin gets: hidden from its own camera ...
 """

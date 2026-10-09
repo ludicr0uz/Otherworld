@@ -274,4 +274,6 @@ each other; everything else may import data and uebp. No module imports
 the entry point. Keep it acyclic -- a module that
 needs a name from a sibling that already imports it means the name is in the
 wrong module.
+
+  metahuman_body  The MetaHuman body hung under the player's mannequin
 """

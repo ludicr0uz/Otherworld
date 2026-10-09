@@ -101,4 +101,7 @@ Editor-side, in pipeline order:
     import_ui_art.py            entry point: HUD art PNGs -> textures
     fab_index.py                entry point: index Fab content -> assets/cache/fab/
     fab_inventory.py            describe a folder's assets from registry tags
+
+  import_metahuman  copy the sample MetaHuman the player wears into Content/MetaHumans
+  metahuman_paths   where the player's MetaHuman is, and what it is made of
 """

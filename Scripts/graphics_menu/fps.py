@@ -17,14 +17,13 @@ menu and the death menu both are), so it reads steadily instead of flickering
 with every frame's delta.
 """
 
-from uebp.graph import (
-    BEL, _connect, _declare, _float_type, _node, _pin, _set, else_, out, then)
+from uebp.vars import declare
+from graphics_menu import hud_vars as MV
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from graphics_menu.ui_graph import part, set_text
 from graphics_menu.umg_consts import HUD_FPS, WBP_HUD
 
-FPS_FRAMES_VAR = "FpsFrames"   # frames drawn since FpsSince
-FPS_SINCE_VAR = "FpsSince"     # real time the current window opened
-FPS_SHOWN_VAR = "FpsShown"     # what the readout says, rounded
+FPS_FRAMES_VAR, FPS_SINCE_VAR, FPS_SHOWN_VAR = MV.FPS
 FPS_WINDOW_S = 0.5
 
 FPS_PREFIX = "FPS  "
@@ -42,9 +41,7 @@ _FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
 
 def declare_fps_vars(ed):
     """All three default to zero, which is what add_member_variable leaves."""
-    _declare(ed, FPS_FRAMES_VAR, BEL.get_basic_type_by_name("int"))
-    _declare(ed, FPS_SINCE_VAR, _float_type())
-    _declare(ed, FPS_SHOWN_VAR, BEL.get_basic_type_by_name("int"))
+    declare(ed, MV.FPS)
 
 
 def author_fps(ed, in_execs):

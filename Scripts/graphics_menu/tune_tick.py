@@ -41,10 +41,11 @@ up after the nudge: the fire graph reads every stat off Held, so a value
 lands on the next shot.
 """
 
+from uebp.vars import declare, defaults
+from graphics_menu.tune_tab import tab_table
 import unreal
 
-from uebp.graph import (
-    BEL, _connect, _declare, _float_type, _loose_pin, _palette, _pin, out, then)
+from uebp.graph import _connect, _loose_pin, _palette, _pin, out, then
 from combat.gun_tuning import GUN_COLUMNS, MELEE_COLUMNS, TUNE_COLUMNS, TUNE_STATS, columns_of
 from combat.melee_tuning import melee_specs
 from combat.paths import (
@@ -74,34 +75,15 @@ from graphics_menu import hud_vars as MV
 from combat.weapon_component import vars as WV
 
 
-def _bools(tab):
-    return (tab.open_var, tab.save_var, tab.saved_var, tab.touched_var)
-
-
-def _ints(tab):
-    return (tab.row_var, tab.pick_var, tab.nudge_var)
-
-
 def declare_tab_vars(ed, tab):
     """A tab's HUD variables. Defaults: tab_defaults()."""
-    for name in _bools(tab):
-        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
-    for name in _ints(tab):
-        _declare(ed, name, BEL.get_basic_type_by_name("int"))
-    for name in filter(None, (tab.values_var, tab.steps_var, tab.mins_var,
-                              tab.maxs_var)):
-        _declare(ed, name, BEL.get_array_type(_float_type()))
-    if tab.kept:
-        _declare(ed, tab.built_var, BEL.get_array_type(_float_type()))
-    if tab.live_var:
-        _declare(ed, tab.live_var, BEL.get_array_type(BEL.get_basic_type_by_name("bool")))
-    _declare(ed, tab.names_var, BEL.get_array_type(BEL.get_basic_type_by_name("string")))
+    declare(ed, tab_table(tab))
 
 
 def tab_defaults(tab, names, values, steps, mins):
     """Shut, untouched, on the first subject, with the built table (and, for
     a kept tab, a second copy of it that no nudge moves)."""
-    return {**{b: False for b in _bools(tab)}, **{i: 0 for i in _ints(tab)},
+    return {**defaults(tab_table(tab)),
             tab.values_var: values, tab.names_var: names,
             tab.steps_var: steps, tab.mins_var: mins,
             **({tab.built_var: list(values)} if tab.kept else {})}

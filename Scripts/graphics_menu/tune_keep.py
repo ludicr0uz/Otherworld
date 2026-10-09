@@ -32,12 +32,14 @@ which author_load_kept and build_keep_savegames also run, so the HUD build
 has one call for each.
 """
 
+from uebp.vars import declare
+from graphics_menu.tune_keep_consts import TUNE_SAVE_FIELDS
 import unreal
 
 from combat.log import _log
 from uebp.graph import (
-    BEL, BGE, _connect, _create_blueprint, _declare, _float_type, _loose_pin, _must_load,
-    _palette, _pin, out, then)
+    BEL, BGE, _connect, _create_blueprint, _loose_pin, _must_load, _palette, _pin, out, then,
+)
 from uebp.layout import arrange
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_save import author_load_graphics, build_graphics_savegame
@@ -56,8 +58,7 @@ def build_tune_savegame():
     """Create (or re-declare) BP_TuneSave and compile it. A record, no graph."""
     bp = _create_blueprint(TUNE_SAVE_BP_PATH, unreal.SaveGame)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
-    for field in (TUNE_SAVE_TABLE_FIELD, TUNE_SAVE_BUILT_FIELD):
-        _declare(ed, field, BEL.get_array_type(_float_type()))
+    declare(ed, TUNE_SAVE_FIELDS)
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_TuneSave failed to compile")

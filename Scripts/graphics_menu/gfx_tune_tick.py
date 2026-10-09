@@ -27,9 +27,12 @@ The pick follows Quality rather than the other way round on a Tick where
 neither moved, so the tab always shows the preset that is running.
 """
 
+from uebp.vars import declare, defaults
+from graphics_menu.gfx_tune_consts import GFX_TUNE_TABLE
 from uebp.graph import (
-    BEL, _add_component, _connect, _declare, _drop_components, _loose_pin, _must_load, _pin,
-    _root_handle, out, then)
+    BEL, _add_component, _connect, _drop_components, _loose_pin, _must_load, _pin, _root_handle,
+    out, then,
+)
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_save import author_keep_graphics
 from graphics_menu.gfx_stats import (
@@ -58,8 +61,7 @@ def install_tuner(bp):
 
 def declare_gfx_tune_vars(ed):
     declare_tab_vars(ed, GFX_TAB)
-    for name in (GFX_TUNE_PICK_SEEN_VAR, GFX_APPLIED_VAR):
-        _declare(ed, name, BEL.get_basic_type_by_name("int"))
+    declare(ed, GFX_TUNE_TABLE)
 
 
 def gfx_tune_defaults():
@@ -69,7 +71,7 @@ def gfx_tune_defaults():
                            [float(s.step) for s in GFX_STATS],
                            [float(s.lo) for s in GFX_STATS]),
             GFX_TAB.maxs_var: [float(s.hi) for s in GFX_STATS],
-            GFX_TUNE_PICK_SEEN_VAR: 0, GFX_APPLIED_VAR: GFX_APPLIED_DEFAULT}
+            **defaults(GFX_TUNE_TABLE)}
 
 
 def _author_pick(ed, in_execs, made):

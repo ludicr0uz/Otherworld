@@ -46,6 +46,8 @@ SimpleMoveToLocation, as the stroll, the strafe and the stalk are: the level
 verifier counts the chase's MoveToActor and MoveToLocation, one of each.
 """
 
+from uebp.vars import declare
+from npc import controller_vars as NV
 import unreal
 
 from combat.paths import FIRE_WARD_VAR, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
@@ -103,14 +105,7 @@ def wards(key):
 
 def declare_ward_vars(ed):
     """All zero by default: no hold, no side, not fleeing."""
-    kinds = {name: BEL.get_basic_type_by_name("real")
-             for name in (WARD_SINCE_VAR, WARD_LAST_VAR, WARD_SIDE_VAR,
-                          WARD_TURN_AT_VAR, WARD_FLEE_UNTIL_VAR)}
-    kinds[WARD_FLEE_GOAL_VAR] = BEL.get_struct_type(unreal.Vector.static_struct())
-    for name, kind in kinds.items():
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, kind):
-            raise RuntimeError(f"could not declare {name}")
+    declare(ed, NV.WARD)
     declare_ward_roar_vars(ed)
 
 

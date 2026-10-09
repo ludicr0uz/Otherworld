@@ -276,4 +276,7 @@ needs a name from a sibling that already imports it means the name is in the
 wrong module.
 
   metahuman_body  The MetaHuman body hung under the player's mannequin
+
+  anim_vars       What the builders add to the player's anim Blueprints' member variables (the weapon layers, and before G4 ...
+  game_mode_vars  What the builders add to BP_ThirdPersonGameMode's member variables, named once: each row is the name and the ...
 """

@@ -13,6 +13,7 @@ one row.
 import dataclasses
 
 from combat.tuning import BLEEDING_TAG
+from uebp.vars import FLOAT, Var
 from survival.paths import BLEEDING_GE_CLASS_PATH, BLEEDING_GE_PATH
 
 
@@ -38,7 +39,8 @@ ON_HIT = {
 # A real on the graph that rolls, added to every chance in it. 0 as built; a
 # probe writes +1 for "every hit" and -1 for "never" (probes/probe_bleeding.py),
 # since a one-in-three roll proves nothing in a short run.
-ON_HIT_BONUS_VAR = "OnHitChanceBonus"
+ON_HIT_BONUS_VAR = Var("OnHitChanceBonus", FLOAT)
+ON_HIT_TABLE = (ON_HIT_BONUS_VAR,)       # on_hit_graph.declare_on_hit_vars
 
 
 def melee_attack(creature):

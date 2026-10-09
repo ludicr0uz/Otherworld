@@ -28,6 +28,7 @@ The mannequin fallback's ABP_Unarmed is left alone: its speed is in cm/s for
 whatever else wears it.
 """
 
+from combat import anim_vars as AN
 from combat.log import _log
 from uebp.graph import BEL, BGE, PIN, _assets, _connect, _node, _pin, _set, out
 from uebp.layout import arrange
@@ -36,7 +37,7 @@ from uebp.nodes.math import FN_MUL_FF
 
 # The Speed the blend space's jog row sits at.
 JOG_ROW_CMS = 600.0
-GROUND_SPEED = "GroundSpeed"
+GROUND_SPEED = AN.GroundSpeed
 STOCK_DIR = "/Game/Characters/Mannequins/"
 
 

@@ -108,29 +108,29 @@ HIT_ANIM_FALLBACK_DIR = "/Game/Characters/Mannequins/Anims/Rifle/HitReact"
 # install_hit_reactions from that character's OWN skeleton -- exactly as the
 # hit-zone tables are. An AnimSequence belongs to one skeleton, so a shared
 # default here could only ever be right for one body.
-HIT_REACTIONS_VAR = "HitReactions"
+HIT_REACTIONS_VAR = HV.HitReactions
 # Unit vector, world space, pointing from the victim TOWARD whatever hit it.
 # Written by the pellet loop (off the impact normal, which already points back
 # up the shot) and by a wanderer's punch; read once, by the direction pick.
 # Zero is a legal value and means "nobody said" -- the pick is written so that
 # it falls to Front, which is the reaction that has three clips.
-LAST_HIT_FROM_VAR = "LastHitFrom"
+LAST_HIT_FROM_VAR = HV.LastHitFrom
 # What Health was on the previous Tick. The whole trigger.
-PREV_HEALTH_VAR = "PrevHealth"
+PREV_HEALTH_VAR = HV.PrevHealth
 # When the next reaction may start, in world seconds. Same shape as the
 # wanderers' NextVoiceTime and the weapons' NextFireTime: a deadline, not a
 # timer, so nothing has to tick it down.
-NEXT_REACT_VAR = "NextReactTime"
+NEXT_REACT_VAR = HV.NextReactTime
 # The index the direction pick chose, stored rather than wired because it is
 # written on four different exec arms and read by one.
-REACT_INDEX_VAR = "ReactIndex"
+REACT_INDEX_VAR = HV.ReactIndex
 # This body is looking down its sights and does not flinch: the hit is taken,
 # the stagger is not played. Written every frame by the player's weapon
 # component (weapon_component/steady.py); nobody writes a wanderer's, which
 # stays False. Why: down the sights the view rides the gun (sights.py), and a
 # flinch takes the arms -- its montage stops the ready pose, the gun falls to
 # the carry at the knee, and the camera went there with it.
-STEADY_VAR = "Steady"
+STEADY_VAR = HV.Steady
 # TEMPORARY INSTRUMENTATION, and it must stay False.
 #
 # "A gate that never opens looks identical to one that works": a -game run in

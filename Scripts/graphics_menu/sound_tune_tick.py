@@ -18,7 +18,9 @@ only a nudge tells it again: the mix is the audio device's and outlives a
 respawn, unlike what the other tabs write.
 """
 
-from uebp.graph import BEL, _connect, _declare, _must_load, _pin, out, then
+from uebp.vars import declare, defaults
+from graphics_menu.sound_tune_consts import SOUND_TUNE_TABLE
+from uebp.graph import _connect, _must_load, _pin, out, then
 from Sound.catalog import SOUND_STATS
 from Sound.mix import SOUND_MIX_PATH, class_path
 from Sound.tuning import VOLUME_MAX, VOLUME_MIN, VOLUME_STEP, table
@@ -37,7 +39,7 @@ MIX_PIN, CLASS_PIN = "InSoundMixModifier", "InSoundClass"
 
 def declare_sound_tune_vars(ed):
     declare_tab_vars(ed, SOUND_TAB)
-    _declare(ed, SOUND_TUNE_APPLIED_VAR, BEL.get_basic_type_by_name("bool"))
+    declare(ed, SOUND_TUNE_TABLE)
 
 
 def sound_tune_defaults():
@@ -48,7 +50,7 @@ def sound_tune_defaults():
                            [float(built[s[0]]) for s in SOUND_STATS],
                            [VOLUME_STEP] * count, [VOLUME_MIN] * count),
             SOUND_TAB.maxs_var: [VOLUME_MAX] * count,
-            SOUND_TUNE_APPLIED_VAR: False}
+            **defaults(SOUND_TUNE_TABLE)}
 
 
 def _asset_pin(node, name, path):

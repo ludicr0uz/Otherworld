@@ -11,9 +11,9 @@ on a path where the widget exists, and a cast that fails still carries on to
 the rest of the frame.
 """
 
-from uebp.graph import (
-    BEL, _connect, _declare, _loose_pin, _must_load, _node, _palette, _pin, _set, else_, out,
-    then)
+from uebp.vars import declare
+from graphics_menu.umg_consts import SCREEN_TABLE
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from graphics_menu.umg_consts import (
     HIDDEN, ROW_CARET, ROW_VALUE, SCREENS, SHOWN, UI_VAR, WBP_HUD, WBP_MENU_ROW,
     class_path,
@@ -39,9 +39,7 @@ def _wire(execs, node):
 def declare_ui_vars(ed):
     """One reference per screen, typed to its own class so its widgets can be
     read off it without a cast."""
-    for var, asset, _z in SCREENS:
-        _declare(ed, var, BEL.get_object_reference_type(
-            BEL.generated_class(_must_load(asset))))
+    declare(ed, SCREEN_TABLE)
 
 
 def author_create_screens(ed, exec_in):

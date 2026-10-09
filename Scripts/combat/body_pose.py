@@ -70,6 +70,8 @@ after patch_aim_pitch, which owns the space conversions around it. A node of
 this module is recognised by its driven Alpha (the aim pitch's is a literal).
 """
 
+from uebp.vars import declare
+from combat import anim_vars as AN
 import math
 
 import unreal
@@ -79,17 +81,17 @@ from asset_pipeline.rig_util import _bone_world
 from combat.aim_pitch import MODIFY_BONE_CLASS, _feeding_all, _nodes_of
 from combat.log import _log
 from uebp.graph import (
-    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _node, _palette, _pin, _set,
-    out)
+    BEL, BGE, PIN, _assets, _connect, _node, _palette, _pin, _set, out,
+)
 from uebp.layout import arrange
 from uebp.nodes.math import FN_CLAMP, FN_MAKE_ROT, FN_MAKE_VECTOR, FN_MUL_FF
 from uebp.nodes.palette import NODE_MODIFY_BONE
 
-POSE_CROUCH = "PoseCrouch"
-POSE_PRONE = "PoseProne"
-GUARD_ARMS = "GuardArms"
-GUARD_GUN = "GuardGun"
-POSE_WEIGHTS = (GUARD_ARMS, GUARD_GUN, POSE_CROUCH, POSE_PRONE)
+POSE_CROUCH = AN.PoseCrouch
+POSE_PRONE = AN.PoseProne
+GUARD_ARMS = AN.GuardArms
+GUARD_GUN = AN.GuardGun
+POSE_WEIGHTS = AN.POSE_WEIGHTS
 # How fast a weight follows its target (FInterpTo speed, 1/s): a stance or a
 # guard settles in about a fifth of a second.
 POSE_BLEND_SPEED = 12.0
@@ -97,8 +99,8 @@ POSE_BLEND_SPEED = 12.0
 # PoseKneel and holds it at KneelTime; pose_weights.py writes both). Not one
 # of POSE_WEIGHTS: no ModifyBone reads it, and going down on a knee takes
 # longer than a guard does: about half a second.
-POSE_KNEEL = "PoseKneel"
-KNEEL_TIME = "KneelTime"
+POSE_KNEEL = AN.PoseKneel
+KNEEL_TIME = AN.KneelTime
 KNEEL_BLEND_SPEED = 5.0
 # The stretch of the kneel clip in which the body is down and the hands work
 # (it kneels before it, and stands after): KneelTime runs up and back down it.
@@ -127,7 +129,7 @@ PRONE_MOVING = "ProneMoving"
 # from the still ones: a crawl is 120 and a crouched walk 270, so either is all
 # walk once under way, and a stop settles back within a step.
 MOVE_FULL_CM_S = 60.0
-GROUND_SPEED = "GroundSpeed"
+GROUND_SPEED = AN.GroundSpeed
 # The fists-up guard, as the LEFT arm's directions in the body frame
 # (+X left, +Y forward, +Z up); the right arm mirrors X. The elbow hangs in
 # front of the ribs and the forearm rises to put the fist before the chin.
@@ -427,8 +429,7 @@ def patch_body_pose(skin):
         raise RuntimeError(f"{skeleton.get_name()} has no {missing}")
 
     _remove_previous(ed, start_out)
-    for name in (*POSE_WEIGHTS, POSE_KNEEL, KNEEL_TIME):
-        _declare(ed, name, _float_type())
+    declare(ed, AN.POSE)
     tail = _downstream(start_out)
     if tail is None:
         raise RuntimeError("the LocalToComponent feeds nothing")

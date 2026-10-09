@@ -8,10 +8,8 @@ import unreal
 from forest_generator.npc_placement import NPC_VARIANTS
 from forest_generator.npc_stalk import NPC_STALK_ROAR
 from npc.paths import (
-    AI_BP_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR, REACTIONS_VAR,
-    STEP_CHASE, STEP_DRAWN, STEP_PRESENT, STEP_PULSE, STEP_STALK, STEP_STROLL,
-    STEP_SWING, STEP_WARD, VOICES_VAR,
-    step_task_path, tree_path,
+    AI_BP_PATH, HIT_SOUNDS_VAR, REACTIONS_VAR, STEP_CHASE, STEP_DRAWN, STEP_PRESENT, STEP_PULSE,
+    STEP_STALK, STEP_STROLL, STEP_SWING, STEP_WARD, VOICES_VAR, step_task_path, tree_path,
 )
 from npc.graph import _log
 from uebp.graph import (
@@ -98,11 +96,7 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     bt = fresh_tree(tree_path(path))
 
     declare(ed, NV.TABLE)
-    # What the swing being landed deals, after the player's guard (npc/block.py).
-    ed.remove_member_variable(HIT_DAMAGE_VAR)
-    if not ed.add_member_variable(HIT_DAMAGE_VAR,
-                                  BEL.get_basic_type_by_name("real")):
-        raise RuntimeError(f"could not declare {HIT_DAMAGE_VAR}")
+    declare(ed, NV.HIT)
 
     # Possession starts the tree. BeginPlay would be too early: a controller's
     # BeginPlay runs before it has possessed anything.

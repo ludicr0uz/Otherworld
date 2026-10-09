@@ -14,14 +14,11 @@ the player takes one (combat/weapon_component/loot_take.py spawns it), so a body
 no hidden actors and nothing is left over when its lifespan ends.
 """
 
-import unreal
+from uebp.vars import declare
+from loot.consts import TABLE
 
-from uebp.graph import (
-    BEL, _connect, _declare, _float_type, _node, _pin, _struct_type, out, then)
-from loot.consts import (
-    LOOT_ARRAYS, LOOT_CHANCES_VAR, LOOT_ICONS_VAR, LOOT_NAMES_VAR, LOOT_TABLE_ICONS_VAR,
-    LOOT_TABLE_NAMES_VAR, LOOT_TABLE_TINTS_VAR, LOOT_TABLE_VAR, LOOT_TINTS_VAR, LOOT_VAR,
-)
+from uebp.graph import _connect, _node, _pin, out, then
+from loot.consts import LOOT_ARRAYS, LOOT_CHANCES_VAR, LOOT_TABLE_VAR
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_GET, FN_ARR_LEN
 from uebp.nodes.math import FN_LESS_FF, FN_RANDOM_UNIT, FN_SUB_II
 from uebp.nodes.palette import MACRO_FOR_LOOP
@@ -31,16 +28,7 @@ def declare_loot_vars(ed):
     """The table (filled by loot/install.py) and the body's contents. The
     classes are class-of-Actor, for DropClasses' reason: this component
     compiles before any item it names exists."""
-    item = BEL.get_class_reference_type(unreal.Actor.static_class())
-    text = BEL.get_basic_type_by_name("string")
-    icon = BEL.get_object_reference_type(unreal.Texture2D.static_class())
-    tint = _struct_type(unreal.LinearColor.static_struct())
-    for name, kind in ((LOOT_TABLE_VAR, item), (LOOT_CHANCES_VAR, _float_type()),
-                       (LOOT_TABLE_NAMES_VAR, text), (LOOT_VAR, item),
-                       (LOOT_NAMES_VAR, text), (LOOT_TABLE_ICONS_VAR, icon),
-                       (LOOT_ICONS_VAR, icon), (LOOT_TABLE_TINTS_VAR, tint),
-                       (LOOT_TINTS_VAR, tint)):
-        _declare(ed, name, BEL.get_array_type(kind))
+    declare(ed, TABLE)
 
 
 def _get(ed, var, made):

@@ -1,9 +1,11 @@
 """BP_HealthComponent's member variables, named once: each row is
 the name, the pin type and the default (uebp/vars.py). The builder declares
-TABLE; a row with no type is a component, or a variable declared elsewhere.
+TABLE, then DAMAGE, the loot rows (loot/consts.py) and STATE, in the order
+they have always been declared in. The defaults of DAMAGE and STATE are the
+builder's and the graph modules' (health_component.py writes them).
 """
 
-from uebp.vars import BOOL, FLOAT, INT, VECTOR, Var, array, cls, obj
+from uebp.vars import BOOL, FLOAT, INT, NAME, VECTOR, Var, array, cls, obj
 from combat.tuning import COMBAT
 
 Health = Var("Health", FLOAT, COMBAT.start_health)
@@ -62,3 +64,40 @@ TABLE = (
     LastInstigator, LastCause, HitCount, SeenHits, DeathPlayed, PlayerRespawnWait,
     RespawnFor,
 )
+
+# Set by whatever hurt this body (game_state.py says what reads them).
+LastDamageTime = Var("LastDamageTime", FLOAT)
+DamagedByPlayer = Var("DamagedByPlayer", BOOL)
+DAMAGE = (LastDamageTime, DamagedByPlayer)
+
+# How long after a death its replacement appears (respawn.py).
+RespawnDelay = Var("RespawnDelay", FLOAT)
+# The number this wanderer was given at spawn. The HUD draws it beside the
+# health bar; the spawn's log line records where that number appeared.
+NpcId = Var("NpcId", INT)
+# Where this wanderer was put. Recorded for diagnosis, not for gameplay --
+# the respawn point is computed from the player, not from here (the old
+# SpawnOrigin, which anchored respawns to it, is gone on purpose). It is
+# what lets the safety net report the spawn that produced a faller.
+SpawnedAt = Var("SpawnedAt", VECTOR)
+# Hit boxes: which physics-asset bodies are head and which are limbs, and
+# what each is worth. On the target rather than on the weapon, because the
+# tables are a fact about the target's skeleton -- install_on_character
+# and install_on_npc fill them from each one's own mesh. Empty here, which
+# makes a target nobody has zoned take every hit at 1.0x.
+HeadBones = Var("HeadBones", array(NAME))
+LimbBones = Var("LimbBones", array(NAME))
+HeadMultiplier = Var("HeadMultiplier", FLOAT)
+LimbMultiplier = Var("LimbMultiplier", FLOAT)
+# Flinching (hit_reaction.py says what each is). On the component rather
+# than on either character, because both of them react the same way and
+# neither of their Blueprints has a graph this could be written into.
+HitReactions = Var("HitReactions", array(obj("/Script/Engine.AnimSequenceBase")))
+LastHitFrom = Var("LastHitFrom", VECTOR)
+PrevHealth = Var("PrevHealth", FLOAT)
+NextReactTime = Var("NextReactTime", FLOAT)
+ReactIndex = Var("ReactIndex", INT)
+Steady = Var("Steady", BOOL)
+STATE = (RespawnDelay, NpcId, SpawnedAt, HeadBones, LimbBones, HeadMultiplier,
+         LimbMultiplier, HitReactions, LastHitFrom, PrevHealth, NextReactTime, ReactIndex,
+         Steady)

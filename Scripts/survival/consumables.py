@@ -14,11 +14,12 @@ BP_ConsumableItem adds the numbers GA_ConsumeItem reads off the payload:
 HungerRestore, ThirstRestore, and HealthRestoreEasy (applied on EASY only).
 """
 
+from uebp.vars import declare, defaults
+from survival import consumable_vars as CV
 import unreal
 
 from combat.log import _log
-from uebp.graph import (
-    BEL, BGE, _apply_defaults, _assets, _create_blueprint, _declare, _float_type, _must_load)
+from uebp.graph import BEL, BGE, _apply_defaults, _assets, _create_blueprint, _must_load
 from uebp.layout import arrange
 from combat.materials import build_flat_material
 from combat.paths import HOLD_ITEM_ANIM_PATH, ITEM_BP_PATH
@@ -44,13 +45,11 @@ def build_consumable_item():
     item_bp = _must_load(ITEM_BP_PATH)
     bp = _create_blueprint(CONSUMABLE_BP_PATH, BEL.generated_class(item_bp))
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
-    for name in ("HungerRestore", "ThirstRestore", "HealthRestoreEasy"):
-        _declare(ed, name, _float_type())
+    declare(ed, CV.TABLE)
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ConsumableItem failed to compile")
-    _apply_defaults(bp, {IV.Consumable: True, "HungerRestore": 0.0,
-                         "ThirstRestore": 0.0, "HealthRestoreEasy": 0.0})
+    _apply_defaults(bp, {IV.Consumable: True, **defaults(CV.TABLE)})
     _log(f"built {CONSUMABLE_BP_PATH}")
     return bp
 
@@ -73,9 +72,9 @@ def build_consumable(spec, base_bp):
         **defaults_for(spec["path"], ITEM_SOUNDS),
         IV.DisplayName: spec["display"],
         IV.Consumable: True,
-        "HungerRestore": float(spec["hunger"]),
-        "ThirstRestore": float(spec["thirst"]),
-        "HealthRestoreEasy": float(spec["health_easy"]),
+        CV.HungerRestore: float(spec["hunger"]),
+        CV.ThirstRestore: float(spec["thirst"]),
+        CV.HealthRestoreEasy: float(spec["health_easy"]),
         # True, unlike every weapon: a consumable starts life on the ground,
         # which is exactly what E looks for. place_forage.py therefore needs no
         # per-instance override (Python refuses to write a Blueprint variable

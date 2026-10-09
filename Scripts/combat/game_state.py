@@ -10,10 +10,12 @@ Where each lives (serversupportsysdesign.md 4.2; net/state_consts.py):
 A client has no GameMode, so nothing it reads may be declared here.
 """
 
-import unreal
+from uebp.vars import declare
+from combat import game_mode_vars as GV
+from combat import health_vars as HV
 
 from combat.log import _log
-from uebp.graph import BEL, BGE, _assets, _declare, _float_type, _struct_type
+from uebp.graph import BEL, BGE, _assets
 from uebp.layout import arrange
 from combat.difficulty import DIFFICULTY_VAR
 from combat.paths import GAME_MODE_BP_PATH
@@ -35,7 +37,7 @@ DEBUG_MODE_VAR = WV.DebugMode
 # stood. Off by default (COMBAT_TRACE_DEFAULT in tuning.py); flipped at runtime
 # from the console with `ke * CombatTraceOn` / `ke * CombatTraceOff`, which
 # call the two custom events combat/combat_trace.py authors on the GameMode.
-COMBAT_TRACE_VAR = "CombatTrace"
+COMBAT_TRACE_VAR = GV.CombatTrace
 COMBAT_TRACE_ON_EVENT = "CombatTraceOn"
 COMBAT_TRACE_OFF_EVENT = "CombatTraceOff"
 COMBAT_TRACE_PREFIX = "[COMBAT-TRACE] "
@@ -65,8 +67,8 @@ TRACER_MISS_COLOR = "(R=0.300000,G=0.800000,B=1.000000,A=1.000000)"
 # Blueprints have no statics -- the GameMode is the project's existing wiring
 # point (it already carries HUDClass), one instance per session, and it outlives
 # every wanderer.
-SPAWN_COUNT_VAR = "NpcSpawnCount"
-NPC_ID_VAR = "NpcId"
+SPAWN_COUNT_VAR = GV.NpcSpawnCount
+NPC_ID_VAR = HV.NpcId
 # Two facts about one player, on their PlayerState (net/state_consts.py):
 # they outlive every wanderer and every one of the player's own components,
 # and replicate to the client whose HUD shows them. NpcKillCount is what the
@@ -78,15 +80,15 @@ PLAYER_DEAD_VAR = "PlayerDead"
 # been seeded this session. On the GameMode because a stream only means
 # anything if it outlives the draws: kept on each wanderer's own health
 # component, every kill would be the first draw of a fresh stream.
-GUN_ROLL_STREAM_VAR = "GunDropRollStream"
-GUN_PICK_STREAM_VAR = "GunDropPickStream"
-GUN_STREAMS_SEEDED_VAR = "GunDropSeeded"
+GUN_ROLL_STREAM_VAR = GV.GunDropRollStream
+GUN_PICK_STREAM_VAR = GV.GunDropPickStream
+GUN_STREAMS_SEEDED_VAR = GV.GunDropSeeded
 # Set on a health component by whatever hurt it. The HUD shows a wanderer's bar
 # only for a few seconds after LastDamageTime, and only a death with
 # DamagedByPlayer true counts as a kill -- the safety net writes Health to 0 for
 # a wanderer that fell through the world, and that is not something anyone shot.
-LAST_DAMAGE_VAR = "LastDamageTime"
-DAMAGED_BY_PLAYER_VAR = "DamagedByPlayer"
+LAST_DAMAGE_VAR = HV.LastDamageTime
+DAMAGED_BY_PLAYER_VAR = HV.DamagedByPlayer
 # Far enough in the past that nothing is "recently damaged" at level start.
 NEVER_DAMAGED = -1000.0
 SPAWN_LOG_PREFIX = "[NPC-SPAWN] #"
@@ -103,7 +105,7 @@ FELL_LOG_PREFIX = "[NPC-FELL] ERROR #"
 # log. The score goes in the line because it is the one number worth having
 # afterwards.
 DEAD_LOG_PREFIX = "[PLAYER-DEAD] killed with "
-SPAWNED_AT_VAR = "SpawnedAt"
+SPAWNED_AT_VAR = HV.SpawnedAt
 # The last noise the player made, for the wanderers to hear. One record,
 # world-scoped for the same reason as the counters above: the emitters (the
 # weapon component, the footstep component) and the listeners (every
@@ -112,15 +114,14 @@ SPAWNED_AT_VAR = "SpawnedAt"
 # and -- for a gunshot -- the direction and reach of the louder cone down the
 # barrel, with the cosine of its half-angle. An all-round noise leaves the
 # cone reach at 0, which no listener can be inside.
-NOISE_TIME_VAR = "NoiseTime"
-NOISE_LOCATION_VAR = "NoiseLocation"
-NOISE_RANGE_VAR = "NoiseRange"
-NOISE_DIRECTION_VAR = "NoiseDirection"
-NOISE_CONE_RANGE_VAR = "NoiseConeRange"
-NOISE_CONE_COS_VAR = "NoiseConeCos"
-NOISE_FLOAT_VARS = (NOISE_TIME_VAR, NOISE_RANGE_VAR, NOISE_CONE_RANGE_VAR,
-                    NOISE_CONE_COS_VAR)
-NOISE_VECTOR_VARS = (NOISE_LOCATION_VAR, NOISE_DIRECTION_VAR)
+NOISE_TIME_VAR = GV.NoiseTime
+NOISE_LOCATION_VAR = GV.NoiseLocation
+NOISE_RANGE_VAR = GV.NoiseRange
+NOISE_DIRECTION_VAR = GV.NoiseDirection
+NOISE_CONE_RANGE_VAR = GV.NoiseConeRange
+NOISE_CONE_COS_VAR = GV.NoiseConeCos
+NOISE_FLOAT_VARS = GV.NOISE_FLOATS
+NOISE_VECTOR_VARS = GV.NOISE_VECTORS
 # Debug mode's damage readout, drawn at each impact for as long as the tracer.
 DAMAGE_TEXT_COLOR = "(R=1.000000,G=0.850000,B=0.100000,A=1.000000)"
 
@@ -165,15 +166,7 @@ def ensure_game_mode_vars():
         raise RuntimeError(f"{GAME_MODE_BP_PATH} has no EventGraph")
     for name in MOVED_VARS:
         ed.remove_member_variable(name)
-    _declare(ed, SPAWN_COUNT_VAR, BEL.get_basic_type_by_name("int"))
-    for name in (COMBAT_TRACE_VAR, GUN_STREAMS_SEEDED_VAR):
-        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
-    for name in NOISE_FLOAT_VARS:
-        _declare(ed, name, _float_type())
-    for name in NOISE_VECTOR_VARS:
-        _declare(ed, name, _struct_type(unreal.Vector.static_struct()))
-    for name in (GUN_ROLL_STREAM_VAR, GUN_PICK_STREAM_VAR):
-        _declare(ed, name, _struct_type(unreal.RandomStream.static_struct()))
+    declare(ed, GV.TABLE)
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonGameMode failed to compile")

@@ -29,8 +29,10 @@ The roll is a pure node read once, by its Branch. The spec is pure too: each
 AddGrantedTag reads the previous one's returned handle (survival/debuffs.py).
 """
 
+from uebp.vars import declare
+from survival.on_hit import ON_HIT_TABLE
 from combat.log import _log
-from uebp.graph import _assets, _connect, _float_type, _node, _pin, _set, else_, out, then
+from uebp.graph import _assets, _connect, _node, _pin, _set, else_, out, then
 from survival.on_hit import ON_HIT_BONUS_VAR
 from uebp.nodes.actor import FN_HAS_AUTHORITY
 from uebp.nodes.gas import (
@@ -42,9 +44,7 @@ from uebp.nodes.system import FN_IS_VALID
 
 def declare_on_hit_vars(ed):
     """Once per graph, before its first _author_on_hit."""
-    ed.remove_member_variable(ON_HIT_BONUS_VAR)
-    if not ed.add_member_variable(ON_HIT_BONUS_VAR, _float_type()):
-        raise RuntimeError(f"could not declare {ON_HIT_BONUS_VAR}")
+    declare(ed, ON_HIT_TABLE)
 
 
 def _author_on_hit(ed, exec_in, target, effects):

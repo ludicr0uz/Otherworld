@@ -8,8 +8,9 @@ DrawHUD, so GA_ConsumeItem reads one world-scoped int and never loads the save
 -- the same push-not-pull shape as the weapon component's settings.
 """
 
+from uebp.vars import declare, defaults
 from combat.difficulty import DIFFICULTY_VAR
-from uebp.graph import BEL, _connect, _loose_pin, _node, _pin, _set, else_, out, then
+from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
 from net.state_consts import GAME_STATE_CLASS_PATH
 from uebp.nodes.actor import FN_HAS_AUTHORITY
 from graphics_menu.settings_rows import (
@@ -19,20 +20,17 @@ from uebp.nodes.math import FN_ADD_II, FN_AND, FN_EQ_II, FN_MOD_II, FN_SELECT_II
 from uebp.nodes.system import FN_IS_VALID
 from graphics_menu import hud_vars as MV
 
-LABELS_VAR = "DifficultyLabels"
+LABELS_VAR = MV.DifficultyLabels
 
 
 def declare_difficulty_vars(ed):
     """The HUD's DifficultyLabels: the names the row shows, indexed like the
     save. Its default is written by the builder's _apply_defaults."""
-    ed.remove_member_variable(LABELS_VAR)
-    if not ed.add_member_variable(LABELS_VAR, BEL.get_array_type(
-            BEL.get_basic_type_by_name("string"))):
-        raise RuntimeError(f"could not declare member variable {LABELS_VAR}")
+    declare(ed, MV.DIFFICULTY)
 
 
 def difficulty_defaults():
-    return {LABELS_VAR: list(DIFFICULTY_LABELS)}
+    return defaults(MV.DIFFICULTY)
 
 
 def author_difficulty_name(ed, settings_out, made):

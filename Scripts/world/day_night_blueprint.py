@@ -12,37 +12,32 @@ it (level_placement.py) and destroys it at BeginPlay, so one set of components
 with one set of values runs every level the same way.
 """
 
+from uebp.vars import declare, defaults
 import unreal
 
 from uebp.graph import (
-    BEL, _add_component, _apply_defaults, _component_object, _declare, _drop_components,
-    _float_type, _must_load, _root_handle)
+    BEL, _add_component, _apply_defaults, _component_object, _drop_components, _must_load,
+    _root_handle,
+)
 from world import world_config as cfg
 from world.paths import SKY_MATERIAL_PATH, SKY_SPHERE_MESH_PATH
 from world import day_night_vars as DV
 
 COMPONENTS = (DV.Sun, DV.Moon, DV.SkyLight, DV.SkyDome, DV.Fog, "NightGrade", DV.DayGrade)
 
-# Variables. The two lengths, Clock, the night's cold, the item highlight and
-# RandomStart are Instance Editable, so a level can run a different day, or start at a set
-# hour, without a rebuild.
-NIGHT_COLD_VAR = "NightTemperatureDropPerSecond"   # night_cold.py reads it
-ITEM_HIGHLIGHT_VAR = "ItemHighlight"               # item_highlight.py reads it
-CONFIG_VARS = (DV.DayLengthSeconds, DV.NightLengthSeconds, DV.Clock, NIGHT_COLD_VAR,
-               ITEM_HIGHLIGHT_VAR)
-RANDOM_START_VAR = "RandomStart"   # BeginPlay picks Clock anywhere in the cycle
+# Variables: rows of day_night_vars.py, under the names the graph modules and
+# the probes read them by.
+NIGHT_COLD_VAR = DV.NightTemperatureDropPerSecond   # night_cold.py reads it
+ITEM_HIGHLIGHT_VAR = DV.ItemHighlight               # item_highlight.py reads it
+CONFIG_VARS = DV.CONFIG
+RANDOM_START_VAR = DV.RandomStart
 STATE_FLOAT_VARS = (DV.DayAmount,)
-# The look multipliers, all 1 as built: the Tick graph scales the sun's and
-# the moon's light, the stars, the sky light, the fog's density and the two
-# discs by them. The M panel's GRAPHICS SETTINGS tab writes them
-# (graphics_menu/gfx_tuner_sky.py); nothing else does.
-SUN_SCALE_VAR, MOON_SCALE_VAR = "SunScale", "MoonScale"
-STAR_SCALE_VAR, AMBIENT_SCALE_VAR, FOG_SCALE_VAR = "StarScale", "AmbientScale", "FogScale"
-SUN_DISC_SCALE_VAR, MOON_DISC_SCALE_VAR = "SunDiscScale", "MoonDiscScale"
-LOOK_SCALE_VARS = (SUN_SCALE_VAR, MOON_SCALE_VAR, STAR_SCALE_VAR, AMBIENT_SCALE_VAR,
-                   FOG_SCALE_VAR, SUN_DISC_SCALE_VAR, MOON_DISC_SCALE_VAR)
-IS_DAY_VAR = "IsDay"
-SKY_MID_VAR = "SkyMaterial"
+SUN_SCALE_VAR, MOON_SCALE_VAR = DV.SunScale, DV.MoonScale
+STAR_SCALE_VAR, AMBIENT_SCALE_VAR, FOG_SCALE_VAR = DV.StarScale, DV.AmbientScale, DV.FogScale
+SUN_DISC_SCALE_VAR, MOON_DISC_SCALE_VAR = DV.SunDiscScale, DV.MoonDiscScale
+LOOK_SCALE_VARS = DV.LOOK_SCALES
+IS_DAY_VAR = DV.IsDay
+SKY_MID_VAR = DV.SkyMaterial
 
 
 def _srgb(c):
@@ -121,12 +116,7 @@ def build_components(bp):
 
 
 def declare_variables(ed):
-    for name in CONFIG_VARS + STATE_FLOAT_VARS + LOOK_SCALE_VARS:
-        _declare(ed, name, _float_type())
-    for name in (IS_DAY_VAR, RANDOM_START_VAR):
-        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
-    _declare(ed, SKY_MID_VAR, BEL.get_object_reference_type(
-        unreal.MaterialInstanceDynamic.static_class()))
+    declare(ed, DV.TABLE)
 
 
 def apply_config(bp):
@@ -137,12 +127,4 @@ def apply_config(bp):
     # The CDO only has the new variables once the class is compiled.
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{bp.get_name()} failed to compile")
-    _apply_defaults(bp, {
-        DV.DayLengthSeconds: float(cfg.DAY_LENGTH_S),
-        DV.NightLengthSeconds: float(cfg.NIGHT_LENGTH_S),
-        DV.Clock: float(cfg.START_CLOCK_S),
-        NIGHT_COLD_VAR: float(cfg.NIGHT_TEMPERATURE_DROP_PER_S),
-        ITEM_HIGHLIGHT_VAR: float(cfg.ITEM_HIGHLIGHT),
-        RANDOM_START_VAR: bool(cfg.RANDOM_START),
-        **{name: 1.0 for name in LOOK_SCALE_VARS},
-    })
+    _apply_defaults(bp, defaults(DV.TABLE))

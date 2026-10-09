@@ -24,6 +24,8 @@ Everything reads off the player_parts cast chain; a pawn without the parts
 skips the whole fragment.
 """
 
+from uebp.vars import declare, defaults
+from graphics_menu.profile_consts import HUD_TABLE
 from uebp.graph import BEL, _connect, _node, _pin, _set, else_, out, then
 from combat.ask_consts import ASK_SAVE_EXIT, EXIT_DUE_VAR, EXIT_PENDING_VAR, EXIT_SECONDS
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
@@ -45,7 +47,6 @@ from combat import health_vars as HV
 from graphics_menu import hud_vars as MV
 from combat.weapon_component import vars as WV
 
-_BOOLS = (EXIT_LEAVING_VAR, PROFILE_CHECKED_VAR, PROFILE_FORGOTTEN_VAR)
 # The countdown's, which the HUD held before the weapon component did.
 RETIRED_VARS = ("ExitPending", "ExitAt", "ExitStartedAt", "ExitCalledOffAt")
 
@@ -54,14 +55,11 @@ def declare_profile_vars(ed):
     """The HUD's profile flags. Defaults: profile_defaults()."""
     for name in RETIRED_VARS:
         ed.remove_member_variable(name)
-    for name in _BOOLS:
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, BEL.get_basic_type_by_name("bool")):
-            raise RuntimeError(f"could not declare member variable {name}")
+    declare(ed, HUD_TABLE)
 
 
 def profile_defaults():
-    return {n: False for n in _BOOLS}
+    return defaults(HUD_TABLE)
 
 
 def _chain(node, in_execs):

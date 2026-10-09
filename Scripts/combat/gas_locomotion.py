@@ -44,6 +44,7 @@ Nothing is hand-animated here and no clip is named: which clip plays is the
 sample's chooser's and its databases' business.
 """
 
+from combat import anim_vars as AN
 import unreal
 
 from combat.gas_locomotion_consts import (
@@ -67,8 +68,8 @@ from combat.server_anim_consts import (
 from uebp import props as EP
 from uebp.g import _G
 from uebp.graph import (
-    BEL, BGE, PIN, _apply_defaults, _assets, _connect, _declare, _loose_pin, _node,
-    _palette, _pin, _set, out, then,
+    BEL, BGE, PIN, _apply_defaults, _assets, _connect, _loose_pin, _node, _palette, _pin, _set,
+    out, then,
 )
 from uebp.layout import arrange
 from uebp.nodes.actor import FN_GET_BASE_AIM_ROT, FN_GET_TRANSFORM, FN_VELOCITY
@@ -84,7 +85,7 @@ from uebp.nodes.move import FN_GET_STANCE, FN_IS_SPRINTING
 from uebp.nodes.palette import NODE_BLEND_BY_BOOL, NODE_BREAK_HIT, NODE_CAST_CHARACTER
 from uebp.nodes.system import FN_IS_DEDICATED_SERVER, FN_TIME_SECONDS
 from uebp.pose_share import fed, share, unshare
-from uebp.vars import BOOL, declare, defaults
+from uebp.vars import declare, defaults
 
 CMC = "/Script/Engine.CharacterMovementComponent"
 CHARACTER = "/Script/Engine.Character"
@@ -382,7 +383,7 @@ def eye_segment(ed):
 
 
 def _author_server_branch(ed, events):
-    _declare(ed, SERVER_POSE_VAR, BOOL())
+    declare(ed, AN.SERVER)
     tap, client, into = eye_segment(ed)
     PIN.break_pin_links(into)
     branch = _palette(ed, NODE_BLEND_BY_BOOL)

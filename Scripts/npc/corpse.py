@@ -29,8 +29,10 @@ gates (_dead_pin): Dead is written by the health component's own Tick, which
 on the frame of the killing blow may not have run yet.
 """
 
+from uebp.vars import declare
+from npc import controller_vars as NV
 from combat.game_state import NPC_ID_VAR
-from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from npc.paths import (
     CORPSE_LOG_PREFIX, CORPSE_VAR, HEALTH_CLASS_PATH, STEP_RESULT_VAR,
 )
@@ -117,9 +119,7 @@ def _author_corpse_gate(ed, exec_in):
     exec pins a living wanderer carries on from, and the exec pin after the
     tree has been told to stop.
     """
-    ed.remove_member_variable(CORPSE_VAR)
-    if not ed.add_member_variable(CORPSE_VAR, BEL.get_basic_type_by_name("bool")):
-        raise RuntimeError(f"could not declare {CORPSE_VAR}")
+    declare(ed, NV.CORPSE)
 
     made = []
 

@@ -138,6 +138,15 @@ def declare(ed, table):
             _declare(ed, var, var.pin_type())
 
 
+def declare_missing(ed, table):
+    """Add each typed row that is not there yet. One already there is left
+    alone, with the nodes that read it: for a graph that is patched in place
+    rather than wiped."""
+    for var in table:
+        if var.pin_type is not None:
+            ed.add_member_variable(var, var.pin_type())
+
+
 def defaults(table):
     """{name: default} for the rows that have one, for ``_apply_defaults``."""
     return {var: var.default.make() if isinstance(var.default, lazy) else var.default

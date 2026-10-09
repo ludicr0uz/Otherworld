@@ -17,6 +17,7 @@ The rows, their steps and minimums are world/world_tuning.WORLD_STATS, and
 their maximums its WORLD_MAXS (only the on/off row has a real one).
 """
 
+from uebp.vars import FLOAT, Var
 from graphics_menu.tune_tab import TuneTab, save_command
 from world.world_tuning import WORLD_STATS
 
@@ -39,7 +40,9 @@ WORLD_TUNE_MINS_VAR = "WorldTuneMins"
 WORLD_TUNE_MAXS_VAR = "WorldTuneMaxs"
 # The hour the HUD last read off the cycle. WorldTuneValues[0] differing
 # from it means a nudge moved the hour: write the cycle's Clock.
-WORLD_TUNE_HOUR_SEEN_VAR = "WorldTuneHourSeen"
+WORLD_TUNE_HOUR_SEEN_VAR = Var("WorldTuneHourSeen", FLOAT, 0.0)
+# The HUD's one beside the tab's own (tune_tab.tab_table).
+WORLD_TUNE_TABLE = (WORLD_TUNE_HOUR_SEEN_VAR,)
 
 WORLD_SUBJECT = "world"
 WORLD_STAT_COUNT = len(WORLD_STATS)

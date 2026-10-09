@@ -24,9 +24,11 @@ counts its calls, so it is made on WearOpen's edges only; WearStill is that
 edge's memory.
 """
 
+from uebp.vars import declare, defaults
+from graphics_menu.wear_consts import TABLE, WEAR_STILL_VAR
 import unreal
 
-from uebp.graph import BEL, _connect, _declare, _loose_pin, _palette, _pin, out, then
+from uebp.graph import _connect, _loose_pin, _palette, _pin, out, then
 from combat.ask_consts import ASK_SLOT, ASK_TAKE_OFF
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.wear_tuning import NOT_CLOTHING
@@ -46,20 +48,14 @@ from uebp.nodes.math import (
 from uebp.nodes.palette import NODE_CAST_WEAPON
 from graphics_menu import hud_vars as MV
 
-WEAR_STILL_VAR = "WearStill"
-
-_BOOLS = (WEAR_OPEN_VAR, WEAR_TAKE_VAR, WEAR_STILL_VAR)
-
 
 def declare_wear_vars(ed):
     """The HUD's I panel variables. Defaults: wear_defaults()."""
-    _declare(ed, WEAR_SEL_VAR, BEL.get_basic_type_by_name("int"))
-    for name in _BOOLS:
-        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
+    declare(ed, TABLE)
 
 
 def wear_defaults():
-    return {WEAR_SEL_VAR: 0, **{b: False for b in _BOOLS}}
+    return defaults(TABLE)
 
 
 def _pressed(ed, pc_out, key, made):

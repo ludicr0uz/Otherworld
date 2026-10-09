@@ -40,17 +40,17 @@ adventurer's is a retargeted copy, rebuilt by build_retarget.py, which runs
 before this builder in the build order.
 """
 
+from uebp.vars import declare
+from combat import anim_vars as AN
 import unreal
 
 from combat.log import _log
-from uebp.graph import (
-    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _node, _palette, _pin, _set,
-    out)
+from uebp.graph import BEL, BGE, PIN, _assets, _connect, _node, _palette, _pin, _set, out
 from uebp.layout import arrange
 from uebp.nodes.math import FN_MAKE_ROT, FN_MUL_FF
 from uebp.nodes.palette import NODE_MODIFY_BONE, NODE_TO_COMPONENT, NODE_TO_LOCAL
 
-AIM_PITCH_VAR = "AimPitch"
+AIM_PITCH_VAR = AN.AimPitch
 # Each of the two bones takes half, and Roll(+a) tips the body's forward down.
 ROLL_PER_DEGREE = -0.5
 
@@ -162,7 +162,7 @@ def patch_aim_pitch(skin):
                            "would turn nothing")
 
     _remove_previous(ed, root)
-    _declare(ed, AIM_PITCH_VAR, _float_type())
+    declare(ed, AN.AIM)
 
     fed = PIN.list_connected_pins(_pin(root, "Result"))
     if not fed:

@@ -6,6 +6,7 @@ dev_guns.py authors it; the constants live here so umg_consts can label the
 row without importing a graph module.
 """
 
+from uebp.vars import BOOL, Var
 from combat.paths import (
     AXE_BP_PATH, KNIFE_BP_PATH, PISTOL_BP_PATH, RIFLE_BP_PATH, SHOTGUN_BP_PATH, SMG_BP_PATH,
     SNIPER_BP_PATH,
@@ -19,9 +20,10 @@ DEV_GUNS_ROW_LABEL = "Dev All Guns"
 
 # The HUD's variables. The row only raises the request; Tick serves it and
 # lowers it, so a probe can ask for the guns without a key press.
-DEV_GUNS_REQUEST_VAR = "DevAllGunsRequested"
+DEV_GUNS_REQUEST_VAR = Var("DevAllGunsRequested", BOOL, False)
 # Scratch for the "already carried?" scan of one gun class.
-DEV_HAS_GUN_VAR = "DevHasGun"
+DEV_HAS_GUN_VAR = Var("DevHasGun", BOOL, False)
+TABLE = (DEV_GUNS_REQUEST_VAR, DEV_HAS_GUN_VAR)
 
 # Every gun, issued or found, in weapon_specs order, and the knife and the axe
 # (issued too, but a player who dropped one gets it back).

@@ -27,13 +27,14 @@ SimpleMoveToLocation, as the stroll is, because the level verifier counts
 the chase's MoveToActor and MoveToLocation: one of each.
 """
 
+from uebp.vars import declare
 from forest_generator.npc_strafe import (
     NPC_STRAFE_ENGAGE_CM, NPC_STRAFE_MAX_ANGLE_DEG, NPC_STRAFE_MAX_DISTANCE_CM,
     NPC_STRAFE_MIN_ANGLE_DEG, NPC_STRAFE_MIN_DISTANCE_CM, NPC_STRAFE_SHARE,
     NPC_STRAFE_SPEED_SCALE,
 )
 from net.players import nearest_living_player, player_pin
-from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from npc.paths import (
     CHARACTER_CLASS_PATH, MOVEMENT_CLASS_PATH, STRAFE_DIST_VAR, STRAFE_FOR_VAR,
     STRAFE_YAW_VAR,
@@ -58,10 +59,7 @@ DESIRED_FLAG = "bUseControllerDesiredRotation"
 def declare_strafe_vars(ed):
     """All zero by default: StrafeFor 0 is NextAttackTime's own start, so
     nothing is picked until a swing has armed the cooldown."""
-    for name in (STRAFE_YAW_VAR, STRAFE_DIST_VAR, STRAFE_FOR_VAR):
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, BEL.get_basic_type_by_name("real")):
-            raise RuntimeError(f"could not declare {name}")
+    declare(ed, NV.STRAFE)
 
 
 def _author_facing(ed, exec_in, focus):

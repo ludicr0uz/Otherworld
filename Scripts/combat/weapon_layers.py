@@ -28,6 +28,8 @@ link_node() and layers_class_path() are for gas_locomotion.py, which puts
 the Linked Anim Graph node in the base.
 """
 
+from uebp.vars import declare_missing
+from combat import anim_vars as AN
 import unreal
 
 from combat.anim_blueprint import (
@@ -37,9 +39,7 @@ from combat.gas_locomotion_consts import SKELETON
 from combat.log import _log
 from combat.player_gait import GROUND_SPEED
 from combat.weapon_layers_consts import INPUT_CLASS, LAYERS_ABP, MAIN_MONTAGES
-from uebp.graph import (
-    BEL, BGE, PIN, _assets, _connect, _float_type, _node, _palette, _pin, out, then,
-)
+from uebp.graph import BEL, BGE, PIN, _assets, _connect, _node, _palette, _pin, out, then
 from uebp.layout import arrange
 from uebp.nodes.actor import FN_VELOCITY
 from uebp.nodes.locomotion import (
@@ -73,7 +73,7 @@ def _event(events, name, palette):
 def _author_ground_speed(events):
     """GroundSpeed = the pawn's velocity over the ground, each update. Left
     alone when it is already there."""
-    events.add_member_variable(GROUND_SPEED, _float_type())
+    declare_missing(events, AN.GROUND)
     _event(events, INIT_EVENT, NODE_EVENT_INIT_ANIM)
     if any(str(BEL.get_node_title(n)) == f"Set {GROUND_SPEED}"
            for n in events.list_all_nodes()):

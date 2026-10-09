@@ -44,7 +44,7 @@ RESPAWN_NAV_SNAP = NPC_RESPAWN_NAV_SNAP_CM
 # How long the pack stays one short after a death. A variable on the component
 # (RespawnDelay) rather than a pin literal, so a probe can shorten the wait.
 RESPAWN_DELAY = NPC_RESPAWN_DELAY_S
-RESPAWN_DELAY_VAR = "RespawnDelay"
+RESPAWN_DELAY_VAR = HV.RespawnDelay
 # Search box for that projection, half-extents in cm. Deliberately wide in XY:
 # a band point that overshoots the navigable island by 20 m snaps back onto its
 # edge rather than failing, which is the common case on a map whose usable

@@ -3,6 +3,7 @@ physics asset, and installing those tables (and Visibility-blocking
 collision) on a character.
 """
 
+from combat import health_vars as HV
 import unreal
 
 from combat.log import _log
@@ -36,10 +37,10 @@ LIMB_CANDIDATES = (
     ("thigh_l", "LeftUpLeg"),
     ("thigh_r", "RightUpLeg"),
 )
-HEAD_BONES_VAR = "HeadBones"
-LIMB_BONES_VAR = "LimbBones"
-HEAD_MULT_VAR = "HeadMultiplier"
-LIMB_MULT_VAR = "LimbMultiplier"
+HEAD_BONES_VAR = HV.HeadBones
+LIMB_BONES_VAR = HV.LimbBones
+HEAD_MULT_VAR = HV.HeadMultiplier
+LIMB_MULT_VAR = HV.LimbMultiplier
 # The bone the current pellet struck, on the weapon component. A variable
 # because it is written on three different exec arms (struck a body, threaded
 # between the limbs, hit something that is not a Character) and read by one.

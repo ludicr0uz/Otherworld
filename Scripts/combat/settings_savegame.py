@@ -6,7 +6,7 @@ import unreal
 
 from combat.log import _log
 from combat.tuning import BIND_VARS
-from uebp.graph import BEL, BGE, _apply_defaults, _create_blueprint, _declare, _key
+from uebp.graph import BEL, BGE, _apply_defaults, _create_blueprint, _key
 from uebp.layout import arrange
 from combat.difficulty import DEFAULT_DIFFICULTY, DIFFICULTY_VAR
 from combat.paths import SETTINGS_BP_PATH, SETTINGS_SLOT
@@ -30,9 +30,6 @@ def build_settings_savegame(rebuild=True):
     bp = _create_blueprint(SETTINGS_BP_PATH, unreal.SaveGame)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     declare(ed, SV.TABLE)
-    # The difficulty, an index into combat.difficulty.DIFFICULTY_LABELS. A save
-    # written before this field existed loads it as the default (EASY).
-    _declare(ed, DIFFICULTY_VAR, BEL.get_basic_type_by_name("int"))
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_Settings failed to compile")

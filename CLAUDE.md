@@ -316,7 +316,10 @@ the player moves by Epic's motion matching, and zombies and wendigos hunt them.
     (`Scripts/uebp/CLAUDE.md`).
   - `uebp.vars`: a Blueprint's variables are rows of its `<blueprint>_vars.py` table
     (`Var(name, type, default)`; a `Var` is its name). Name a variable by its row
-    (`HV.Health`) or its `*_VAR` constant, never by a bare string.
+    (`HV.Health`) or its `*_VAR` constant, never by a bare string. A fragment's own
+    variables are a group of that table or a `TABLE` in its constants module
+    (`cursor_consts.TABLE`), and it declares them with `declare(ed, TABLE)`: no builder
+    calls `_declare` or `add_member_variable` (a dev unit test fails one that does).
 - **No coordinates.** Nothing positions a node: `uebp.layout.arrange(ed)` lays the graph out
   before the compile. A new builder calls it once per graph it authors.
 - **Refactoring the authoring code:** `python3 Scripts/dev/graph_fingerprint.py <label>`

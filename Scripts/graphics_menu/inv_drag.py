@@ -36,7 +36,9 @@ known. DrawHUD because only it knows where a cell is (cursor.py); a -nullrhi
 probe writes the component's request variables instead.
 """
 
-from uebp.graph import BEL, _declare, out
+from uebp.vars import declare, defaults
+from graphics_menu.inv_consts import DRAG_TABLE
+from uebp.graph import out
 from combat.ask_consts import ASK_DROP, ASK_MOVE, ASK_SLOT, ASK_TAKE_OFF, ASK_WEAR
 from combat.paths import WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import PRIMARY, SLOT_ITEMS_VAR
@@ -58,17 +60,13 @@ from uebp.nodes.math import FN_ADD_II, FN_AND, FN_EQ_II, FN_GE_II, FN_LESS_II, F
 from uebp.nodes.system import FN_IS_VALID
 
 
-_INTS = (DRAG_FROM_VAR, INV_OVER_VAR)
-
-
 def declare_inv_vars(ed):
     """The HUD's two drag variables. Defaults: inv_defaults()."""
-    for name in _INTS:
-        _declare(ed, name, BEL.get_basic_type_by_name("int"))
+    declare(ed, DRAG_TABLE)
 
 
 def inv_defaults():
-    return {name: NO_SLOT for name in _INTS}
+    return defaults(DRAG_TABLE)
 
 
 def _author_over(ed, in_execs, made):

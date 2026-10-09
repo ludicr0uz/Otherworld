@@ -14,6 +14,7 @@ one table.
 The rows are Sound/catalog.SOUND_STATS.
 """
 
+from uebp.vars import BOOL, Var
 from Sound.catalog import SOUND_STATS
 from graphics_menu.tune_tab import TuneTab, save_command
 
@@ -36,7 +37,9 @@ SOUND_TUNE_STEPS_VAR = "SoundTuneSteps"
 SOUND_TUNE_MINS_VAR = "SoundTuneMins"
 SOUND_TUNE_MAXS_VAR = "SoundTuneMaxs"
 # The mix holds this HUD's table: false until its first Tick has told it.
-SOUND_TUNE_APPLIED_VAR = "SoundTuneApplied"
+SOUND_TUNE_APPLIED_VAR = Var("SoundTuneApplied", BOOL, False)
+# The HUD's one beside the tab's own (tune_tab.tab_table).
+SOUND_TUNE_TABLE = (SOUND_TUNE_APPLIED_VAR,)
 
 SOUND_SUBJECT = "volume"
 # One row a sound, and there are more sounds than the panel is tall: the list

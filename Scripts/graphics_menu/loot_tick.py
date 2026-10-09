@@ -30,25 +30,24 @@ the target and so shuts the window. Taking the last item does not: the body
 is still there, and the window says NOTHING.
 """
 
+from uebp.vars import declare, defaults
+from graphics_menu.loot_consts import TABLE
 import unreal
 
-from uebp.graph import (
-    BEL, _connect, _declare, _float_type, _loose_pin, _must_load, _palette, _pin, out, then)
+from uebp.graph import _connect, _loose_pin, _palette, _pin, out, then
 from combat.ask_consts import ASK_LOOT_TAKE
-from combat.paths import (
-    HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
-)
+from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import HAS_ROOM_VAR
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from graphics_menu.ask import ask
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.loot_consts import (
-    LOOT_BAG_FULL_VAR, LOOT_BEST_VAR, LOOT_DOWN, LOOT_KEY, LOOT_KNEELING_VAR,
-    LOOT_OPEN_VAR, LOOT_SEL_VAR, LOOT_TAKE_KEY, LOOT_TAKE_VAR, LOOT_TARGET_VAR, LOOT_UP,
+    LOOT_BAG_FULL_VAR, LOOT_DOWN, LOOT_KEY, LOOT_OPEN_VAR, LOOT_SEL_VAR, LOOT_TAKE_KEY,
+    LOOT_TAKE_VAR, LOOT_TARGET_VAR, LOOT_UP,
 )
 from graphics_menu.loot_find import author_find_body, put
 from graphics_menu.loot_kneel import author_kneel
-from loot.consts import LOOT_NAMES_VAR, LOOT_RADIUS, LOOT_VAR
+from loot.consts import LOOT_NAMES_VAR, LOOT_VAR
 from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN, FN_WAS_PRESSED
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN, FN_ARR_VALID
 from uebp.nodes.math import (
@@ -58,20 +57,13 @@ from uebp.nodes.system import FN_IS_VALID
 from graphics_menu import hud_vars as MV
 
 
-_BOOLS = (LOOT_OPEN_VAR, LOOT_TAKE_VAR, LOOT_BAG_FULL_VAR, LOOT_KNEELING_VAR)
-
-
 def declare_loot_vars(ed):
     """The HUD's loot variables. Defaults: loot_defaults()."""
-    target = BEL.get_object_reference_type(BEL.generated_class(_must_load(HEALTH_BP_PATH)))
-    for name, kind in ((LOOT_TARGET_VAR, target), (LOOT_BEST_VAR, _float_type()),
-                       (LOOT_SEL_VAR, BEL.get_basic_type_by_name("int")),
-                       *((b, BEL.get_basic_type_by_name("bool")) for b in _BOOLS)):
-        _declare(ed, name, kind)
+    declare(ed, TABLE)
 
 
 def loot_defaults():
-    return {LOOT_BEST_VAR: LOOT_RADIUS, LOOT_SEL_VAR: 0, **{b: False for b in _BOOLS}}
+    return defaults(TABLE)
 
 
 def _pressed(ed, pc_out, key, made):

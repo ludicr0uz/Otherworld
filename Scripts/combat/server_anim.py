@@ -55,18 +55,19 @@ animation tasks rebuild these graphs; whatever they put in goes on the
 client arm, and verify/server_anim.py must stay green.
 """
 
+from combat import anim_vars as AN
 from combat.anim_blueprint import AIM_SLOT, _slot_name, _slot_node
 from combat.log import _log
 from combat.server_anim_consts import (
     BRANCH_CLASS, CLIENT_PIN, COSMETIC_CLASSES, FLAG_PIN, LAYER_CLASS, SERVER_PIN,
     SERVER_POSE_VAR, SERVER_SLOTS, SLOT_CLASS,
 )
-from uebp.graph import BEL, BGE, PIN, _assets, _connect, _declare, _node, _palette, _pin, _set, out, then
+from uebp.graph import BEL, BGE, PIN, _assets, _connect, _node, _palette, _pin, _set, out, then
 from uebp.layout import arrange
 from uebp.nodes.palette import NODE_BLEND_BY_BOOL
 from uebp.nodes.system import FN_IS_DEDICATED_SERVER
 from uebp.pose_share import share, unshare
-from uebp.vars import BOOL
+from uebp.vars import declare
 
 INIT_EVENT = "BlueprintInitializeAnimation"
 
@@ -202,7 +203,7 @@ def patch_server_anim(anim_bp, kind):
     Re-running replaces the previous branch."""
     bp, ed, events = _graphs(anim_bp)
     _remove(ed, events)
-    _declare(ed, SERVER_POSE_VAR, BOOL())
+    declare(ed, AN.SERVER)
 
     tap, last = _eye_segment(ed, kind)
     eye_out = out(last, "Pose")

@@ -10,15 +10,14 @@ compile (write_tuned_defaults), because add_member_variable's own default
 does not apply.
 """
 
-from uebp.graph import BEL, out
+from uebp.vars import declare
+from npc import controller_vars as NV
+from uebp.graph import out
 from npc.monster_tuning import MONSTER_STATS, TUNED_VAR
 
 
 def declare_tuned_vars(ed):
-    for _col, var, *_rest in MONSTER_STATS:
-        ed.remove_member_variable(var)
-        if not ed.add_member_variable(var, BEL.get_basic_type_by_name("real")):
-            raise RuntimeError(f"could not declare {var}")
+    declare(ed, NV.TUNED)
 
 
 def tuned(ed, column):

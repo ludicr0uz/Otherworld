@@ -24,10 +24,12 @@ A blow that lands on the player writes WardSince back to 0 (npc/melee.py's
 flight starts over, and so does the throw for the first roar.
 """
 
+from uebp.vars import declare
+from npc import controller_vars as NV
 from forest_generator.npc_ward import (
     NPC_WARD_ROAR_AT_S, NPC_WARD_ROAR_S, NPC_WARD_ROAR_VARY_S,
 )
-from uebp.graph import BEL, else_, out, then
+from uebp.graph import else_, out, then
 from npc.paths import WARD_ROAR_AT_VAR, WARD_ROAR_UNTIL_VAR
 from npc.roar import _author_bellow
 from uebp.nodes.math import (
@@ -36,10 +38,7 @@ from uebp.nodes.math import (
 
 def declare_ward_roar_vars(ed):
     """Both zero by default: no roar due, none under way."""
-    for name in (WARD_ROAR_AT_VAR, WARD_ROAR_UNTIL_VAR):
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, BEL.get_basic_type_by_name("real")):
-            raise RuntimeError(f"could not declare {name}")
+    declare(ed, NV.WARD_ROAR)
 
 
 def _author_roar_time(g, exec_in, pins):

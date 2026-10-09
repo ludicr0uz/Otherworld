@@ -32,13 +32,14 @@ import unreal
 
 from combat.log import _log
 from uebp.graph import (
-    BEL, BGE, _apply_defaults, _connect, _create_blueprint, _declare, _events, _float_type,
-    _node, _pin, _set, out, then)
+    BEL, BGE, _apply_defaults, _connect, _create_blueprint, _events, _node, _pin, _set, out,
+    then,
+)
 from uebp import net
 from uebp.layout import arrange
 from survival.debuffs import _author_debuff_sync
 from survival.paths import SURVIVAL_BP_PATH
-from survival.tuning import DEBUFFS, SURVIVAL
+from survival.tuning import DEBUFFS
 from uebp.nodes.actor import FN_GET_OWNER
 from uebp.nodes.gas import FN_GET_ASC, FN_GIVE_ABILITY
 from uebp.nodes.palette import MACRO_SWITCH_AUTHORITY_COMP
@@ -154,15 +155,9 @@ def build_survival_component(rebuild=True):
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
 
-    for stat in STATS:
-        _declare(ed, stat, _float_type())
-        _declare(ed, f"Max{stat}", _float_type())
+    declare(ed, UV.STATS)
     declare(ed, UV.TABLE)
-    _declare(ed, "AbilitySystem", BEL.get_object_reference_type(
-        unreal.AbilitySystemComponent.static_class()))
-    for _stat, effect_var, _tags in DEBUFFS:
-        _declare(ed, effect_var, BEL.get_class_reference_type(
-            unreal.GameplayEffect.static_class()))
+    declare(ed, UV.LINKS)
 
     # After every declare: re-declaring a variable drops its replication.
     for stat in REPLICATED:
@@ -178,13 +173,6 @@ def build_survival_component(rebuild=True):
     net.replicate_component(bp)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_SurvivalComponent failed to recompile")
-    _apply_defaults(bp, {**defaults(UV.TABLE),
-        UV.Hunger: SURVIVAL.max_hunger,
-        UV.MaxHunger: SURVIVAL.max_hunger,
-        UV.Thirst: SURVIVAL.max_thirst,
-        UV.MaxThirst: SURVIVAL.max_thirst,
-        UV.Temperature: SURVIVAL.start_temperature,
-        UV.MaxTemperature: SURVIVAL.max_temperature,
-    })
+    _apply_defaults(bp, {**defaults(UV.STATS), **defaults(UV.TABLE)})
     _log(f"built {SURVIVAL_BP_PATH}")
     return bp

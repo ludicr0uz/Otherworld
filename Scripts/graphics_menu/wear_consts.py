@@ -22,6 +22,7 @@ with the menu open the menu's.
 """
 
 from combat.wear_tuning import WEAR_SLOTS
+from uebp.vars import BOOL, INT, Var
 
 WEAR_KEY = "I"
 WEAR_UP, WEAR_DOWN = "Up", "Down"       # menu_nav.NAV_UP / NAV_DOWN
@@ -29,9 +30,12 @@ WEAR_TAKE_KEY = "Enter"
 
 # The HUD's variables. The keys only raise WearOpen / WearTakeOffRequested,
 # so a probe can open the panel and take a garment off without a keyboard.
-WEAR_OPEN_VAR = "WearOpen"
-WEAR_SEL_VAR = "WearSel"
-WEAR_TAKE_VAR = "WearTakeOffRequested"
+WEAR_OPEN_VAR = Var("WearOpen", BOOL, False)
+WEAR_SEL_VAR = Var("WearSel", INT, 0)
+WEAR_TAKE_VAR = Var("WearTakeOffRequested", BOOL, False)
+WEAR_STILL_VAR = Var("WearStill", BOOL, False)
+# In the order wear_tick.py has always declared them.
+TABLE = (WEAR_SEL_VAR, WEAR_OPEN_VAR, WEAR_TAKE_VAR, WEAR_STILL_VAR)
 
 # WBP_HUD's widgets.
 WEAR_PANEL = "WearPanel"

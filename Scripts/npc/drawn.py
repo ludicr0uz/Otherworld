@@ -29,13 +29,14 @@ stock x TunePatrolSpeed), written after the order on every pass, like the
 Stroll step's: "slowly" is the patrol walk, and tuning that tunes this.
 """
 
-import unreal
+from uebp.vars import declare
+from npc import controller_vars as NV
 
 from forest_generator.npc_drawn import (
     NPC_DRAWN_ARRIVE_CM, NPC_DRAWN_BY_FIRE, NPC_DRAWN_RANGE_CM,
 )
 from npc.graph import _Graph, _log
-from uebp.graph import BEL, _assets, _connect, _pin, else_, out, then
+from uebp.graph import _assets, _connect, _pin, else_, out, then
 from npc.patrol import _author_walk_speed
 from npc.paths import DRAWN_TO_VAR, DRAWN_VAR
 from survival.paths import CAMPFIRE_BP_PATH, CAMPFIRE_CLASS_PATH
@@ -60,14 +61,7 @@ def draws(key):
 
 def declare_drawn_vars(ed):
     """False and none by default: nothing draws it yet."""
-    kinds = {
-        DRAWN_VAR: BEL.get_basic_type_by_name("bool"),
-        DRAWN_TO_VAR: BEL.get_object_reference_type(unreal.Actor.static_class()),
-    }
-    for name, kind in kinds.items():
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, kind):
-            raise RuntimeError(f"could not declare {name}")
+    declare(ed, NV.DRAWN)
 
 
 def _author_drawn(ed, exec_in, result, stock):

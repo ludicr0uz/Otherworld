@@ -17,9 +17,11 @@ the request, which is what lets a probe ask for the guns without a key press
 (probes/probe_dev_all_guns.py).
 """
 
+from uebp.vars import declare, defaults
+from graphics_menu.dev_consts import TABLE
 import unreal
 
-from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from combat.paths import ITEM_BP_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import SLOT_COUNT
 from graphics_menu.dev_consts import (
@@ -36,19 +38,13 @@ from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
 
-_VARS = (DEV_GUNS_REQUEST_VAR, DEV_HAS_GUN_VAR)
-
-
 def declare_dev_guns_vars(ed):
     """The HUD's two bools. Defaults: dev_guns_defaults()."""
-    for name in _VARS:
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, BEL.get_basic_type_by_name("bool")):
-            raise RuntimeError(f"could not declare member variable {name}")
+    declare(ed, TABLE)
 
 
 def dev_guns_defaults():
-    return {n: False for n in _VARS}
+    return defaults(TABLE)
 
 
 def _class_literal(node, pin_name, class_path):

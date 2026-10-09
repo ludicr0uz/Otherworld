@@ -18,10 +18,12 @@ tree's half-second beat, and a cone drawn that seldom lags the body it is
 attached to. Drawn for one frame (Duration 0) and redrawn the next.
 """
 
+from uebp.vars import declare
+from npc import controller_vars as NV
 from combat.game_state import DEBUG_MODE_VAR
 from net.state_consts import GAME_STATE_CLASS_PATH
 from net.state_graph import game_state
-from uebp.graph import BEL, _connect, _node, _palette, _pin, _set, else_, then
+from uebp.graph import _connect, _node, _palette, _pin, _set, else_, then
 from npc.paths import (
     AGGRO_VAR, CORPSE_VAR, SIGHT_CONE_AGGRO_COLOR, SIGHT_CONE_PATROL_COLOR,
     SIGHT_CONE_SIDES, SIGHT_CONE_STAMP_VAR, SIGHT_CONE_THICKNESS,
@@ -39,10 +41,7 @@ def _author_sight_cone(ed):
     Needs the Tune*, Aggro and Corpse variables declared (npc/steps.py).
     Returns the nodes it made.
     """
-    ed.remove_member_variable(SIGHT_CONE_STAMP_VAR)
-    if not ed.add_member_variable(SIGHT_CONE_STAMP_VAR,
-                                  BEL.get_basic_type_by_name("real")):
-        raise RuntimeError(f"could not declare {SIGHT_CONE_STAMP_VAR}")
+    declare(ed, NV.SIGHT_CONE)
     made = []
 
     def keep(n):

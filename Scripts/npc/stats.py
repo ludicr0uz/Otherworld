@@ -2,13 +2,14 @@
 health changes), and the voice on a timer -- both hung off the controller's heartbeat.
 """
 
-import unreal
+from uebp.vars import declare
+from npc import controller_vars as NV
 
 from npc.paths import (
-    AGGRO_VAR, APPLIED_HEALTH_VAR, HEALTH_CLASS_PATH, NEXT_VOICE_VAR,
-    REACTIONS_VAR, SOUND_ARRAY_VARS, STATS_APPLIED_VAR, VOICES_VAR,
+    AGGRO_VAR, APPLIED_HEALTH_VAR, HEALTH_CLASS_PATH, NEXT_VOICE_VAR, REACTIONS_VAR,
+    STATS_APPLIED_VAR, VOICES_VAR,
 )
-from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
 from Sound.play import _author_random_sound
 from npc.tuned import tuned
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_GET_PAWN
@@ -71,21 +72,7 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max, quiet_on_patrol=
         made.append(n)
         return n
 
-    for name, kind in ((STATS_APPLIED_VAR, "bool"), (NEXT_VOICE_VAR, "real"),
-                       (APPLIED_HEALTH_VAR, "real")):
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, BEL.get_basic_type_by_name(kind)):
-            raise RuntimeError(f"could not declare {name}")
-    sound_array = BEL.get_array_type(
-        BEL.get_object_reference_type(unreal.SoundBase.static_class()))
-    for name in SOUND_ARRAY_VARS:
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, sound_array):
-            raise RuntimeError(f"could not declare {name}")
-    ed.remove_member_variable(REACTIONS_VAR)
-    if not ed.add_member_variable(REACTIONS_VAR, BEL.get_array_type(
-            BEL.get_object_reference_type(unreal.AnimSequenceBase.static_class()))):
-        raise RuntimeError(f"could not declare {REACTIONS_VAR}")
+    declare(ed, NV.STATS)
 
     pawn = keep(_node(ed, FN_GET_PAWN))
     pawn_out = _pin(pawn, "ReturnValue", is_input=False)

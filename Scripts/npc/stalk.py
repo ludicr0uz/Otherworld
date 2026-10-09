@@ -62,7 +62,8 @@ SimpleMoveToLocation, as the stroll and the strafe are: the level verifier
 counts the chase's MoveToActor and MoveToLocation, one of each.
 """
 
-import unreal
+from uebp.vars import declare
+from npc import controller_vars as NV
 
 from forest_generator.npc_stalk import (
     NPC_STALK_ARRIVE_CM, NPC_STALK_OPEN_ARRIVE_CM, NPC_STALK_ROAR_S,
@@ -70,7 +71,7 @@ from forest_generator.npc_stalk import (
 )
 from npc.graph import _Graph
 from net.players import nearest_living_player, player_pin
-from uebp.graph import BEL, _connect, _pin, else_, out, then
+from uebp.graph import _connect, _pin, else_, out, then
 from npc.paths import (
     ENRAGED_VAR, STALK_ARRIVED_VAR,
     STALK_CHARGING_VAR, STALK_COVER_VAR, STALK_HIDDEN_VAR, STALK_LEG_UNTIL_VAR,
@@ -94,17 +95,7 @@ from uebp.nodes.system import FN_TIME_SECONDS
 def declare_stalk_vars(ed):
     """All zero/false by default: not roared, no leg, not charging, not
     enraged."""
-    for name, kind in ((STALK_ROAR_UNTIL_VAR, "real"), (STALK_SIDE_VAR, "real"),
-                       (STALK_TURN_AT_VAR, "real"), (STALK_CHARGING_VAR, "bool"),
-                       (ENRAGED_VAR, "bool")):
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, BEL.get_basic_type_by_name(kind)):
-            raise RuntimeError(f"could not declare {name}")
-    # Where the player stood when it roared: the zero vector until then.
-    ed.remove_member_variable(STALK_ORIGIN_VAR)
-    if not ed.add_member_variable(
-            STALK_ORIGIN_VAR, BEL.get_struct_type(unreal.Vector.static_struct())):
-        raise RuntimeError(f"could not declare {STALK_ORIGIN_VAR}")
+    declare(ed, NV.STALK)
     declare_cover_vars(ed)
 
 

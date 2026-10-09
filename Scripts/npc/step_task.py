@@ -14,6 +14,8 @@ One class per controller, because each controller is its own Blueprint (not a
 child of a shared one) and a cast is the only typed way to reach its events.
 """
 
+from uebp.vars import declare
+from npc import controller_vars as NV
 import unreal
 
 from npc.graph import _log
@@ -70,9 +72,7 @@ def build_step_task(ai_bp, path, steps):
     bp = _create_blueprint(path, unreal.BTTask_BlueprintBase)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     ed.remove_nodes(ed.list_all_nodes())
-    ed.remove_member_variable(STEP_VAR)
-    if not ed.add_member_variable(STEP_VAR, BEL.get_basic_type_by_name("name")):
-        raise RuntimeError(f"could not declare {STEP_VAR}")
+    declare(ed, NV.STEP_TASK)
     BEL.set_blueprint_variable_instance_editable(bp, STEP_VAR, True)
 
     ai_class = BEL.generated_class(ai_bp)

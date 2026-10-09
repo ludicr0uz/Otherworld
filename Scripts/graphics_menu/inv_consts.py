@@ -18,6 +18,7 @@ mouse) read one table. The slot codes are combat/slot_tuning.py's.
     and the mouse does not turn the view (inv_carry.py)
 """
 
+from uebp.vars import BOOL, INT, Var
 from combat.slot_tuning import (
     BAG_FIRST, BAG_SIZE, HAND, PRIMARY, SLOT_COUNT, WEAPON_SLOT_NAMES,
 )
@@ -52,11 +53,13 @@ KIT_BOTTOM = 44.0                   # the kit's bottom edge, over the watermark
 
 # The HUD's variables. InvDragFrom: the slot a press in the I panel started a
 # drag on (NO_SLOT when none). InvOver: the slot under the cursor this frame.
-DRAG_FROM_VAR = "InvDragFrom"
-INV_OVER_VAR = "InvOver"
 NO_SLOT = -1
+DRAG_FROM_VAR = Var("InvDragFrom", INT, NO_SLOT)
+INV_OVER_VAR = Var("InvOver", INT, NO_SLOT)
+DRAG_TABLE = (DRAG_FROM_VAR, INV_OVER_VAR)       # inv_drag.py declares it
 # The look input is held (a drag is on): SetIgnoreLookInput's edge memory.
-LOOK_HELD_VAR = "InvLookHeld"
+LOOK_HELD_VAR = Var("InvLookHeld", BOOL, False)
+CARRY_TABLE = (LOOK_HELD_VAR,)                  # inv_carry.py declares it
 # The dragged item's icon, carried on the cursor: an Image on WBP_HUD's root.
 DRAG_ICON = "DragIcon"
 # The inventory's area: a drag released over none of these (and so over no

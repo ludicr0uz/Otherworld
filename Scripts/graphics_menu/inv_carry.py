@@ -21,7 +21,9 @@ SetIgnoreLookInput counts its calls, as SetIgnoreMoveInput does, so it is
 made on the drag's edges only; InvLookHeld is that edge's memory.
 """
 
-from uebp.graph import BEL, _connect, _declare, _pin, out, then
+from uebp.vars import declare, defaults
+from graphics_menu.inv_consts import CARRY_TABLE
+from uebp.graph import _connect, _pin, out, then
 from combat.paths import ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import SLOT_ITEMS_VAR
 from combat import item_vars as IV
@@ -45,11 +47,11 @@ from graphics_menu import hud_vars as MV
 
 def declare_carry_vars(ed):
     """The HUD's look-held memory. Default: carry_defaults()."""
-    _declare(ed, LOOK_HELD_VAR, BEL.get_basic_type_by_name("bool"))
+    declare(ed, CARRY_TABLE)
 
 
 def carry_defaults():
-    return {LOOK_HELD_VAR: False}
+    return defaults(CARRY_TABLE)
 
 
 def _dragging(ed, made):

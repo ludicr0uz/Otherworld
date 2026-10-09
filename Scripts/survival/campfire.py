@@ -39,13 +39,16 @@ flames to 90 cm. It blocks nothing: the player walks through it. A point
 light at the flames' height lights the ground round it at night.
 """
 
+from uebp.vars import declare, defaults
+from survival import campfire_vars as CV
 import unreal
 
 from combat.log import _log
 from uebp.graph import (
     BEL, BGE, _add_component, _apply_defaults, _assets, _component_object, _connect,
-    _create_blueprint, _declare, _drop_components, _events, _float_type, _loose_pin,
-    _must_load, _node, _palette, _pin, _root_handle, _set, out, then)
+    _create_blueprint, _drop_components, _events, _loose_pin, _must_load, _node, _palette, _pin,
+    _root_handle, _set, out, then,
+)
 from uebp import net
 from uebp.layout import arrange
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
@@ -69,8 +72,8 @@ CAMPFIRE_SCALE = 0.4
 MESH_CENTRE_XY = (8.06, -1.27)
 MESH_BOTTOM_Z = -5.94
 
-WARM_RADIUS_VAR = "WarmRadius"
-WARM_RATE_VAR = "WarmPerSecond"
+WARM_RADIUS_VAR = CV.WarmRadius
+WARM_RATE_VAR = CV.WarmPerSecond
 TEMPERATURE_VAR = "Temperature"
 MAX_TEMPERATURE_VAR = "MaxTemperature"
 
@@ -168,8 +171,7 @@ def build_campfire(rebuild=True):
     _build_model(bp)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
-    for name in (WARM_RADIUS_VAR, WARM_RATE_VAR):
-        _declare(ed, name, _float_type())
+    declare(ed, CV.TABLE)
 
     # The server's clock burns it down; its destroy reaches every copy.
     owns = ed.add_branch_node()
@@ -183,10 +185,7 @@ def build_campfire(rebuild=True):
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{CAMPFIRE_BP_PATH} failed to compile")
-    _apply_defaults(bp, {
-        WARM_RADIUS_VAR: CAMPFIRE_WARM_RADIUS_CM,
-        WARM_RATE_VAR: CAMPFIRE_WARM_PER_S,
-    })
+    _apply_defaults(bp, defaults(CV.TABLE))
     # Every client is sent the fire the server lit (class default: after the
     # compile).
     net.replicate_actor(bp)

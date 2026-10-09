@@ -28,7 +28,7 @@ from uebp.nodes.actor import FN_IGNORE_MOVE
 from uebp.nodes.math import FN_NEQ_BB
 from graphics_menu import hud_vars as MV
 
-MENU_STILL_VAR = "MenuStill"
+MENU_STILL_VAR = MV.MenuStill
 
 
 def author_menu_still(ed, pc_out, in_execs):

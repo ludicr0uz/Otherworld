@@ -22,6 +22,7 @@ from graphics_menu.world_tune_consts import WORLD_TUNE_ACTION, WORLD_TUNE_ROW_LA
 from graphics_menu.settings_rows import (
     BIND_LABELS, DIFFICULTY_LABEL, SETTINGS_TITLE, SLIDERS)
 from combat.tuning import BLEEDING_TAG
+from uebp.vars import BOOL, FLOAT, INT, STRING, Var, obj, struct
 from survival.tuning import DEHYDRATED_TAG, STARVING_TAG
 
 UI_DIR = "/Game/UI"
@@ -46,15 +47,19 @@ def class_path(asset_path):
 # The HUD's references to the four screens: (HUD variable, asset, z-order).
 # BeginPlay creates each, adds it to the viewport collapsed, and DrawHUD shows
 # whichever the frame calls for. Later z-orders draw on top.
-SCREENS = (("UiHud", WBP_HUD, 0),
-           ("UiPause", WBP_PAUSE_MENU, 10),
-           ("UiMain", WBP_MAIN_MENU, 20),
-           ("UiDeath", WBP_DEATH_MENU, 30))
+# Each reference is typed to its own class, so its widgets are read off it
+# without a cast.
+SCREENS = tuple((Var(var, obj(class_path(asset))), asset, z) for var, asset, z in (
+    ("UiHud", WBP_HUD, 0),
+    ("UiPause", WBP_PAUSE_MENU, 10),
+    ("UiMain", WBP_MAIN_MENU, 20),
+    ("UiDeath", WBP_DEATH_MENU, 30)))
+SCREEN_TABLE = tuple(var for var, _asset, _z in SCREENS)   # ui_graph.py declares it
 UI_VAR = {asset: var for var, asset, _z in SCREENS}
 
 # The HUD variable that tells the title from a game in play: false until the
 # menu's new-game row (or -nomenu), and BeginPlay pauses the world alongside it.
-GAME_STARTED_VAR = "GameStarted"
+GAME_STARTED_VAR = Var("GameStarted", BOOL)
 
 # What "shown" means. Never Visible: every key is polled off the controller,
 # so no widget may take a click or hover away from the game viewport. The
@@ -92,10 +97,14 @@ ROW_CARET, ROW_LABEL_BOX, ROW_LABEL, ROW_VALUE = "Caret", "LabelBox", "Label", "
 # own 2:1 (item_icons/items.py).
 ROW_ICON = "Icon"
 ROW_ICON_W, ROW_ICON_H = 100.0, 50.0
-ROW_TEXT_VAR, ROW_WIDTH_VAR, ROW_COLOR_VAR = "LabelText", "LabelWidth", "LabelColor"
+ROW_LABEL_W = 284.0      # the settings page's value column, off its labels
+ROW_TEXT_VAR = Var("LabelText", STRING, "")
+ROW_WIDTH_VAR = Var("LabelWidth", FLOAT, ROW_LABEL_W)
+# Its default is written by wbp_parts.py and compared as text (see there).
+ROW_COLOR_VAR = Var("LabelColor", struct("/Script/SlateCore.SlateColor"))
+ROW_TABLE = (ROW_TEXT_VAR, ROW_WIDTH_VAR, ROW_COLOR_VAR)
 ROW_FONT = 15.0          # the settings page's old 1.5x
 ROW_CARET_W = 36.0
-ROW_LABEL_W = 284.0      # the settings page's value column, off its labels
 ROW_GAP = 14.0           # px under each row
 
 # ─── WBP_InventorySlot ────────────────────────────────────────────────────────
@@ -104,7 +113,9 @@ SLOT_BACK, SLOT_ACTIVE, SLOT_ICON, SLOT_AMMO, SLOT_FRAME = (
 # An empty slot's silhouette of what belongs in it (a weapon slot's kind, a
 # worn slot's garment): the Ghost image, drawing the instance's GhostTexture
 # (set per cell in the designer, as a menu row's label is) translucent.
-SLOT_GHOST, SLOT_GHOST_VAR = "Ghost", "GhostTexture"
+SLOT_GHOST = "Ghost"
+SLOT_GHOST_VAR = Var("GhostTexture", obj("/Script/Engine.Texture2D"))
+SLOT_TABLE = (SLOT_GHOST_VAR,)
 COL_GHOST = "(R=1.000000,G=1.000000,B=1.000000,A=0.220000)"
 SLOT_W, SLOT_H = 84.0, 59.0
 SLOT_GAP = 7.0
@@ -224,7 +235,7 @@ PAUSE_PANEL = "Panel"
 # Up / Down move the caret (PAUSE_ROW_VAR), Enter or a click takes the row.
 MENU_KEY = "M"
 PAUSE_ACCEPT_KEY = "Enter"       # not Space: the menu does not pause, and Space jumps
-PAUSE_ROW_VAR = "PauseRow"
+PAUSE_ROW_VAR = Var("PauseRow", INT, 0)
 PAUSE_TITLE = GAME_TITLE
 START_ACTION, SETTINGS_ACTION = "start", "settings"
 # The second row: on the title, the Multiplayer page (mode_consts.py).

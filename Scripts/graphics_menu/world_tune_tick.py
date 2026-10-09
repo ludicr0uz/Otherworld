@@ -20,10 +20,11 @@ table loaded from the player's save (tune_keep.py), which has to reach the
 cycle with the tab shut. Nothing else moves the table.
 """
 
+from uebp.vars import declare, defaults
+from graphics_menu.world_tune_consts import WORLD_TUNE_TABLE
 import unreal
 
-from uebp.graph import (
-    BEL, _connect, _declare, _float_type, _loose_pin, _palette, _pin, out, then)
+from uebp.graph import BEL, _connect, _loose_pin, _palette, _pin, out, then
 from graphics_menu.dev_guns import _branch, _call, _class_literal, _get
 from graphics_menu.loot_find import put
 from graphics_menu.tune_tabs import other_open_vars
@@ -43,7 +44,7 @@ from world import day_night_vars as DV
 
 def declare_world_tune_vars(ed):
     declare_tab_vars(ed, WORLD_TAB)
-    _declare(ed, WORLD_TUNE_HOUR_SEEN_VAR, _float_type())
+    declare(ed, WORLD_TUNE_TABLE)
 
 
 def world_tune_defaults():
@@ -57,7 +58,7 @@ def world_tune_defaults():
                            [float(s[3]) for s in WORLD_STATS],
                            [float(s[4]) for s in WORLD_STATS]),
             WORLD_TAB.maxs_var: [float(m) for m in WORLD_MAXS],
-            WORLD_TUNE_HOUR_SEEN_VAR: 0.0}
+            **defaults(WORLD_TUNE_TABLE)}
 
 
 def _value(ed, s, made):

@@ -41,18 +41,18 @@ node out with its own on a rerun, so the build order is the pitch, the body
 poses, then this.
 """
 
+from uebp.vars import declare
+from combat import anim_vars as AN
 import unreal
 
 from combat.aim_pitch import IK_CLASS, _feeding, _nodes_of
 from combat.log import _log
-from uebp.graph import (
-    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _palette, _pin, _struct_type,
-    out)
+from uebp.graph import BEL, BGE, PIN, _assets, _connect, _palette, _pin, out
 from uebp.layout import arrange
 from combat import item_vars as IV
 from uebp.nodes.palette import NODE_TWO_BONE_IK
 
-SUPPORT_HAND_VAR = "SupportHand"
+SUPPORT_HAND_VAR = AN.SupportHand
 # The point, on the anim BP; and under the same name, each gun's own on
 # BP_WeaponItem.
 SUPPORT_POINT_VAR = IV.SupportPoint
@@ -151,8 +151,7 @@ def patch_support_hand(skin):
                            "hand would hold nothing")
 
     _remove_previous(ed)
-    _declare(ed, SUPPORT_HAND_VAR, _float_type())
-    _declare(ed, SUPPORT_POINT_VAR, _struct_type(unreal.Vector.static_struct()))
+    declare(ed, AN.SUPPORT)
 
     pose_in = _pin(to_ls[0], "ComponentPose")
     fed = PIN.list_connected_pins(pose_in)

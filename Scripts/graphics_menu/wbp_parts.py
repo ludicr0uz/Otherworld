@@ -9,11 +9,13 @@ them. What the HUD does write per frame is the caret's opacity (the selected
 row) and the value column (a slider's number, a key's name, ON/OFF).
 """
 
+from uebp.vars import declare, defaults
+from graphics_menu.umg_consts import ROW_TABLE, SLOT_TABLE
 import unreal
 
 from uebp.graph import (
-    BEL, BGE, _apply_defaults, _connect, _declare, _float_type, _must_load, _node, _palette,
-    _pin, out, then)
+    BEL, BGE, _apply_defaults, _connect, _must_load, _node, _palette, _pin, out, then,
+)
 from uebp.layout import arrange
 from graphics_menu import umg_author as U
 from graphics_menu.umg_consts import (
@@ -77,10 +79,8 @@ def build_menu_row():
     U.compile_and_save(bp)   # the widget variables exist once compiled
 
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
-    _declare(ed, ROW_TEXT_VAR, BEL.get_basic_type_by_name("string"))
-    _declare(ed, ROW_WIDTH_VAR, _float_type())
-    _declare(ed, ROW_COLOR_VAR, BEL.get_struct_type(unreal.SlateColor.static_struct()))
-    for var in (ROW_TEXT_VAR, ROW_WIDTH_VAR, ROW_COLOR_VAR):
+    declare(ed, ROW_TABLE)
+    for var in ROW_TABLE:
         BEL.set_blueprint_variable_instance_editable(bp, var, True)
     _author_pre_construct(bp)
     U.compile_and_save(bp)
@@ -88,7 +88,7 @@ def build_menu_row():
     # struct's to_tuple(), and a SlateColor's nests a LinearColor in it.
     unreal.get_default_object(BEL.generated_class(bp)).set_editor_property(
         ROW_COLOR_VAR, U.slate_colour(COL_ROW))
-    _apply_defaults(bp, {ROW_TEXT_VAR: "", ROW_WIDTH_VAR: ROW_LABEL_W})
+    _apply_defaults(bp, defaults(ROW_TABLE))
     got = unreal.get_default_object(BEL.generated_class(bp)).get_editor_property(ROW_COLOR_VAR)
     if got.export_text() != U.slate_colour(COL_ROW).export_text():
         raise RuntimeError(f"{ROW_COLOR_VAR} default did not stick: {got.export_text()}")
@@ -123,8 +123,7 @@ def build_inventory_slot():
     U.compile_and_save(bp)   # the widget variables exist once compiled
 
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
-    _declare(ed, SLOT_GHOST_VAR,
-             BEL.get_object_reference_type(unreal.Texture2D.static_class()))
+    declare(ed, SLOT_TABLE)
     BEL.set_blueprint_variable_instance_editable(bp, SLOT_GHOST_VAR, True)
     ed.remove_nodes(ed.list_all_nodes())
     pre = _palette(ed, NODE_PRE_CONSTRUCT)

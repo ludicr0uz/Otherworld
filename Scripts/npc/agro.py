@@ -22,7 +22,8 @@ AgroSettings in forest_generator/npc_agro.py under monster_tuning.csv. The
 M panel's MONSTER SETTINGS tab writes them on a live wanderer.
 """
 
-import unreal
+from uebp.vars import declare
+from npc import controller_vars as NV
 
 from combat.game_state import DEBUG_MODE_VAR, NOISE_TIME_VAR
 from combat.paths import GAME_MODE_BP_PATH
@@ -36,9 +37,8 @@ from uebp.graph import (
     out, then)
 from npc.patrol import _author_patrol_step, _author_walk_speed
 from npc.paths import (
-    AGGRO_REASON_VAR, AGGRO_VAR, AGGRO_VOICES_VAR, BB_AGGRO_KEY, BB_REASON_KEY, NEXT_PATROL_VAR,
-    PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR, RUN_SPEED_VAR,
-    SENSE_STEPS, STEP_PRESENT, STEP_STROLL,
+    AGGRO_REASON_VAR, AGGRO_VAR, AGGRO_VOICES_VAR, BB_AGGRO_KEY, BB_REASON_KEY, SENSE_STEPS,
+    STEP_PRESENT, STEP_STROLL,
 )
 from Sound.play import _author_random_sound
 from npc.senses import _author_hearing, _author_hurt, _author_sight, _author_touch
@@ -50,24 +50,10 @@ from uebp.nodes.system import (
     FN_CONCAT, FN_DISPLAY_NAME, FN_WARN)
 
 
-def _declare(ed, name, pin_type):
-    ed.remove_member_variable(name)
-    if not ed.add_member_variable(name, pin_type):
-        raise RuntimeError(f"could not declare {name}")
-
-
 def _declare_agro_vars(ed):
     """All zero/false by default, which is the right start: not aggro, not set
     up, and a patrol point due immediately (NextPatrolTime 0)."""
-    real = BEL.get_basic_type_by_name("real")
-    vector = BEL.get_struct_type(unreal.Vector.static_struct())
-    for name in (AGGRO_VAR, PATROL_READY_VAR):
-        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
-    _declare(ed, AGGRO_REASON_VAR, BEL.get_basic_type_by_name("string"))
-    for name in (RUN_SPEED_VAR, NEXT_PATROL_VAR):
-        _declare(ed, name, real)
-    for name in (PATROL_HOME_VAR, PATROL_TARGET_VAR):
-        _declare(ed, name, vector)
+    declare(ed, NV.AGRO)
 
 
 def _noise_record_exists():

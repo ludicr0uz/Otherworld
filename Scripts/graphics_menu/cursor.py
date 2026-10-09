@@ -27,15 +27,15 @@ A -nullrhi run never lays a widget out, so no row is ever under anything
 there: probes/probe_menu_cursor.py raises the flags a click would.
 """
 
+from uebp.vars import declare, defaults
+from graphics_menu.cursor_consts import TABLE
 import unreal
 
-from uebp.graph import BEL, _connect, _declare, _float_type, _loose_pin, _palette, _pin, _set, out, then
+from uebp.graph import _connect, _loose_pin, _palette, _pin, _set, out, then
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.cursor_consts import (
-    BACK_KEY, CLICK_KEY, ESCAPE_KEY, CURSOR_BOOLS, CURSOR_INTS, CURSOR_MOVED_VAR, CURSOR_POS_VAR,
-    CURSOR_REALS,
-    CURSOR_ROW_VAR, CURSOR_SHOWN_VAR, CURSOR_WANTED_VAR, NO_ROW, PAGE_CLICK_VAR,
-    PAUSE_CLICK_VAR,
+    BACK_KEY, CLICK_KEY, ESCAPE_KEY, CURSOR_MOVED_VAR, CURSOR_POS_VAR, CURSOR_ROW_VAR,
+    CURSOR_SHOWN_VAR, CURSOR_WANTED_VAR, NO_ROW, PAGE_CLICK_VAR, PAUSE_CLICK_VAR,
     TRIGGER_SPENT_VAR,
 )
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
@@ -59,19 +59,12 @@ ROW = object()
 
 def declare_cursor_vars(ed):
     """The HUD's cursor variables. Defaults: cursor_defaults()."""
-    for name in CURSOR_BOOLS:
-        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
-    for name in CURSOR_INTS:
-        _declare(ed, name, BEL.get_basic_type_by_name("int"))
-    for name in CURSOR_REALS:
-        _declare(ed, name, _float_type())
-    _declare(ed, CURSOR_POS_VAR, BEL.get_struct_type(unreal.Vector2D.static_struct()))
+    declare(ed, TABLE)
 
 
 def cursor_defaults():
     """Hidden, unasked for, over nothing, nothing clicked or dragged."""
-    return {**{b: False for b in CURSOR_BOOLS}, **{i: NO_ROW for i in CURSOR_INTS},
-            **{r: 0.0 for r in CURSOR_REALS}}
+    return defaults(TABLE)
 
 
 def _pc(ed, made):

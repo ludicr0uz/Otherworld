@@ -39,6 +39,8 @@ Constants only.
 
 from dataclasses import dataclass
 
+from uebp.vars import BOOL, FLOAT, INT, STRING, Var, array
+
 TUNE_UP, TUNE_DOWN = "Up", "Down"
 TUNE_LESS, TUNE_MORE = "Left", "Right"
 TUNE_SAVE_KEY = "Enter"
@@ -126,6 +128,29 @@ class TuneTab:
         the same: the caret runs round (tune_tick._author_keys), so the stop
         after the last is the one over the first."""
         return self.row_count + (1 if self.save_widget else 0)
+
+
+def tab_bools(tab):
+    return (tab.open_var, tab.save_var, tab.saved_var, tab.touched_var)
+
+
+def tab_ints(tab):
+    return (tab.row_var, tab.pick_var, tab.nudge_var)
+
+
+def tab_table(tab):
+    """A tab's HUD variables as rows (uebp/vars.py), in the order they have
+    always been declared: shut, untouched, on the first subject. The arrays'
+    defaults are the built tables, which tune_tick.tab_defaults is handed."""
+    floats = [name for name in (tab.values_var, tab.steps_var, tab.mins_var, tab.maxs_var)
+              if name]
+    if tab.kept:
+        floats.append(tab.built_var)
+    return (*(Var(name, BOOL, False) for name in tab_bools(tab)),
+            *(Var(name, INT, 0) for name in tab_ints(tab)),
+            *(Var(name, array(FLOAT)) for name in floats),
+            *((Var(tab.live_var, array(BOOL)),) if tab.live_var else ()),
+            Var(tab.names_var, array(STRING)))
 
 
 def save_command(module):

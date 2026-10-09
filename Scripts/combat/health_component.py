@@ -12,23 +12,18 @@ from combat.death import (
     CORPSE_SECONDS, PLAYER_RESPAWN_WAIT, _author_corpse, _author_death_collapse,
     _author_kill_count, _author_player_death,
 )
-from combat.game_state import (
-    DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR, NEVER_DAMAGED, NPC_ID_VAR,
-    SPAWNED_AT_VAR,
-)
+from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR, NEVER_DAMAGED
 from combat.log import _log
 from uebp.graph import (
-    BEL, BGE, _apply_defaults, _assets, _connect, _create_blueprint, _declare, _events,
-    _float_type, _node, _pin, _post_physics_tick, _set, _struct_type, else_, out, then)
+    BEL, BGE, _apply_defaults, _assets, _connect, _create_blueprint, _events, _node, _pin,
+    _post_physics_tick, _set, else_, out, then,
+)
 from uebp import net
 from uebp.layout import arrange
 from combat.hit_reaction import (
-    HIT_REACTIONS_VAR, LAST_HIT_FROM_VAR, NEXT_REACT_VAR, PREV_HEALTH_VAR,
-    REACT_INDEX_VAR, STEADY_VAR, _author_hit_reaction, _author_steady_gate,
+    NEXT_REACT_VAR, PREV_HEALTH_VAR, STEADY_VAR, _author_hit_reaction, _author_steady_gate,
 )
-from combat.hit_zones import (
-    HEAD_BONES_VAR, HEAD_MULT_VAR, LIMB_BONES_VAR, LIMB_MULT_VAR,
-)
+from combat.hit_zones import HEAD_MULT_VAR, LIMB_MULT_VAR
 from combat.paths import HEALTH_BP_PATH, ITEM_BP_PATH
 from combat.player_kill import author_player_kill
 from combat.player_respawn import author_player_respawn
@@ -103,40 +98,11 @@ def build_health_component(rebuild=True):
     tick, begin = _events(ed, rebuild)
 
     declare(ed, HV.TABLE)
-    _declare(ed, LAST_DAMAGE_VAR, _float_type())
-    _declare(ed, DAMAGED_BY_PLAYER_VAR, BEL.get_basic_type_by_name("bool"))
+    declare(ed, HV.DAMAGE)
     # Corpse loot: the table loot/install.py fills, and what this body carries.
     declare_loot_vars(ed)
-    # How long after a death its replacement appears.
-    _declare(ed, RESPAWN_DELAY_VAR, _float_type())
-    # The number this wanderer was given at spawn. The HUD draws it beside the
-    # health bar; the log line below records where that number appeared.
-    _declare(ed, NPC_ID_VAR, BEL.get_basic_type_by_name("int"))
-    # Where this wanderer was put. Recorded for diagnosis, not for gameplay --
-    # the respawn point is computed from the player, not from here (the old
-    # SpawnOrigin, which anchored respawns to it, is gone on purpose). It is
-    # what lets the safety net report the spawn that produced a faller.
-    _declare(ed, SPAWNED_AT_VAR, _struct_type(unreal.Vector.static_struct()))
-    # Hit boxes: which physics-asset bodies are head and which are limbs, and
-    # what each is worth. On the target rather than on the weapon, because the
-    # tables are a fact about the target's skeleton -- install_on_character
-    # and install_on_npc fill them from each one's own mesh. Empty here, which
-    # makes a target nobody has zoned take every hit at 1.0x.
-    for name in (HEAD_BONES_VAR, LIMB_BONES_VAR):
-        _declare(ed, name, BEL.get_array_type(BEL.get_basic_type_by_name("name")))
-    for name in (HEAD_MULT_VAR, LIMB_MULT_VAR):
-        _declare(ed, name, _float_type())
-
-    # Flinching. Four variables and a clip table, all on the component rather
-    # than on either character, because both of them react the same way and
-    # neither of their Blueprints has a graph this could be written into.
-    _declare(ed, HIT_REACTIONS_VAR, BEL.get_array_type(
-        BEL.get_object_reference_type(unreal.AnimSequenceBase.static_class())))
-    _declare(ed, LAST_HIT_FROM_VAR, _struct_type(unreal.Vector.static_struct()))
-    for name in (PREV_HEALTH_VAR, NEXT_REACT_VAR):
-        _declare(ed, name, _float_type())
-    _declare(ed, REACT_INDEX_VAR, BEL.get_basic_type_by_name("int"))
-    _declare(ed, STEADY_VAR, BEL.get_basic_type_by_name("bool"))
+    # The respawn's, the hit boxes' and the flinch's (health_vars.py).
+    declare(ed, HV.STATE)
 
     # SpawnOrigin used to hold where this actor started, back when a replacement
     # appeared near the dead one's own spawn point. It has to be removed

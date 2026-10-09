@@ -3,7 +3,8 @@ the name, the pin type and the default (uebp/vars.py). The builder declares
 TABLE; a row with no type is a component, or a variable declared elsewhere.
 """
 
-from uebp.vars import BOOL, FLOAT, STRING, Var, array, struct
+from uebp.vars import BOOL, FLOAT, INT, STRING, Var, array, struct
+from combat.difficulty import DIFFICULTY_VAR
 from combat.tuning import COMBAT
 from net.session_consts import DEFAULT_SERVER_ADDRESS, SERVER_ADDRESS_VAR
 
@@ -25,5 +26,9 @@ DebugMode = Var("DebugMode", BOOL, True)
 # (graphics_menu/mode_draw.py). Local settings, not the character's profile;
 # a save written before this field existed loads it as the default.
 ServerAddress = Var(SERVER_ADDRESS_VAR, STRING, DEFAULT_SERVER_ADDRESS)
+# The difficulty, an index into combat.difficulty.DIFFICULTY_LABELS. A save
+# written before this field existed loads it as the default (EASY), which
+# the builder writes.
+Difficulty = Var(DIFFICULTY_VAR, INT)
 
-TABLE = (MouseSensitivity, ScopeSensitivity, Binds, DebugMode, ServerAddress)
+TABLE = (MouseSensitivity, ScopeSensitivity, Binds, DebugMode, ServerAddress, Difficulty)

@@ -49,16 +49,16 @@ locomotion to what it fed. A skin without clips (PlayerSkin.stance_clips) gets
 nothing here and keeps the procedural crouch and prone.
 """
 
+from uebp.vars import declare
+from combat import anim_vars as AN
 from combat.aim_pitch import OWN_POSE_CLASSES, _feeding_all, _nodes_of
 from combat.aim_pitch import _remove_previous as _remove_pitch_chain
 from combat.anim_blueprint import AIM_SLOT, _slot_node
-from combat.body_pose import (
-    KNEEL_TIME, POSE_CROUCH, POSE_KNEEL, POSE_PRONE, _float_type, move_alpha,
-)
+from combat.body_pose import KNEEL_TIME, POSE_CROUCH, POSE_KNEEL, POSE_PRONE, move_alpha
 from combat.gas_moves import crouch_on, slide_on
 from combat.gas_moves_tuning import POSE_SLIDE, SLIDE_CLIP
 from combat.log import _log
-from uebp.graph import BEL, BGE, PIN, _assets, _connect, _declare, _palette, _pin, _set, out
+from uebp.graph import BEL, BGE, PIN, _assets, _connect, _palette, _pin, _set, out
 from uebp.layout import arrange
 
 BLEND_CLASS = "AnimGraphNode_TwoWayBlend"
@@ -198,7 +198,7 @@ def patch_stance_clips(skin):
                  for f in ("crouch_idle", "crouch_walk", "prone_crawl", "search_kneel")}
         if slide_on():
             clips["slide"] = _assets().load_asset(SLIDE_CLIP)
-            _declare(ed, POSE_SLIDE, _float_type())
+            declare(ed, AN.SLIDE)
         missing = [f for f, c in clips.items() if not c]
         if missing:
             raise RuntimeError(f"no clip for {missing}: run import_quaternius.py"

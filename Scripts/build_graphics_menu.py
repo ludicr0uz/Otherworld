@@ -56,8 +56,8 @@ import unreal
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # The authoring helpers every builder shares.
 from uebp.graph import (
-    BEL, BGE, PIN, _assets, _connect, _create_blueprint, _declare, _key, _loose_pin, _node,
-    _palette, _pin, _set, else_, make_log, out, then)
+    BEL, BGE, _assets, _connect, _create_blueprint, _key, _loose_pin, _node, _palette, _pin,
+    _set, else_, make_log, out, then)
 # BP_Settings' asset path. The settings screen's own contract with the combat
 # package (BIND_VARS, the sensitivity limits) lives in graphics_menu/settings_rows.py.
 from combat import paths as combat_paths                           # noqa: E402
@@ -89,8 +89,7 @@ from graphics_menu.settings_input import _emit_save                # noqa: E402
 from graphics_menu.settings_page import _author_push_settings      # noqa: E402
 # The UMG screens: their layouts, their creation at BeginPlay, and the
 # DrawHUD fragments that write into them.
-from graphics_menu.umg_consts import (                              # noqa: E402
-    DEBUG_ACTION, GAME_STARTED_VAR, HUD_BP_PATH, PAUSE_ROW_VAR)
+from graphics_menu.umg_consts import DEBUG_ACTION, GAME_STARTED_VAR, HUD_BP_PATH   # noqa: E402
 from graphics_menu.wbp_hud import build_hud_widget                  # noqa: E402
 from graphics_menu.wbp_parts import (                              # noqa: E402
     build_inventory_slot, build_menu_row)
@@ -135,8 +134,7 @@ from graphics_menu.mode_consts import (                             # noqa: E402
 from graphics_menu import mode_consts                               # noqa: E402
 from graphics_menu.mode_tick import (                               # noqa: E402
     author_mode_begin, author_mode_in_play, author_mode_rows_tick)
-from graphics_menu.menu_still import (                              # noqa: E402
-    MENU_STILL_VAR, author_menu_still)
+from graphics_menu.menu_still import author_menu_still             # noqa: E402
 from graphics_menu.monster_tune_consts import MONSTER_TAB           # noqa: E402
 from graphics_menu.monster_tune_tick import (                       # noqa: E402
     author_monster_tune_tick, declare_monster_tune_vars, monster_tune_defaults)
@@ -296,9 +294,7 @@ def _ensure_variables(ed, bp):
     # The M panel's caret, and whether the controller was told to ignore move
     # input for the open panel (menu_still.py); GameStarted is false until the
     # player picks NEW GAME, and BeginPlay pauses the world alongside it.
-    _declare(ed, PAUSE_ROW_VAR, BEL.get_basic_type_by_name("int"))
-    for name in (MENU_STILL_VAR, GAME_STARTED_VAR):
-        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
+    declare(ed, MV.PANEL)
     # The canvas HUD's bind labels: the settings rows carry their own now.
     ed.remove_member_variable("BindLabels")
     declare_ui_vars(ed)
@@ -1011,7 +1007,7 @@ def build_hud_blueprint(rebuild=False):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_GraphicsMenuHUD failed to compile")
     _apply_defaults(bp, {**defaults(MV.TABLE),
-                         PAUSE_ROW_VAR: 0, MENU_STILL_VAR: False,
+                         **defaults(MV.PANEL),
                          MV.Quality: DEFAULT_PRESET,
                          MV.KeyPool: [_key(k) for k in KEY_POOL],
                          AddressKeys: [_key(k) for k, _c in ADDRESS_KEYS],

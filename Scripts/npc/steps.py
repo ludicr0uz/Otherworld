@@ -28,6 +28,8 @@ Each event runs to its end in one call: no Delay and no latent node, so the
 task reads StepResult straight after calling it.
 """
 
+from uebp.vars import declare
+from npc import controller_vars as NV
 from forest_generator.npc_drawn import NPC_DRAWN_ARRIVE_CM, NPC_DRAWN_RANGE_CM
 from forest_generator.npc_placement import NPC_VOICE_MAX_S, NPC_VOICE_MIN_S
 from forest_generator.npc_voice import quiet_on_hunt, quiet_on_patrol
@@ -199,9 +201,7 @@ def _author_steps(ed, key, melee_anim):
 
     Returns the sense step names authored, in priority order (sound is
     dropped when the GameMode has no noise record)."""
-    ed.remove_member_variable(STEP_RESULT_VAR)
-    if not ed.add_member_variable(STEP_RESULT_VAR, BEL.get_basic_type_by_name("bool")):
-        raise RuntimeError(f"could not declare {STEP_RESULT_VAR}")
+    declare(ed, NV.STEPS)
     _declare_agro_vars(ed)
     declare_tuned_vars(ed)
     declare_strafe_vars(ed)

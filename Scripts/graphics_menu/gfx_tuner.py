@@ -26,21 +26,18 @@ command, tag and Clamp in that graph as its own, and this is one owner for
 "what a preset does".
 """
 
+from uebp.vars import declare, defaults
+from graphics_menu.gfx_tune_consts import TUNER_TABLE
 import unreal
 
 from combat.log import _log
-from uebp.graph import (
-    BEL, BGE, _apply_defaults, _create_blueprint, _declare, _events, _float_type, _pin, out,
-    then)
+from uebp.graph import BEL, BGE, _apply_defaults, _create_blueprint, _events, _pin, out, then
 from uebp.layout import arrange
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_stats import CVAR, LEVEL, STAT_COUNT, stats_by, table_values
 from graphics_menu.gfx_tune_consts import (
-    TUNER_BASE_VAR, TUNER_BP_PATH, TUNER_DIRTY_VAR, TUNER_GRASS_DISTANCE_APPLIED_VAR,
-    TUNER_GRASS_LAYERS_APPLIED_VAR, TUNER_GRASS_SHADOWS_APPLIED_VAR,
-    TUNER_LEVEL_APPLIED_VAR, TUNER_NEVER, TUNER_PRESET_VAR,
-    TUNER_TREE_DISTANCE_APPLIED_VAR, TUNER_VALUES_VAR, TUNER_WIND_APPLIED_VAR,
-    TUNER_WIND_DISTANCE_APPLIED_VAR,
+    TUNER_BASE_VAR, TUNER_BP_PATH, TUNER_DIRTY_VAR, TUNER_LEVEL_APPLIED_VAR, TUNER_PRESET_VAR,
+    TUNER_VALUES_VAR,
 )
 from graphics_menu.gfx_tuner_foliage import author_foliage
 from graphics_menu.gfx_tuner_read import applied, whole
@@ -52,19 +49,8 @@ from uebp.nodes.system import (
     FN_APPLY, FN_BUILD_FLOAT, FN_BUILD_INT, FN_CONSOLE, FN_GET_GUS, FN_SET_OVERALL)
 
 
-INT_VARS = (TUNER_PRESET_VAR, TUNER_BASE_VAR, TUNER_LEVEL_APPLIED_VAR,
-            TUNER_GRASS_SHADOWS_APPLIED_VAR, TUNER_GRASS_LAYERS_APPLIED_VAR,
-            TUNER_WIND_APPLIED_VAR, TUNER_WIND_DISTANCE_APPLIED_VAR)
-FLOAT_VARS = (TUNER_GRASS_DISTANCE_APPLIED_VAR, TUNER_TREE_DISTANCE_APPLIED_VAR)
-
-
 def tuner_defaults():
-    return {TUNER_VALUES_VAR: table_values(), TUNER_PRESET_VAR: 0, TUNER_BASE_VAR: 0,
-            TUNER_DIRTY_VAR: False, TUNER_LEVEL_APPLIED_VAR: TUNER_NEVER,
-            TUNER_GRASS_SHADOWS_APPLIED_VAR: TUNER_NEVER,
-            TUNER_GRASS_LAYERS_APPLIED_VAR: TUNER_NEVER,
-            TUNER_WIND_APPLIED_VAR: TUNER_NEVER, TUNER_WIND_DISTANCE_APPLIED_VAR: TUNER_NEVER,
-            TUNER_GRASS_DISTANCE_APPLIED_VAR: 1.0, TUNER_TREE_DISTANCE_APPLIED_VAR: 1.0}
+    return {**defaults(TUNER_TABLE), TUNER_VALUES_VAR: table_values()}
 
 
 def command_prefix(cvar):
@@ -73,12 +59,7 @@ def command_prefix(cvar):
 
 
 def _declare_vars(ed):
-    _declare(ed, TUNER_VALUES_VAR, BEL.get_array_type(_float_type()))
-    _declare(ed, TUNER_DIRTY_VAR, BEL.get_basic_type_by_name("bool"))
-    for name in INT_VARS:
-        _declare(ed, name, BEL.get_basic_type_by_name("int"))
-    for name in FLOAT_VARS:
-        _declare(ed, name, _float_type())
+    declare(ed, TUNER_TABLE)
 
 
 def _author_level(ed, in_execs, made):

@@ -27,12 +27,14 @@ only reader, so the HUD's builder builds it (as BP_Profile, profile_asset.py),
 and a probe can set its slot aside without touching the player's keybinds.
 """
 
+from uebp.vars import declare
+from graphics_menu.gfx_tune_consts import GFX_SAVE_FIELDS
 import unreal
 
 from combat.log import _log
 from uebp.graph import (
-    BEL, BGE, _connect, _create_blueprint, _declare, _float_type, _loose_pin, _must_load,
-    _palette, _pin, out, then)
+    BEL, BGE, _connect, _create_blueprint, _loose_pin, _must_load, _palette, _pin, out, then,
+)
 from uebp.layout import arrange
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.gfx_stats import CUSTOM_PRESET, PRESET_LABELS, STAT_COUNT
@@ -52,8 +54,7 @@ def build_graphics_savegame():
     """Create (or re-declare) BP_GraphicsSave and compile it. A record, no graph."""
     bp = _create_blueprint(GFX_SAVE_BP_PATH, unreal.SaveGame)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
-    _declare(ed, GFX_SAVE_QUALITY_FIELD, BEL.get_basic_type_by_name("int"))
-    _declare(ed, GFX_SAVE_TABLE_FIELD, BEL.get_array_type(_float_type()))
+    declare(ed, GFX_SAVE_FIELDS)
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_GraphicsSave failed to compile")

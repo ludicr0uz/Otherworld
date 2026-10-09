@@ -47,7 +47,8 @@ GetInstanceTransform and the navmesh projection are pure: each is branched
 on its bool before its other output is read.
 """
 
-import unreal
+from uebp.vars import declare
+from npc import controller_vars as NV
 
 from forest_generator.npc_placement import NPC_CAPSULE_HALF_HEIGHT_CM
 from forest_generator.npc_stalk import (
@@ -59,7 +60,7 @@ from forest_generator.npc_stalk import (
     NPC_STALK_SWEEP_LIFT_CM, NPC_STALK_SWEEP_RADIUS_CM, cover_trees,
 )
 from npc.graph import _Graph
-from uebp.graph import BEL, _connect, _loose_pin, _palette, _pin, else_, out, then
+from uebp.graph import _connect, _loose_pin, _palette, _pin, else_, out, then
 from npc.paths import (
     STALK_ARRIVED_VAR, STALK_COVER_VAR, STALK_HIDDEN_VAR, STALK_IGNORE_VAR,
     STALK_LEG_UNTIL_VAR, STALK_LEGS_VAR, STALK_SIDE_VAR,
@@ -83,19 +84,7 @@ NO_COVER_SCALE = 1000000.0
 
 def declare_cover_vars(ed):
     """The leg's own state. Zero and false are the right start: no leg yet."""
-    kinds = {
-        STALK_COVER_VAR: BEL.get_struct_type(unreal.Vector.static_struct()),
-        STALK_HIDDEN_VAR: BEL.get_basic_type_by_name("bool"),
-        STALK_ARRIVED_VAR: BEL.get_basic_type_by_name("bool"),
-        STALK_LEG_UNTIL_VAR: BEL.get_basic_type_by_name("real"),
-        STALK_LEGS_VAR: BEL.get_basic_type_by_name("int"),
-        STALK_IGNORE_VAR: BEL.get_array_type(
-            BEL.get_object_reference_type(unreal.Actor.static_class())),
-    }
-    for name, kind in kinds.items():
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, kind):
-            raise RuntimeError(f"could not declare {name}")
+    declare(ed, NV.STALK_COVER)
 
 
 def _thrice(g, value):

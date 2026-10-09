@@ -26,6 +26,7 @@ gfx_stats.GFX_STATS.
 
 from graphics_menu.gfx_stats import GFX_STATS, PRESET_LABELS, STAT_COUNT
 from graphics_menu.tune_tab import TuneTab, save_command
+from uebp.vars import BOOL, FLOAT, INT, Var, array
 
 GFX_TUNE_ACTION = "graphics_tuning"  # the M panel row that opens the tab
 GFX_TUNE_ROW_LABEL = "Graphics Settings"
@@ -47,11 +48,13 @@ GFX_TUNE_MINS_VAR = "GfxTuneMins"
 GFX_TUNE_MAXS_VAR = "GfxTuneMaxs"
 # The pick Tick last saw. GfxTunePick differing from it means Left / Right on
 # the preset row moved it: Quality follows. Otherwise the pick follows Quality.
-GFX_TUNE_PICK_SEEN_VAR = "GfxTunePickSeen"
+GFX_TUNE_PICK_SEEN_VAR = Var("GfxTunePickSeen", INT, 0)
 # The Quality the tuner was last handed. -1 is no preset, so the first Tick
 # of every session hands it the startup preset's row.
-GFX_APPLIED_VAR = "GfxQualityApplied"
 GFX_APPLIED_DEFAULT = -1
+GFX_APPLIED_VAR = Var("GfxQualityApplied", INT, GFX_APPLIED_DEFAULT)
+# The HUD's two beside the tab's own (tune_tab.tab_table): gfx_tune_tick.py declares them.
+GFX_TUNE_TABLE = (GFX_TUNE_PICK_SEEN_VAR, GFX_APPLIED_VAR)
 
 # The HUD's BP_GraphicsTuner component (gfx_tuner.py), which applies a row.
 TUNER_COMPONENT = "GraphicsTuner"
@@ -89,22 +92,29 @@ assert len(PRESET_LABELS) == 4
 TUNER_BP_PATH = "/Game/UI/BP_GraphicsTuner"
 TUNER_CLASS_PATH = f"{TUNER_BP_PATH}.BP_GraphicsTuner_C"
 # What the HUD hands it: the whole table, which preset to apply, and the ask.
-TUNER_VALUES_VAR = "Values"
-TUNER_PRESET_VAR = "Preset"
-TUNER_DIRTY_VAR = "Dirty"
+TUNER_NEVER = -1
+# Values' default is the built table, which gfx_tuner.tuner_defaults reads.
+TUNER_VALUES_VAR = Var("Values", array(FLOAT))
+TUNER_PRESET_VAR = Var("Preset", INT, 0)
+TUNER_DIRTY_VAR = Var("Dirty", BOOL, False)
 # Preset * STAT_COUNT, set once at the top of an apply: a stat is Values[Base + s].
-TUNER_BASE_VAR = "Base"
+TUNER_BASE_VAR = Var("Base", INT, 0)
 # What the world was last set to, so an apply only redoes what moved. The
 # distances start at 1 (a level is saved at its own distances); the rest at
 # -1, no value, so the first apply of a session always does them.
-TUNER_LEVEL_APPLIED_VAR = "LevelApplied"
-TUNER_GRASS_DISTANCE_APPLIED_VAR = "GrassDistanceApplied"
-TUNER_TREE_DISTANCE_APPLIED_VAR = "TreeDistanceApplied"
-TUNER_GRASS_SHADOWS_APPLIED_VAR = "GrassShadowsApplied"
-TUNER_GRASS_LAYERS_APPLIED_VAR = "GrassLayersApplied"
-TUNER_WIND_APPLIED_VAR = "WindApplied"
-TUNER_WIND_DISTANCE_APPLIED_VAR = "WindDistanceApplied"   # metres
-TUNER_NEVER = -1
+TUNER_LEVEL_APPLIED_VAR = Var("LevelApplied", INT, TUNER_NEVER)
+TUNER_GRASS_DISTANCE_APPLIED_VAR = Var("GrassDistanceApplied", FLOAT, 1.0)
+TUNER_TREE_DISTANCE_APPLIED_VAR = Var("TreeDistanceApplied", FLOAT, 1.0)
+TUNER_GRASS_SHADOWS_APPLIED_VAR = Var("GrassShadowsApplied", INT, TUNER_NEVER)
+TUNER_GRASS_LAYERS_APPLIED_VAR = Var("GrassLayersApplied", INT, TUNER_NEVER)
+TUNER_WIND_APPLIED_VAR = Var("WindApplied", INT, TUNER_NEVER)
+TUNER_WIND_DISTANCE_APPLIED_VAR = Var("WindDistanceApplied", INT, TUNER_NEVER)   # metres
+# In the order gfx_tuner.py has always declared them.
+TUNER_TABLE = (TUNER_VALUES_VAR, TUNER_DIRTY_VAR, TUNER_PRESET_VAR, TUNER_BASE_VAR,
+               TUNER_LEVEL_APPLIED_VAR, TUNER_GRASS_SHADOWS_APPLIED_VAR,
+               TUNER_GRASS_LAYERS_APPLIED_VAR, TUNER_WIND_APPLIED_VAR,
+               TUNER_WIND_DISTANCE_APPLIED_VAR, TUNER_GRASS_DISTANCE_APPLIED_VAR,
+               TUNER_TREE_DISTANCE_APPLIED_VAR)
 
 # ─── BP_GraphicsSave: what the player's graphics keep between sessions ───────
 GFX_SAVE_BP_PATH = "/Game/UI/BP_GraphicsSave"
@@ -114,6 +124,7 @@ GFX_SAVE_USER_INDEX = 0
 # The picked preset, and the HUD's whole table as it stood. Only Custom's row
 # of it is read back; a table of any other length is from an older build
 # (another STAT_COUNT) and is left alone, pick and all.
-GFX_SAVE_QUALITY_FIELD = "SavedQuality"
-GFX_SAVE_TABLE_FIELD = "SavedTable"
+GFX_SAVE_QUALITY_FIELD = Var("SavedQuality", INT)
+GFX_SAVE_TABLE_FIELD = Var("SavedTable", array(FLOAT))
+GFX_SAVE_FIELDS = (GFX_SAVE_QUALITY_FIELD, GFX_SAVE_TABLE_FIELD)   # gfx_save.py declares them
 GFX_SAVE_TABLE_LEN = len(PRESET_LABELS) * STAT_COUNT

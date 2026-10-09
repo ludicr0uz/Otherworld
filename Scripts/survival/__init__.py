@@ -61,4 +61,7 @@ knows the tag names and the bleed's numbers, in combat.tuning). npc imports
 survival's on_hit and on_hit_graph; survival never imports npc.
 
   terrain_heights  Terrain height at a point, from the terrain mesh's own triangles
+
+  campfire_vars    BP_Campfire's member variables, named once: each row is the name, the pin type and the default (uebp/vars.py)
+  consumable_vars  BP_ConsumableItem's member variables (what it adds to BP_WeaponItem's, combat/item_vars.py), named once: each ...
 """

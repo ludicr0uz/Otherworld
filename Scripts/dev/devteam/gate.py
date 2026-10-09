@@ -30,16 +30,18 @@ def sweep_targets(root):
     return [p for p in tops + levels if os.path.basename(p) not in EXCLUDE]
 
 
-def run_sweep(root, log_path):
-    """Run the suite cold. Returns {label: result dict}, or None if the sweep
+def run_sweep(root, log_path, serve_dir=None):
+    """Run the suite cold, or, given ``serve_dir``, in that warm serve editor
+    (the before-sweep; the after-sweep stays cold). Returns {label: result dict}, or None if the sweep
     itself broke (no JSON came back); its output is appended to log_path."""
     targets = sweep_targets(root)
     fd, json_path = tempfile.mkstemp(prefix="devteam-sweep-", suffix=".json")
     os.close(fd)
     cmd = [sys.executable, os.path.join(root, "Scripts", "dev", "uepy.py"),
-           "--cold", "--summary", "--json", json_path, *targets]
+           *([] if serve_dir else ["--cold"]), "--summary", "--json", json_path, *targets]
+    env = dict(os.environ, UEPY_SERVE=serve_dir) if serve_dir else None
     with open(log_path, "a") as log:
-        subprocess.run(cmd, cwd=root, stdout=log, stderr=subprocess.STDOUT,
+        subprocess.run(cmd, cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT,
                        stdin=subprocess.DEVNULL)
     try:
         with open(json_path) as fh:
@@ -134,8 +136,9 @@ def regressions(before, after, known=()):
     return problems
 
 
-def table(before, after=None):
-    """A Markdown table of one sweep, or of before -> after."""
+def table(before, after=None, times=None):
+    """A Markdown table of one sweep, or of before -> after; ``times`` ({label:
+    text}) adds a line of how long each sweep took."""
     labels = sorted(set(before or {}) | set(after or {}))
     if after is None:
         rows = ["| verifier | result |", "|---|---|"]
@@ -144,4 +147,6 @@ def table(before, after=None):
         rows = ["| verifier | before | after |", "|---|---|---|"]
         rows += [f"| {l} | {describe((before or {}).get(l))} | {describe(after.get(l))} |"
                  for l in labels]
+    if times:
+        rows += ["", "Sweep time: " + ", ".join(f"{k} {v}" for k, v in times.items())]
     return "\n".join(rows)

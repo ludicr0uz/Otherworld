@@ -118,7 +118,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(1, os.path.dirname(HERE))        # Scripts/: asset_pipeline
 
-from devteam import fab, fast, limits, pause                         # noqa: E402
+from devteam import baseline_cache, fab, fast, limits, pause                         # noqa: E402
 from devteam.accounting import git_head                             # noqa: E402
 from devteam.tasks import Task, parse_tasks, requeue, tick          # noqa: E402
 from devteam.triage import triage                                   # noqa: E402
@@ -306,6 +306,7 @@ def main():
         if ok and swept:
             # The next task's baseline, as long as nothing changes in between.
             cache[tree_state()] = swept
+            baseline_cache.save(ROOT, tree_state(), swept)
         if not ok and not args.keep_going:
             print("dev-team: stopping (use --keep-going to continue past failures)")
             break

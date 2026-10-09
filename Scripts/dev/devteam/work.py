@@ -12,7 +12,7 @@ import hashlib
 import os
 import time
 
-from devteam import fab, gate, limits, pause, probe_gate
+from devteam import baseline_cache, fab, gate, limits, pause, probe_gate
 from devteam.accounting import (
     describe_time, describe_tokens, git, git_head, merge_results, tag_commit,
     token_usage,
@@ -62,22 +62,25 @@ def tree_fingerprint():
     return digest.hexdigest()
 
 
-def _sweep_and_probes(log_path, probe_set):
-    rows = gate.run_sweep(ROOT, log_path)
+def _sweep_and_probes(log_path, probe_set, serve_dir=None):
+    rows = gate.run_sweep(ROOT, log_path, serve_dir)
     if rows is not None and probe_set:
         rows.update(probe_gate.run_probes(ROOT, probe_set, log_path))
     return rows
 
 
-def sweep(label, log_path, pauser=None, probe_set=None):
+def sweep(label, log_path, pauser=None, probe_set=None, warm=False, timings=None):
     """One verifier sweep, then the probe set if there is one. A pause typed
     meanwhile is heard, and acted on by the caller once the sweep is back."""
     started = time.time()
+    serve = SERVE_DIR if warm else None
     if pauser:
         with pauser.watching():
-            rows = _sweep_and_probes(log_path, probe_set)
+            rows = _sweep_and_probes(log_path, probe_set, serve)
     else:
-        rows = _sweep_and_probes(log_path, probe_set)
+        rows = _sweep_and_probes(log_path, probe_set, serve)
+    if timings is not None:
+        timings[label] = f"{time.time() - started:.0f}s" + (" (warm)" if warm else " (cold)")
     if rows is None:
         print(f"    gate: {label} sweep failed to run ({time.time() - started:.0f}s)")
     else:
@@ -97,6 +100,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     pause.Paused when the user paused it."""
     log_path = os.path.join(run_dir, f"task-{n:02d}.jsonl")
     sweep_log = os.path.join(run_dir, f"task-{n:02d}-sweeps.txt")
+    timings = {}
     env = session_env(os.environ, SERVE_DIR)
     ask = dict(interactive=args.interactive)
     baseline = parked.get("baseline") if parked else None
@@ -152,7 +156,16 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
             return False, [blocked], {}, None, None
         if args.gate:
             state = tree_state()
-            baseline = cache.get(state) or sweep("baseline", sweep_log, pauser, probes)
+            baseline = cache.get(state)
+            if baseline is None:
+                baseline = baseline_cache.load(ROOT, state)
+                if baseline:
+                    print("    gate: baseline from the cache (tree unchanged)")
+                    timings["baseline"] = "cached"
+            if baseline is None:
+                baseline = sweep("baseline", sweep_log, pauser, probes, warm=True,
+                                 timings=timings)
+                baseline_cache.save(ROOT, state, baseline)
         limits.wait(meter, pauser)
         paused("start")
         prompt = build_prompt(task, n, total, progress,
@@ -188,7 +201,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     if not (ok and args.gate):
         return ok, reports, result, gate_table, None
     close_editors()
-    after = sweep("after", sweep_log, pauser, probes)
+    after = sweep("after", sweep_log, pauser, probes, timings=timings)
     paused("gate", result, reports)
     problems = gate.regressions(baseline, after, gate.load_known())
     attempts = 0
@@ -210,10 +223,10 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         paused("session", result, reports)
         if not ok:
             break
-        after = sweep("after fix", sweep_log, pauser, probes)
+        after = sweep("after fix", sweep_log, pauser, probes, timings=timings)
         paused("gate", result, reports)
         problems = gate.regressions(baseline, after, gate.load_known())
-    gate_table = gate.table(baseline, after)
+    gate_table = gate.table(baseline, after, timings)
     if problems:
         ok = False
         reports.append("FAILED: the verifier gate still regresses:\n"

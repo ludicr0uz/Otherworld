@@ -370,7 +370,7 @@ class RunOneTest(unittest.TestCase):
             return True, f"report {len(self.sessions)}", {
                 "session_id": "sid", "total_cost_usd": 1.0, "duration_ms": 1000}
 
-        def run_sweep(root, log_path):
+        def run_sweep(root, log_path, serve_dir=None):
             self.sweeps.append(1)
             if self.pause_in == ("sweep", len(self.sweeps)):
                 self.pauser.requested = True
@@ -380,6 +380,8 @@ class RunOneTest(unittest.TestCase):
                                    (work.gate, "run_sweep", run_sweep),
                                    (work, "close_editors", lambda: True),
                                    (work, "tree_state", lambda: ("h", "")),
+                                   (work.baseline_cache, "load", lambda root, state: None),
+                                   (work.baseline_cache, "save", lambda root, state, rows: None),
                                    (work, "print", lambda *a, **k: None)):
             patcher = mock.patch.object(target, name, fake, create=True)
             patcher.start()

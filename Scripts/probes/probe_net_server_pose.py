@@ -18,6 +18,8 @@ On a client: its own body's anim instance took the client arm, and every
 skinned mesh on it ticks, as before.
 """
 
+SYSTEMS = ('net',)
+
 import time
 
 import unreal

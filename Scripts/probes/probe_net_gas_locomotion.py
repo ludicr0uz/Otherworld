@@ -14,6 +14,8 @@ On the server the same body is posed with the feet's ground traces skipped
 the whole pose skipped.
 """
 
+SYSTEMS = ('net', 'animation', 'movement')
+
 import time
 
 import unreal

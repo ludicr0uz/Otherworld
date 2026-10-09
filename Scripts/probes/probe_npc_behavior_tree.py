@@ -9,6 +9,8 @@ where its touch sense fires: Aggro flips on the controller AND the Blackboard
 the Pulse step makes it a corpse and stops the tree.
 """
 
+SYSTEMS = ('npc',)
+
 import unreal
 
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH

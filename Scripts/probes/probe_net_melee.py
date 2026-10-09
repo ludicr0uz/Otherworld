@@ -23,6 +23,8 @@ Single player's checks are probes/probe_knife.py, probe_punch.py,
 probe_hot_blade.py and probe_wendigo_ward.py, through the same events.
 """
 
+SYSTEMS = ('net', 'melee')
+
 import time
 
 import unreal

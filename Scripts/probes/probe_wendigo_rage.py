@@ -15,6 +15,8 @@ hunt, with whatever turns fall in it. This one makes both things happen:
     roaring or picking a tree, and runs at the player.
 """
 
+SYSTEMS = ('npc',)
+
 import math
 
 import unreal

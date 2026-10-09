@@ -30,6 +30,8 @@ Run with --windowed and OW_HOT_SHOTS=1 to save a picture of the hot knife and
 the hot axe, from in front of the player, to Saved/Screenshots/MacEditor.
 """
 
+SYSTEMS = ('melee',)
+
 import os
 import shutil
 

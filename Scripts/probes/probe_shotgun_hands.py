@@ -21,6 +21,8 @@ Run with --windowed and OW_GRIP_SHOTS=1 to save pictures of both hands from
 round the gun to Saved/Screenshots/MacEditor.
 """
 
+SYSTEMS = ('weapons', 'animation')
+
 import os
 
 import unreal

@@ -25,6 +25,8 @@ The server acts, step by step, and the three machines compare:
 Join order varies, so a player is known by its player id, never by index.
 """
 
+SYSTEMS = ('net', 'health')
+
 import time
 
 import unreal

@@ -25,6 +25,8 @@ Each is behind its own switch (combat/gas_moves_tuning.py); a switch that is
 off is noted and its part skipped.
 """
 
+SYSTEMS = ('animation', 'movement')
+
 import math
 import types
 

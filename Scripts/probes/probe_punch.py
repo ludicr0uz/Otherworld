@@ -10,6 +10,8 @@ from COMBAT.punch_clip_start_s) plays in the upper-body slot, and the blow
 takes COMBAT.punch_damage off the wanderer and credits the player.
 """
 
+SYSTEMS = ('melee',)
+
 import unreal
 
 from asset_pipeline import lyra_paths as LYRA

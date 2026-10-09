@@ -14,6 +14,8 @@ Run with --windowed and OW_THROW_SHOTS=1 to save a picture of each item in
 the air to Saved/Screenshots/MacEditor.
 """
 
+SYSTEMS = ('melee', 'throw')
+
 import math
 import os
 

@@ -21,6 +21,8 @@ sampled, a bot never spawned, a hit history that recorded nothing while
 clients were connected. The numbers themselves are the result.
 """
 
+SYSTEMS = ('net', 'load')
+
 import json
 import os
 import time

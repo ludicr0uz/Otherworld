@@ -23,6 +23,8 @@ No key can be injected into a headless game, so every press is a variable
 first, so the game starts on the issued loadout, and put back at the end.
 """
 
+SYSTEMS = ('clothing',)
+
 import math
 import os
 import shutil

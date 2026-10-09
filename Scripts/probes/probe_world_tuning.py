@@ -19,6 +19,8 @@ verifier's.
 world_tuning.csv is set aside first and put back.
 """
 
+SYSTEMS = ('menu', 'world')
+
 import shutil
 
 import unreal

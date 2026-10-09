@@ -23,6 +23,8 @@ probe_net_throw.py prove the asks); the shots are client 1's own, through
 FireForced and SightsForced. Friendly fire is on: there are no teams yet.
 """
 
+SYSTEMS = ('net',)
+
 import unreal
 
 from combat import health_vars as HV

@@ -24,6 +24,8 @@ judges the shot where client 1 saw client 2. The lag a run has is read off
 client 1's command line (-PktLag=, uepylib/net_plan.py) and posted.
 """
 
+SYSTEMS = ('net',)
+
 import re
 import time
 

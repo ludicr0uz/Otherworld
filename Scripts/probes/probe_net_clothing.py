@@ -29,6 +29,8 @@ DropForced, which the component's Tick turns into the Server events where the
 keys are read: a Blueprint Server event called from Python is not sent.
 """
 
+SYSTEMS = ('net', 'clothing')
+
 import time
 
 import unreal

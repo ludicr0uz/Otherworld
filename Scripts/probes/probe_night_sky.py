@@ -6,6 +6,8 @@ Run with --windowed and OW_SKY_SHOTS=1 to save pictures of the sky to
 Saved/Screenshots/MacEditor: towards the moon, the Pole Star and Orion.
 """
 
+SYSTEMS = ('world',)
+
 import math
 import os
 

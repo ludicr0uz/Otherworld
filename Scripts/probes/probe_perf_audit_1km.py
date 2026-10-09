@@ -6,6 +6,8 @@
 Results go to Saved/uepy/bench/bench_1km.json. See probe_perf_audit.py.
 """
 
+SYSTEMS = ('load',)
+
 from probes import probe_perf_audit as B
 
 B.OUT_NAME = "bench_1km.json"

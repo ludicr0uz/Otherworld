@@ -22,6 +22,8 @@ The client's world and HUD are new after each travel: every step asks again
 (probes/title.py).
 """
 
+SYSTEMS = ('net', 'title')
+
 import os
 
 import unreal

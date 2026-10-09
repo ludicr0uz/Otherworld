@@ -24,6 +24,8 @@ frame of FLOOD_ASKS AskSlot is served: the guard passes both and counts
 nothing.
 """
 
+SYSTEMS = ('net',)
+
 import time
 
 import unreal

@@ -24,6 +24,8 @@ each Multicast is a plain call that plays here, and the counter rises by one
 per cosmetic (the pellets' chips too).
 """
 
+SYSTEMS = ('net',)
+
 import os
 import time
 

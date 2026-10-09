@@ -27,6 +27,8 @@ and saves a picture of each step to Saved/Screenshots/MacEditor.
 look is the keys' own, and the pose the equip plays is still Held's.
 """
 
+SYSTEMS = ('net',)
+
 import os
 import time
 

@@ -21,6 +21,8 @@ Single player only: the bytes are the same on any machine, and the record a
 server holds is the same struct.
 """
 
+SYSTEMS = ('inventory',)
+
 import struct
 import time
 

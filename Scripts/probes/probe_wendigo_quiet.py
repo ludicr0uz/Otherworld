@@ -12,6 +12,8 @@ re-arms it 4-9 s on. So:
     and is re-armed 4-9 s on, which is the growl.
 """
 
+SYSTEMS = ('npc',)
+
 import unreal
 
 from forest_generator.npc_placement import NPC_VOICE_MAX_S, NPC_VOICE_MIN_S

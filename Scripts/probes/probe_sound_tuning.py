@@ -21,6 +21,8 @@ few frames later, so it waits for the whole listing).
 sound_tuning.csv is set aside first and put back.
 """
 
+SYSTEMS = ('menu', 'sound')
+
 import re
 import shutil
 

@@ -15,6 +15,8 @@ A sound can't be heard in a headless game; this reads what would play it:
     the spent sprint itself is verify/sound_states.py's).
 """
 
+SYSTEMS = ('sound',)
+
 import time
 
 import unreal

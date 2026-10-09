@@ -13,6 +13,8 @@ jacket in the bag.
                                         bag's first free slot
 """
 
+SYSTEMS = ('inventory', 'clothing')
+
 from combat.slot_tuning import BAG_FIRST, BAG_LAST, HAND, PISTOL_SLOT, SLOT_VAR
 from combat.wear_tuning import NOT_CLOTHING, TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_REQUEST_VAR
 

@@ -17,6 +17,8 @@ themselves are the verifier's. With the zombie row picked:
 monster_tuning.csv is set aside first and put back.
 """
 
+SYSTEMS = ('menu',)
+
 import shutil
 
 import unreal

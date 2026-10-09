@@ -10,6 +10,8 @@ The mannequin fallback's anim Blueprint is not scaled: the probe then only
 checks the speed.
 """
 
+SYSTEMS = ('animation',)
+
 import time
 
 import unreal

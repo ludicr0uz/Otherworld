@@ -14,6 +14,8 @@ stood where it can see the player and left to roar and start its hunt:
 That the hunt itself is as it was is probes/probe_wendigo_stalk.py's.
 """
 
+SYSTEMS = ('npc',)
+
 import math
 
 import unreal

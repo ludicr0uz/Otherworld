@@ -21,6 +21,8 @@ loadout, and put back at the end. What the picture looks like is
 probe_sight_align.py with --windowed and OW_SIGHT_SHOTS=1.
 """
 
+SYSTEMS = ('animation',)
+
 import os
 import shutil
 

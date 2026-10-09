@@ -23,6 +23,8 @@ With -nullrhi clients the probe calls DrawHUD itself (the engine draws none);
 with --windowed the engine does, and "zero HUD errors" means something.
 """
 
+SYSTEMS = ('net',)
+
 import time
 
 import unreal

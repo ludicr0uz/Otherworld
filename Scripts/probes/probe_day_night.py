@@ -7,6 +7,8 @@ frames for Tick to apply it, then compares against sun_state() for the clock
 the actor reads back (Tick adds its frame time on top of the write).
 """
 
+SYSTEMS = ('world',)
+
 import math
 
 from world import world_config as cfg

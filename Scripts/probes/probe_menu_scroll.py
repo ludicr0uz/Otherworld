@@ -9,6 +9,8 @@ press itself, and the bar under a real cursor, need a window and a hand
 (graphics_menu/CLAUDE.md).
 """
 
+SYSTEMS = ('menu',)
+
 from graphics_menu import cursor_consts as CC
 from graphics_menu import hud_vars as MV
 from graphics_menu import umg_consts as C

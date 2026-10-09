@@ -19,6 +19,8 @@ so its player 0 is its own player. The rule is held by the verifier
 (net/owner_checks.py); this is the positive case, on a real client's screen.
 """
 
+SYSTEMS = ('net', 'hud')
+
 import time
 
 import unreal

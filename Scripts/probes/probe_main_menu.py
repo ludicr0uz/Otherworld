@@ -23,6 +23,8 @@ would.
 Waits are on the wall clock or on a condition: game time stands still here.
 """
 
+SYSTEMS = ('menu',)
+
 import time
 
 import unreal

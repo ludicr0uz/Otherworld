@@ -16,6 +16,8 @@ measured on a live wanderer:
 FireForced stands in for the fire key. Any profile on disk is set aside first.
 """
 
+SYSTEMS = ('health',)
+
 import os
 import shutil
 

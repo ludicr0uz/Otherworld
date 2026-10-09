@@ -13,6 +13,8 @@ wanderer's swing stamps (npc/melee.py).
 Any profile already on disk is set aside first and put back at the end.
 """
 
+SYSTEMS = ('menu',)
+
 import os
 import shutil
 

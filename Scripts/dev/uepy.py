@@ -138,6 +138,8 @@ def parse_args():
                     help="run even though the editor is mid-PIE")
     ap.add_argument("--list", action="store_true",
                     help="list editors, games and inboxes, then exit")
+    ap.add_argument("--list-probes", action="store_true",
+                    help="list each probe and the systems it declares, then exit (no editor)")
     ap.add_argument("--close-editors", action="store_true",
                     help="save and quit (or kill) this project's editors, then exit")
     ap.add_argument("--game", action="store_true",
@@ -193,11 +195,27 @@ def parse_args():
     return ap, ap.parse_args()
 
 
+def list_probes():
+    """Print probe and its SYSTEMS, read from the source: no editor, no import."""
+    import ast
+    import glob
+    here = os.path.dirname(os.path.abspath(__file__))
+    for path in sorted(glob.glob(os.path.join(here, "..", "probes", "probe_*.py"))):
+        tags = ()
+        for node in ast.parse(open(path).read()).body:
+            if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "SYSTEMS" for t in node.targets):
+                tags = ast.literal_eval(node.value)
+        print(f"{os.path.basename(path)[:-3]:36} {', '.join(tags)}")
+    return 0
+
+
 def main():
     ap, args = parse_args()
     set_project(args.project)
     engine = engine_dir(args.engine)
 
+    if args.list_probes:
+        return list_probes()
     if args.list:
         list_listeners(engine)
         return 0

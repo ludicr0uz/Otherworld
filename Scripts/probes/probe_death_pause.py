@@ -9,6 +9,8 @@ the body has had its DEATH_PAUSE_SECONDS on the floor. Run it last in a game:
 it leaves the player dead and the world paused.
 """
 
+SYSTEMS = ('health',)
+
 import time
 
 import unreal

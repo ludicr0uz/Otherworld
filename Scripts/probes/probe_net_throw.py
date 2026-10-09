@@ -25,6 +25,8 @@ Single player's check is probes/probe_throw_strike.py, which throws the same
 blade at the same kind of trunk through the same events.
 """
 
+SYSTEMS = ('net', 'throw')
+
 import time
 
 import unreal

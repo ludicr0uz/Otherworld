@@ -27,6 +27,8 @@ The steps go round the board (probes/net.py):
     server     "saw-walk"
 """
 
+SYSTEMS = ('net', 'menu')
+
 import time
 
 import unreal

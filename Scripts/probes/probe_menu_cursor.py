@@ -11,6 +11,8 @@ does. Which row the cursor is over, and the click itself,
 need a window and a hand (graphics_menu/CLAUDE.md).
 """
 
+SYSTEMS = ('menu',)
+
 from net.state_consts import PLAYER_STATE_BP_PATH
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu import cursor_consts as CC

@@ -12,6 +12,8 @@ button. Python reads a widget's cached geometry back as
 zeros, so the sweep finds the rows instead of aiming at them.
 """
 
+SYSTEMS = ('menu',)
+
 import unreal
 
 from graphics_menu import cursor_consts as CC

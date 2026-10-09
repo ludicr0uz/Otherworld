@@ -17,6 +17,8 @@ Run with --windowed and OW_THROW_SHOTS=1 to save pictures of the wind-up and
 of the item in the air to Saved/Screenshots/MacEditor.
 """
 
+SYSTEMS = ('throw',)
+
 import math
 import os
 

@@ -11,6 +11,8 @@ A -nullrhi run lays nothing out, so the checks here are only that the
 widgets are shown; the look is the pictures'.
 """
 
+SYSTEMS = ('inventory',)
+
 import unreal
 
 from combat.paths import WEAPON_COMP_CLASS_PATH

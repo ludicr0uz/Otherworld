@@ -8,6 +8,8 @@ blink has to stop at full opacity.
     python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_hud_low_flash.py
 """
 
+SYSTEMS = ('hud',)
+
 import time
 
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH

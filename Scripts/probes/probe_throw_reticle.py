@@ -9,6 +9,8 @@ The keys are held and clicked as probe_throw.py does it (ThrowKeyForced,
 ThrowClickForced). The view is turned until the reticle rests on open ground.
 """
 
+SYSTEMS = ('throw',)
+
 import math
 
 import unreal

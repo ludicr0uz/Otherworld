@@ -18,6 +18,8 @@ well out of the zombies' sight, so nothing below is a hunt:
 Any profile on disk is set aside first, as probe_campfire.py does.
 """
 
+SYSTEMS = ('npc',)
+
 import os
 import shutil
 

@@ -17,6 +17,8 @@ floor of what a change costs; the figure is in Scripts/net/CLAUDE.md ("The
 inventory"). Only a window with no writes fails: the number is the result.
 """
 
+SYSTEMS = ('net', 'inventory')
+
 import time
 
 import unreal

@@ -24,6 +24,8 @@ What each stretch proves, read off the running anim instance
                   retargeter), as probe_metahuman_body measures it standing
 """
 
+SYSTEMS = ('animation', 'movement')
+
 import math
 
 import unreal

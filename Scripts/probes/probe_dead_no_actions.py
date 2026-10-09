@@ -17,6 +17,8 @@ Any profile on disk is set aside first and put back at the end: the player
 dies here, and death deletes the profile.
 """
 
+SYSTEMS = ('health',)
+
 import os
 import shutil
 

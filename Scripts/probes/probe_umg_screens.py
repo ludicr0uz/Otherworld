@@ -8,6 +8,8 @@ canvas when called this way; they are not what this probe is about.) State is
 set by writing the HUD's and the game's variables: a probe has no keyboard.
 """
 
+SYSTEMS = ('hud',)
+
 import os
 
 import unreal

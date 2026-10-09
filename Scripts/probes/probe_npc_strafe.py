@@ -13,6 +13,8 @@ next the probe samples where it stands and which way it faces:
     turns the way it runs again.
 """
 
+SYSTEMS = ('npc',)
+
 import math
 
 import unreal

@@ -9,6 +9,8 @@ draws, so the per-frame copy from BP_Settings onto the GameMode never runs and
 cannot overwrite it.
 """
 
+SYSTEMS = ('survival',)
+
 from combat.difficulty import DIFFICULTY_VAR, EASY, MEDIUM
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH
 from net.state_consts import GAME_STATE_BP_PATH

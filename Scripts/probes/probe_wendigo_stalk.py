@@ -18,6 +18,8 @@ moment it goes aggro until it has swung at them:
     swings.
 """
 
+SYSTEMS = ('npc',)
+
 import math
 
 import unreal

@@ -28,6 +28,8 @@ no server to disagree: each has its speed, a crouch its own, and stamina
 spent is off the bar. It is the check that the feel did not change.
 """
 
+SYSTEMS = ('net', 'movement')
+
 import math
 import os
 import re

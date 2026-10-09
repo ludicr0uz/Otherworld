@@ -22,6 +22,8 @@ cannot take back what the fire gives. Any profile on disk is set aside first,
 so the game starts on the issued loadout, and put back at the end.
 """
 
+SYSTEMS = ('survival',)
+
 import os
 import shutil
 

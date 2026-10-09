@@ -12,6 +12,8 @@ by probe_metahuman_body's own measure and tolerance. Then it puts the
 mannequin back and checks the body is on it again.
 """
 
+SYSTEMS = ('animation',)
+
 import unreal
 
 from asset_pipeline.gas_bridge_paths import (

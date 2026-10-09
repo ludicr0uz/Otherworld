@@ -28,6 +28,8 @@ Server event where the key is read: a Blueprint Server event called from
 Python is not sent.
 """
 
+SYSTEMS = ('net', 'survival')
+
 import time
 
 import unreal

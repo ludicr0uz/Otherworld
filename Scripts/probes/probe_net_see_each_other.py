@@ -16,6 +16,8 @@ The steps go round the board (probes/net.py), each mover posting where it is:
     client k   "jumped"   how high it rose, and it has landed
 """
 
+SYSTEMS = ('net',)
+
 import time
 
 import unreal

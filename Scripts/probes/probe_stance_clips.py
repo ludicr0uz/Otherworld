@@ -12,6 +12,8 @@ aimed chest, carried over from the procedural prone, put the hands 2 cm off
 the ground; this probe is what caught it.)
 """
 
+SYSTEMS = ('animation', 'movement')
+
 import unreal
 
 from combat.carry_tuning import RAISE_FORCED_VAR

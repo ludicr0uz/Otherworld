@@ -8,6 +8,8 @@ breath key. The breath is written short (Breath) rather than held for its
 whole 5 s, which a headless game's slow clock may not reach.
 """
 
+SYSTEMS = ('weapons',)
+
 from combat.breath_tuning import (
     BREATH_FORCED_VAR, BREATH_HELD_VAR, BREATH_HOLD_S, BREATH_SCALE_VAR,
     BREATH_SWAY_SCALE, BREATH_VAR, BREATH_WINDED_SCALE, WINDED_VAR,

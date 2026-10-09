@@ -11,6 +11,8 @@ the Tick wrote: each bed component's volume multiplier.
   - the wind is at 1 at both.
 """
 
+SYSTEMS = ('sound',)
+
 from world import world_config as cfg
 from Sound.sound_world import BEDS, BED_DAY_COMP, BED_NIGHT_COMP, BED_WIND_COMP
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH

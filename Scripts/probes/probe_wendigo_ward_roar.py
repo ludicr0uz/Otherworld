@@ -17,6 +17,8 @@ player keeps the fire turned on it except where it says otherwise:
     standing, and only then runs.
 """
 
+SYSTEMS = ('npc',)
+
 import math
 import os
 import shutil

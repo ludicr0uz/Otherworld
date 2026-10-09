@@ -30,6 +30,8 @@ and no new body comes. (The profile's delete is probe_profile's.)
 Join order varies, so a player is known by its player id, never by index.
 """
 
+SYSTEMS = ('net', 'health')
+
 import time
 
 import unreal

@@ -11,6 +11,8 @@ A sound can't be heard in a headless game; this reads what would play it:
     comes due (its patrol growls are its patrol's: npc/stats.py).
 """
 
+SYSTEMS = ('sound',)
+
 import math
 
 import unreal

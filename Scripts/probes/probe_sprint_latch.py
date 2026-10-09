@@ -11,6 +11,8 @@ Source/Otherworld, combat/player_move.py).
     key let go  the latch clears.
 """
 
+SYSTEMS = ('movement',)
+
 import math
 
 import unreal

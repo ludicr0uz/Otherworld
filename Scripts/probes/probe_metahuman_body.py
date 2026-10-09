@@ -10,6 +10,8 @@ fall (the jump clip), then dead, when the mannequin's ragdoll should carry
 the MetaHuman down with it.
 """
 
+SYSTEMS = ('animation',)
+
 import unreal
 
 from asset_pipeline.metahuman_paths import ABP_RETARGET

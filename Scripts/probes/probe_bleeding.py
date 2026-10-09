@@ -18,6 +18,8 @@ which is what OnHitChanceBonus is for. The full 3 minutes are not waited out;
 the effect's remaining time is read instead.
 """
 
+SYSTEMS = ('health', 'survival')
+
 import math
 
 import unreal

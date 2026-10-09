@@ -15,6 +15,8 @@ title up by hand under -nomenu; this is the real one.)
                        player walking, the issued loadout in the bag
 """
 
+SYSTEMS = ('title',)
+
 import unreal
 
 from graphics_menu import hud_vars as MV

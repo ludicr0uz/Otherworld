@@ -34,6 +34,8 @@ component's Tick turns into the Server events where the keys are read: a
 Blueprint Server event called from Python is not sent.
 """
 
+SYSTEMS = ('net', 'inventory')
+
 import time
 
 import unreal

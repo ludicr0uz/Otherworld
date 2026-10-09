@@ -11,6 +11,8 @@ harness gives a client no -nomenu), so that is the game's own rule
 so each side waits for it before it reports.
 """
 
+SYSTEMS = ('net',)
+
 import unreal
 
 from graphics_menu.umg_consts import GAME_STARTED_VAR

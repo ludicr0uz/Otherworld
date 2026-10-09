@@ -24,6 +24,8 @@ FireForced, ReloadForced and SightsForced stand in for the keys. The server
 gives both players health to spare: the shots draw the pack.
 """
 
+SYSTEMS = ('net',)
+
 import time
 
 import unreal

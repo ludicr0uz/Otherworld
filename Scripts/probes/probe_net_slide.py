@@ -21,6 +21,8 @@ replicated bSliding; that copy's pose is the weapon layers' PoseSlide, which
 this probe does not read.
 """
 
+SYSTEMS = ('net', 'movement')
+
 import math
 import time
 

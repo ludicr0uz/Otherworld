@@ -27,6 +27,8 @@ which go through the same events. Join order varies, so a player is known by
 its player id.
 """
 
+SYSTEMS = ('net',)
+
 import math
 import time
 

@@ -9,6 +9,8 @@ Saved/Screenshots/MacEditor/ for a look: the title page, the settings page
 and the game (the watermark beside the inventory strip).
 """
 
+SYSTEMS = ('hud',)
+
 import unreal
 
 from graphics_menu import legal_consts as L

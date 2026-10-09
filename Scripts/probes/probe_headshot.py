@@ -16,6 +16,8 @@ it is drawn is the graph's (graphics_menu/reticle_checks.py).
 FireForced stands in for the fire key. Any profile on disk is set aside first.
 """
 
+SYSTEMS = ('weapons',)
+
 import os
 import shutil
 

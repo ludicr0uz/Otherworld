@@ -19,6 +19,8 @@ With the wendigo row picked:
 monster_tuning.csv is set aside first and put back.
 """
 
+SYSTEMS = ('npc', 'menu')
+
 import shutil
 
 import unreal

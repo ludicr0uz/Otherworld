@@ -7,6 +7,8 @@ into the cone?": the probe steers the pawn each frame at an angle off its own
 forward and reads the flag back.
 """
 
+SYSTEMS = ('movement',)
+
 import math
 
 from combat.paths import WEAPON_COMP_CLASS_PATH

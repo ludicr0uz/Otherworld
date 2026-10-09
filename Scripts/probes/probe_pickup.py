@@ -15,6 +15,8 @@ Any profile on disk is set aside first, so the game starts on the issued
 loadout with room in the bag, and put back at the end.
 """
 
+SYSTEMS = ('inventory',)
+
 import math
 import os
 import shutil

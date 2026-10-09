@@ -21,6 +21,8 @@ midnight, to Saved/Screenshots/MacEditor: the only way to see the glimmer
 without playing.
 """
 
+SYSTEMS = ('inventory',)
+
 import os
 import shutil
 

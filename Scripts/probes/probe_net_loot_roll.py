@@ -22,6 +22,8 @@ Bodies are matched by NpcId, the number the server gives a wanderer: no actor
 name is shared between processes.
 """
 
+SYSTEMS = ('net', 'loot')
+
 import math
 import time
 

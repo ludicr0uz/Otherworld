@@ -26,6 +26,8 @@ That a wendigo with no fire in front of it hunts and swings as before is
 probes/probe_wendigo_stalk.py's.
 """
 
+SYSTEMS = ('npc',)
+
 import math
 import os
 import shutil

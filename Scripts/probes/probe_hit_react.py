@@ -6,6 +6,8 @@ probe writes it and Health, as a damage source would, and reads which clip
 the HitSlot plays (`anim.get_current_active_montage()`).
 """
 
+SYSTEMS = ('health',)
+
 import unreal
 
 from combat.anim_blueprint import HIT_SLOT

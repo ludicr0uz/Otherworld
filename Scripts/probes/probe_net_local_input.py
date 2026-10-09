@@ -16,6 +16,8 @@ all, each on that client's copy.
 Single player (`--game`) runs the standalone arm: the one character is local.
 """
 
+SYSTEMS = ('net',)
+
 import time
 
 import unreal

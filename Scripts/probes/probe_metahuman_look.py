@@ -15,6 +15,8 @@ Each picture lands in Saved/Screenshots/MacEditor, and the log says which
 numbers are which.
 """
 
+SYSTEMS = ('animation',)
+
 import os
 
 import unreal

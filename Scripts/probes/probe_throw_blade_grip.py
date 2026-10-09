@@ -5,6 +5,8 @@ weapon_component/throw_ready.py), and letting the key go puts the hammer grip
 back. The axe, which has no throw grip, stays in its own.
 """
 
+SYSTEMS = ('throw',)
+
 import unreal
 
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH

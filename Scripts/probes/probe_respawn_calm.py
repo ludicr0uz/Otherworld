@@ -14,6 +14,8 @@ record on the GameMode, and both are the old world's. The new pack must be
 out at its placed distance, patrolling, and still patrolling seconds later.
 """
 
+SYSTEMS = ('health',)
+
 import unreal
 
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH

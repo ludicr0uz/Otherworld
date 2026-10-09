@@ -13,6 +13,8 @@ here is a blow: the wanderer's TakeHit, naming the player's controller. The
 death nobody caused is still Health written to 0, as the world-floor net does.
 """
 
+SYSTEMS = ('health',)
+
 import unreal
 
 from combat import health_vars as HV

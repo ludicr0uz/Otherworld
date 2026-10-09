@@ -12,6 +12,8 @@ fed each frame and the turn it gives is read back off the control rotation.
 The scope's case is the positive one: there the turn must be smaller.
 """
 
+SYSTEMS = ('menu',)
+
 import math
 
 import unreal

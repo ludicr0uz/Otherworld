@@ -21,6 +21,8 @@ Nothing spawns here, so the campfire, the ammunition box and a dead
 wanderer's replacement are held by the verifiers' checks of their graphs.
 """
 
+SYSTEMS = ('net',)
+
 import unreal
 
 from net import players_consts as P

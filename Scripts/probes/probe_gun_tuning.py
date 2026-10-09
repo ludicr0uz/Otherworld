@@ -23,6 +23,8 @@ verifier's. With the shotgun issued:
 gun_tuning.csv and any saved profile are set aside first and put back.
 """
 
+SYSTEMS = ('weapons', 'menu')
+
 import os
 import shutil
 

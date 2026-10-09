@@ -13,6 +13,8 @@ another built table is left alone.
 The slot is boot.py's to clear and put back (probes/kept_slots.py).
 """
 
+SYSTEMS = ('menu',)
+
 import os
 
 import unreal

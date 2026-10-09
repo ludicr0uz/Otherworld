@@ -13,6 +13,8 @@ was written, and a run that has one should set it aside first
 (probe_dead_no_actions.py does).
 """
 
+SYSTEMS = ('animation',)
+
 import unreal
 
 from combat import health_vars as HV

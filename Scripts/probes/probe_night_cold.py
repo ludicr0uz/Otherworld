@@ -13,6 +13,8 @@ against game time, not wall clock.
   - a huge rate stops at 0, not below.
 """
 
+SYSTEMS = ('survival',)
+
 from survival.paths import SURVIVAL_CLASS_PATH
 from world import world_config as cfg
 from world.day_night_blueprint import NIGHT_COLD_VAR

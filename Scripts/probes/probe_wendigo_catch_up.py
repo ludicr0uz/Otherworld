@@ -17,6 +17,8 @@ probes/probe_wendigo_fled.py):
 That the hunt itself is as it was is probes/probe_wendigo_stalk.py's.
 """
 
+SYSTEMS = ('npc',)
+
 import math
 
 import unreal

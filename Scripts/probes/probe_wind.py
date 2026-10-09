@@ -16,6 +16,8 @@ has no keyboard). A nudge saves the player's graphics, so their save
 What the wind looks like needs a rendered run: a headless one draws nothing.
 """
 
+SYSTEMS = ('world',)
+
 import os
 import shutil
 

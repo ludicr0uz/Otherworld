@@ -19,6 +19,8 @@ each frame; probe_sprint_latch.py runs one.
 player_tuning.csv is set aside first and put back.
 """
 
+SYSTEMS = ('menu',)
+
 import shutil
 
 import unreal

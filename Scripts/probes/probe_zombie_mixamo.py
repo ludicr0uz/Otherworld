@@ -7,6 +7,8 @@ running, and put beside the player it swings -- and the montage its swing
 plays is built from the Mixamo attack, not the mannequin's MM_Attack_01.
 """
 
+SYSTEMS = ('npc',)
+
 import unreal
 
 BESIDE_CM = 100.0     # well inside the touch range and the melee range

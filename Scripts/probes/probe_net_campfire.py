@@ -30,6 +30,8 @@ probe_campfire.py, probe_chop_tree.py, probe_lit_stick.py and
 probe_hot_blade.py, through the same events.
 """
 
+SYSTEMS = ('net', 'survival')
+
 import time
 
 import unreal

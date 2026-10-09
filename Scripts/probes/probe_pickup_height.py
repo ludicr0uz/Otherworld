@@ -11,6 +11,8 @@ where it is put. Any profile on disk is set aside and put back, as in
 probe_pickup.py.
 """
 
+SYSTEMS = ('inventory',)
+
 import os
 import shutil
 

@@ -43,6 +43,8 @@ Saved/Screenshots/MacEditor/.
         --probe Scripts/probes/probe_graphics_tuning.py
 """
 
+SYSTEMS = ('menu',)
+
 import os
 import shutil
 

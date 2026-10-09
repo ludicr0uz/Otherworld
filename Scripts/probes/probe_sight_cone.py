@@ -12,6 +12,8 @@ straight after its DrawDebugCone (npc/sight_cone.py).
   - debug mode off: the stamps stop.
 """
 
+SYSTEMS = ('weapons',)
+
 import unreal
 
 from combat.game_state import DEBUG_MODE_VAR

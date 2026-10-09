@@ -26,6 +26,8 @@ The hat and the fire are what M23 and M25 proved for players who were there
 (probe_net_take.py, probe_net_campfire.py); this is the one who was not.
 """
 
+SYSTEMS = ('net',)
+
 import time
 
 import unreal

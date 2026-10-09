@@ -15,6 +15,8 @@ gates the spawn.
 component marks itself Dead to the frame the counter moves.
 """
 
+SYSTEMS = ('health',)
+
 import unreal
 
 from combat.game_state import SPAWN_COUNT_VAR

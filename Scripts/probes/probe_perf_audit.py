@@ -14,6 +14,8 @@ The spot is the tree with the most neighbours within 35 m, viewed from 6 m
 back, so it is the same place for the same tree scatter (seed), whatever the
 tree meshes are.
 """
+
+SYSTEMS = ('load',)
 import json
 import math
 import os

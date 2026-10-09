@@ -50,6 +50,8 @@ MAX_ROUNDS = 5
 SIGHTS_SPREAD_DEG = 0.1     # the cloud down the sights: none
 SPARE_HEALTH = 100000.0
 GUN_NEAR_CM = 60.0
+GUN_WAIT = 6.0              # seconds the server's gun has to be seen there...
+GUN_SAME_CM = 10.0          # ...and the wait ends early on one this near
 HAND_MOVED_CM = 10.0
 
 
@@ -159,9 +161,20 @@ def probe_server(p):
             f"server {now}, client 1 {(loaded, reserve)}; it started at {start}")
     p.check("the server answered every ask client 1 sent",
             _asks(p, wc)[1] == sent, f"served {_asks(p, wc)[1]}, sent {sent}")
-    off = (held.get_actor_location() - unreal.Vector(*gun_at)).length()
+    # Not at one instant: a wanderer's blow drops the gun to the hip for a second
+    # (the hit reaction takes the ready pose's slot until the keepalive replays
+    # it), on each machine in its own moment, and client 1 posted where its gun
+    # was in one of the two. The server's gun is to come there.
+    near = [float("inf")]
+
+    def beside():
+        near[0] = min(near[0], (held.get_actor_location() - unreal.Vector(*gun_at)).length())
+        return near[0] < GUN_SAME_CM
+
+    yield _await(lambda: stand() or beside(), GUN_WAIT)
     p.check(f"the server's gun is where client 1's is (within {GUN_NEAR_CM:g} cm): "
-            "the shot leaves the server's muzzle", off < GUN_NEAR_CM, f"{off:.0f} cm apart")
+            "the shot leaves the server's muzzle", near[0] < GUN_NEAR_CM,
+            f"{near[0]:.0f} cm apart at the nearest")
 
     p.check("the server saw client 1 aim down the sights, and its own cloud for the "
             "gun closed: the shot is drawn in the server's cloud, not a client's",

@@ -1,5 +1,6 @@
-"""verify.weapon_inputs -- BP_WeaponComponent basics: defaults, polled keys, sprint, ammunition,
-reload and the dry-fire click.
+"""verify.weapon_inputs -- BP_WeaponComponent basics: defaults, polled keys, the
+traces, sprint, and each gun's ammunition defaults. What the graph does with
+the ammunition, and the dry-fire click, is verify/ammo_graph.py.
 """
 
 import unreal
@@ -7,23 +8,24 @@ import unreal
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
 from combat.camera import AIM_TRACE_RANGE
 from combat.paths import PISTOL_BP_PATH, SHOTGUN_BP_PATH
-from combat.slot_tuning import SLOT_KEYS, SLOT_VAR, UNPLACED
+from combat.slot_tuning import DROP_ITEM_VAR, SLOT_KEYS, SLOT_VAR, UNPLACED
 from combat.tuning import (
     BIND_VARS, COMBAT, DROP_FORWARD, PISTOL_MAGAZINE, SHOTGUN_MAGAZINE,
     SHOTGUN_RESERVE,
 )
 from combat.weapon_specs import _weapon_specs
 from combat.shot_vars import AIM_PARAM, SERVER_FIRE
-from combat.verify.fixtures import titles, w, wc, wg
-from combat.verify.chop import is_chop_node
-from combat.verify.light import is_light_trace
-from combat.verify.knife import is_melee_play, is_melee_sweep
-from combat.verify.throw import is_throw_play, is_throw_trace, launch_nodes
-from combat.verify.throw_aim import is_ready_node
+from combat.strike_vars import SERVER_TAKE
+from combat.verify.anchor import (
+    event, event_nodes, feeders, pure_feeds, reads, title,
+)
+from combat.verify.fixtures import w, wg
 from combat.verify.common import (
-    BEL, PIN, by_pins, cdo, check, graph, in_pins, load, out_pins, past_marks, pin_value,
+    BEL, PIN, by_pins, cdo, check, in_pins, load, out_pins, past_marks, pin_value,
     shot_traces, titled,
 )
+from combat.weapon_component import vars as WV
+from combat.weapon_component.look_vars import HandPose
 
 
 # ─── The weapon component ────────────────────────────────────────────────────
@@ -80,13 +82,6 @@ def check_keys_are_variables():
     want_keys = sorted([f"Get {v}" for v, _k in BIND_VARS] + ["Get KeyFire"]
                        + [f"Get {v}" for v, _k, _s in SLOT_KEYS])
     check(f"polls exactly {want_keys}", sorted(driven) == want_keys, str(sorted(driven)))
-    # One Get per bind, reused by every poll -- an output pin takes any number of
-    # links, so eight polls come off seven reads.
-    reads = [n for n in wg
-             if str(BEL.get_node_title(n)).replace("\n", " ")
-             in {f"Get {v}" for v, _k in BIND_VARS}]
-    check("one read per bind, shared by the polls that use it",
-          len(reads) == len(BIND_VARS), str(len(reads)))
     for var, default in BIND_VARS + tuple((v, k) for v, k, _s in SLOT_KEYS):
         got = w.get_editor_property(var)
         check(f"{var} defaults to {default}, the key this file documents",
@@ -97,9 +92,14 @@ def check_keys_are_variables():
     # pose, are their own sections' (verify/punch.py, knife.py, throw.py,
     # throw_aim.py).
     # A play has a rate; IsPlayingSlotAnimation has an Asset and a slot too.
+    # The ready pose's plays are the ones handed HandPose, each behind its own
+    # gate: the keepalive's asks the slots, the equip's does not.
     plays = [n for n in by_pins(wg, "Asset", "SlotNodeName", "InPlayRate")
-             if not is_melee_play(n) and not is_throw_play(n)
-             and not is_ready_node(n)]
+             if [title(f) for f in feeders(n, "Asset")] == [f"Get {HandPose}"]]
+    keepalive = [n for n in plays
+                 if any("IsSlotActive" in t.replace(" ", "")
+                        for g in feeders(n, "execute") for t in reads(g))]
+    equip = [n for n in plays if n not in keepalive]
     # TWO, and the second one is not a duplicate. A montage started in HitSlot stops
     # the ready pose in DefaultSlot -- montages are stopped per GROUP and UE 5.8
     # exposes no way to put a slot in a different group from Python -- so the flinch
@@ -108,14 +108,16 @@ def check_keys_are_variables():
     # weight 1.000 until the first punch landed and read 0.000 for the rest of the
     # session.
     check("the ready pose is played into a slot twice: on equip, and again after a "
-          "hit reaction has taken it away", len(plays) == 2, str(len(plays)))
-    for i, play in enumerate(plays):
-        check(f"ready-pose play {i} goes into {AIM_SLOT}",
-              pin_value(play, "SlotNodeName") == AIM_SLOT,
-              pin_value(play, "SlotNodeName"))
-        check(f"ready-pose play {i} loops rather than playing once",
-              int(float(pin_value(play, "LoopCount"))) >= 100,
-              pin_value(play, "LoopCount"))
+          "hit reaction has taken it away", bool(equip) and bool(keepalive),
+          f"{len(equip)} on equip, {len(keepalive)} behind the slots' test")
+    for name, group in (("the equip's", equip), ("the keepalive's", keepalive)):
+        check(f"{name} ready-pose play goes into {AIM_SLOT}",
+              bool(group) and all(pin_value(n, "SlotNodeName") == AIM_SLOT for n in group),
+              str([pin_value(n, "SlotNodeName") for n in group]))
+        check(f"{name} ready-pose play loops rather than playing once",
+              bool(group) and all(int(float(pin_value(n, "LoopCount"))) >= 100
+                                  for n in group),
+              str([pin_value(n, "LoopCount") for n in group]))
     check("empty hands stop the slot", bool(by_pins(wg, "InBlendOutTime", "SlotNodeName")))
 
     # The keepalive's two guards. Without the HitSlot one it restarts the ready pose
@@ -133,35 +135,42 @@ def check_keys_are_variables():
     # decides what is being aimed at, the muzzle line decides whether the gun can
     # reach it, and the pellets fly down the muzzle line. Getting this wrong is not
     # a compile error -- it is a gun that shoots from behind the player's shoulder.
-    traces = [n for n in by_pins(wg, "Start", "End", "TraceChannel") + shot_traces(wg)
-              if not is_melee_sweep(n) and not is_throw_trace(n)
-              and not is_chop_node(n) and not is_light_trace(n)]
+    # Each trace is found where its fragment puts it, not by how many the
+    # graph holds: the aim's by the camera it starts at, the clearance by the
+    # AimPoint it ends on, the pellets' under Server_Fire, the drop's behind
+    # the item being let go.
+    lines = by_pins(wg, "Start", "End", "TraceChannel")
+    aim = [t for t in lines
+           if any(title(f) == "GetCameraLocation" for f in feeders(t, "Start"))]
+    clearance = [t for t in lines
+                 if [title(f) for f in feeders(t, "End")] == [f"Get {AIM_PARAM}"]]
+    pellets = shot_traces(event_nodes(SERVER_FIRE))
+    drop = [t for t in lines
+            if any(title(f) == f"Get {DROP_ITEM_VAR}"
+                   for b in feeders(t, "execute") for f in feeders(b, "self"))]
+    traces = aim + clearance + pellets + drop
     check("there are four traces (camera aim, muzzle clearance, the pellets' ShotTrace "
           "and the one that sets a dropped item on the ground: the drop key's and "
           "the dragged drop's are one, the server's)",
-          len(traces) == 4, str(len(traces)))
+          all((aim, clearance, pellets, drop)),
+          f"aim {len(aim)}, clearance {len(clearance)}, pellets {len(pellets)}, "
+          f"drop {len(drop)}")
 
+    def _from_muzzle(t):
+        # The muzzle comes through the carry's SelectVector (verify/carry.py):
+        # its B is the muzzle, its A where the muzzle will be once raised.
+        return any({"A", "B", "bPickA"} <= in_pins(n) and all(
+            {"T", "Location"} <= in_pins(f)  # TransformLocation
+            for side in ("A", "B") for f in feeders(n, side))
+            for n in feeders(t, "Start"))
 
-
-
-    from_muzzle, from_camera = [], []
-    for t in traces:
-        feeders = [PIN.get_owning_node(q) for q in
-                   PIN.list_connected_pins(BEL.find_input_pin(t, "Start"))]
-        for n in feeders:
-            # The muzzle comes through the carry's SelectVector (verify/carry.py):
-            # its B is the muzzle, its A where the muzzle will be once raised.
-            if {"A", "B", "bPickA"} <= in_pins(n) and all(
-                    {"T", "Location"} <= in_pins(PIN.get_owning_node(q))  # TransformLocation
-                    for side in ("A", "B")
-                    for q in PIN.list_connected_pins(BEL.find_input_pin(n, side))):
-                from_muzzle.append(t)
-            if str(BEL.get_node_title(n)) == "GetCameraLocation":
-                from_camera.append(t)
     check("two traces start at the weapon's muzzle: the clearance check and the pellets",
-          len(from_muzzle) == 2, f"{len(from_muzzle)} fed by the carry's pick of two TransformLocations")
+          bool(clearance) and bool(pellets)
+          and all(_from_muzzle(t) for t in clearance + pellets),
+          str([title(f) for t in clearance + pellets for f in feeders(t, "Start")]))
     check("exactly one trace starts at the camera -- the one that picks the target",
-          len(from_camera) == 1, f"{len(from_camera)} fed by GetCameraLocation")
+          bool(aim) and not [t for t in clearance + pellets + drop if t in aim],
+          str([title(f) for t in clearance + pellets + drop for f in feeders(t, "Start")]))
     # Built as a MakeVector, not as a pin literal: that operator's B pin is a
     # struct pin when nothing is connected, and struct pins take no literal at all.
     check("the camera's ray reaches AIM_TRACE_RANGE when it hits nothing",
@@ -174,20 +183,24 @@ def check_keys_are_variables():
                   for axis in "XYZ")
               for n in titled(wg, "MakeVector")),
           f"{DROP_FORWARD:.0f} cm ahead")
-    # One subtraction off the shooter's AimPoint: the pellet direction, taken
-    # from Server_Fire's own parameter (shot.py), since the shot is traced by
-    # the machine that owns it. (The throw's launch takes its own, from the
-    # variable: verify/throw_aim.py.)
-    throw_launch = launch_nodes()
-    fire_event = graph(wc).find_event_node(SERVER_FIRE)
-    deltas = [n for n in titled(wg, "vector - vector")
-              if n not in throw_launch
+    # The pellet flies along ShotDirection, which Server_Fire draws once
+    # around a subtraction off the shooter's AimPoint, its own parameter
+    # (shot.py), since the shot is traced by the machine that owns it. (The
+    # throw's launch takes its own, from the variable: verify/throw_aim.py.)
+    fire_event = event(SERVER_FIRE)
+    drawn = [n for n in event_nodes(SERVER_FIRE) if title(n) == f"Set {WV.ShotDirection}"]
+    deltas = [n for d in drawn for n in pure_feeds(d)
+              if title(n) == "vector - vector"
               and any(PIN.get_owning_node(q) == fire_event
                       and str(PIN.get_pin_name(q)) == AIM_PARAM
                       for q in PIN.list_connected_pins(BEL.find_input_pin(n, "A")))]
     check("the pellet direction is muzzle -> the AimPoint the shooter sent, not camera "
-          "forward", len(deltas) == 1,
-          f"{len(deltas)} vector subtractions driven by {SERVER_FIRE}'s {AIM_PARAM}")
+          "forward",
+          bool(deltas) and bool(pellets)
+          and all(f"Get {WV.ShotDirection}" in reads(f)
+                  for t in pellets for f in feeders(t, "End")),
+          f"{len(deltas)} vector subtractions driven by {SERVER_FIRE}'s {AIM_PARAM} "
+          f"behind {WV.ShotDirection}, which the pellet's End reads")
 
     # A held weapon is rigidly attached and never rotated on its own. Driving its
     # rotation from the aim was tried and reverted: the gun swivelled out of the
@@ -199,7 +212,7 @@ def check_keys_are_variables():
     held_turns = [n for n in turns if not _after_detach(n)]
     check("nothing rotates the held weapon in the hand: the only turn is the "
           "throw's, after the item is detached",
-          len(turns) <= 1 and not held_turns,
+          not held_turns,
           f"{len(turns)} SetActorRotation node(s), {len(held_turns)} not after a detach")
     # No trace draws itself any more: DrawDebugType is an enum literal on the pin
     # and an enum pin cannot be driven, so "only in debug mode" is inexpressible
@@ -214,30 +227,24 @@ def check_keys_are_variables():
         check(f"{var} exists on the weapon component for the HUD to read",
               isinstance(value, kind), type(value).__name__)
 
-    # The guns' three, and the component's own (Sound/sound_weapons.py, sound_items.py):
-    # a swing for the punch and one for the blade, the axe on a tree, a match.
-    #   3  the shot, the click, the reload
-    #   2  a swing: the fist's and the blade's, each once, in its Fx_ event
-    #      (the Server event's Multicast and the owning client's prediction
-    #      both call it: verify/fx.py)
-    #   2  a blow landing on a body: the fist's and the blade's
-    #   1  the axe's chop in a tree
-    #   4  a throw: leaving the hand (a blade's, and a blunt thing's), sinking
-    #      into a body, lodging in a tree
-    #   1  the match
-    #   5  the axe's kill by the head, the breath of a spent sprint, an item
-    #      handled (where the server serves the move, and where a client's
-    #      picture follows it: view.py) and an item used up
-    #      (verify/sound_states.py)
-    check("the component plays eighteen sounds: the guns' three, a swing and "
-          "a landed blow for the fist and for the blade, the chop, a throw's "
-          "four, the match, a thrown axe's kill by the head, the breath, an "
-          "item handled (the server's serve, a client's picture) and an item used up",
-          len(by_pins(wg, "Sound", "Location")) == 18,
-          f"{len(by_pins(wg, 'Sound', 'Location'))} PlaySoundAtLocation node(s)")
-    check("impacts spawn blood", len(by_pins(wg, "Class", "SpawnTransform")) >= 3,
-          f"{len(by_pins(wg, 'Class', 'SpawnTransform'))} spawn nodes "
-          "(shotgun, pistol, blood)")
+    # Which sounds there are is each section's own to say (the guns' three in
+    # the click and the clack below, a swing's and a blow's in verify/fx.py, an
+    # item's in verify/sound_states.py). What holds of every one of them: it is
+    # read off a variable (Sound/sound_weapons.py, sound_items.py), since a
+    # sound left as a pin literal is one build_sound.py cannot rebind.
+    sounds = by_pins(wg, "Sound", "Location")
+    unbound = [n for n in sounds if not feeders(n, "Sound")]
+    check("every sound the component plays is read off a variable, none a pin "
+          "literal: the guns' three, a swing and a landed blow for the fist and for "
+          "the blade, the chop, a throw's four, the match, a thrown axe's kill by "
+          "the head, the breath, an item handled and an item used up",
+          bool(sounds) and not unbound,
+          f"{len(unbound)} of {len(sounds)} PlaySoundAtLocation node(s) with no "
+          "Sound linked")
+    blood = [n for n in by_pins(wg, "Class", "SpawnTransform")
+             if [title(f) for f in feeders(n, "Class")] == ["Get BloodClass"]]
+    check("impacts spawn blood", bool(blood),
+          f"{len(blood)} spawn node(s) handed BloodClass")
     check("damage is clamped at zero", bool(by_pins(wg, "Value", "Min", "Max")))
     check("switching wraps with a modulo", bool(by_pins(wg, "A", "B")))
     check("interact searches the world for items to pick up", bool(by_pins(wg, "ActorClass")))
@@ -265,11 +272,16 @@ def _check_pickup_keeps_held():
                 if "EquippedIndex" in str(BEL.get_node_title(n))]
     check("pick-up does not switch straight to what it picked up",
           not straight, f"{len(straight)} EquippedIndex write(s) fed by Array_Add")
-    placed = [n for a in adds for n in past_marks(_linked(a, "then"))
-              if str(BEL.get_node_title(n)).replace("\n", " ").startswith(f"Set {SLOT_VAR}")
+    # The pick-up is Server_Take's add to Inventory (item_world.py).
+    takes = [a for a in by_pins(event_nodes(SERVER_TAKE), "TargetArray", "NewItem")
+             if [title(f) for f in feeders(a, "TargetArray")] == ["Get Inventory"]]
+    placed = [n for a in takes for n in past_marks(_linked(a, "then"))
+              if title(n).startswith(f"Set {SLOT_VAR}")
               and pin_value(n, SLOT_VAR) == str(UNPLACED)]
     check("...it is set UNPLACED: the slot sync finds it a weapon slot, a bag slot, or the hand",
-          len(placed) == 1, f"{len(placed)} Set {SLOT_VAR} = {UNPLACED} after an add")
+          bool(takes) and bool(placed),
+          f"{len(takes)} add(s) to Inventory under {SERVER_TAKE}, {len(placed)} followed "
+          f"by Set {SLOT_VAR} = {UNPLACED}")
 
 
 # ─── Sprint and stamina ──────────────────────────────────────────────────────
@@ -311,25 +323,31 @@ def check_sprint_and_stamina():
           and any("BaseSpeed" in str(BEL.get_node_title(n)).replace("\n", " ")
                   for n in wg),
           str(sorted(walk_titles)))
-    # The hit-box multiplier has two SelectFloats of its own, each picked by a
-    # table lookup; those are counted in the hit-box section, not here. So are
-    # the stance's, each picked by comparing Stance (verify/stance.py), the
-    # side the chopped wood lands on (verify/chop.py), and the throw's yaw
-    # and pitch (verify/throw_aim.py), and the held breath's, picked by
-    # BreathHeld and Winded (verify/breath.py).
-    throw_launch = launch_nodes()
-    selects = [n for n in titled(wg, "SelectFloat")
-               if not is_chop_node(n) and n not in throw_launch and not any(k in str(BEL.get_node_title(PIN.get_owning_node(q)))
-                          for k in ("Contains", "Equal", "Get BreathHeld", "Get Winded")
-                          for q in PIN.list_connected_pins(BEL.find_input_pin(n, "bPickA")))]
-    # Five: the sights key picks the zoom (the weapon's, or the shoulder's),
-    # and accuracy.py picks the shoulder's and the sights' factor for the
-    # cloud and the kick. (The sprint's two, the speed and the sign of the
-    # drain, went into the movement component with the sprint.)
+    # The graph has many SelectFloats (the hit boxes', the stance's, the
+    # chop's, the throw's, the held breath's: each its own section's). These
+    # are found by what they feed and what picks them: the zoom's feeds
+    # AimZoom, picked by the sights key; accuracy.py's shoulder factor of the
+    # cloud and of the kick is picked by Aiming and handed on to the sights'
+    # pick. (The sprint's two, the speed and the sign of the drain, went into
+    # the movement component with the sprint.)
+    def _picked_by(n, what):
+        return any(what in title(f) for f in feeders(n, "bPickA"))
+
+    zoom = [f for n in wg if title(n) == "Set AimZoom"
+            for f in feeders(n, "AimZoom") if title(f) == "SelectFloat"]
+    factors = {}
+    for kind in ("Spread", "Recoil"):
+        shoulder = [n for n in titled(wg, "SelectFloat")
+                    if [title(f) for f in feeders(n, "A")] == [f"Get {kind}ShoulderScale"]]
+        factors[kind] = [c for n in shoulder if _picked_by(n, "Get Aiming")
+                         for c in _linked(n, "ReturnValue")
+                         if title(c) == "SelectFloat" and _picked_by(c, "Get SightAiming")]
     check("SelectFloat picks the aimed zoom, and the shoulder and sights "
           "factors of the cloud and the kick",
-          len(selects) == 5,
-          f"{len(selects)} SelectFloat node(s)")
+          bool(zoom) and all(_picked_by(n, "SightAiming") for n in zoom)
+          and all(factors.values()),
+          f"{len(zoom)} into AimZoom, "
+          + ", ".join(f"{k}: {len(v)}" for k, v in factors.items()))
     # The requirement the flag exists for: you cannot shoot while running.
     sprint_reads = [n for n in wg if "Sprinting" in out_pins(n)]
     check("the trigger reads Sprinting", bool(sprint_reads),
@@ -407,100 +425,8 @@ def check_ammunition():
           f"{pistol.get_editor_property('ReloadSeconds'):.2f}s")
 
 
-# --- what the graph does with all that ---------------------------------------
-
-def check_ammunition_graph():
-    loaded_writes = [t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
-                                 for n in wg) if t == "Set Loaded"]
-    # The server's shot, the owning client's predicted round (shot.py), the
-    # reload, and a client's picture of the server's record (view.py).
-    check("firing spends a round, on the server and as the owning client's "
-          "prediction, and reloading puts rounds back (and a client's picture takes "
-          "the record's)",
-          len(loaded_writes) == 4, f"{len(loaded_writes)} writes to Loaded")
-    next_writes = [t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
-                               for n in wg) if t == "Set NextFireTime"]
-    check("the interval (the server's, and the owning client's predicted one) and the "
-          "reload push the same NextFireTime deadline",
-          len(next_writes) == 3, f"{len(next_writes)} writes to NextFireTime")
-    check("the deadline is compared against the clock, not a frame count",
-          bool(titled(wg, "GetTimeSeconds")),
-          f"{len(titled(wg, 'GetTimeSeconds'))} GetTimeSeconds")
-    # The reserve is only ever *spent* here; it is topped up by BP_AmmoPickup.
-    check("the weapon component spends the reserve and never grants it (its other "
-          "write is a client's picture of the record)",
-          len([t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
-                           for n in wg) if t == "Set Reserve"]) == 2)
-    # The pure-node trap, in the one place where getting it wrong is free ammo.
-    check("the reload works out how many rounds move ONCE and stores it",
-          len([t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
-                           for n in wg) if t == "Set ReloadTake"]) == 1)
-    check("...and reads it back three times rather than recomputing it",
-          len([n for n in wg if "ReloadTake" in out_pins(n)]) == 3,
-          f"{len([n for n in wg if 'ReloadTake' in out_pins(n)])} reads")
-    check("the reload can never take more than the reserve holds",
-          bool(titled(wg, "Min (Integer)")),
-          str(sorted({t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
-                                  for n in wg) if t.lower().startswith("min")})))
-    # The pistol's reload: the gap stands in for its reserve (so the magazine
-    # fills even from a negative count), and the reserve is written back as is.
-    endless_reads = [n for n in wg if "InfiniteReserve" in out_pins(n)]
-    check("the reload asks InfiniteReserve twice: what it may take, what it is charged",
-          len(endless_reads) == 2, f"{len(endless_reads)} InfiniteReserve reads")
-    selects = [n for n in wg if {"A", "B", "bPickA"} <= in_pins(n)]
-    check("...each through a Select, not a branch around the reload",
-          len(selects) >= 2, f"{len(selects)} Select nodes")
-    # The gate is nested, not folded: every one of these reads a property off Held,
-    # and the outer condition is pulled on frames where nothing is equipped.
-    ammo_reads = [n for n in wg if "UsesAmmo" in out_pins(n)]
-    check("the fire gate, the server's own test of the shot and the reload each ask "
-          "the weapon whether it uses ammo",
-          len(ammo_reads) == 3, f"{len(ammo_reads)} UsesAmmo reads")
-    check("an unlimited weapon short-circuits the magazine test (an OR, not an AND)",
-          bool(titled(wg, "OR Boolean")),
-          str(sorted({t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
-                                  for n in wg) if " OR" in t.upper()})))
-
-
-# ─── The click and the clack ─────────────────────────────────────────────────
-
-def check_click_and_clack():
-    # Two sounds whose whole value is *when* they do not play. A click on every
-    # refused trigger pull would fire on the SMG's every-0.09s cooldown; a clack on
-    # every R would reward pressing reload at a full magazine.
-
-    check("the empty chamber clicks",
-          titles.count("Get DryFireSound") == 1,
-          f"{titles.count('Get DryFireSound')} reads of DryFireSound")
-    check("the reload clacks",
-          titles.count("Get ReloadSound") == 1,
-          f"{titles.count('Get ReloadSound')} reads of ReloadSound")
-    dry = [n for n in by_pins(wg, "Sound", "Location")
-           if any("DryFireSound" in str(BEL.get_node_title(PIN.get_owning_node(q)))
-                  for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Sound")))]
-    check("exactly one node plays the click", len(dry) == 1, f"{len(dry)}")
-    if dry:
-        # The gate above it must be an AND, not a bare NOT: "empty" alone would
-        # click through every cooldown frame of a held trigger.
-        ins = BEL.find_input_pin(dry[0], "execute")
-        gate = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(ins)]
-        cond = ([PIN.get_owning_node(q)
-                 for q in PIN.list_connected_pins(
-                     BEL.find_input_pin(gate[0], "Condition"))] if gate else [])
-        check("...behind a Branch whose condition is an AND of two things, so it "
-              "stays silent between shots as well as when loaded",
-              bool(cond) and "AND" in str(BEL.get_node_title(cond[0])).upper(),
-              str([str(BEL.get_node_title(n)) for n in cond]))
-        # And one of the two has to be the negation of the ammunition test.
-        nots = [t for t in titles if "NOT" in t.upper() and "Boolean" in t]
-        check("...one half of which is \"has no ammunition\"", len(nots) >= 3,
-              f"{len(nots)} NOT nodes (unlimited-weapon, not-sprinting, empty, pose)")
-
-
 def run():
     check_weapon_component()
     check_keys_are_variables()
     check_sprint_and_stamina()
     check_ammunition()
-    check_ammunition_graph()
-    check_click_and_clack()

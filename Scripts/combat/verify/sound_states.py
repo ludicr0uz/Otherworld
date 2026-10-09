@@ -11,7 +11,7 @@ from combat.chop_tuning import CHOPS_VAR
 from combat.paths import FOOTSTEP_BP_PATH, MATCHES_BP_PATH, STICK_BP_PATH, WOOD_BP_PATH
 from combat.verify.common import BEL, by_pins, cdo, check, graph, load, num_pin, pin_value
 from combat.verify.fixtures import _eas, hg, wg
-from combat.verify.throw_strike import _feeders, _pure_feeds
+from combat.verify.anchor import feeders as _feeders, pure_feeds as _pure_feeds
 from combat.verify import fx as fxv
 from combat import fx_vars as FX
 from combat.weapon_component import vars as WV

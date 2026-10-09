@@ -255,9 +255,9 @@ def check_weapon_drop():
         while frontier and hops < 400 and not guarded:
             node = frontier.pop(0)
             hops += 1
-            if id(node) in seen:
+            if node.get_path_name() in seen:
                 continue
-            seen.add(id(node))
+            seen.add(node.get_path_name())
             if "Branch" in str(BEL.get_node_title(node)).replace("\n", " "):
                 cond = BEL.find_input_pin(node, "Condition")
                 if cond and cond.is_valid() and any(
@@ -304,9 +304,9 @@ def check_who_drops():
             if not feeders:
                 break
             node = feeders[0]
-            if id(node) in seen:
+            if node.get_path_name() in seen:
                 break
-            seen.add(id(node))
+            seen.add(node.get_path_name())
             title = str(BEL.get_node_title(node)).replace("\n", " ")
             if "Branch" in title:
                 cond = BEL.find_input_pin(node, "Condition")

@@ -404,6 +404,38 @@ weapons build. `verify/gas_moves.py` checks each switch both ways,
   steps 122 s (the weapon component is nearly all of it); `--only blood,knife` 1.9 s.
 - A new builder is a new function and a row in `STEPS`, in the order it must run.
 
+## Verifiers mirror builders: anchor, never count the graph
+
+A check that counts a kind of node over the whole graph ("`Loaded` is written four times",
+"exactly one node plays the click", "18 PlaySoundAtLocation nodes") fails the day another
+feature legitimately adds one, and says nothing about where its own are. Every task used to
+reword 5 to 15 of them. A new check **starts from something with a name and says what is
+wired there** (`verify/anchor.py`; V4 did `weapon_inputs.py`, `ammo_graph.py` and
+`throw_strike.py`; the other sections still count: convert a count when it breaks,
+don't re-count it).
+
+- **The anchor is a name the builder gave**: an event (`event_nodes(SERVER_FIRE)`: what it
+  runs and the pure nodes feeding those), a variable's read or write (`Get HandPose` on a
+  play's `Asset`, `Set NextFireTime` under `ReloadNow`), a cosmetic's pair
+  (`verify/fx.nodes_of`, `calls`), a fragment's entry (the throw stage's gate behind the
+  emptying of `ThrowPast`).
+- **From there, step along links** (`feeders(node, pin)`, `runs(node, "then")`,
+  `pure_feeds`, `reads`) and assert what each step finds: its title, what feeds its pins,
+  which arm it is on. `throw_strike._walk` is the model for a fragment: each node is the
+  one the step before it runs, and a check says what it must be.
+- **`the(nodes)`** is the node a step arrives at, `None` for none or several. Use it on
+  what is linked at an anchor's pin; `the([n for n in wg if ...])` is the count again.
+- **"Only" and "never" are `all(...)` / `not [...]`** over what the anchor reaches
+  ("every trace that ignores `ThrowPast` is the stage's floor"), with `bool(found)` beside
+  an `all` so an anchor that found nothing fails. Never `len(...) == N`.
+- **Say in the detail what was found at each anchor** (`Server_Fire 1, predicted 1,
+  ReloadNow 1`), so a failure names the fragment that lost its node.
+- **Prove a new anchored check can fail**: point it at the wrong event or step in a
+  scratch script (patch the module's constant, clear `lru_cache`s) and see it fail.
+- **A visited set is keyed by `get_path_name()`, never `id(node)`**: a node's Python
+  wrapper is freed between steps and the next one can take its address, which ended a walk
+  early at random (`verify/drops.py`'s two walks up to the `DamagedByPlayer` Branch).
+
 ## Tuning
 
 `COMBAT`, a frozen `CombatConfig` in `tuning.py`, is the **one** place global combat numbers

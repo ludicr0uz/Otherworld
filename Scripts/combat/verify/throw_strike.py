@@ -6,6 +6,10 @@ item set into the body and attached to the bone it struck, the tree test, the
 height it may lodge at, the chips, the item set into the trunk, and the fall
 both then skip.
 
+The checks walk the stage from its gate (_walk: each node is the one the step
+before it runs) and say what each must be; none counts a kind of node over the
+graph (verify/anchor.py).
+
 is_strike_node picks out the stage's nodes, so the older counts over the whole
 graph (blood and impact spawns, LastHitFrom writes, the chop's tree test, the
 pellet's body trace) can set them aside, as they do the chop's.
@@ -13,8 +17,7 @@ pellet's body trace) can set them aside, as they do the chop's.
 
 import functools
 import math
-
-import unreal
+import types
 
 from combat.axe import AXE_DISPLAY, axe_lodge
 from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR
@@ -34,6 +37,7 @@ from combat.throw_tuning import (
 from combat.tuning import COMBAT, INTERACT_RADIUS
 from combat.verify import fx as fxv
 from combat import fx_vars as FX
+from combat.verify.anchor import feeders as _feeders, pure_feeds as _pure_feeds, runs, the
 from combat.verify.common import (
     take_hits,
     BEL, PIN, by_pins, check, has_in_pin, in_pins, num_pin, pin_value,
@@ -52,34 +56,19 @@ from combat.weapon_specs import _weapon_specs
 # from a trunk's bark it can stand: what the lodge's height is reached from.
 REACH_FROM_CM = 90.0
 REACH_OUT_CM = 60.0
+# Anywhere but the head, a wound is the item's whole ThrowDamage.
+WHOLE = 1.0
 
 
-def _feeders(node, pin):
-    p = BEL.find_input_pin(node, pin)
-    return [PIN.get_owning_node(q) for q in PIN.list_connected_pins(p)] if p else []
-
-
-def _pure_feeds(node):
-    """Every node feeding ``node`` through data links, not looking past a node
-    with an exec pin: what such a node gives out was stored when it ran."""
-    seen, stack = [], [node]
-    while stack:
-        for pin in BEL.list_input_pins(stack.pop()):
-            if str(PIN.get_pin_name(pin)) == "execute":
-                continue
-            for q in PIN.list_connected_pins(pin):
-                src = PIN.get_owning_node(q)
-                if src in seen:
-                    continue
-                seen.append(src)
-                if not has_in_pin(src, "execute"):
-                    stack.append(src)
-    return seen
+def _entries():
+    """Where the flight enters the stage: it empties ThrowPast."""
+    return [n for n in wg if _title(n) == "Clear"
+            and [_title(f) for f in _feeders(n, "TargetArray")] == [f"Get {THROW_PAST_VAR}"]]
 
 
 def _gates():
-    """The Branches that ask the thrown item's ThrowDamage."""
-    return [n for n in wg if _title(n) == "Branch"
+    """The Branches the entry runs, which ask the thrown item's ThrowDamage."""
+    return [n for e in _entries() for n in runs(e, "then") if _title(n) == "Branch"
             and any(_title(f) == f"Get {THROW_DAMAGE_VAR}"
                     for c in _feeders(n, "Condition") for f in _feeders(c, "A"))]
 
@@ -140,10 +129,6 @@ def _floor():
             for q in PIN.list_connected_pins(p) if _title(PIN.get_owning_node(q)) == k]
 
 
-def _mine(nodes):
-    return [n for n in nodes if is_strike_node(n)]
-
-
 def _spawns(var):
     return [n for n in by_pins(wg, "Class", "SpawnTransform")
             if any(_title(f) == f"Get {var}" for f in _feeders(n, "Class"))]
@@ -198,266 +183,287 @@ def check_blades():
           f"{far:.0f} cm from the player's middle, reach {INTERACT_RADIUS:g}")
 
 
+def _t(node):
+    return _title(node) if node is not None else "nothing"
+
+
+def _step(node, pin):
+    """The one node this exec output runs; a walk that lost its way stays lost."""
+    return the(runs(node, pin)) if node is not None else None
+
+
+@functools.lru_cache(maxsize=1)
+def _walk():
+    """The stage, node by node from its gate (weapon_component/throw_strike.py):
+    each name is the one node the step before it runs, or None. The checks
+    say what each must be; nothing here is found by counting the graph."""
+    w = types.SimpleNamespace()
+    w.gate = the(_gates())
+    w.health = _step(w.gate, "then")              # the struck actor's health cast
+    w.emptied = _step(w.health, "then")           # ThrowBone set to no bone
+    w.character = _step(w.emptied, "then")        # the cast for its mesh
+    w.line = _step(w.character, "then")           # the body trace along the blade
+    w.line_hit = _step(w.line, "then")
+    w.nearest = _step(w.line_hit, "else")         # the one towards the nearest bone
+    w.nearest_hit = _step(w.nearest, "then")
+    w.wound = _step(w.character, "CastFailed")    # the TakeHit all four ways reach
+    w.stamp = _step(w.wound, "then")
+    w.stab = _step(w.stamp, "then")               # Multicast_Stab
+    w.stuck = _step(w.stab, "then")               # is ThrowBone a bone
+    w.in_body = _step(w.stuck, "then")
+    w.hold = _step(w.in_body, "then")
+    w.past = _step(w.stuck, "else")               # the body goes into ThrowPast
+    w.floor = _step(w.past, "then")
+    w.tree = _step(w.health, "CastFailed")        # the tree's cast
+    w.high = _step(w.tree, "then")
+    w.lodge = _step(w.high, "then")               # Multicast_Lodge
+    w.in_tree = _step(w.lodge, "then")
+    w.lodged = _step(w.in_tree, "then")
+    return w
+
+
+def _noted(trace, struck):
+    """(the ThrowBone write, the ThrowSkin write) a body trace's Branch runs
+    where it struck."""
+    bone = _step(struck, "then")
+    return trace, bone, _step(bone, "then")
+
+
 def check_strike_gate():
-    gates = _gates()
+    w = _walk()
     check(f"the flight asks {THROW_DAMAGE_VAR} once: is what struck a blade",
-          len(gates) == 1, str(len(gates)))
-    if len(gates) != 1:
+          w.gate is not None,
+          f"{len(_entries())} emptying of {THROW_PAST_VAR}, {len(_gates())} gate(s) behind")
+    if w.gate is None:
         return False
-    reads = [f for c in _feeders(gates[0], "Condition") for f in _feeders(c, "A")]
+    conds = _feeders(w.gate, "Condition")
+    read = the([f for c in conds for f in _feeders(c, "A")])
     check("...of the item in the air, against zero",
-          len(reads) == 1 and _of_thrown(reads[0])
-          and all(pin_value(c, "B") in ("", "0", "0.0", "0.000000")
-                  for c in _feeders(gates[0], "Condition")),
-          str([pin_value(c, "B") for c in _feeders(gates[0], "Condition")]))
-    clears = _feeders(gates[0], "execute")
-    before = [b for c in clears for b in _feeders(c, "execute")]
+          read is not None and _of_thrown(read)
+          and all(pin_value(c, "B") in ("", "0", "0.0", "0.000000") for c in conds),
+          str([pin_value(c, "B") for c in conds]))
+    entry = the(_feeders(w.gate, "execute"))
+    before = the(_feeders(entry, "execute")) if entry is not None else None
     check("...on the frame the flight's segment hits something, before the "
           f"item is set down, {THROW_PAST_VAR} emptied first",
-          len(clears) == 1 and has_in_pin(clears[0], "TargetArray")
-          and not has_in_pin(clears[0], "NewItem")
-          and [_title(f) for f in _feeders(clears[0], "TargetArray")]
-          == [f"Get {THROW_PAST_VAR}"]
-          and len(before) == 1 and _title(before[0]) == "Branch"
-          and any(is_throw_trace(t) for t in _feeders(before[0], "Condition")),
-          str([_title(b) for b in clears + before]))
+          entry is not None and entry in _entries()
+          and before is not None and _title(before) == "Branch"
+          and any(is_throw_trace(t) for t in _feeders(before, "Condition")),
+          str([_t(entry), _t(before)]))
     return True
 
 
 def check_wound():
-    writes = _mine(take_hits(wg))
+    w = _walk()
+    wound = w.wound
     check("a blade that strikes a body takes its health once (the body's TakeHit: "
           "combat/damage.py)",
-          len(writes) == 1, str(len(writes)))
-    if len(writes) != 1:
+          wound is not None and wound in take_hits(wg), _t(wound))
+    if wound is None:
         return
-    fed = {_title(n) for n in _pure_feeds(writes[0])}
+    fed = {_title(n) for n in _pure_feeds(wound)}
     check(f"...by the thrown item's {THROW_DAMAGE_VAR} (the body floors it at zero)",
           f"Get {THROW_DAMAGE_VAR}" in fed, str(sorted(fed)))
-    picks = [n for n in _pure_feeds(writes[0]) if {"A", "B", "bPickA"} <= in_pins(n)]
-    tests = [f for n in picks for f in _feeders(n, "bPickA")]
+    pick = the([n for n in _pure_feeds(wound) if {"A", "B", "bPickA"} <= in_pins(n)])
+    test = the(_feeders(pick, "bPickA")) if pick is not None else None
     check(f"...times the struck body's own {HEAD_MULT_VAR} where the bone the "
           f"blade went in at ({THROW_BONE_VAR}) is one of its {HEAD_BONES_VAR}, "
           "and whole anywhere else",
-          len(picks) == 1 and num_pin(picks[0], "B") == 1.0
-          and [_title(f) for f in _feeders(picks[0], "A")] == [f"Get {HEAD_MULT_VAR}"]
-          and len(tests) == 1
-          and [_title(f) for f in _feeders(tests[0], "TargetArray")]
+          pick is not None and num_pin(pick, "B") == WHOLE
+          and [_title(f) for f in _feeders(pick, "A")] == [f"Get {HEAD_MULT_VAR}"]
+          and test is not None
+          and [_title(f) for f in _feeders(test, "TargetArray")]
           == [f"Get {HEAD_BONES_VAR}"]
-          and [_title(f) for f in _feeders(tests[0], "ItemToFind")]
+          and [_title(f) for f in _feeders(test, "ItemToFind")]
           == [f"Get {THROW_BONE_VAR}"],
-          f"{len(picks)} Select(s), {len(tests)} test(s)")
-    marks = _mine([n for n in wg if _title(n) == f"Set {THROW_BONE_VAR}"])
-    none = [n for n in marks if not _feeders(n, THROW_BONE_VAR)]
-    cast = [c for n in none for c in _feeders(n, "execute")]
+          f"picked by {_t(pick)}, tested by {_t(test)}")
     check(f"the stage is behind the health cast of the actor the flight struck: "
           f"it empties {THROW_BONE_VAR} first",
-          len(marks) == 3 and len(none) == 1
-          and pin_value(none[0], THROW_BONE_VAR) in ("", "None")
-          and len(cast) == 1 and "HealthComponent" in _title(cast[0]).replace(" ", ""),
-          f"{len(marks)} write(s), behind {[_title(c) for c in cast]}")
-    line, nearest = _skins()
-    told = [n for n in marks if _feeders(n, THROW_BONE_VAR)]
-    spots = _mine([n for n in wg if _title(n) == f"Set {THROW_SKIN_VAR}"])
+          w.emptied is not None and _title(w.emptied) == f"Set {THROW_BONE_VAR}"
+          and not _feeders(w.emptied, THROW_BONE_VAR)
+          and pin_value(w.emptied, THROW_BONE_VAR) in ("", "None")
+          and "HealthComponent" in _title(w.health).replace(" ", ""),
+          f"{_t(w.emptied)}, behind {_t(w.health)}")
+    noted = [_noted(w.line, w.line_hit), _noted(w.nearest, w.nearest_hit)]
     check(f"each of the two body traces that strikes notes its bone and its "
           f"point: {THROW_BONE_VAR}, then {THROW_SKIN_VAR}, off its own hit",
-          len(line) == 1 and len(nearest) == 1 and len(told) == 2 and len(spots) == 2
-          and sorted(t.get_path_name() for sp in spots for t in _feeders(sp, "execute"))
-          == sorted(t.get_path_name() for t in told)
-          and all(_feeders(sp, THROW_SKIN_VAR) == _feeders(t, THROW_BONE_VAR)
-                  and _feeders(t, THROW_BONE_VAR)[0] in line + nearest
-                  for sp in spots for t in _feeders(sp, "execute"))
-          and {f.get_path_name() for t in told for f in _feeders(t, THROW_BONE_VAR)}
-          == {n.get_path_name() for n in line + nearest},
-          f"{len(told)} bone(s), {len(spots)} point(s)")
-    ways = _feeders(writes[0], "execute")
+          all(t is not None and bone is not None and skin is not None
+              and _title(bone) == f"Set {THROW_BONE_VAR}"
+              and _title(skin) == f"Set {THROW_SKIN_VAR}"
+              and _feeders(bone, THROW_BONE_VAR) == [t]
+              and _feeders(skin, THROW_SKIN_VAR) == [t]
+              for t, bone, skin in noted),
+          str([(_t(t), _t(bone), _t(skin)) for t, bone, skin in noted]))
+    ways = _feeders(wound, "execute")
     before = sorted(_title(f).replace(" ", "") for f in ways)
     check("...and the wound comes after the body's skin is looked for, on all "
           "four of its ways out: struck on the blade's line, struck towards "
           "the nearest bone, both missed, and a body that is no Character",
           before == sorted([f"Set{THROW_SKIN_VAR}"] * 2 + ["CastToCharacter", "Branch"])
-          and all(sp in ways for sp in spots)
-          and any(_feeders(f, "Condition") == nearest for f in ways
-                  if _title(f) == "Branch"),
+          and all(skin in ways for _trace, _bone, skin in noted)
+          and w.nearest_hit in ways and w.character in ways,
           str(before))
-    told = {pin: [_title(f).replace(" ", "") for f in _feeders(writes[0], pin)]
+    told = {pin: [_title(f).replace(" ", "") for f in _feeders(wound, pin)]
             for pin in ("InstigatedBy", "Cause")}
     normal = [str(PIN.get_pin_name(q)).replace(" ", "") for q in
-              PIN.list_connected_pins(BEL.find_input_pin(writes[0], "From"))]
+              PIN.list_connected_pins(BEL.find_input_pin(wound, "From"))]
     check("...stamped as a pellet's hit is: who struck it (the thrower's controller: "
           "the kill's credit, and the wendigo's rage), which way it came (the flinch) "
           "and with what (the thrown item)",
           told["InstigatedBy"] == ["GetInstigatorController"] and normal == ["ImpactNormal"]
-          and len(told["Cause"]) == 1
+          and told["Cause"] == [f"Get{THROWN_VAR}"]
           and not [n for v in (LAST_DAMAGE_VAR, DAMAGED_BY_PLAYER_VAR, LAST_HIT_FROM_VAR)
                    for n in wg if _title(n) == f"Set {v}"],
           f"{told}, From off {normal}")
-    blood = _mine(_spawns("BloodClass"))
     # Between the two, the headshot stamp (verify/headshot.py); the blood is
     # Fx_Stab's, told after it.
-    tells = fxv.calls(FX.STAB)
-    told = _feeders(tells[0], "execute") if len(tells) == 1 else []
+    blood = fxv.in_fx(FX.STAB, _spawns("BloodClass"))
     check("...and it bleeds: one blood spawn (Fx_Stab), told after the wound and its "
           f"{HEADSHOT_TIME_VAR} stamp",
-          len(blood) == 1 and fxv.in_fx(FX.STAB, blood) == blood and len(tells) == 1
-          and [_title(n).split(" ")[0] + " " + HEADSHOT_TIME_VAR for n in told]
-          == [f"Set {HEADSHOT_TIME_VAR}"]
-          and _feeders(told[0], "execute") == writes,
-          f"{len(blood)} spawns, {len(tells)} tell(s) after {[_title(n) for n in told]}")
-    adds = [n for n in by_pins(wg, "TargetArray", "NewItem")
-            if [_title(f) for f in _feeders(n, "TargetArray")] == [f"Get {THROW_PAST_VAR}"]]
-    floors = [n for n in by_pins(wg, "Start", "End", "TraceChannel", "ActorsToIgnore")
-              if [_title(f) for f in _feeders(n, "ActorsToIgnore")]
-              == [f"Get {THROW_PAST_VAR}"]]
-    check_stick(blood)
-    drops = [f for a in adds for f in _feeders(a, "execute")]
+          bool(blood) and w.stab is not None and w.stab in fxv.calls(FX.STAB)
+          and _title(w.stamp).startswith("Set")
+          and _title(w.stamp).endswith(f" {HEADSHOT_TIME_VAR}"),
+          f"{len(blood)} spawn(s) under Fx_Stab, {_t(w.stamp)} then {_t(w.stab)}")
+    check_stick()
+    ignoring = [n for n in by_pins(wg, "Start", "End", "TraceChannel", "ActorsToIgnore")
+                if [_title(f) for f in _feeders(n, "ActorsToIgnore")]
+                == [f"Get {THROW_PAST_VAR}"]]
     check(f"a body it cannot be set into drops it, and that fall passes the "
           f"body by: the struck actor goes into {THROW_PAST_VAR} once, off the "
           f"arm on which {THROW_BONE_VAR} is no bone (the Character cast "
           "failed, or the body trace missed), and only the "
           "flight's trace down to the ground ignores it",
-          len(adds) == 1 and drops == _stuck_gates()
-          and any(has_in_pin(f, "Hit") for f in _feeders(adds[0], "NewItem"))
-          and len(floors) == 1 and is_throw_trace(floors[0])
-          and floors[0].get_path_name() in {n.get_path_name() for n in _floor()},
-          f"{len(adds)} add(s), {len(floors)} trace(s)")
+          w.past is not None and has_in_pin(w.past, "NewItem")
+          and [_title(f) for f in _feeders(w.past, "TargetArray")]
+          == [f"Get {THROW_PAST_VAR}"]
+          and any(has_in_pin(f, "Hit") for f in _feeders(w.past, "NewItem"))
+          and _asks_bone(w.stuck)
+          and w.floor is not None and is_throw_trace(w.floor) and w.floor in ignoring
+          and all(n in _floor() for n in ignoring),
+          f"{_t(w.past)} then {_t(w.floor)}; {len(ignoring)} trace(s) ignore "
+          f"{THROW_PAST_VAR}")
 
 
 def _body_traces():
     return [n for n in wg if {"TraceStart", "TraceEnd", "bTraceComplex"} <= in_pins(n)]
 
 
-def _skins():
-    """(the body trace on along the blade's own line, the one towards the
-    nearest bone): told apart by the nearest-bone node feeding the second."""
-    traces = _mine(_body_traces())
-    nearest = [n for n in traces
-               if any(has_in_pin(f, "TestLocation") for f in _pure_feeds(n))]
-    return [n for n in traces if n not in nearest], nearest
+def _asks_bone(node):
+    """Is this the Branch that asks whether ThrowBone is a bone."""
+    return (node is not None and _title(node) == "Branch"
+            and any(_title(f) == f"Get {THROW_BONE_VAR}"
+                    and pin_value(c, "B") in ("", "None")
+                    for c in _feeders(node, "Condition") for f in _feeders(c, "A")))
 
 
-def _puts():
-    """(the move that sets the item into a body, the one into a tree): told
-    apart by what the item's point is set on, the body's skin or the flight's
-    own hit."""
-    puts = _mine(by_pins(wg, "NewLocation", "NewRotation"))
-    in_body = [n for n in puts
-               if any(_title(n2) == f"Get {THROW_SKIN_VAR}"
-                      for f in _feeders(n, "NewLocation") for n2 in _pure_feeds(f))]
-    return in_body, [n for n in puts if n not in in_body]
-
-
-def _stuck_gates():
-    """The Branches that ask whether ThrowBone is a bone: is the blade to be
-    left in the body."""
-    return _mine([n for n in wg if _title(n) == "Branch"
-                  and any(_title(f) == f"Get {THROW_BONE_VAR}"
-                          and pin_value(c, "B") in ("", "None")
-                          for c in _feeders(n, "Condition") for f in _feeders(c, "A"))])
+def _is_put(node):
+    """Is this the one move that places and turns the item in the air."""
+    return (node is not None and {"NewLocation", "NewRotation"} <= in_pins(node)
+            and _of_thrown(node))
 
 
 def _from_hit(node, pin):
     return any(has_in_pin(f, "Hit") for f in _feeders(node, pin))
 
 
-def check_stick(blood):
-    casts = _mine([n for n in wg if _title(n).replace(" ", "") == "CastToCharacter"])
+def check_stick():
+    w = _walk()
+    cast = w.character
     check("where the blade went into the body: one cast of the struck actor "
           "to Character, for its mesh",
-          len(casts) == 1
-          and [_title(f) for f in _feeders(casts[0], "execute")] == [f"Set {THROW_BONE_VAR}"]
-          and _from_hit(casts[0], "Object"), str(len(casts)))
-    line, nearest = _skins()
+          cast is not None and _title(cast).replace(" ", "") == "CastToCharacter"
+          and _from_hit(cast, "Object"), _t(cast))
+    line, nearest = w.line, w.nearest
+    bodies = _body_traces()
     check("...two traces of that mesh's physics bodies alone",
-          len(line) == 1 and len(nearest) == 1
-          and all(pin_value(n, "bTraceComplex").lower() == "false"
+          line is not None and nearest is not None
+          and all(n in bodies and pin_value(n, "bTraceComplex").lower() == "false"
                   and [_title(f) for f in _feeders(n, "self")] == ["Get Mesh"]
-                  for n in line + nearest), f"{len(line)} + {len(nearest)}")
-    if len(line) != 1 or len(nearest) != 1:
+                  for n in (line, nearest)), f"{_t(line)} + {_t(nearest)}")
+    if line is None or nearest is None:
         return
-    way = _pure_feeds(line[0])
+    way = _pure_feeds(line)
     check("...the first on along the blade's own line: from the flight's hit "
           f"the way its segment flew, {STICK_LINE_REACH_CM:g} cm far",
-          _feeders(line[0], "execute") == casts and _from_hit(line[0], "TraceStart")
-          and not _from_hit(line[0], "TraceEnd")
+          _from_hit(line, "TraceStart") and not _from_hit(line, "TraceEnd")
+          and not any(has_in_pin(n, "TestLocation") for n in way)
           and any("Normal" in _title(n) for n in way)
           and any(num_pin(n, "X") == num_pin(n, "Y") == num_pin(n, "Z")
                   == STICK_LINE_REACH_CM for n in way if {"X", "Y", "Z"} <= in_pins(n)),
           str(sorted(_title(n) for n in way)))
-    missed = [n for n in wg if _title(n) == "Branch" and _feeders(n, "Condition") == line]
-    way = _pure_feeds(nearest[0])
-    bones = [n for n in way if has_in_pin(n, "TestLocation")]
+    way = _pure_feeds(nearest)
+    bone = the([n for n in way if has_in_pin(n, "TestLocation")])
     check("...the second only where that struck nothing: from the flight's hit "
           f"towards the bone nearest it that has a body, {STICK_TRACE_PAST:g} "
           "times as far",
-          len(missed) == 1 and _feeders(nearest[0], "execute") == missed
-          and _from_hit(nearest[0], "TraceStart") and len(bones) == 1
-          and pin_value(bones[0], "bRequirePhysicsAsset") == "true"
-          and [_title(f) for f in _feeders(bones[0], "self")] == ["Get Mesh"]
-          and _from_hit(bones[0], "TestLocation")
+          w.line_hit is not None and _title(w.line_hit) == "Branch"
+          and _feeders(w.line_hit, "Condition") == [line]
+          and _feeders(w.nearest_hit, "Condition") == [nearest]
+          and _from_hit(nearest, "TraceStart") and bone is not None
+          and pin_value(bone, "bRequirePhysicsAsset") == "true"
+          and [_title(f) for f in _feeders(bone, "self")] == ["Get Mesh"]
+          and _from_hit(bone, "TestLocation")
           and any(num_pin(n, "X") == num_pin(n, "Y") == num_pin(n, "Z") == STICK_TRACE_PAST
                   for n in way if {"X", "Y", "Z"} <= in_pins(n)),
-          f"{len(bones)} nearest-bone node(s)")
-    in_body, _in_tree = _puts()
-    found = _stuck_gates()
+          f"behind {_t(w.line_hit)}, the bone by {_t(bone)}")
+    in_body = w.in_body
     check("a blade that wounded a body stays in it: after the blood and the "
           "sound of it going in, where "
           f"{THROW_BONE_VAR} is a bone, the item in the air is set on the skin "
           f"({THROW_SKIN_VAR}) once, as it is into a trunk",
-          len(in_body) == 1 and len(found) == 1 and _of_thrown(in_body[0])
-          and _feeders(in_body[0], "execute") == found
-          and _feeders(found[0], "execute") == fxv.calls(FX.STAB)
-          and _feeders(in_body[0], "NewLocation") != _feeders(in_body[0], "NewRotation"),
-          f"{len(in_body)} move(s), {len(found)} Branch(es)")
-    holds = _mine(by_pins(wg, "Parent", "SocketName", "LocationRule"))
+          _asks_bone(w.stuck) and w.stab in fxv.calls(FX.STAB) and _is_put(in_body)
+          and any(_title(n) == f"Get {THROW_SKIN_VAR}"
+                  for f in _feeders(in_body, "NewLocation") for n in _pure_feeds(f))
+          and _feeders(in_body, "NewLocation") != _feeders(in_body, "NewRotation"),
+          f"{_t(w.stab)}, {_t(w.stuck)}, {_t(in_body)}")
+    hold = w.hold
     check("...and attached to the mesh at the bone it struck, keeping "
           "where it was set and its own size",
-          len(holds) == 1 and _of_thrown(holds[0])
-          and _feeders(holds[0], "execute") == in_body
-          and [_title(f) for f in _feeders(holds[0], "Parent")] == ["Get Mesh"]
-          and [_title(f) for f in _feeders(holds[0], "SocketName")]
+          hold is not None and {"Parent", "SocketName", "LocationRule"} <= in_pins(hold)
+          and _of_thrown(hold)
+          and [_title(f) for f in _feeders(hold, "Parent")] == ["Get Mesh"]
+          and [_title(f) for f in _feeders(hold, "SocketName")]
           == [f"Get {THROW_BONE_VAR}"]
-          and all(pin_value(holds[0], r) == "KeepWorld"
+          and all(pin_value(hold, r) == "KeepWorld"
                   for r in ("LocationRule", "RotationRule", "ScaleRule")),
-          str(len(holds)))
+          _t(hold))
 
 
 def check_lodge():
+    w = _walk()
     _ran, exits = _stage()
-    casts = _mine([n for n in wg if "instancedstaticmesh" in
-                   _title(n).replace(" ", "").lower() and has_in_pin(n, "Object")])
+    tree = w.tree
     check("a blade that strikes no body asks whether it struck a tree: one "
           "cast to InstancedStaticMeshComponent, off the health cast's failed arm",
-          len(casts) == 1 and any("HealthComponent" in _title(f).replace(" ", "")
-                                  for c in casts for f in _feeders(c, "execute")),
-          str(len(casts)))
-    highs = _mine([n for n in wg if _title(n) == "Branch"
-                   and any(num_pin(c, "B") == LODGE_MAX_HEIGHT_CM
-                           for c in _feeders(n, "Condition"))])
+          tree is not None and has_in_pin(tree, "Object")
+          and "instancedstaticmesh" in _title(tree).replace(" ", "").lower()
+          and "HealthComponent" in _title(w.health).replace(" ", ""),
+          _t(tree))
+    high = w.high
     check(f"...and how high: within {LODGE_MAX_HEIGHT_CM:g} cm of the tree "
           "instance's own origin, in world space",
-          len(highs) == 1
+          high is not None and _title(high) == "Branch"
+          and any(num_pin(c, "B") == LODGE_MAX_HEIGHT_CM
+                  for c in _feeders(high, "Condition"))
           and any(has_in_pin(f, "InstanceIndex") and pin_value(f, "bWorldSpace") == "true"
-                  for f in _pure_feeds(highs[0])),
-          str(len(highs)))
-    chips = _mine(_spawns(IMPACT_CLASS_VAR))
-    tells = fxv.calls(FX.LODGE)
+                  for f in _pure_feeds(high)),
+          _t(high))
+    chips = fxv.in_fx(FX.LODGE, _spawns(IMPACT_CLASS_VAR))
     check("it chips the bark once (Fx_Lodge), told on the reachable arm",
-          len(chips) == 1 and fxv.in_fx(FX.LODGE, chips) == chips and len(tells) == 1
-          and _feeders(tells[0], "execute") == highs, f"{len(chips)} spawn(s), {len(tells)} tell(s)")
-    in_body, puts = _puts()
+          bool(chips) and w.lodge is not None and w.lodge in fxv.calls(FX.LODGE),
+          f"{len(chips)} spawn(s) under Fx_Lodge, told by {_t(w.lodge)}")
+    put = w.in_tree
     check("...and, after the tell of the chips and the chop's sound, is set into the "
           "trunk once: the item in the air, placed and turned in one move",
-          len(puts) == 1 and _of_thrown(puts[0])
-          and _feeders(puts[0], "execute") == tells
-          and any(has_in_pin(f, "Hit") for f in _feeders(puts[0], "NewLocation")
+          _is_put(put)
+          and any(has_in_pin(f, "Hit") for f in _feeders(put, "NewLocation")
                   for f in [f] + _feeders(f, "A")),
-          str(len(puts)))
-    if len(puts) != 1:
+          _t(put))
+    if not _is_put(put):
         return
-    turn = {_title(n) for f in _feeders(puts[0], "NewRotation")
+    turn = {_title(n) for f in _feeders(put, "NewRotation")
             for n in [f] + _pure_feeds(f)}
-    at = {_title(n) for f in _feeders(puts[0], "NewLocation")
+    at = {_title(n) for f in _feeders(put, "NewLocation")
           for n in [f] + _pure_feeds(f)}
     check(f"...its own {LODGE_TURN_VAR}, then its X along the segment it flew",
           f"Get {LODGE_TURN_VAR}" in turn
@@ -466,20 +472,25 @@ def check_lodge():
           str(sorted(turn)))
     check(f"...its {LODGE_POINT_VAR}, turned the same way, on the hit",
           {f"Get {LODGE_POINT_VAR}", f"Get {LODGE_TURN_VAR}"} <= at, str(sorted(at)))
-    held = [n for n in _mine(by_pins(wg, "Parent", "SocketName", "LocationRule"))]
-    landed = exits.get("Set Dropped", [])
-    marks = [f for n in landed for f in _feeders(n, "execute")]
+    landed = the(exits.get("Set Dropped", []))
+    marks = _feeders(landed, "execute") if landed is not None else []
     check("lodged, in a tree or in a body, it is flagged Lodged (the pick-up "
           "puts such a blade back in empty hands) and skips the fall: straight "
           "on to the landing's Dropped, so it stays there as a pick-up",
-          len(landed) == 1 and _title(landed[0]) == "Set Lodged"
-          and pin_value(landed[0], "Lodged") == "true" and _of_thrown(landed[0])
-          and len(marks) == 2 and all(n in marks for n in puts + held)
-          and len(exits) == 2, f"{sorted(exits)}, {[_title(n) for n in landed]}")
-    falls = [v for k, v in exits.items() if k != "Set Dropped"]
+          landed is not None and landed == w.lodged and _title(landed) == "Set Lodged"
+          and pin_value(landed, "Lodged") == "true" and _of_thrown(landed)
+          and w.hold is not None
+          and sorted(n.get_path_name() for n in marks)
+          == sorted(n.get_path_name() for n in (put, w.hold)),
+          f"{_t(landed)} after {[_title(n) for n in marks]}")
+    falls = [n for k, v in exits.items() if k != "Set Dropped" for n in v]
+    arms = [w.gate, w.past, tree, high]
     check("everything else still comes down to the ground: an item that is no "
           "blade, one a body dropped, one that struck no tree, one too high",
-          len(falls) == 1 and len(falls[0]) == 4, str([len(v) for v in falls]))
+          all(n is not None for n in arms)
+          and sorted(n.get_path_name() for n in falls)
+          == sorted(n.get_path_name() for n in arms),
+          str([_title(n) for n in falls]))
 
 
 def run():

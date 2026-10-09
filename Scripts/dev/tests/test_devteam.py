@@ -585,7 +585,7 @@ class KnownFailuresTest(unittest.TestCase):
                                  "since": "2026-01-02", "why": "why | more"}])
 
     def test_shipped_file_parses(self):
-        self.assertEqual(len(gate.load_known()), 2)
+        self.assertEqual(len(gate.load_known()), 1)
 
     def test_listed_check_is_not_a_regression(self):
         known = gate.parse_known("a | pose x | since d | w")

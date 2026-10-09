@@ -25,6 +25,7 @@ Single player's check is probes/probe_throw_strike.py, which throws the same
 blade at the same kind of trunk through the same events.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # the axe is thrown at a tree and the 50 m level's nearest is 17 m off
 SYSTEMS = ('net', 'throw')
 
 import time

@@ -18,6 +18,7 @@ On a client: its own body's anim instance took the client arm, and every
 skinned mesh on it ticks, as before.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # needs a wanderer more than 30 m from both players; the 50 m level has none
 SYSTEMS = ('net',)
 
 import time

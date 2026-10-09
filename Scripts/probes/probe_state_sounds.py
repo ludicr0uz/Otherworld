@@ -15,6 +15,7 @@ A sound can't be heard in a headless game; this reads what would play it:
     the spent sprint itself is verify/sound_states.py's).
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('sound',)
 
 import time

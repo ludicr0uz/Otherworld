@@ -24,6 +24,7 @@ What each stretch proves, read off the running anim instance
                   retargeter), as probe_metahuman_body measures it standing
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('animation', 'movement')
 
 import math

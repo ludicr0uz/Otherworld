@@ -14,6 +14,7 @@ Run with --windowed and OW_THROW_SHOTS=1 to save a picture of each item in
 the air to Saved/Screenshots/MacEditor.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('melee', 'throw')
 
 import math

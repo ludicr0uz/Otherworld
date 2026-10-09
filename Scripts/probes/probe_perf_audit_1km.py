@@ -6,6 +6,7 @@
 Results go to Saved/uepy/bench/bench_1km.json. See probe_perf_audit.py.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_1000m"  # benchmarks the 1 km map
 SYSTEMS = ('load',)
 
 from probes import probe_perf_audit as B

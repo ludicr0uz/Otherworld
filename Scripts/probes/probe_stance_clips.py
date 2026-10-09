@@ -12,6 +12,7 @@ aimed chest, carried over from the procedural prone, put the hands 2 cm off
 the ground; this probe is what caught it.)
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('animation', 'movement')
 
 import unreal

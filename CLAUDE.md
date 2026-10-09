@@ -276,7 +276,16 @@ editor.
 **Iteration rules:**
 1. **Never guess an engine API name across a boot.** Dump the candidates (`dir()`, pin names) in
    the same script, or grep the engine's plugin sources.
-2. **Right-size `-game` runs.** 25 s is enough for spawn bugs.
+2. **Right-size `-game` runs.** 25 s is enough for spawn bugs. A probe launch boots
+   `Lvl_Probe_50m` (18 trees, no grass), unless the probe declares `LEVEL = "/Game/Maps/..."`
+   at module level (28 do, on `Lvl_Forest_200m`, each with its reason; the perf audits on theirs)
+   or `--map` is given; probes on one level share one launch (`uepylib/probe_level.py`).
+   **The fixed cost per launch** (measured, one cheap probe, 16 GB Mac): `--game` 40 s on the
+   200 m level, 38 s on the probe level; `--net --clients 2` 74 s and 73 s. The level is only
+   2–4 s of it: about 21 s is the engine's boot, ~7 s the Blueprints and anim graphs the
+   Entry map loads before the level opens. So batch probes into one launch rather than
+   expecting the small level to make a launch cheap. A batch shares a world: ~100 probes in
+   one `--game` launch stall (the same on the 200 m level), so run big sets in chunks.
 3. **Scope verification to what you changed.** Run the full sweep (level, weapons, NPC, HUD,
    survival) once before calling the work done.
 4. **For a guard, zero errors proves nothing.** A gate that never opens logs the same as one that

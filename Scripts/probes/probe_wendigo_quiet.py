@@ -12,6 +12,7 @@ re-arms it 4-9 s on. So:
     and is re-armed 4-9 s on, which is the growl.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('npc',)
 
 import unreal

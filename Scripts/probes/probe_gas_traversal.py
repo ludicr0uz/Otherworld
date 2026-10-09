@@ -25,6 +25,7 @@ Each is behind its own switch (combat/gas_moves_tuning.py); a switch that is
 off is noted and its part skipped.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('animation', 'movement')
 
 import math

@@ -15,6 +15,7 @@ Each picture lands in Saved/Screenshots/MacEditor, and the log says which
 numbers are which.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('animation',)
 
 import os

@@ -17,6 +17,7 @@ probes/probe_wendigo_fled.py):
 That the hunt itself is as it was is probes/probe_wendigo_stalk.py's.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('npc',)
 
 import math

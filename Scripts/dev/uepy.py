@@ -48,7 +48,7 @@ import re
 import sys
 import time
 
-from uepylib import cold, editors, game, inbox, net, net_plan, probe_map, remote, server, warm
+from uepylib import cold, editors, game, inbox, net, net_plan, probe_level, probe_map, remote, server, warm
 from uepylib.paths import (
     editor_inbox, engine_dir, game_inbox, log, saved_uepy, serve_inbox, set_project,
 )
@@ -182,7 +182,8 @@ def parse_args():
                     help="with --game or --net: keep the title menu (no -nomenu), "
                          "for a probe that works it; with --net each client "
                          "starts alone on the level and the probe joins")
-    ap.add_argument("--map", default=game.DEFAULT_MAP, help="level for --game and --net")
+    ap.add_argument("--map", help="level for --game and --net (default: Lvl_Probe_50m for a probe, "
+                                   "unless it declares LEVEL; else Lvl_Forest_200m)")
     ap.add_argument("--seconds", type=int,
                     help=f"--game duration (default {game.GAME_SECONDS}; with "
                          f"--probe, a ceiling of {game.PROBE_SECONDS}); with --net, "
@@ -239,13 +240,15 @@ def probes_for(engine, args):
         if args.dry_run:
             continue
         if kind == "game" or kind == "title":
-            ok &= game.run_game(engine, args.map, args.seconds or max(game.PROBE_SECONDS, 30 * len(probes) + 60), [],
-                                probes, args.probe_timeout, args.windowed, kind == "title")
+            for level, group in probe_level.by_level(probes, args.map):
+                ok &= game.run_game(engine, level, args.seconds or max(game.PROBE_SECONDS, 30 * len(group) + 60), [],
+                                    group, args.probe_timeout, args.windowed, kind == "title")
         else:
             clients = plan["clients"] if kind == "net" else 1
-            ok &= net.run_net(engine, args.map, clients, args.port, args.seconds, probes,
-                              args.probe_timeout, args.windowed, args.allow_pie,
-                              kind == "net-title", args.lag, 0, False)
+            for level, group in probe_level.by_level(probes, args.map):
+                ok &= net.run_net(engine, level, clients, args.port, args.seconds, group,
+                                  args.probe_timeout, args.windowed, args.allow_pie,
+                                  kind == "net-title", args.lag, 0, False)
     return 0 if ok else 1
 
 
@@ -276,15 +279,19 @@ def main():
                                       args.bots)
         if problem:
             ap.error(problem)
-        ok = net.run_net(engine, args.map, args.clients, args.port, args.seconds, probes,
-                         args.probe_timeout, args.windowed, args.allow_pie, args.title,
-                         args.lag, args.bots, args.trace)
+        ok = True
+        for level, group in probe_level.by_level(probes, args.map):
+            ok &= net.run_net(engine, level, args.clients, args.port, args.seconds, group,
+                              args.probe_timeout, args.windowed, args.allow_pie, args.title,
+                              args.lag, args.bots, args.trace)
         return 0 if ok else 1
     if args.game:
         seconds = args.seconds or (game.PROBE_SECONDS if probes else game.GAME_SECONDS)
         extra = [(f"/{p}/", p) for p in args.grep]
-        ok = game.run_game(engine, args.map, seconds, extra, probes, args.probe_timeout,
-                           args.windowed, args.title)
+        ok = True
+        for level, group in probe_level.by_level(probes, args.map):
+            ok &= game.run_game(engine, level, seconds, extra, group, args.probe_timeout,
+                                args.windowed, args.title)
         return 0 if ok else 1
 
     targets = [("file", os.path.abspath(s)) for s in args.scripts]

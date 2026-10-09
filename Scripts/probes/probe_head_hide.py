@@ -21,6 +21,7 @@ loadout, and put back at the end. What the picture looks like is
 probe_sight_align.py with --windowed and OW_SIGHT_SHOTS=1.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('animation',)
 
 import os

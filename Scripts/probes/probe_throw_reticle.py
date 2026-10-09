@@ -9,6 +9,7 @@ The keys are held and clicked as probe_throw.py does it (ThrowKeyForced,
 ThrowClickForced). The view is turned until the reticle rests on open ground.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('throw',)
 
 import math

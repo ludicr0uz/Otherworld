@@ -6,6 +6,7 @@ probe writes it and Health, as a damage source would, and reads which clip
 the HitSlot plays (`anim.get_current_active_montage()`).
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('health',)
 
 import unreal

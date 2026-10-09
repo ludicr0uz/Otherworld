@@ -15,6 +15,7 @@ hunt, with whatever turns fall in it. This one makes both things happen:
     roaring or picking a tree, and runs at the player.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('npc',)
 
 import math

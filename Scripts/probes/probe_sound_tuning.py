@@ -21,6 +21,7 @@ few frames later, so it waits for the whole listing).
 sound_tuning.csv is set aside first and put back.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('menu', 'sound')
 
 import re

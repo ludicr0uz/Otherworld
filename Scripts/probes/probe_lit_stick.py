@@ -24,6 +24,7 @@ Any profile on disk is set aside first, so the game starts on the issued
 loadout, and put back at the end.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('throw', 'survival')
 
 import os

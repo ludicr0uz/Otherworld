@@ -17,6 +17,7 @@ Run with --windowed and OW_THROW_SHOTS=1 to save pictures of the wind-up and
 of the item in the air to Saved/Screenshots/MacEditor.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('throw',)
 
 import math

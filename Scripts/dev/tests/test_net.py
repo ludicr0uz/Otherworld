@@ -37,7 +37,7 @@ class ArgsTest(unittest.TestCase):
         self.assertTrue(args.net)
         self.assertEqual((args.clients, args.port, args.windowed, args.probe),
                          (1, net_plan.DEFAULT_PORT, False, []))
-        self.assertEqual(args.map, "/Game/Maps/Lvl_Forest_200m")
+        self.assertIsNone(args.map)  # chosen per probe: uepylib/probe_level.py
 
     def test_net_takes_clients_probes_and_a_window(self):
         args = self.parse("--net", "--clients", "2", "--windowed", "--seconds", "9",

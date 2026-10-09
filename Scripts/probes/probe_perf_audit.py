@@ -15,6 +15,7 @@ back, so it is the same place for the same tree scatter (seed), whatever the
 tree meshes are.
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # benchmarks the real forest
 SYSTEMS = ('load',)
 import json
 import math

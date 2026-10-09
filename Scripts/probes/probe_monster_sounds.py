@@ -11,6 +11,7 @@ A sound can't be heard in a headless game; this reads what would play it:
     comes due (its patrol growls are its patrol's: npc/stats.py).
 """
 
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('sound',)
 
 import math

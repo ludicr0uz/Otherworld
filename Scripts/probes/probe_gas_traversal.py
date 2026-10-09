@@ -118,7 +118,7 @@ def probe(p):
         p=p, pawn=pawn, world=world, wc=wc, mesh=mesh, inst=inst, move=move,
         capsule=capsule, layers=layers, now=now, state=state, picked=picked, speed=speed,
         held=held, back_home=back_home, yaw=yaw)
-    for part in (_legs, _crouch, _slide, _mantle):
+    for part in (_legs, _crouch, _slide, _mantle, _vault_hurdle):
         yield from part(r)
 
 
@@ -363,3 +363,58 @@ def _mantle(r):
             f"before {_name(posed)}; {sorted(seen['montage'])}, feet {stood - feet.z:.0f} cm "
             f"up after {took:.1f} s; then {_name(after)}")
     block.destroy_actor()
+
+
+def _vault_hurdle(r):
+    """A thin block, a metre high and half that, is hurdled: the player ends on
+    the far side of each, the sample's own montage played. The sample's chooser
+    gives a thin block a hurdle and a deep one (60 cm) a mantle; no block of
+    this one-cube mesh got a vault out of it, standing or on the run."""
+    p, pawn, inst, move, capsule, now, held = r.p, r.pawn, r.inst, r.move, r.capsule, r.now, r.held
+    if not T.GAS_TRAVERSAL:
+        return
+    comp = pawn.get_component_by_class(unreal.load_class(None, TRAVERSAL_CLASS))
+    block_class = unreal.load_class(None, f"{T.BLOCK_BP}.{T.BLOCK_BP.rsplit('/', 1)[1]}_C")
+    for word, scale in (("hurdle a metre", unreal.Vector(0.3, 3.0, 1.0)),
+                        ("hurdle half a metre", unreal.Vector(0.3, 3.0, 0.5))):
+        yield from r.back_home()
+        feet = pawn.get_actor_location() - unreal.Vector(0, 0, capsule.get_scaled_capsule_half_height())
+        ahead = pawn.get_actor_forward_vector()
+        block = unreal.OtherworldLoadLibrary.spawn_actor_at(r.world, block_class, unreal.Transform(
+            feet + ahead * 300.0, unreal.Rotator(0.0, 0.0, r.yaw), scale))
+        p.check(f"a thin block to {word} spawns", block is not None)
+        if block is None:
+            continue
+        block.set_actor_scale3d(scale)
+        yield 0.2
+        origin, extent = block.get_actor_bounds(True)
+        shape = block.get_component_by_class(unreal.StaticMeshComponent)
+        low, high = shape.get_local_bounds()
+        depth = (high.x - low.x) * shape.get_world_scale().x
+        block.set_actor_location(
+            block.get_actor_location() + (feet + ahead * (BLOCK_AHEAD_CM + depth / 2.0))
+            - unreal.Vector(origin.x, origin.y, origin.z - extent.z), False, True)
+        yield 0.2
+        origin, extent = block.get_actor_bounds(True)
+        p.note(f"{word} block {2 * extent.x:.0f} x {2 * extent.y:.0f} x {2 * extent.z:.0f} cm")
+        before = pawn.get_actor_location()
+        seen = set()
+
+        def watch():
+            montage = inst.get_current_active_montage()
+            if montage:
+                seen.add(montage.get_name())
+        pawn.call_method(T.JUMP_EVENT)
+        start = now()
+        yield from held(0.5, each=watch)
+        while (comp.get_editor_property(T.DOING_VAR) or move.movement_mode
+               != unreal.MovementMode.MOVE_WALKING) and now() - start < 8.0:
+            yield from held(0.1, each=watch)
+        yield from held(0.5)
+        went = (pawn.get_actor_location() - before).dot(ahead)
+        p.check(f"the jump key in front of a thin block plays the sample's hurdle ({word}) and the "
+                "player ends past it, on the ground",
+                any("Hurdle" in m for m in seen) and went > BLOCK_AHEAD_CM + depth,
+                f"{sorted(seen)}, {went:.0f} cm ahead, feet "
+                f"{pawn.get_actor_location().z - capsule.get_scaled_capsule_half_height() - feet.z:.0f} up")
+        block.destroy_actor()

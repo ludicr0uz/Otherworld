@@ -1241,3 +1241,7 @@ These are feel checks a headless run can't do:
   near-white shows least; whether 5.5-8.5 m from the camera is the right "near"; how it sits over a long gun (it stands at
   the item's origin, not its middle), over a blade lodged in a trunk or a body, and in tall
   grass.
+
+## Hit reactions (C4)
+
+The six `MM_HitReact` clips stay on the motion-matching base: GAS's shove set has only a front shove, Lyra's are the same Epic clips. Record: `docs/health.md`, "Decision (C4)". Proof: `probes/probe_hit_react.py` (front, back, left, right).

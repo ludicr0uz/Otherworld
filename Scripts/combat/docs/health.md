@@ -244,3 +244,12 @@ cast's failed arm, `weapon_component/surface_impact.py`). Never both.
   pellet, each on its surface and facing out of it, no blood) and one into a wanderer (blood,
   and never more bursts than pellets). A hip-fired shell is a wide cloud: pellets that miss
   the ground carry on to a trunk, so a probe must not expect them round the reticle.
+
+### Decision (C4): the six `MM_HitReact` clips stay
+
+Compared on the bridge skeleton (the player plays `A_UEFN_Player_MM_HitReact_*`, retargeted by
+`retarget_to_uefn.py`): GAS's shove set (`/Game/GAS/.../Interactions/Shoves`) is one front shove
+(`M_relaxed_ragdoll_shove_stand_F`) and a pose-search database, with no back, left or right, so
+it is a worse spread. Lyra's `MM_HitReact_{Front,Back,Left,Right}_*` are the same Epic
+mannequin clips the game already uses; nothing is gained by swapping, and nothing was imported
+for the comparison, so nothing was deleted. `probes/probe_hit_react.py` shows one reaction from each side.

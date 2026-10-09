@@ -575,3 +575,35 @@ class AccountingTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class KnownFailuresTest(unittest.TestCase):
+
+    def test_parse(self):
+        rows = gate.parse_known("# c\n\na.py | pose x | since 2026-01-02 | why | more\nbad\n")
+        self.assertEqual(rows, [{"target": "a.py", "check": "pose x",
+                                 "since": "2026-01-02", "why": "why | more"}])
+
+    def test_shipped_file_parses(self):
+        self.assertEqual(len(gate.load_known()), 8)
+
+    def test_listed_check_is_not_a_regression(self):
+        known = gate.parse_known("a | pose x | since d | w")
+        after = {"a": row("a", 9, 1, ["pose x is off"])}
+        self.assertEqual(gate.regressions({"a": row("a", 10, 0)}, after, known), [])
+        self.assertEqual(len(gate.regressions({"a": row("a", 10, 0)}, after)), 1)
+        mixed = {"a": row("a", 8, 2, ["pose x is off", "other"])}
+        self.assertEqual(len(gate.regressions({"a": row("a", 10, 0)}, mixed, known)), 1)
+
+    def test_known_report(self):
+        known = gate.parse_known("a | pose x | since d | w\nb | y | since d | w")
+        standing, fixed = gate.known_report(
+            known, {"a": row("a", 9, 1, ["pose x"]), "b": row("b", 5, 0)})
+        self.assertEqual(len(standing), 1)
+        self.assertIn("remove the line", fixed[0])
+
+    def test_prompt_names_the_rule(self):
+        task = mock.Mock(text="t")
+        self.assertIn("known_failures.md",
+                      build_prompt(task, 1, 1, "/p", "| t |", False))
+        self.assertIn("known_failures.md", build_prompt(task, 1, 1, "/p", None, False))

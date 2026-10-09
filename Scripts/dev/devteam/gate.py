@@ -60,8 +60,55 @@ def describe(row):
     return f"{row['passed']}/{total}" + ("" if row.get("ok") else " FAILED")
 
 
-def regressions(before, after):
-    """What got worse between two sweeps, one line each (empty: nothing)."""
+KNOWN_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "known_failures.md")
+
+
+def parse_known(text):
+    """Rows of known_failures.md: ``target | check label | since DATE | why``.
+    Returns [{target, check, since, why}]; blank, ``#`` and malformed lines are skipped."""
+    rows = []
+    for line in text.splitlines():
+        parts = [x.strip() for x in line.split("|", 3)]
+        if line.lstrip().startswith("#") or len(parts) < 4 or not parts[0] or not parts[1]:
+            continue
+        rows.append({"target": parts[0], "check": parts[1],
+                     "since": parts[2].removeprefix("since").strip(), "why": parts[3]})
+    return rows
+
+
+def load_known(path=KNOWN_PATH):
+    try:
+        with open(path) as fh:
+            return parse_known(fh.read())
+    except OSError:
+        return []
+
+
+def _is_known(known, label, failure):
+    name = label.removesuffix(".py")
+    return any(k["target"].removesuffix(".py") == name and k["check"] in failure
+               for k in known)
+
+
+def known_report(known, after):
+    """(still failing, fixed) lines for the listed checks of the verifiers in ``after``."""
+    standing, fixed = [], []
+    for k in known:
+        row = next((r for l, r in (after or {}).items()
+                    if l.removesuffix(".py") == k["target"].removesuffix(".py")), None)
+        if row is None:
+            continue                                        # a probe, or not swept
+        if any(k["check"] in f for f in row.get("failures") or []):
+            standing.append(f"known: {k['target']} | {k['check']} (since {k['since']})")
+        else:
+            fixed.append(f"fixed, remove the line: {k['target']} | {k['check']}")
+    return standing, fixed
+
+
+def regressions(before, after, known=()):
+    """What got worse between two sweeps, one line each (empty: nothing).
+    A failure listed in ``known`` is never a regression."""
     if after is None:
         return ["the verifier sweep itself failed to run (see the sweep log)"]
     before = before or {}
@@ -73,6 +120,11 @@ def regressions(before, after):
             continue
         if a.get("ok"):
             continue
+        fails = a.get("failures") or []
+        if known and fails and not (a.get("tracebacks") or a.get("errors")) \
+                and len(fails) >= (a.get("failed") or 0) \
+                and all(_is_known(known, label, f) for f in fails):
+            continue                                        # only known failures
         if b is not None and not b.get("ok") and (a.get("failed") or 0) <= (b.get("failed") or 0):
             continue                                        # failing before, no worse
         first = "; ".join((a.get("failures") or a.get("tracebacks") or a.get("errors")

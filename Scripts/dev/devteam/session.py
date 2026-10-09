@@ -84,7 +84,15 @@ Before this session started, dev-team ran the verifier suite:
 
 When you finish, dev-team runs the same suite again. A verifier that newly \
 fails, or fails more checks than above, fails this task, so run the suites \
-you touched before you commit."""
+you touched before you commit.
+
+{known}"""
+
+KNOWN_RULE = """\
+Standing failures are listed in Scripts/dev/known_failures.md (one line each: \
+verifier or probe | check label | since | why). A listed check that fails is not \
+yours and never counts as a regression. Never rebuild, stash or check out HEAD to \
+prove a baseline: report against the recorded one."""
 
 GATE_BROKEN = """\
 dev-team could not get a baseline from the verifier suite before this session \
@@ -135,9 +143,9 @@ SETTINGS = {"permissions": {"allow": ALLOW, "deny": DENY}}
 def build_prompt(task, n, total, progress_path, baseline_table, commit):
     progress = PROGRESS.format(path=progress_path) if n > 1 else ""
     if baseline_table is None:
-        gate = GATE_BROKEN
+        gate = GATE_BROKEN + "\n\n" + KNOWN_RULE
     else:
-        gate = GATE.format(table=baseline_table)
+        gate = GATE.format(table=baseline_table, known=KNOWN_RULE)
     return PROMPT.format(n=n, total=total, task=task.text, progress=progress,
                          commit=COMMIT if commit else "", gate=gate, fail=FAIL_MARK,
                          fab=FAB.format(mark=FAB_MARK))

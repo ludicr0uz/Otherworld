@@ -182,7 +182,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     close_editors()
     after = sweep("after", sweep_log, pauser)
     paused("gate", result, reports)
-    problems = gate.regressions(baseline, after)
+    problems = gate.regressions(baseline, after, gate.load_known())
     attempts = 0
     while problems and attempts < args.fix_attempts and result.get("session_id"):
         attempts += 1
@@ -204,7 +204,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
             break
         after = sweep("after fix", sweep_log, pauser)
         paused("gate", result, reports)
-        problems = gate.regressions(baseline, after)
+        problems = gate.regressions(baseline, after, gate.load_known())
     gate_table = gate.table(baseline, after)
     if problems:
         ok = False

@@ -22,6 +22,9 @@ from combat.weapon_component import vars as WV
 WRITABLE = [(WEAPON_COMP_BP_PATH, WV.Stance), (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)]
 
 SETTLE_S = 0.6
+# The prone crawl is Mixamo's zombie crawl (C5), which lays the hands 12-18 cm up as it
+# bobs; the Quaternius stand-in held them above 15. Off the ground is the point.
+HANDS_UP_CM = 8.0
 
 
 def _skin(player):
@@ -100,14 +103,14 @@ def probe(p):
     gap = _hand_gap(player)
     p.check("prone with the shotgun raised: both hands are up off the ground, as "
             "far apart as standing (the gun is still in both)",
-            min(lying["hand_l"], lying["hand_r"]) > 15.0 and abs(gap - stand_gap) < 3.0,
+            min(lying["hand_l"], lying["hand_r"]) > HANDS_UP_CM and abs(gap - stand_gap) < 3.0,
             f"hands {lying['hand_l']:.0f} / {lying['hand_r']:.0f} cm up, "
             f"{stand_gap:.1f} -> {gap:.1f} cm apart")
     p.set(wc, RAISE_FORCED_VAR, False)
     yield SETTLE_S
     crawl = _heights(player)
     p.check("...and with no key held too: prone, the gun is not lowered",
-            min(crawl["hand_l"], crawl["hand_r"]) > 15.0
+            min(crawl["hand_l"], crawl["hand_r"]) > HANDS_UP_CM
             and abs(_hand_gap(player) - stand_gap) < 3.0,
             f"hands {crawl['hand_l']:.0f} / {crawl['hand_r']:.0f} cm up")
     p.set(wc, "Stance", 0)

@@ -134,7 +134,8 @@ _author_* fragment per concern, each in its own module:
               blow runs in the upkeep, pending only where the event ran
   knife       a Melee item held: the fire key slashes (behind the fire gate,
               beside the Consumable branch); punch.py's swing and blow on the
-              KNIFE Strike, playing A_KnifeSlash
+              KNIFE Strike, playing A_KnifeSlash, or A_AxeSwing while the
+              axe's ready pose is in hand
   holds       the guard and the use key as the server knows them:
               Server_SetHolds on a change, and the server's copy's own
               Blocking (its stamina) and FireWard (its stick), in the mirror

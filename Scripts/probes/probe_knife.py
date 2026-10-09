@@ -22,7 +22,7 @@ from combat.paths import (
 )
 from combat.tuning import COMBAT
 from combat.weapon_component.knife import (
-    KNIFE_ANIM_VAR, KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR, NEXT_KNIFE_VAR,
+    AXE_ANIM_VAR, KNIFE_ANIM_VAR, KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR, NEXT_KNIFE_VAR,
 )
 from graphics_menu.profile_consts import PROFILE_SLOT
 from combat import health_vars as HV
@@ -114,8 +114,9 @@ def _run(p):
     clip = p.get(wc, KNIFE_ANIM_VAR)
     p.check("the swing takes the queued slash",
             not p.get(wc, KNIFE_QUEUED_VAR) and p.get(wc, KNIFE_PENDING_VAR))
-    p.check(f"...and plays A_KnifeSlash in {AIM_SLOT}",
-            clip is not None and anim.is_playing_slot_animation(clip, AIM_SLOT),
+    p.check(f"...and plays A_KnifeSlash in {AIM_SLOT}, not the axe's clip",
+            clip is not None and anim.is_playing_slot_animation(clip, AIM_SLOT)
+            and not anim.is_playing_slot_animation(p.get(wc, AXE_ANIM_VAR), AIM_SLOT),
             str(anim.get_current_active_montage()))
     p.check("...and stamps the knife's cooldown",
             abs(p.get(wc, NEXT_KNIFE_VAR) - t0 - COMBAT.knife_interval_s) < 0.2,

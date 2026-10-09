@@ -5,8 +5,10 @@
             --> KnifeQueued. Not Melee goes on to the ready gate (the guns).
     swing   KnifeQueued --> Server_Slash, which (a Melee item in a living
             hand, not guarding, off cooldown) stamps NextKnifeTime and
-            KnifeDueTime, sets KnifePending and plays A_KnifeSlash
-            (KnifeAnim) into the upper-body slot
+            KnifeDueTime, sets KnifePending and plays the swing's clip into
+            the upper-body slot: A_AxeSwing (AxeAnim) while the ready pose in
+            hand (HandPose, which every machine's copy has) is the axe's
+            (AxePose), else A_KnifeSlash (KnifeAnim)
     blow    KnifePending AND now >= KnifeDueTime --> a sphere in front of the
             chest; a body with BP_HealthComponent loses COMBAT.knife_damage,
             or twice that off a creature afraid of fire while the blade in
@@ -22,10 +24,12 @@ a Melee item never reaches the ammunition or cooldown tests of a gun.
 
 The press only queues, so a probe can slash by writing KnifeQueued (no key
 can be injected into a headless game). Tuning is COMBAT.knife_* in tuning.py;
-the clip is knife_anim.py's.
+the clips are melee_clips.py's, each cut so that it strikes
+COMBAT.knife_impact_s in.
 """
 
-from uebp.graph import _connect, _node, _pin, else_, out, then
+from uebp.graph import _connect, _must_load, _node, _pin, else_, out, then
+from combat.paths import AXE_ANIM_PATH, HOLD_AXE_ANIM_PATH
 from combat.fx_vars import BLADE_HIT, SLASH
 from combat.strike_vars import SERVER_SLASH
 from combat.tuning import COMBAT
@@ -46,12 +50,23 @@ KNIFE_PENDING_VAR = "KnifePending"
 NEXT_KNIFE_VAR = "NextKnifeTime"
 KNIFE_DUE_VAR = "KnifeDueTime"
 MELEE_VAR = IV.Melee
+# The axe's own clip, and the ready pose that says the axe is in hand.
+AXE_ANIM_VAR = "AxeAnim"
+AXE_POSE_VAR = "AxePose"
+AXE_CLIP_VARS = (AXE_ANIM_VAR, AXE_POSE_VAR)
 
 KNIFE = Strike("knife", KNIFE_ANIM_VAR, KNIFE_QUEUED_VAR, KNIFE_PENDING_VAR,
                NEXT_KNIFE_VAR, KNIFE_DUE_VAR, COMBAT.knife_interval_s,
                COMBAT.knife_impact_s, COMBAT.knife_damage, COMBAT.knife_reach_cm,
                COMBAT.knife_radius_cm, COMBAT.knife_chest_cm, WV.BladeHitSounds,
-               SERVER_SLASH, True, SLASH, BLADE_HIT)
+               SERVER_SLASH, True, SLASH, BLADE_HIT,
+               by_pose=((AXE_POSE_VAR, AXE_ANIM_VAR),))
+
+
+def axe_clip_defaults():
+    """The component's defaults for AXE_CLIP_VARS."""
+    return {AXE_ANIM_VAR: _must_load(AXE_ANIM_PATH),
+            AXE_POSE_VAR: _must_load(HOLD_AXE_ANIM_PATH)}
 
 
 def _author_knife_press(ed, held, tap, not_melee):

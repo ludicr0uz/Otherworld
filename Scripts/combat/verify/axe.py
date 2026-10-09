@@ -1,11 +1,15 @@
-"""verify.axe -- the axe (combat/axe.py): the item, its model in the fist, and
-its place in the starting loadout. The swing is the knife's (verify/knife.py):
-the one Held.Melee Branch takes either."""
+"""verify.axe -- the axe (combat/axe.py): the item, its model in the fist, its
+swing's clip and its place in the starting loadout. The swing is the knife's
+stage (verify/knife.py): the one Held.Melee Branch takes either, and plays the
+axe's own clip while the axe's ready pose is in hand."""
 
 import unreal
 
 from combat.axe import AXE_DISPLAY, AXE_MESH, AXE_SCALE, axe_outline
-from combat.paths import AXE_BP_PATH, HOLD_KNIFE_ANIM_PATH, ITEM_BP_PATH
+from combat.paths import (
+    AXE_ANIM_PATH, AXE_BP_PATH, HOLD_AXE_ANIM_PATH, ITEM_BP_PATH, KNIFE_BP_PATH,
+)
+from combat.skin import player_skin
 from combat.verify.common import (
     BEL, by_pins, cdo, check, component_template, load,
 )
@@ -13,7 +17,7 @@ from combat.verify.fixtures import w, wg
 from combat.verify.grip_fit import check_handles_in_fist
 from combat.verify.punch import _feeders, _title
 from combat.weapon_component.inventory import STARTER_CLASS_VARS
-from combat.weapon_component.knife import MELEE_VAR
+from combat.weapon_component.knife import AXE_ANIM_VAR, AXE_POSE_VAR, MELEE_VAR
 
 # A one-handed camp axe, head to knob (cm).
 AXE_LENGTH_CM = (50.0, 80.0)
@@ -55,13 +59,25 @@ def check_axe_item():
           str(model.get_collision_profile_name()) == "NoCollision",
           str(model.get_collision_profile_name()))
     pose = d.get_editor_property("AimPose")
-    check("...held in A_HoldKnife, with an icon and its name",
-          pose is not None and pose == load(HOLD_KNIFE_ANIM_PATH)
+    check("...held in A_HoldAxe, Mixamo's axe idle (melee_clips.py), with an icon "
+          "and its name",
+          pose is not None and pose == load(HOLD_AXE_ANIM_PATH)
           and d.get_editor_property("Icon") is not None
           and str(d.get_editor_property("DisplayName")) == AXE_DISPLAY,
           f"{pose} {d.get_editor_property('Icon')}")
-    check_handles_in_fist([("Axe", AXE_BP_PATH, HOLD_KNIFE_ANIM_PATH,
+    check_handles_in_fist([("Axe", AXE_BP_PATH, HOLD_AXE_ANIM_PATH,
                             axe_outline(), "Grip", None)])
+    swing = w.get_editor_property(AXE_ANIM_VAR)
+    check(f"{AXE_ANIM_VAR} is A_AxeSwing, a clip of the axe's own (the knife's stage "
+          "plays it: verify/knife.py), on the worn skeleton",
+          swing is not None and swing == load(AXE_ANIM_PATH)
+          and swing.get_editor_property("skeleton")
+          == load(player_skin().mesh).get_editor_property("skeleton"), str(swing))
+    check(f"...picked while the ready pose in hand is {AXE_POSE_VAR}: the axe's own, "
+          "and no other item's",
+          w.get_editor_property(AXE_POSE_VAR) == pose
+          and pose != cdo(load(KNIFE_BP_PATH)).get_editor_property("AimPose"),
+          str(w.get_editor_property(AXE_POSE_VAR)))
 
 
 def check_axe_loadout():

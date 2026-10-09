@@ -4,15 +4,16 @@
     OW_FX_SHOTS=1 python3 Scripts/dev/uepy.py --net --clients 2 --windowed --probe-timeout 240 --probe Scripts/probes/probe_net_fx.py
 
 Client 1 acts: it walks a few metres off (its footsteps), fires its issued
-gun at the ground ahead, reloads, brings the knife to hand and slashes, then
-throws the knife. After each step it posts what its own copy counts.
+gun at the ground ahead, reloads, brings the axe to hand and swings it, then
+the knife and slashes, then throws the knife. After each step it posts what its own copy counts.
 
 Every cosmetic the server tells of is counted on the copy that played it
 (FxPlayed, the gated arm of each Multicast_*): the server and client 2 count
 client 1's shot, reload, swing and throw (and its throw's clip), client 2 the
 pellets' chips too, and client 1 itself counts only the chips (what it did
-not predict). Client 2 also sees the knife's clip and the throw's clip
-playing on its copy of client 1's character, and the chips as BP_BulletImpact
+not predict). Client 2 also sees the axe's own clip (picked on each machine by
+the ready pose it is told of: weapon_component/knife.py), the knife's clip and
+the throw's clip playing on its copy of client 1's character, and the chips as BP_BulletImpact
 actors in its world, and its copy's footstep component striding.
 
 With --windowed and OW_FX_SHOTS=1 client 2 faces client 1's character and
@@ -43,7 +44,7 @@ from combat.weapon_component.throw import (
     THROW_AIMING_VAR, THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR)
 from combat.weapon_component.throw_windup import THROW_ANIM_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR
-from combat.weapon_component.knife import KNIFE_ANIM_VAR
+from combat.weapon_component.knife import AXE_ANIM_VAR, KNIFE_ANIM_VAR
 
 RUNS_ON = ("server", "client", "standalone")
 WRITABLE = [(WEAPON_COMP_BP_PATH, v) for v in (
@@ -57,9 +58,11 @@ SEEN_S = 6.0          # wall seconds a watcher gives a cosmetic to arrive
 WALK_CM = 350.0
 AIM_DOWN_DEG = -25.0  # the shot goes into the ground ahead: pellets that land
 SPARE_HEALTH = 100000.0
-STEPS = ("fired", "reloaded", "slashed", "thrown")
+STEPS = ("fired", "reloaded", "chopped", "slashed", "thrown")
+# The clip another machine must see on its copy, and what the check calls it.
+SEEN_CLIPS = {"chopped": (AXE_ANIM_VAR, "axe"), "slashed": (KNIFE_ANIM_VAR, "knife")}
 # What the server's word adds to FxPlayed on a copy that did not predict it.
-TOLD = {"fired": 1, "reloaded": 1, "slashed": 1, "thrown": 2}
+TOLD = {"fired": 1, "reloaded": 1, "chopped": 1, "slashed": 1, "thrown": 2}
 
 
 def _await(ready, seconds=WAIT):
@@ -165,15 +168,19 @@ def _act(p, pawn, wc, other):
     p.set(wc, ReloadForced, False)
     yield from _await(lambda: all(p.posted(w, "saw reloaded") for w in ("client 2", "server")))
 
-    p.hold(wc, _index(p, wc, "knife"))
-    yield from _await(lambda: p.get(wc, WV.Held) is not None
-                      and "knife" in p.get(wc, WV.Held).get_class().get_name().lower(), 10.0)
-    yield from _await(lambda: False, 0.5)
     now = lambda: unreal.GameplayStatics.get_time_seconds(p.world())
-    yield from _await(lambda: now() >= p.get(wc, NEXT_KNIFE_VAR), 5.0)
-    yield from step("slashed", lambda: p.set(wc, KNIFE_QUEUED_VAR, True),
-                    lambda: not p.get(wc, KNIFE_QUEUED_VAR))
-    yield from _await(lambda: all(p.posted(w, "saw slashed") for w in ("client 2", "server")))
+    for name, word in (("chopped", "axe"), ("slashed", "knife")):
+        p.hold(wc, _index(p, wc, word))
+        yield from _await(lambda: p.get(wc, WV.Held) is not None
+                          and word in p.get(wc, WV.Held).get_class().get_name().lower(), 10.0)
+        # ...and long enough for the others to be told the ready pose in
+        # hand, which is what picks the axe's clip on their copies.
+        yield from _await(lambda: False, 0.5)
+        yield from _await(lambda: now() >= p.get(wc, NEXT_KNIFE_VAR), 5.0)
+        yield from step(name, lambda: p.set(wc, KNIFE_QUEUED_VAR, True),
+                        lambda: not p.get(wc, KNIFE_QUEUED_VAR))
+        yield from _await(lambda: all(p.posted(w, f"saw {name}")
+                                      for w in ("client 2", "server")))
 
     bag = len(list(p.get(wc, WV.Inventory)))
 
@@ -189,7 +196,8 @@ def _act(p, pawn, wc, other):
     p.check("client 1's throw left its hand", len(list(p.get(wc, WV.Inventory))) < bag,
             f"{bag} -> {len(list(p.get(wc, WV.Inventory)))} item(s)")
     p.check("client 1 did not count its own reload, swing or throw: it predicted them",
-            mine["reloaded"] == 0 and mine["slashed"] == 0 and mine["thrown"] == 0,
+            mine["reloaded"] == 0 and mine["chopped"] == 0 and mine["slashed"] == 0
+            and mine["thrown"] == 0,
             str(mine))
     yield from _await(lambda: all(p.posted(w, "saw thrown") for w in ("client 2", "server")))
     p.post("done")
@@ -233,8 +241,8 @@ def _watch(p, other, draws):
         yield from _await(lambda: p.posted("client 1", name) is not None)
         want = TOLD[name]
         yield from _await(lambda: _played(p, wc) >= counted + want, SEEN_S)
-        if name in ("slashed", "thrown") and draws:
-            clip = KNIFE_ANIM_VAR if name == "slashed" else THROW_ANIM_VAR
+        if name in ("chopped", "slashed", "thrown") and draws:
+            clip, what = SEEN_CLIPS.get(name, (THROW_ANIM_VAR, "throw"))
             seen, states, until = [], [], time.time() + 3.0
             while time.time() < until and not seen:
                 if _playing(p, wc, other, clip):
@@ -244,7 +252,7 @@ def _watch(p, other, draws):
                     states.append(state)
                 yield 0.0
             _shot(p)
-            p.check(f"{p.where} sees client 1's {'knife' if name == 'slashed' else 'throw'} "
+            p.check(f"{p.where} sees client 1's {what} "
                     "clip playing on its copy of the character",
                     bool(seen), f"{seen[0] if seen else 'never seen'}; the slot went "
                     f"{states[:6]}")

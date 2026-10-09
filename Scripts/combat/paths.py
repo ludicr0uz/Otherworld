@@ -31,12 +31,15 @@ PISTOL_BP_PATH = f"{WEAPON_DIR}/BP_Pistol"
 SMG_BP_PATH = f"{WEAPON_DIR}/BP_SMG"
 RIFLE_BP_PATH = f"{WEAPON_DIR}/BP_AssaultRifle"
 SNIPER_BP_PATH = f"{WEAPON_DIR}/BP_SniperRifle"
-# The knife: a melee item, not a gun (knife.py), and its slash clip, which
-# knife_anim.py keys for whatever body the player wears.
+# The knife: a melee item, not a gun (knife.py), and its swing's clip, a
+# stab (the asset keeps the name it had as a keyed slash), which
+# melee_clips.py bakes from Mixamo's.
 KNIFE_BP_PATH = f"{WEAPON_DIR}/BP_Knife"
 KNIFE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_KnifeSlash"
-# The axe: the other melee item (axe.py), swung through the knife's stage.
+# The axe: the other melee item (axe.py), swung through the knife's stage,
+# in a clip of its own (melee_clips.py).
 AXE_BP_PATH = f"{WEAPON_DIR}/BP_Axe"
+AXE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_AxeSwing"
 # Wood: what a tree gives the axe (wood.py, weapon_component/chop.py).
 WOOD_BP_PATH = f"{WEAPON_DIR}/BP_Wood"
 # The matches: struck, with wood in the bag, to light a campfire (matches.py,
@@ -45,10 +48,12 @@ MATCHES_BP_PATH = f"{WEAPON_DIR}/BP_Matches"
 # The stick: lit at a campfire, a torch until it burns out (stick.py,
 # weapon_component/torch.py).
 STICK_BP_PATH = f"{WEAPON_DIR}/BP_Stick"
-# The hold poses (combat/hold_pose.py): food and water carried, the knife
-# ready, the stick carried as a torch and held out at a creature.
+# The hold poses (combat/hold_pose.py): food and water carried, the stick
+# carried as a torch and held out at a creature.
 HOLD_ITEM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldItem"
+# The knife and the axe ready: Mixamo's idles (combat/melee_clips.py).
 HOLD_KNIFE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldKnife"
+HOLD_AXE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldAxe"
 HOLD_TORCH_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldTorch"
 WARD_TORCH_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_WardTorch"
 # The arm cocked while a throw is aimed (combat/throw_pose.py).

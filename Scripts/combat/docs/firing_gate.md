@@ -63,8 +63,9 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - The swing and the blow are the punch's (`punch._author_swing`), run on the `KNIFE` Strike
     with its own variables (`KnifeQueued/Pending`, `NextKnifeTime`, `KnifeDueTime`, `KnifeAnim`).
     They run every frame whatever is held, so a slash put away mid-swing still lands.
-  - The clip is `A_KnifeSlash` (`knife_anim.py`), 0.6 s, starting and ending in the pistol ready
-    pose the knife is held in; the ready-pose keepalive puts that pose back afterwards.
+  - The clip is `A_KnifeSlash` (Mixamo's stab), or `A_AxeSwing` while the axe's ready pose is in
+    hand (`melee_clips.py`), each cut to strike `COMBAT.knife_impact_s` in; the ready-pose
+    keepalive puts the ready pose back afterwards.
   - The blow: a 25 cm sphere 150 cm forward, 35 HP, the pellet's stamps. No blood, no hit zones.
   - `Scripts/probes/probe_knife.py` equips the knife, writes `KnifeQueued` and sees the clip, the
     35 HP and the ready pose come back. `verify/knife.py`'s `is_melee_*` set both attacks' nodes

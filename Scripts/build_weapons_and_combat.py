@@ -36,8 +36,9 @@ WHAT THIS BUILDS
   BP_Matches        child of BP_WeaponItem: a box of matches; struck with wood
                     in the bag, it lights a campfire (combat/matches.py,
                     weapon_component/light.py; the campfire is survival's)
-  Anims/A_KnifeSlash  the slash, keyed for the worn body (combat/knife_anim.py)
-  Anims/A_HoldItem, A_HoldKnife  how food and the knife are held (combat/hold_pose.py)
+  Anims/A_KnifeSlash, A_AxeSwing, A_HoldKnife, A_HoldAxe  the knife's and the axe's
+                      swing and ready pose, baked from Mixamo's (combat/melee_clips.py)
+  Anims/A_HoldItem, A_HoldTorch, A_WardTorch  how food and the stick are held (combat/hold_pose.py)
   Anims/A_ThrowReady  the arm cocked while a throw is aimed (combat/throw_pose.py)
   Anims/A_AimShotgun             the shotgun's ready pose: the thumb over the stock (combat/shotgun_pose.py)
   BP_HealthComponent  Health/MaxHealth + death, despawn and respawn
@@ -83,7 +84,8 @@ from combat.wood import build_wood                                # noqa: E402
 from combat.matches import build_matches                          # noqa: E402
 from combat.stick import build_stick                              # noqa: E402
 from combat.knife import build_knife                              # noqa: E402
-from combat.knife_anim import build_knife_slash                   # noqa: E402
+from combat.melee_clips import build_melee_clips                  # noqa: E402
+from combat.paths import KNIFE_ANIM_PATH                          # noqa: E402
 from combat.hold_pose import build_hold_poses                     # noqa: E402
 from combat.shotgun_pose import build_shotgun_pose                # noqa: E402
 from combat.install import (                                      # noqa: E402
@@ -172,12 +174,14 @@ def main():
         weapons[spec["display"]] = build_weapon(spec, item_bp)
     # Before the knife and the consumables, whose grips are solved in them.
     build_hold_poses(skin)
+    # The knife's and the axe's ready pose and swing: Mixamo's clips.
+    melee_clips = build_melee_clips(skin)
     # The arm cocked while a throw is aimed: the throw clip, stopped.
     build_throw_ready(skin)
     # The third starter item: a melee item, not a row of the gun table.
     knife_bp = build_knife(item_bp)
-    knife_clip = build_knife_slash(skin)
-    # The fourth: the axe, swung through the knife's slash.
+    knife_clip = melee_clips[KNIFE_ANIM_PATH]
+    # The fourth: the axe, swung through the knife's stage.
     axe_bp = build_axe(item_bp)
     # ...and what a tree gives it.
     wood_bp = build_wood(item_bp)

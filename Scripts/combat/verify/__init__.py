@@ -82,9 +82,10 @@ and it never relies on a variable another section left behind.
   accuracy    the per-gun cloud and recoil factors: the table, the weapons'
               variables, AimSpread/RecoilScale/ReticleSpread, the shot's draw
   punch       empty hands: the press gate, the clip, the sweep and the blow
-  knife       the knife: the item, the slash clip, the loadout, the press
+  knife       the knife: the item, the swing's clip, the loadout, the press
               behind the fire gate, the swing and the blow; is_melee_*
-  axe         the axe: the item, its model in the fist, the loadout
+  axe         the axe: the item, its model in the fist, its swing's clip, the
+              loadout
   chop        chopping a tree: BP_Wood, who Chops, the stage off the knife's
               blow (the tree test, the count, the stored landing point, the
               spawn); is_chop_node
@@ -95,8 +96,11 @@ and it never relies on a variable another section left behind.
               burn-out, the torch poses, the loadout, Using/UsePressed off the
               sights key (which then does not aim), the light at a campfire,
               FireWard, the raised pose's swap
-  hold_pose   every hold pose's arms; A_HoldItem / A_HoldKnife: hands, fist,
-              who holds them
+  hold_pose   every hold pose's arms; A_HoldItem: hands, fist; who holds the
+              knife's and the carry's
+  melee_clips the knife's and the axe's ready pose and swing: Mixamo's clips
+              frame for frame, in place, the right fist the pistol's, the
+              hand out at the blow's time
   shotgun_pose  A_AimShotgun: the rifle pose but for the thumbs, where they
               point and sit on the shotgun, the grip unchanged
   interact    the interact key: its idle state, the probe's press, the reach,
@@ -179,6 +183,6 @@ and it never relies on a variable another section left behind.
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "glimmer", "heat",
+    "hold_pose", "melee_clips", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
 )

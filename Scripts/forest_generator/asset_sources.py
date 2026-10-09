@@ -302,7 +302,12 @@ GENERATED = (
              "into Characters/Rigs, and re-points the zombie's "
              "A_Zombie01_BS_Idle_Walk_Run at the Mixamo idle/walk/run. Runs "
              "after build_retarget.py, which re-applies that blend space edit "
-             "itself when it regenerates the set.",
+             "itself when it regenerates the set. Its last step "
+             "(import_mixamo_player.py alone) is the player's melee set: the "
+             "clips of mixamo_paths.PLAYER_CLIPS under Knife/ and MeleeAxe/, "
+             "retargeted onto the player's skeleton under UEFN_Player/ "
+             "(RTG_UEFN_Player_from_XBot in Characters/Rigs), which the weapons "
+             "build bakes into Weapons/Anims (combat/melee_clips.py).",
     ),
     AssetSource(
         dest="Content/Sourced/Quaternius",
@@ -405,7 +410,10 @@ CACHE = CACHE + (
              "(it needs an Adobe sign-in); each ships X Bot.fbx and one FBX "
              "per clip. "
              "import_mixamo.py unzips them beside themselves; "
-             "asset_pipeline/mixamo_paths.PACKS lists the ones it reads.",
+             "asset_pipeline/mixamo_paths.PACKS lists the ones it reads. The "
+             "player's melee set is PLAYER_PACKS: Pro Melee Axe Pack.zip, and "
+             "a folder Knife/ holding the single downloads Stabbing.fbx and "
+             "Knife Idle.fbx.",
     ),
 )
 

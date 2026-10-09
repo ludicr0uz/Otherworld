@@ -45,7 +45,7 @@ from combat.anim_blueprint import AIM_SLOT
 from combat.damage import hit as take_hit, owner_instigator
 from net.guard import author_guard
 from uebp.graph import (
-    _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
+    PIN, _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat import item_vars as IV
 from combat.paths import HEALTH_CLASS_PATH, ITEM_CLASS_PATH
 from combat.fx_vars import LOCATION_PARAM, PUNCH as PUNCH_FX, PUNCH_HIT, SOUND_AT_PARAMS
@@ -62,9 +62,10 @@ from uebp.nodes.actor import (
     FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GET_OWNER,
     FN_PLAY_SLOT)
 from uebp.nodes.math import (
-    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_GE_FF, FN_MUL_VF, FN_NOT)
+    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_EQ_OO, FN_GE_FF, FN_MUL_VF, FN_NOT)
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_SPHERE_TRACE, FN_TIME_SECONDS
+from combat.weapon_component import look_vars as LV
 from combat.weapon_component import vars as WV
 from Sound.play import _author_sound
 
@@ -104,6 +105,10 @@ class Strike:
     # How far into its clip the swing starts (the wind-up skipped), so the
     # blow's time can stay where the game has it under a longer clip.
     clip_start_s: float = 0.0
+    # ((ready-pose variable, clip variable), ...): the swing plays that clip
+    # instead while HandPose is that ready pose (the axe's, on the knife's
+    # Strike). HandPose and not Held: every machine's copy has it (look.py).
+    by_pose: tuple = ()
 
 
 PUNCH = Strike("punch", PUNCH_ANIM_VAR, PUNCH_QUEUED_VAR, PUNCH_PENDING_VAR,
@@ -175,15 +180,14 @@ def _author_punch_blow(ed, exec_ins):
     return _author_blow(ed, PUNCH, exec_ins)
 
 
-def _author_clip(ed, strike, exec_in):
-    """The strike's clip into the upper-body slot, and the air it moves,
-    heard at the player. Returns (the exec pin after them, the play node)."""
+def _author_play(ed, strike, anim_var, exec_in):
+    """One clip into the upper-body slot, once; returns the play node."""
     mesh = _get(ed, WV.OwnerMesh)
     anim = _node(ed, FN_ANIM_INSTANCE)
     _connect(mesh, _pin(anim, "self"))
     play = _node(ed, FN_PLAY_SLOT)
     _connect(out(anim), _pin(play, "self"))
-    _connect(_get(ed, strike.anim_var), _pin(play, "Asset"))
+    _connect(_get(ed, anim_var), _pin(play, "Asset"))
     _set(play, "SlotNodeName", AIM_SLOT)
     _set(play, "BlendInTime", PUNCH_BLEND_S)
     _set(play, "BlendOutTime", PUNCH_BLEND_S)
@@ -192,10 +196,34 @@ def _author_clip(ed, strike, exec_in):
     if strike.clip_start_s:
         _set(play, "InTimeToStartMontageAt", strike.clip_start_s)
     _connect(exec_in, _pin(play, "execute"))
+    return play
+
+
+def _author_clip(ed, strike, exec_in):
+    """The strike's clip into the upper-body slot, and the air it moves,
+    heard at the player. Which clip is the ready pose in hand's
+    (``strike.by_pose``: a Branch each), else the strike's own. Returns (the
+    exec pin after them, the strike's own play node)."""
+    played = []
+    for pose_var, anim_var in strike.by_pose:
+        same = _node(ed, FN_EQ_OO)
+        _connect(_get(ed, LV.HandPose), _pin(same, "A"))
+        _connect(_get(ed, pose_var), _pin(same, "B"))
+        pick = ed.add_branch_node()
+        _connect(out(same), _pin(pick, "Condition"))
+        _connect(exec_in, _pin(pick, "execute"))
+        played.append(then(_author_play(ed, strike, anim_var, then(pick))))
+        exec_in = else_(pick)
+    play = _author_play(ed, strike, strike.anim_var, exec_in)
     owner = _node(ed, FN_GET_OWNER)
     here = _node(ed, FN_ACTOR_LOC)
     _connect(out(owner), _pin(here, "self"))
-    return _author_sound(ed, WV.SwingSounds, out(here), then(play)), play
+    after = _author_sound(ed, WV.SwingSounds, out(here), then(play))
+    # Every play runs on into the one sound: an exec input takes many links.
+    sound, = PIN.list_connected_pins(then(play))
+    for pin in played:
+        _connect(pin, sound)
+    return after, play
 
 
 def _author_swing(ed, strike, exec_ins):

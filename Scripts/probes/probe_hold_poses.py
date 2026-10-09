@@ -8,7 +8,8 @@ raised, as an aim key raises it: at rest a gun is carried lowered, which is
 probe_carry.py's). Each must
 play its own AimPose in the upper-body slot -- A_HoldItem for the mushroom,
 A_HoldKnife for the knife -- and the right hand must actually move: lowest
-with the mushroom, highest with the pistol, the knife in between.
+with the mushroom or the knife (its ready pose is Mixamo's knife idle, the
+blade at the hip), highest with the pistol.
 
 Any profile on disk is set aside first, so the game starts on the issued
 loadout, and put back at the end.
@@ -112,7 +113,9 @@ def _run(p):
         heights[label] = _hand_z(player)
     p.note(f"right hand above the capsule centre: "
            f"{ {k: round(v, 1) for k, v in heights.items()} }")
-    p.check("the mushroom is carried low, the knife higher, the pistol aimed highest",
-            heights["mushroom"] + APART_CM < heights["knife"]
+    # The knife's ready pose is Mixamo's knife idle (melee_clips.py): the
+    # blade at the hip, not up before the chest as the keyed pose had it.
+    p.check("the mushroom and the knife are carried low, the pistol aimed high over both",
+            heights["mushroom"] + APART_CM < heights["pistol"]
             and heights["knife"] + APART_CM < heights["pistol"],
             str({k: round(v, 1) for k, v in heights.items()}))

@@ -188,7 +188,7 @@ class CombatConfig:
     # --- the knife: the fire key with the knife held (weapon_component/knife) -
     # The same three stages as the punch (press, swing, blow), on their own
     # variables. A slash every knife_interval_s; the blow lands knife_impact_s
-    # in, at the bottom of the swing of A_KnifeSlash (knife_anim.py), on the
+    # in, which is where each swing's clip is cut to strike (melee_clips.py), on the
     # first body a knife_radius_cm sphere meets within knife_reach_cm. Three
     # slashes kill a 100 HP wanderer, against the punch's seven: a real weapon
     # at arm's length, where the guns are at range.

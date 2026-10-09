@@ -138,11 +138,13 @@ DATA (constants and pure tables -- no Blueprint authoring)
   stick             BP_Stick: Quaternius's Survival Pack torch, bare and
                     burning, and its glow; its own Tick puts it out and shows
                     the one or the other; build_stick()
-  knife_anim        A_KnifeSlash: the slash keyed bone by bone onto the
-                    knife's hold pose (AnimationDataController)
-  hold_pose         A_HoldItem / A_HoldKnife / A_HoldTorch / A_WardTorch: food
-                    carried at the waist, the knife up in a fighting stance, the
-                    stick carried as a torch and held out, keyed off the idle
+  melee_clips       A_HoldKnife / A_KnifeSlash / A_HoldAxe / A_AxeSwing: the
+                    knife's and the axe's ready pose and swing, baked from
+                    Mixamo's clips (the right fist closed, a swing cut to
+                    strike at the blow's time); the MELEE_CLIPS table
+  hold_pose         A_HoldItem / A_HoldTorch / A_WardTorch: food carried at
+                    the waist, the stick carried as a torch and held out,
+                    keyed off the idle
   throw_pose        A_ThrowReady: the arm cocked while a throw is aimed, the
                     skin's throw clip stopped where its hand is furthest back
   shotgun_pose      A_AimShotgun: the shotgun's ready pose, the rifle's with

@@ -46,8 +46,8 @@ from combat.weapon_component.inventory import (
     STARTER_CLASS_VARS, _author_wc_begin_play,
 )
 from combat.weapon_component.knife import (
-    KNIFE_ANIM_VAR, KNIFE_DUE_VAR, KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR,
-    NEXT_KNIFE_VAR,
+    AXE_CLIP_VARS, KNIFE_ANIM_VAR, KNIFE_DUE_VAR, KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR,
+    NEXT_KNIFE_VAR, axe_clip_defaults,
 )
 from combat.weapon_component.pose_weights import (
     HELD_SUPPORT_POINT, HELD_TWO_HANDED, SEARCHING_VAR,
@@ -300,8 +300,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # What the knife's blow takes off the body it met (hot_blow.py).
     _declare(ed, BLOW_DAMAGE_VAR, _float_type())
     # The knife's slash (knife.py): the same four, on the knife's own clip.
-    _declare(ed, KNIFE_ANIM_VAR, BEL.get_object_reference_type(
-        unreal.AnimSequenceBase.static_class()))
+    for name in (KNIFE_ANIM_VAR, *AXE_CLIP_VARS):
+        _declare(ed, name, BEL.get_object_reference_type(
+            unreal.AnimSequenceBase.static_class()))
     for name in (KNIFE_QUEUED_VAR, KNIFE_PENDING_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     for name in (NEXT_KNIFE_VAR, KNIFE_DUE_VAR):
@@ -466,6 +467,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         NEXT_PUNCH_VAR: 0.0,
         PUNCH_DUE_VAR: 0.0,
         KNIFE_ANIM_VAR: knife_clip,
+        **axe_clip_defaults(),
         KNIFE_QUEUED_VAR: False,
         KNIFE_PENDING_VAR: False,
         NEXT_KNIFE_VAR: 0.0,

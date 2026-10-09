@@ -13,8 +13,8 @@ THE MODEL AND HOW IT SITS IN THE HAND
 -------------------------------------
 SK_M9_Knife_X stands on its end in its own frame: the handle z -5.2..7.2
 (2.7 cm round, centred on z 1.0), the guard at z -5.4, the blade down to
-z -24.3 -- measured off the mesh's vertices. It is held in A_HoldKnife, a
-fighting stance (hold_pose.py) whose fist is the pistol pose's, and a pistol's
+z -24.3 -- measured off the mesh's vertices. It is held in A_HoldKnife,
+Mixamo's knife idle (melee_clips.py), whose fist is the pistol pose's, and a pistol's
 grip runs up and down through the fist, so the knife's handle does too: the
 model is turned over, blade up, and tipped 30 deg forward, a hammer grip with
 the edge leading. `Grip` in the outline is the handle, so grip._grip_location
@@ -35,6 +35,7 @@ from uebp.graph import BEL, _apply_defaults, _assets, _create_blueprint, _must_l
 from combat.grip import _grip_location, _grip_rotation, _rotate_vector
 from combat.heat import build_heated_model, build_hot_instance
 from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
+from combat.skin import player_skin
 from combat.paths import (
     CUBE, HOLD_KNIFE_ANIM_PATH, KNIFE_BP_PATH, MAT_HOT_KNIFE, MAT_METAL,
     THROW_READY_ANIM_PATH,
@@ -138,7 +139,11 @@ def build_knife(item_bp):
     (_n, _m, loc, rot, _s), = knife_model()
     build_heated_model(bp, knife_model(), _placed(BLADE_CENTRE, rot, loc))
     aim = HOLD_KNIFE_ANIM_PATH
-    grip_rot = _grip_rotation(aim)
+    # Seated as a pistol is: the ready pose's fist is the pistol pose's
+    # (melee_clips.py), and its hand is turned as Mixamo's clip turns it, so
+    # the rotation is the pistol hand's own and not one solved for a hand
+    # that faces ahead.
+    grip_rot = _grip_rotation(player_skin().aim_pistol)
     lodge = knife_lodge()
     throw_grip = knife_throw_grip(grip_rot)
     _apply_defaults(bp, {

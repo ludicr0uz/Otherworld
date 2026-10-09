@@ -5,8 +5,10 @@ An axe IS a BP_WeaponItem flagged `Melee`, for the reasons the knife is one
 (knife.py): the bag, Q, G, E and the HUD strip are keyed on that class, and
 the fire key's gate branches on `Melee` before anything gun-shaped runs. So
 with the axe in hand the fire key swings it through the knife's own stage
-(weapon_component/knife.py): the same clip, cooldown, reach and damage. It has
-no numbers of its own yet; an axe that hits harder needs its own Strike there.
+(weapon_component/knife.py): the same cooldown, reach and damage, in a clip of
+its own (A_AxeSwing, a chop from overhead: melee_clips.py; the stage picks it
+by the ready pose in hand). It has no numbers of its own yet; an axe that
+hits harder needs its own Strike there.
 What is its own is `Chops`: a blow of it that lands on a tree cuts wood
 (weapon_component/chop.py).
 
@@ -20,7 +22,8 @@ in cm: the haft from z -16 (its knob) to 23, the straight of it between the
 rings at z -4 and 6.5, the head z 25.7..49.2 from the bit at x -17.5 to the
 poll at x 7.8.
 
-It is held as the knife is, in A_HoldKnife, whose fist is the pistol pose's:
+It is held in A_HoldAxe (Mixamo's axe idle, melee_clips.py), whose fist is
+the pistol pose's as the knife's ready pose's is:
 the haft runs up through the fist, the model is turned round so the bit leads
 and tipped TILT_DEG forward. `Grip` in the outline is the stretch of haft
 above the knob, so grip._grip_location seats it in the fist exactly as it
@@ -37,8 +40,9 @@ from combat.grip import _grip_location, _grip_rotation, _rotate_vector
 from combat.heat import build_heated_model, build_hot_instance
 from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
 from combat.knife import _placed
+from combat.skin import player_skin
 from combat.paths import (
-    AXE_BP_PATH, CUBE, HOLD_KNIFE_ANIM_PATH, MAT_HOT_AXE, MAT_METAL,
+    AXE_BP_PATH, CUBE, HOLD_AXE_ANIM_PATH, MAT_HOT_AXE, MAT_METAL,
 )
 from combat.lodge import lodge_pose
 from combat.melee_tuning import melee_throw
@@ -117,8 +121,12 @@ def build_axe(item_bp):
     bp = _create_blueprint(AXE_BP_PATH, BEL.generated_class(item_bp))
     (_n, _m, loc, rot, _s), = axe_model()
     build_heated_model(bp, axe_model(), _placed(HEAD_CENTRE, rot, loc))
-    aim = HOLD_KNIFE_ANIM_PATH
-    grip_rot = _grip_rotation(aim)
+    aim = HOLD_AXE_ANIM_PATH
+    # Seated as a pistol is: the ready pose's fist is the pistol pose's
+    # (melee_clips.py), and its hand is turned as Mixamo's clip turns it, so
+    # the rotation is the pistol hand's own and not one solved for a hand
+    # that faces ahead.
+    grip_rot = _grip_rotation(player_skin().aim_pistol)
     lodge = axe_lodge()
     _apply_defaults(bp, {
         **defaults_for(AXE_BP_PATH, ITEM_SOUNDS),
@@ -166,5 +174,5 @@ def build_axe(item_bp):
         IV.AimPose: _must_load(aim),
     })
     _log(f"built {AXE_BP_PATH} ({AXE_MESH.rsplit('/', 1)[-1]} at {AXE_SCALE}, "
-         f"swung as the knife is)")
+         f"swung through the knife's stage)")
     return bp

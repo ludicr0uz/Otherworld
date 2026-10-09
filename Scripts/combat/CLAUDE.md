@@ -383,14 +383,14 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
     sections whose nodes moved into a pair); `probes/probe_net_fx.py` the two-client proof.
 - **The knife is a melee item, not a gun** (`knife.py`): a `BP_WeaponItem` child flagged `Melee`,
   drawn by the pack's `SK_M9_Knife_X` (blade up, tipped 30° forward, the pistol's grip), and
-  not a row of `_weapon_specs()`, whose every column and check is about a gun. Its slash clip
-  `/Game/Weapons/Anims/A_KnifeSlash` is keyed from Python (`knife_anim.py`): the pack has no
-  animation and no stock clip is a knife attack.
+  not a row of `_weapon_specs()`, whose every column and check is about a gun. Its swing's clip
+  `/Game/Weapons/Anims/A_KnifeSlash` is Mixamo's stab (`melee_clips.py`, "The melee clips"
+  below; the asset keeps the name it had as a slash keyed from Python).
 - **The axe is the other melee item** (`axe.py`): Quaternius's Survival Pack `SM_Axe` (CC0,
   `/Game/Sourced/Quaternius/Survival`) at 0.2, a 65 cm camp axe, head up and tipped 30° forward
-  with the bit leading, held in `A_HoldKnife` by the stretch of haft above its knob. It has
+  with the bit leading, held in `A_HoldAxe` by the stretch of haft above its knob. It has
   **no strike of its own**: `Melee` sends the fire key to the knife's stage, so it swings
-  `A_KnifeSlash` for `COMBAT.knife_damage`. An axe that hits harder needs its
+  for `COMBAT.knife_damage`, in a clip of its own (`A_AxeSwing`). An axe that hits harder needs its
   own `Strike` in `weapon_component/` (`punch.py` has the two stages).
 - **The axe cuts wood from a tree** (`weapon_component/chop.py`, numbers in `chop_tuning.py`).
   The knife stage's blow passes what it struck to `_author_chop` off its failed health cast
@@ -438,13 +438,12 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
     pick-up's does.
   - The fire goes where the player faces, whatever is there: facing a trunk at arm's length
     puts it in the tree. `probes/probe_campfire.py` runs the whole chain in a game.
-- **Knife, food and the stick have their own hold poses, not the pistol's aim**
-  (`hold_pose.py`): `A_HoldKnife` (knife up at the chest, left fist raised as a guard),
-  `A_HoldItem` (the item carried at the waist, left arm hanging), `A_HoldTorch` (the stick
+- **Food and the stick have their own hold poses, not the pistol's aim**
+  (`hold_pose.py`): `A_HoldItem` (the item carried at the waist, left arm hanging), `A_HoldTorch` (the stick
   up beside the head) and `A_WardTorch` (it held out at arm's length), keyed off the idle by
   arm directions like the guard's. The right hand keeps the pistol pose's orientation and fingers, so the grip solve
-  gives the pistol's answer and every item stays upright in the fist. The slash starts and ends
-  in `A_HoldKnife`. `probes/probe_hold_poses.py` measures the hand heights in game.
+  gives the pistol's answer and every item stays upright in the fist. The knife's and the
+  axe's ready poses are clips ("The melee clips"). `probes/probe_hold_poses.py` measures the hand heights in game.
 - **The shotgun, pistol, knife, axe, matches and a stick are issued; the SMG, rifle and sniper are found.**
   The issued items are `inventory.STARTER_CLASS_VARS`: one class variable each on the
   component, spawned at BeginPlay into `slot_tuning.STARTER_SLOTS` (the shotgun in hand, out
@@ -812,7 +811,7 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
   the six flinches off the mannequin, the crouch, crawl, kneel and throw off
   Quaternius's own rig; `asset_pipeline/import_lyra.py`: the punch, Lyra's
   `MM_Pistol_Melee`, since C1; `SKIN_GAS` names them), and the poses the build keys (the hold
-  poses, the shotgun's, the throw's, the slash) are keyed on that skeleton from them and
+  poses, the shotgun's, the throw's) are keyed on that skeleton from them and
   from the sample's idle.
 - **No clip played into a slot may have root motion** (`hold_pose.in_place`,
   `verify/weapon_layers.py`). A montage of a clip with the flag on takes the character's
@@ -847,6 +846,46 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
 - **`probe_sight_align` fails one check of 186** (the rifle, looking up 25°: the shot's
   point 0.37° off the sight line). The view is still and the point is a hit 7.7 m away,
   5 cm off the line: the aim trace grazing a branch from the lower eye point, not the pose.
+
+## The melee clips (C2, 2026-10-08)
+
+The knife's and the axe's ready pose and swing are Mixamo's clips, not poses keyed from
+Python: `Knife Idle` and `Stabbing` (two single downloads), and the Pro Melee Axe Pack's
+`standing idle` and `standing melee attack downward`. `asset_pipeline/import_mixamo.py`
+(its last step; `import_mixamo_player.py` runs that step alone) imports the four named in
+`mixamo_paths.PLAYER_CLIPS` onto `SK_XBot` and retargets them onto the player's skeleton
+into `/Game/Sourced/Mixamo/UEFN_Player`; the weapons build's `melee_clips.py` bakes each
+into the game's own asset (`A_HoldKnife`, `A_KnifeSlash`, `A_HoldAxe`, `A_AxeSwing`), and
+`verify/melee_clips.py` checks each bake against Mixamo's frame for frame.
+
+- **A bake changes two things.** The right hand's fingers are the pistol pose's on every
+  frame (Mixamo's hand is posed for a prop the game does not have, and the items are seated
+  in the pistol's fist), and a swing starts `COMBAT.knife_impact_s` before the moment its
+  clip strikes (`MeleeClip.hit_s`, read off the hand's path: 0.97 s into the stab, 0.85 s
+  into the chop), since the blow is timed and not notified. The wind-up before that is not
+  played; the recovery is, to the clip's end, unless the next swing cuts it short.
+- **The grip rotation is the pistol hand's** (`knife.py`, `axe.py`:
+  `_grip_rotation(skin.aim_pistol)`), not one solved against the ready pose: that solve
+  turns the item to face ahead, and Mixamo's hand does not face ahead. The location is
+  still solved in the ready pose, whose fist is the pistol's.
+- **Which clip a swing plays is picked on each machine by the ready pose in hand**
+  (`Strike.by_pose`, `punch._author_clip`): `A_AxeSwing` while `HandPose` is `AxePose`,
+  else the strike's own. Not by `Held`: another client's copy of a player has `HandPose`
+  (`look.py`, off the replicated `LookPose`) and may not have the item.
+  `probe_net_fx.py` has client 2 see the axe's clip and the knife's on client 1's copy.
+- **A new melee item's clips** are two rows of `PLAYER_CLIPS`, two of `MELEE_CLIPS`, and
+  a `by_pose` pair on the `KNIFE` Strike.
+- **The stick is not a melee item** (it is not `Melee`; the fire key does nothing with it),
+  so it has no swing, and its torch poses are still `hold_pose.py`'s.
+- **The clips are on the sample's skeleton alone.** With `GAS_LOCOMOTION` off, or the
+  sample missing, the weapons build stops at `melee_clips.py` saying so: the keyed slash
+  that any skeleton could be given is gone.
+- **Mixamo's knife idle carries the knife at the hip**, where the keyed pose held it up
+  before the chest, and its stab ends with the hand 14 cm above where the idle holds it
+  (two downloads); the slot's blend takes that up.
+- `probe_metahuman_look.py` (windowed) pictures the axe held and as its blow lands, and
+  checks that both are moving clips; `probe_axe.py` and `probe_knife.py` swing each at a
+  wanderer.
 
 ## Crouch, slide and traversal from the sample (G5, 2026-10-08)
 
@@ -1020,13 +1059,13 @@ These are feel checks a headless run can't do:
 - the carry (`carry_tuning.py`): how a rifle reads jogging in one hand with the arm's swing
   (there is no two-handed carry clip), whether the gun coming up in 0.25 s behind the first
   shot reads, and whether 1.5 s is the right time to keep it up after the last one;
-- the knife: how the keyed slash reads (`knife_anim.SLASH_KEYS`), whether the blow at
-  `COMBAT.knife_impact_s` lines up with the cut, how the knife sits in the fist (the pistol
-  grip's solve), and how the two hold poses read (`hold_pose.HOLD_*_DIRS`; the wrist keeps the
-  pistol pose's angle on a lower forearm);
-- the axe: how it reads in the fist and over the shoulder in the knife's stance (the head
-  stands 35 cm above the hand, near the face), and swung on the knife's short slash, which
-  was keyed for a blade (`probes/probe_axe.py` only proves it is in the hand and lands);
+- the knife and the axe (C2): how Mixamo's stab and chop read with their wind-up cut off
+  (`melee_clips.MeleeClip.hit_s`), whether the blow at `COMBAT.knife_impact_s` lines up with
+  each, how the knife and the axe sit in a hand turned as Mixamo's clip turns it (the pistol
+  hand's grip rotation), and how the carry's hold pose reads (`hold_pose.HOLD_ITEM_DIRS`);
+- the axe: how it reads carried at the side in Mixamo's idle and coming down in its chop,
+  which starts with the axe already overhead (`probes/probe_axe.py` only proves it is in
+  the hand and lands; `probe_metahuman_look.py` has two pictures of the blow);
 - chopping (`chop_tuning.py`): whether three blows a piece feels right, whether the chips
   read as a cut (there is no chop sound and no mark on the trunk), where the wood lands on a
   slope or among roots, and how the wood looks in the hand: the fist's joints sit up to 1.6 cm

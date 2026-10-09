@@ -316,6 +316,26 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_lyra.py
 - **The licence is not recorded** (`fab_library.json`, the entry's `license` is empty): ask
   the user before a build with it ships.
 
+## Mixamo for the player: the knife's and the axe's clips (C2, 2026-10-08)
+
+`import_mixamo.py`'s last step (`mixamo_player.py`; `import_mixamo_player.py` runs it
+alone and leaves the zombie's 75 assets as they are) imports the clips named in
+`mixamo_paths.PLAYER_CLIPS` onto `SK_XBot` and retargets them onto `SK_UEFN_Mannequin`
+by the plain retargeter (`RTG_UEFN_Player_from_XBot`), in place, root motion off, into
+`/Game/Sourced/Mixamo/UEFN_Player`. All of it is committed, as the zombie's is.
+
+- **The downloads** go in `assets/cache/mixamo` (`PLAYER_PACKS`): `Pro Melee Axe Pack.zip`,
+  and a folder `Knife/` holding Mixamo's single downloads `Stabbing.fbx` and
+  `Knife Idle.fbx`. A pack with no zip is such a folder; it needs no X Bot of its own.
+- **Only the named clips are imported** (the axe pack has 47), and none of them onto a
+  creature: these packs are not rows of `PACKS`.
+- **What the game plays is the weapons build's bake of them** (`combat/melee_clips.py`;
+  `Scripts/combat/CLAUDE.md`, "The melee clips"), so after a re-import run
+  `build_weapons_and_combat.py`.
+- **`import_mixamo.py` purges its own package as it loads**, so another script cannot
+  import it as a module (the import dies on a `KeyError` for its own name): share a step
+  as a function of one of its modules, as `mixamo_player.import_player_set` is.
+
 ## The skeleton bridge: how the GAS clips reach the MetaHuman (2026-10-08)
 
 The sample's clips, databases and anim blueprint are on `SK_UEFN_Mannequin`; the player's

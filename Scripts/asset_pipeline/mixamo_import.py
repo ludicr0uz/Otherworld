@@ -20,22 +20,24 @@ from asset_pipeline.mixamo_paths import (
 from asset_pipeline.rig_util import _load, _log
 
 
-def extract_packs():
+def extract_packs(packs=PACKS):
     """Unzip each cached pack into a folder beside it; return {short: dir}.
 
     Re-extracted every run: a zip replaced by a fresh download must not be
-    shadowed by the files of the old one.
+    shadowed by the files of the old one.  A pack with no zip is a folder of
+    loose FBX files by its name (mixamo_paths.PLAYER_PACKS).
     """
     out = {}
-    for stem, short in PACKS:
+    for stem, short in packs:
         archive = os.path.join(MIXAMO_CACHE, f"{stem}.zip")
-        if not os.path.isfile(archive):
+        dest = os.path.join(MIXAMO_CACHE, stem)
+        if os.path.isfile(archive):
+            with zipfile.ZipFile(archive) as z:
+                z.extractall(dest)
+        elif not os.path.isdir(dest):
             raise RuntimeError(
                 f"{archive} is missing: copy the Mixamo download there "
                 "(assets/cache/mixamo/, git-ignored)")
-        dest = os.path.join(MIXAMO_CACHE, stem)
-        with zipfile.ZipFile(archive) as z:
-            z.extractall(dest)
         out[short] = dest
     return out
 

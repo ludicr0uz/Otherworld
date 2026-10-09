@@ -18,10 +18,17 @@ reads are mixamo_paths.PACKS.  Then:
        rebuild the NPCs afterwards: build_npc_blueprints.py
     5. the roar alone onto each of mixamo_paths.ROAR_CREATURES (the
        wendigo), for the hunt's first beat (npc/stalk.py)
-    6. check it all, and log [VERIFY] lines like the suites do
+    6. the player's melee set (mixamo_paths.PLAYER_CLIPS: the knife's and
+       the axe's swing and ready pose) onto SK_XBot and from there onto the
+       player's skeleton, into Mixamo/UEFN_Player/          (mixamo_player);
+       rebuild the weapons afterwards: build_weapons_and_combat.py
+    7. check it all, and log [VERIFY] lines like the suites do
 
 A new pack is a PACKS entry; a new clip in a role is a LOCOMOTION or MELEE
 edit.  Every clip of every pack is retargeted regardless of role.
+
+Step 6 alone, which leaves the creatures' clips as they are:
+import_mixamo_player.py.
 """
 
 import os
@@ -45,6 +52,7 @@ from asset_pipeline.mixamo_locomotion import (                    # noqa: E402
 from asset_pipeline.mixamo_paths import (                         # noqa: E402
     MELEE, MIXAMO_CREATURES, MIXAMO_ROOT, ROAR, ROAR_CREATURES, mixamo_clip,
 )
+from asset_pipeline.mixamo_player import import_player_set        # noqa: E402
 from asset_pipeline.mixamo_retarget import (                      # noqa: E402
     build_xbot_rig, retarget_clips,
 )
@@ -52,11 +60,7 @@ from forest_generator.npc_placement import NPC_VARIANTS            # noqa: E402
 from forest_generator.npc_stalk import NPC_STALK_ROAR              # noqa: E402
 
 
-def main():
-    unreal.AssetRegistryHelpers.get_asset_registry().wait_for_completion()
-    if not unreal.EditorAssetLibrary.does_directory_exist(MIXAMO_ROOT):
-        unreal.EditorAssetLibrary.make_directory(MIXAMO_ROOT)
-
+def _creatures(check):
     packs = extract_packs()
     _mesh, skeleton = import_xbot(packs)
     clips = import_clips(packs, skeleton)
@@ -68,12 +72,6 @@ def main():
         apply_locomotion(creature)
     for creature in ROAR_CREATURES:
         retarget_clips(rig, creature, [clips[ROAR]])
-
-    results = []
-
-    def check(label, ok, detail=""):
-        results.append(ok)
-        unreal.log_warning(f"[VERIFY] {'PASS' if ok else 'FAIL'} {label} {detail}")
 
     check("Mixamo Clips Imported", len(clips) >= 36, f"({len(clips)})")
     for creature in MIXAMO_CREATURES:
@@ -94,6 +92,23 @@ def main():
               bool(worn) and all(NPC_STALK_ROAR.get(k) == mixamo_clip(creature, *ROAR)
                                  for k in worn),
               f"(NPC_STALK_ROAR: {NPC_STALK_ROAR})")
+
+
+def main(creatures=True, player=True):
+    unreal.AssetRegistryHelpers.get_asset_registry().wait_for_completion()
+    if not unreal.EditorAssetLibrary.does_directory_exist(MIXAMO_ROOT):
+        unreal.EditorAssetLibrary.make_directory(MIXAMO_ROOT)
+
+    results = []
+
+    def check(label, ok, detail=""):
+        results.append(ok)
+        unreal.log_warning(f"[VERIFY] {'PASS' if ok else 'FAIL'} {label} {detail}")
+
+    if creatures:
+        _creatures(check)
+    if player:
+        import_player_set(check)
     unreal.log_warning(f"[VERIFY] {sum(results)}/{len(results)} checks passed")
 
 

@@ -1,7 +1,8 @@
-"""verify.hold_pose -- the hold poses (combat/hold_pose.py): A_HoldItem and
-A_HoldKnife are on the worn skeleton, their arms point where the tables say,
-the hands land where a carry and a fighting stance put them, the fist is the
-pistol pose's, and the knife and the food are held in them (guns are not).
+"""verify.hold_pose -- the hold poses (combat/hold_pose.py): each is on the
+worn skeleton with its arms where the tables say, A_HoldItem's hands land
+where a carry puts them and its fist is the pistol pose's, and the knife and
+the food are held in their ready poses (guns are not). The knife's and the
+axe's ready poses are clips, not keyed poses: verify/melee_clips.py.
 """
 
 import math
@@ -9,7 +10,7 @@ import math
 import unreal
 
 from combat.grip import fist_in_socket
-from combat.hold_pose import CHILD, HOLD_ITEM_DIRS, HOLD_KNIFE_DIRS, HOLD_POSES
+from combat.hold_pose import CHILD, HOLD_POSES
 from combat.knife import knife_outline
 from combat.paths import HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, KNIFE_BP_PATH
 from combat.skin import player_skin
@@ -21,8 +22,6 @@ from combat.weapon_specs import _weapon_specs
 # relative to the hips bone.
 CARRY_REACH_CM = 15.0       # the carried item is out in front of the hips
 CARRY_HEIGHT_CM = (-25.0, 35.0)   # between the thigh and the ribs
-KNIFE_REACH_CM = 20.0       # the knife is held out before the body
-KNIFE_OVER_CARRY_CM = 15.0  # and higher than a carried item
 ARM_DIR_DOT = 0.99          # an arm within ~8 deg of its table direction
 FIST_SAME_CM = 0.5          # the fist, in the grip socket's frame
 
@@ -73,30 +72,21 @@ def check_hold_clips():
 def check_hands_placed():
     skin = player_skin()
     b = skin.pose_bones
-    carry, knife = load(HOLD_ITEM_ANIM_PATH), load(HOLD_KNIFE_ANIM_PATH)
-    if carry is None or knife is None:
-        check("both hold poses load", False)
+    carry = load(HOLD_ITEM_ANIM_PATH)
+    if carry is None:
+        check("the carry's hold pose loads", False)
         return
-    c, k = _pose(carry), _pose(knife)
+    c = _pose(carry)
     hand_c = _sub(c(b["hand_r"]), c(b["hips"]))
-    hand_k = _sub(k(b["hand_r"]), k(b["hips"]))
     check("A_HoldItem carries the item in front of the body at the waist",
           hand_c[1] > CARRY_REACH_CM and CARRY_HEIGHT_CM[0] < hand_c[2] < CARRY_HEIGHT_CM[1],
           f"right hand {tuple(round(v, 1) for v in hand_c)} from the hips")
     check("...with the left arm left hanging",
           c(b["hand_l"])[2] < c(b["forearm_l"])[2] < c(b["upperarm_l"])[2])
-    check("A_HoldKnife holds the knife out, higher than a carried item",
-          hand_k[1] > KNIFE_REACH_CM and hand_k[2] > hand_c[2] + KNIFE_OVER_CARRY_CM,
-          f"right hand {tuple(round(v, 1) for v in hand_k)} from the hips")
-    check("...with the left fist up as a guard",
-          k(b["hand_l"])[2] > k(b["forearm_l"])[2]
-          and k(b["hand_l"])[1] > k(b["hips"])[1] + KNIFE_REACH_CM,
-          f"left hand {tuple(round(v, 1) for v in _sub(k(b['hand_l']), k(b['hips'])))}")
     fist = fist_in_socket(skin.aim_pistol)[0]
-    off = {path.rsplit("/", 1)[-1]: round((fist_in_socket(path)[0] - fist).length(), 2)
-           for path in (HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH)}
-    check("...and both close the right hand as the pistol pose does (fist within 0.5 cm)",
-          all(d < FIST_SAME_CM for d in off.values()), str(off))
+    off = round((fist_in_socket(HOLD_ITEM_ANIM_PATH)[0] - fist).length(), 2)
+    check("...and the right hand closed as the pistol pose closes it (fist within 0.5 cm)",
+          off < FIST_SAME_CM, f"{off} cm")
 
 
 def check_held_in_hold_poses():

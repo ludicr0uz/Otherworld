@@ -16,6 +16,8 @@ the bones arrive as ``Hips``, ``Spine``, ``LeftHandIndex1``...
 import os
 import re
 
+from asset_pipeline.gas_bridge_paths import PLAYER_FAMILY
+
 # ─── Host side: the zips, kept in the git-ignored cache ─────────────────────
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
@@ -108,3 +110,29 @@ ROAR_CREATURES = ("Wendigo01",)
 # rate = meant speed / clip speed, clamped, because a shamble played three
 # times over reads as a twitch rather than a hurry.
 RATE_SCALE_RANGE = (0.5, 2.0)
+
+
+# ─── The player's melee set ─────────────────────────────────────────────────
+# The knife's and the axe's swing and ready pose (combat/melee_clips.py bakes
+# the game's clips from them).  Not PACKS: nothing of these is retargeted onto
+# a creature, and only the clips named in PLAYER_CLIPS are imported (the axe
+# pack has 47).  A pack is a zip, as above, or a folder of loose FBX files by
+# that name (Mixamo's single downloads: "Stabbing.fbx", "Knife Idle.fbx"),
+# which has no X Bot of its own and needs none: every Mixamo download is on
+# the one skeleton.
+PLAYER_PACKS = (("Pro Melee Axe Pack", "MeleeAxe"),
+                ("Knife", "Knife"))
+
+# {role: (pack's short name, clip stem)}.  A new clip in a role is an edit
+# here, a re-run of import_mixamo.py and the weapons build.
+PLAYER_CLIPS = {
+    "knife_ready": ("Knife", "KnifeIdle"),
+    "knife_swing": ("Knife", "Stabbing"),
+    "axe_ready": ("MeleeAxe", "StandingIdle"),
+    "axe_swing": ("MeleeAxe", "StandingMeleeAttackDownward"),
+}
+
+
+def player_clip(role):
+    """A role's clip on the player's skeleton (SK_UEFN_Mannequin)."""
+    return mixamo_clip(PLAYER_FAMILY, *PLAYER_CLIPS[role])

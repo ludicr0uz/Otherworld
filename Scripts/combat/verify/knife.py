@@ -1,5 +1,5 @@
-"""verify.knife -- the knife (combat/knife.py, knife_anim.py and
-weapon_component/knife.py): the item, the slash clip, the loadout, the press
+"""verify.knife -- the knife (combat/knife.py, melee_clips.py and
+weapon_component/knife.py): the item, the swing's clip, the loadout, the press
 behind the fire gate, the swing and the blow.
 
 The helpers is_melee_play / is_melee_sweep / is_melee_gate / is_melee_write
@@ -12,7 +12,7 @@ import unreal
 from combat.anim_blueprint import AIM_SLOT
 from combat.heat_tuning import BLOW_DAMAGE_VAR
 from combat.knife import KNIFE_DISPLAY, KNIFE_MESH
-from combat.knife_anim import FPS, FRAMES, SLASH_KEYS
+from combat.melee_clips import KNIFE_SWING
 from combat.light_tuning import LIGHTS_VAR
 from combat.paths import (
     HOLD_KNIFE_ANIM_PATH, ITEM_BP_PATH, KNIFE_ANIM_PATH, KNIFE_BP_PATH,
@@ -33,13 +33,16 @@ from combat.verify.punch import (
     is_punch_write,
 )
 from combat.weapon_component.knife import (
-    KNIFE_ANIM_VAR, KNIFE_DUE_VAR, KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR, MELEE_VAR,
-    NEXT_KNIFE_VAR,
+    AXE_ANIM_VAR, AXE_POSE_VAR, KNIFE_ANIM_VAR, KNIFE_DUE_VAR, KNIFE_PENDING_VAR,
+    KNIFE_QUEUED_VAR, MELEE_VAR, NEXT_KNIFE_VAR,
 )
+from combat.weapon_component.look_vars import HandPose
 
 
 def is_knife_play(node):
-    return any(_title(f) == f"Get {KNIFE_ANIM_VAR}" for f in _feeders(node, "Asset"))
+    """A play of the knife's Strike: the knife's clip, or the axe's."""
+    return any(_title(f) in (f"Get {KNIFE_ANIM_VAR}", f"Get {AXE_ANIM_VAR}")
+               for f in _feeders(node, "Asset"))
 
 
 def is_knife_sweep(node):
@@ -106,36 +109,21 @@ def check_knife_item():
 
 
 def check_knife_clip():
+    """Which clip the swing plays; what the clip is, verify/melee_clips.py."""
     skin = player_skin()
     clip = w.get_editor_property(KNIFE_ANIM_VAR)
-    check(f"{KNIFE_ANIM_VAR} is A_KnifeSlash",
+    check(f"{KNIFE_ANIM_VAR} is A_KnifeSlash, Mixamo's stab (melee_clips.py)",
           clip is not None and clip == load(KNIFE_ANIM_PATH), str(clip))
     if clip is None:
         return
     worn = load(skin.mesh)
     check("...on the worn skeleton, or the slot would play nothing",
           clip.get_editor_property("skeleton") == worn.get_editor_property("skeleton"))
-    check(f"...{FRAMES / FPS:.1f} s long, no longer than the knife's interval",
-          abs(clip.get_play_length() - FRAMES / FPS) < 1e-3
-          and clip.get_play_length() <= COMBAT.knife_interval_s + 1e-3,
-          f"{clip.get_play_length():.3f}")
-    src = load(HOLD_KNIFE_ANIM_PATH)
-    arm = skin.pose_bones["upperarm_r"]
-    lib = unreal.AnimationLibrary
-
-    def turn(anim, t):
-        return lib.get_bone_pose_for_time(anim, arm, t, False).rotation
-
-    start = turn(clip, 0.0).angular_distance(turn(src, 0.0))
-    end = turn(clip, clip.get_play_length()).angular_distance(turn(src, 0.0))
-    check("...starting and ending in the ready pose",
-          start < 1e-3 and end < 1e-3, f"{start:.4f} {end:.4f} rad")
-    swing = turn(clip, SLASH_KEYS[1][0]).angular_distance(turn(clip, SLASH_KEYS[2][0]))
-    check("...and the arm really swings between the wind-up and the cut (> 40 deg)",
-          swing > 0.7, f"{swing:.2f} rad")
-    check("...with the blow between the wind-up and the end of the cut",
-          SLASH_KEYS[1][0] < COMBAT.knife_impact_s <= SLASH_KEYS[2][0],
-          f"{COMBAT.knife_impact_s}")
+    check("...cut so that it strikes when the timed blow lands, and outlasting it",
+          abs(KNIFE_SWING.start_s + COMBAT.knife_impact_s - KNIFE_SWING.hit_s) < 1e-6
+          and KNIFE_SWING.start_s >= 0.0
+          and clip.get_play_length() > COMBAT.knife_impact_s,
+          f"from {KNIFE_SWING.start_s:.2f} s, {clip.get_play_length():.2f} s long")
 
 
 def check_knife_loadout():
@@ -202,14 +190,33 @@ def check_knife_press():
 
 def check_knife_swing():
     plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if is_knife_play(n)]
-    check("one knife clip play, in its Fx_ event: the Server event's Multicast and "
-          "the owning client's prediction both call it (verify/fx.py)",
-          len(plays) == 1 and fxv.in_fx(FX.SLASH, plays) == plays, str(len(plays)))
-    if len(plays) != 1:
+    check("two clip plays on the knife's Strike, the knife's and the axe's, both in "
+          "its Fx_ event: the Server event's Multicast and the owning client's "
+          "prediction both call it (verify/fx.py)",
+          len(plays) == 2 and fxv.in_fx(FX.SLASH, plays) == plays
+          and sorted(_title(f) for p in plays for f in _feeders(p, "Asset"))
+          == [f"Get {AXE_ANIM_VAR}", f"Get {KNIFE_ANIM_VAR}"], str(len(plays)))
+    if len(plays) != 2:
         return
-    check(f"...into {AIM_SLOT}, the upper-body slot, once",
+    check(f"...into {AIM_SLOT}, the upper-body slot, once, from the clip's start",
           all(pin_value(p, "SlotNodeName") == AIM_SLOT
-              and int(float(pin_value(p, "LoopCount"))) == 1 for p in plays))
+              and int(float(pin_value(p, "LoopCount"))) == 1
+              # (a literal equal to its pin's default reads back empty)
+              and num_pin(p, "InTimeToStartMontageAt") in (0.0, None) for p in plays))
+    axe = next(p for p in plays if _title(_feeders(p, "Asset")[0]) == f"Get {AXE_ANIM_VAR}")
+    knife = next(p for p in plays if p is not axe)
+    pick = _feeders(axe, "execute")
+    asked = ({_title(x) for x in _feeds(BEL.find_input_pin(pick[0], "Condition"))}
+             if len(pick) == 1 and _title(pick[0]) == "Branch" else set())
+    other = ([PIN.get_owning_node(q) for q in PIN.list_connected_pins(BEL.find_else_pin(pick[0]))]
+             if asked else [])
+    check("...the axe's while the ready pose in hand is the axe's (HandPose, which "
+          "every machine's copy has, against AxePose), else the knife's",
+          {f"Get {HandPose}", f"Get {AXE_POSE_VAR}"} <= asked and other == [knife],
+          str(sorted(asked)))
+    after = [{n.get_path_name() for n in _exec_next(p)} for p in plays]
+    check("...and both run on into the one swing sound",
+          len(after[0]) == 1 and after[0] == after[1], str(after))
     # The two callers: the server's tell, and the client's prediction.
     plays = fxv.calls(FX.SLASH) + fxv.predicts(FX.SLASH)
 

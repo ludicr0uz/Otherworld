@@ -58,6 +58,9 @@ Editor-side, in pipeline order:
     mixamo_import.py            unzip the packs; import X Bot and every clip onto SK_XBot
     mixamo_retarget.py          IK_XBot, RTG_<Creature>_from_XBot, batch retarget
     mixamo_locomotion.py        the creature's blend space plays the Mixamo gait; checks
+    mixamo_player.py            the player's melee set (PLAYER_CLIPS) onto SK_XBot and
+                                from there onto the player's skeleton, in place
+    import_mixamo_player.py     entry point: that step of import_mixamo.py alone
     import_quaternius.py        entry point: Quaternius zips -> UAL clips on the
                                 adventurer, gun/survival props, the zombie
     quaternius_paths.py         constants: packs, asset paths, which clips/models play

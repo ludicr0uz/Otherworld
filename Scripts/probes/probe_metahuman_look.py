@@ -1,9 +1,12 @@
 """Pictures of the MetaHuman player from in front: standing, walking,
-sidestepping, with the axe, with the rifle carried and then down its sights
-(from in front, from the side, and the player's own sight picture).
+sidestepping, with the axe (held, and in the middle of its swing), with the
+rifle carried and then down its sights (from in front, from the side, and the
+player's own sight picture).
 
-Not a check: a way to SEE the MetaHuman wear the mannequin's animation,
-which the game's own camera cannot show. probe_bound_look.py's eye (a
+A way to SEE the MetaHuman wear the mannequin's animation, which the game's
+own camera cannot show; its only checks are the axe's: that what holds it and
+what swings it are Mixamo's clips (combat/melee_clips.py), moving ones, and
+not the keyed poses they replaced. probe_bound_look.py's eye (a
 hidden wanderer carried in front of the player). Run windowed:
 
     python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_metahuman_look.py
@@ -16,8 +19,14 @@ import os
 
 import unreal
 
+from combat.anim_blueprint import AIM_SLOT
 from combat.game_state import DEBUG_MODE_VAR
-from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
+from combat.paths import (
+    AXE_ANIM_PATH, HOLD_AXE_ANIM_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
+)
+from combat.skin import skin_of_mesh
+from combat.tuning import COMBAT
+from combat.weapon_component.knife import AXE_ANIM_VAR, KNIFE_QUEUED_VAR
 from combat.seat_tuning import SEAT_VAR, SIGHTS_FORCED_VAR
 from combat.weapon_component import vars as WV
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
@@ -25,7 +34,11 @@ from net.state_consts import GAME_STATE_BP_PATH
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(WEAPON_COMP_BP_PATH, WV.EquippedIndex), (GAME_STATE_BP_PATH, DEBUG_MODE_VAR),
-            (WEAPON_COMP_BP_PATH, SIGHTS_FORCED_VAR), (HUD_BP_PATH, DEV_GUNS_REQUEST_VAR)]
+            (WEAPON_COMP_BP_PATH, SIGHTS_FORCED_VAR), (HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
+            (WEAPON_COMP_BP_PATH, KNIFE_QUEUED_VAR)]
+AXE = "BP_Axe_C"
+# A clip, not a pose: over its length the right hand goes further than this.
+CLIP_MOVES_CM = 5.0
 # The rifle is a drop: the dev-all-guns request puts one in the bag.
 RIFLE = "BP_AssaultRifle_C"
 HOLD = (("empty hands", None), ("axe", "BP_Axe_C"), ("rifle", RIFLE))
@@ -40,6 +53,55 @@ SHOTS_DIR = os.path.join(unreal.Paths.project_saved_dir(), "Screenshots", "MacEd
 
 def _count():
     return len(os.listdir(SHOTS_DIR)) if os.path.isdir(SHOTS_DIR) else 0
+
+
+def _hand_travel(clip, bone):
+    """How far ``bone`` gets from where it starts, over ``clip`` (cm)."""
+    def at(t):
+        pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(
+            clip, t, unreal.AnimPoseEvaluationOptions())
+        return unreal.AnimPoseExtensions.get_bone_pose(
+            pose, bone, unreal.AnimPoseSpaces.WORLD).translation
+    n = 20
+    return max((at(i * clip.get_play_length() / n) - at(0.0)).length() for i in range(n + 1))
+
+
+def _axe_clips(p, player, wc, moving, shot):
+    """The axe in hand: it is held in Mixamo's idle and swung in Mixamo's
+    chop, and a picture is taken as the blow lands."""
+    mesh = player.get_editor_property("mesh")
+    anim = mesh.get_anim_instance()
+    skin = skin_of_mesh(mesh.get_editor_property("skeletal_mesh_asset").get_path_name())
+    hand = skin.pose_bones["hand_r"] if skin else "hand_r"
+    ready = p.get(p.get(wc, "Held"), "AimPose")
+    p.check("the axe is held in A_HoldAxe, playing in the slot",
+            ready is not None and ready.get_path_name().split(".")[0] == HOLD_AXE_ANIM_PATH
+            and anim.is_playing_slot_animation(ready, AIM_SLOT), str(ready))
+    if ready is not None:
+        travel = _hand_travel(ready, hand)
+        p.check("...a clip, not a pose: Mixamo's idle moves the hand",
+                travel > CLIP_MOVES_CM and ready.get_play_length() > 1.0,
+                f"{travel:.1f} cm over {ready.get_play_length():.2f} s")
+    p.set(wc, KNIFE_QUEUED_VAR, True)
+    yield lambda: not p.get(wc, KNIFE_QUEUED_VAR)
+    swing = p.get(wc, AXE_ANIM_VAR)
+    p.check("its swing is A_AxeSwing, playing in the slot",
+            swing is not None and swing.get_path_name().split(".")[0] == AXE_ANIM_PATH
+            and anim.is_playing_slot_animation(swing, AIM_SLOT),
+            str(anim.get_current_active_montage()))
+    if swing is not None:
+        travel = _hand_travel(swing, hand)
+        p.check("...a clip, not three keyed turns: Mixamo's chop carries the hand "
+                "from overhead to the waist",
+                travel > 60.0, f"{travel:.0f} cm")
+    yield moving(0.0, 0.0, COMBAT.knife_impact_s)
+    shot("axe, as the swing's blow lands")
+    yield moving(0.0, 0.0, 0.6, side=250.0)
+    p.set(wc, KNIFE_QUEUED_VAR, True)
+    yield lambda: not p.get(wc, KNIFE_QUEUED_VAR)
+    yield moving(0.0, 0.0, COMBAT.knife_impact_s, side=250.0)
+    shot("axe, as the swing's blow lands, from the right")
+    yield moving(0.0, 0.0, 1.0)
 
 
 def probe(p):
@@ -108,6 +170,8 @@ def probe(p):
         # Once from the side, standing.
         yield moving(0.0, 0.0, 0.6, side=250.0)
         shot(f"{label}, standing, from the right")
+        if cls == AXE:
+            yield from _axe_clips(p, player, wc, moving, shot)
     # Down the rifle's sights (the sights key's stand-in, held): from in front,
     # from the side, and then the player's own view, the sight picture.
     if p.get(wc, "Held") is not None and p.get(wc, "Held").get_class().get_name() == RIFLE:

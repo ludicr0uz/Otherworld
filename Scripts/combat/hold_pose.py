@@ -1,15 +1,15 @@
 """The hold poses: A_HoldItem (food and water carried in the right hand),
-A_HoldKnife (the knife up, ready to fight), A_HoldTorch (the stick carried
-as a torch) and A_WardTorch (it held out at a creature), AnimSequences keyed
-here for whatever body the player wears.
+A_HoldTorch (the stick carried as a torch) and A_WardTorch (it held out at a
+creature), AnimSequences keyed here for whatever body the player wears.
 
 WHY NOT THE PISTOL'S POSE
 -------------------------
 An item's AimPose is the ready pose the slot holds while it is in hand
-(weapon_component/inventory.py). The knife and the consumables used to borrow
-the pistol's, MF_Pistol_Idle_ADS: both arms out at eye level, sighting down a
-mushroom. No clip of a carry or a knife stance exists on this machine, so the
-two poses are keyed the way knife_anim.py keys the slash.
+(weapon_component/inventory.py). The consumables used to borrow the pistol's,
+MF_Pistol_Idle_ADS: both arms out at eye level, sighting down a mushroom. No
+clip of a carry or of a torch held up exists on this machine, so these poses
+are keyed. (The knife's and the axe's ready poses were too, until C2: they
+are Mixamo's idles now, melee_clips.py.)
 
 HOW THEY ARE MADE
 -----------------
@@ -26,9 +26,6 @@ across the fingers).
 
     A_HoldItem   the right upper arm hangs, the forearm comes forward at the
                  waist: an item carried in front, the left arm at the side
-    A_HoldKnife  a fighting stance: the right elbow before the ribs, the
-                 forearm rising so the knife is at the chest, blade up; the
-                 left fist up before the chin as a guard
     A_HoldTorch  the stick carried as a torch: the right elbow out from the
                  ribs, the forearm rising, so the fist is at the shoulder
                  and the fire beside the head, clear of the face
@@ -36,8 +33,7 @@ across the fingers).
                  the right arm straight ahead at the shoulder's height, the
                  fire at arm's length between the player and what they face
 
-Constant clips (a held pose, as the ADS poses are). The slash
-(knife_anim.py) is keyed off A_HoldKnife, so it starts and ends in it.
+Constant clips (a held pose, as the ADS poses are).
 """
 
 import unreal
@@ -47,8 +43,7 @@ from combat.body_pose import CLAVICLE_DIR, _between, _conj, _mul, _norm
 from combat.log import _log
 from uebp.graph import _assets
 from combat.paths import (
-    HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, HOLD_TORCH_ANIM_PATH,
-    WARD_TORCH_ANIM_PATH,
+    HOLD_ITEM_ANIM_PATH, HOLD_TORCH_ANIM_PATH, WARD_TORCH_ANIM_PATH,
 )
 
 FPS = 30
@@ -64,14 +59,6 @@ HOLD_ITEM_DIRS = {
     "upperarm_r": (-0.10, 0.20, -0.97),
     "forearm_r": (0.15, 0.92, -0.36),
 }
-HOLD_KNIFE_DIRS = {
-    "clavicle_r": CLAVICLE_R,
-    "clavicle_l": CLAVICLE_DIR,
-    "upperarm_r": (-0.20, 0.45, -0.87),
-    "forearm_r": (0.10, 0.88, 0.46),
-    "upperarm_l": (0.10, 0.50, -0.86),
-    "forearm_l": (-0.20, 0.40, 0.89),
-}
 HOLD_TORCH_DIRS = {
     "clavicle_r": CLAVICLE_R,
     "upperarm_r": (-0.45, 0.35, -0.82),
@@ -85,7 +72,6 @@ WARD_TORCH_DIRS = {
 CHILD = {"clavicle": "upperarm", "upperarm": "forearm", "forearm": "hand"}
 
 HOLD_POSES = ((HOLD_ITEM_ANIM_PATH, HOLD_ITEM_DIRS),
-              (HOLD_KNIFE_ANIM_PATH, HOLD_KNIFE_DIRS),
               (HOLD_TORCH_ANIM_PATH, HOLD_TORCH_DIRS),
               (WARD_TORCH_ANIM_PATH, WARD_TORCH_DIRS))
 

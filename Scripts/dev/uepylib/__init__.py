@@ -15,6 +15,7 @@ uepy.py is the thin CLI; everything it does lives here:
   net_plan    that run's processes: names, command lines, environments, argument checks
   net_report  that run's one report: joins and errors per process, every process's probes
   net_memory  that run's memory: each process's peak footprint and resident size, sampled
+  detach      detached --game/--net runs: --detach, --wait, --status
   editors     finding and closing the project's running editors
 
 The modules that do not start processes (summary, targets, net_plan,

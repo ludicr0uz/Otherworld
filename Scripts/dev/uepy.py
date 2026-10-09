@@ -17,6 +17,9 @@ uepy_inbox.py, then the engine's multicast remote execution), which turns those
     Scripts/dev/uepy.py --in-game probe.py           # into a running -game
     Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_join.py
     Scripts/dev/uepy.py --net --clients 2 --bots 32 --trace --probe Scripts/probes/probe_net_load.py
+    Scripts/dev/uepy.py --net --clients 2 --detach --probe P   # prints a run dir, returns at once
+    Scripts/dev/uepy.py --wait <run dir> [--timeout S]       # ...later: its report and exit code
+    Scripts/dev/uepy.py --status                              # detached runs
     Scripts/dev/uepy.py --cold Scripts/verify_level.py   # force a fresh editor
     Scripts/dev/uepy.py --close-editors              # save, quit, or kill them
 
@@ -48,7 +51,7 @@ import re
 import sys
 import time
 
-from uepylib import cold, editors, game, inbox, net, net_plan, probe_level, probe_map, remote, server, warm
+from uepylib import cold, detach, editors, game, inbox, net, net_plan, probe_level, probe_map, remote, server, warm
 from uepylib.paths import (
     editor_inbox, engine_dir, game_inbox, log, saved_uepy, serve_inbox, set_project,
 )
@@ -170,6 +173,12 @@ def parse_args():
     ap.add_argument("--lag", type=int, default=0, metavar="MS",
                     help="with --net: delay every packet a client sends by MS "
                          "(the engine's Net PktLag), to check prediction")
+    ap.add_argument("--detach", action="store_true",
+                    help="with --game or --net: start the run, print its run directory, return at once")
+    ap.add_argument("--wait", metavar="RUN_DIR",
+                    help="block until a detached run finishes and print its report")
+    ap.add_argument("--timeout", type=float, metavar="S", help="with --wait: give up (fail) after S seconds")
+    ap.add_argument("--status", action="store_true", help="list detached runs")
     ap.add_argument("--probe", action="append", default=[], metavar="FILE",
                     help="with --game or --net: run this probe (Scripts/probes); "
                          "repeatable")
@@ -263,6 +272,20 @@ def main():
         return probes_for(engine, args)
     if args.list:
         list_listeners(engine)
+        return 0
+    if args.status:
+        return detach.status(detach.runs_root())
+    if args.wait:
+        return detach.wait(os.path.abspath(args.wait), args.timeout)
+    if args.detach:
+        if not (args.net or args.game):
+            ap.error("--detach starts a --game or --net run: pass one")
+        argv = [a for a in sys.argv[1:] if a != "--detach"]
+        run = detach.start(argv, detach.runs_root(), os.path.abspath(__file__))
+        if run is None:
+            return 1
+        print(run, flush=True)
+        log(f"detached; collect with: uepy.py --wait {run}")
         return 0
     if args.close_editors:
         _closed, left = editors.close_editors()

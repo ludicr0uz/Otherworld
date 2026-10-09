@@ -49,7 +49,11 @@ start a run to poll for later. This headless session is never told when a \
 background command finishes, so a session that waits for one ends with its \
 work unverified and uncommitted. Give a long run a timeout instead (up to \
 600000 ms), and put several probes in one launch (`--probe A --probe B`) \
-rather than one launch each. While you work, run `uepy.py --probes-for` \
+rather than one launch each. A long --game or --net run can instead be \
+detached: `uepy.py --net --clients 2 --detach --probe P` prints a run \
+directory and returns at once, so read or edit meanwhile, then `uepy.py \
+--wait <run dir> --timeout 500` prints the usual report (and fails on \
+timeout); `--status` lists runs. One detached run at a time. While you work, run `uepy.py --probes-for` \
 (no paths: the probes your `git diff` can affect, one --game and one --net \
 launch; `--dry-run` lists them) instead of choosing probes by hand or \
 repeating one. Do not run the regression yourself: dev-team's gate runs a \

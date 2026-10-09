@@ -184,6 +184,9 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_j
 python3 Scripts/dev/uepy.py --net --clients 1 --lag 120 --probe Scripts/probes/probe_net_move_states.py   # with 120 ms of lag
 python3 Scripts/dev/uepy.py --net --clients 2 --bots 32 --trace --probe Scripts/probes/probe_net_load.py   # the load test: 32 server-driven bots, an Insights trace
 python3 Scripts/dev/uepy.py --game --title --probe Scripts/probes/probe_title_single.py   # the real title menu, see below
+python3 Scripts/dev/uepy.py --net --clients 2 --detach --probe P   # start a --game/--net run, print its run dir, return at once
+python3 Scripts/dev/uepy.py --wait <run dir> [--timeout S]       # block for its report (exit code of the run; fails on timeout)
+python3 Scripts/dev/uepy.py --status               # detached runs (one at a time: a second --detach refuses)
 python3 Scripts/dev/uepy.py --cold <script>        # force a fresh editor
 python3 Scripts/dev/uepy.py --summary <scripts>    # one line per script + its failures
 python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's editors

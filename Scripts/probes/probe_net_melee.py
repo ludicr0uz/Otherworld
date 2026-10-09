@@ -243,7 +243,7 @@ def probe_client(p):
         yield _await(lambda: p.posted("server", "judged"), 120.0)
         return
 
-    spot = p.posted("server", "target")
+    p.posted("server", "target")
     # The body the server stands in front of this client, once it is seen there
     # (the others go as the server's destroys arrive).
     front = lambda: _nearest(_bodies(p)[1], _vec(

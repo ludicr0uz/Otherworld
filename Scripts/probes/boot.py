@@ -123,7 +123,7 @@ def make_writable(pairs):
         # and a collected Blueprint reloads from disk without the edit.
         _state["keep"].extend([bp, bel.generated_class(bp)])
     if compiled:
-        _log(f"made writable for this run: "
+        _log("made writable for this run: "
              + ", ".join(f"{p.rsplit('/', 1)[-1]}.{v}" for p, v in pairs))
     return problems
 

@@ -63,6 +63,19 @@ printf '%s\n' "$files" | while IFS= read -r f; do
     fi
 done
 
+# Lint staged Python (Scripts/ruff.toml: pyflakes rules, so undefined names and
+# unused imports). Skipped, loudly, if ruff is not installed (pip install ruff).
+pyfiles=$(printf '%s\n' "$files" | grep '\.py$')
+if [ -n "$pyfiles" ]; then
+    if command -v ruff >/dev/null 2>&1; then
+        printf '%s\n' "$pyfiles" | while IFS= read -r f; do
+            [ -f "$f" ] && printf '%s\0' "$f"
+        done | xargs -0 ruff check --config Scripts/ruff.toml --quiet || echo "LINT" >> "$GIT_DIR/.precommit_fail"
+    else
+        echo "pre-commit: ruff not installed, Python not linted (pip install ruff)"
+    fi
+fi
+
 if [ -f "$GIT_DIR/.precommit_fail" ]; then
     rm -f "$GIT_DIR/.precommit_fail"
     echo

@@ -9,7 +9,6 @@ the HitSlot plays (`anim.get_current_active_montage()`).
 LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('health',)
 
-import unreal
 
 from combat.anim_blueprint import HIT_SLOT
 from combat.hit_reaction import HIT_DIR_BACK, HIT_DIR_FRONT, HIT_DIR_LEFT, HIT_DIR_RIGHT

@@ -122,7 +122,7 @@ def probe_server(p):
     p.post("ahead judged")
     yield _await(lambda: p.posted("client 1", "behind") and served() > base)
     yield 0.2
-    p.check(f"...and one at a point behind it is refused (the guard's AimAllowed): the "
+    p.check("...and one at a point behind it is refused (the guard's AimAllowed): the "
             "round goes nowhere, and the ask is still counted served",
             loaded() == before and _counts(guard)[2] == 1 and served() == base + 1,
             f"Loaded {before} -> {loaded()}, {_counts(guard)[2]} aim(s) refused, "

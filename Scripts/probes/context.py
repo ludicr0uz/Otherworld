@@ -183,7 +183,6 @@ class Probe(object):
         the next Tick it is held (the hand's item goes home first); on a
         client, once the server has served it and its record is back. Already
         in hand, or past the end of the bag: nothing."""
-        import unreal
         from combat.slot_tuning import HAND, SLOT_VAR
         bag = list(wc.get_editor_property("Inventory"))
         if not 0 <= index < len(bag):

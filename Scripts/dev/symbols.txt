@@ -6406,8 +6406,8 @@ probes/bots.py:236: _complain
 probes/bots.py:244: _tick
 probes/bots.py:256: _drive
 probes/context.py:29: class Probe
-probes/context.py:281: EQUIPPED_INDEX
-probes/context.py:284: _is_weapon_component
+probes/context.py:280: EQUIPPED_INDEX
+probes/context.py:283: _is_weapon_component
 probes/kept_slots.py:21: BACKUP
 probes/kept_slots.py:24: _files
 probes/kept_slots.py:28: set_aside
@@ -6681,7 +6681,7 @@ probes/probe_hit_bodies.py:40: ON_BODY_CM
 probes/probe_hit_bodies.py:54: _through
 probes/probe_hit_bodies.py:61: _aim_at_chest
 probes/probe_hit_bodies.py:81: _run
-probes/probe_hit_react.py:23: _clip
+probes/probe_hit_react.py:22: _clip
 probes/probe_hold_poses.py:41: SETTLE_S
 probes/probe_hold_poses.py:42: APART_CM
 probes/probe_hold_poses.py:45: _file

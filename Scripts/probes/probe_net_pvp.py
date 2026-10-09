@@ -33,7 +33,7 @@ from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, HIT_BONE_VAR, LIMB_BONES_VAR, LIMB_MULT_VAR)
 from combat import item_vars as IV
 from combat.paths import (
-    HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH)
+    HEALTH_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH)
 from combat.seat_tuning import SIGHTS_FORCED_VAR
 from combat.shot_vars import ReloadForced
 from combat.slot_tuning import MELEE_SLOT, PISTOL_SLOT

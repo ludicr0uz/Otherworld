@@ -143,7 +143,7 @@ def probe_client(p):
     ticking = unreal.OtherworldPoseLibrary.ticking_skinned_meshes(body)
     p.check(f"...and every skinned mesh on it ticks: {p.where} draws them",
             ticking == _skinned(body) and ticking >= 1, f"{ticking} of {_skinned(body)}")
-    p.check(f"...none of them throttled by the server's rule",
+    p.check("...none of them throttled by the server's rule",
             unreal.OtherworldPoseLibrary.server_pose_every_frames(body) == 0,
             str(unreal.OtherworldPoseLibrary.server_pose_every_frames(body)))
     yield from _await(lambda: p.posted("server", "judged"), 60.0)

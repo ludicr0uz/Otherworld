@@ -4,7 +4,6 @@ import os
 import tempfile
 import unittest
 
-import _paths
 from devteam import gate, probe_gate
 from probes import sets
 

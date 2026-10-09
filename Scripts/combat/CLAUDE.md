@@ -1006,6 +1006,24 @@ weapons build. `verify/gas_moves.py` checks each switch both ways,
   - A shot fired in a traversal leaves from the carry's lowered point (`Lowered` is
     held), and the fire gate does not ask about it.
 
+## Building one step (T9)
+
+`build_weapons_and_combat.py` is an entry point over `combat/build_steps.py`, a table of
+`Step(name, function, needs, made)`. `uepy.py --only a,b Scripts/build_weapons_and_combat.py`
+(or `UEPY_BUILD_ONLY=a,b`) runs those steps, in table order, and nothing else.
+
+- A step run alone finds what earlier steps hand on (the item Blueprint, the weapons, the
+  knife's clip...) on disk, where the last full build left it (`Ctx`).
+- A `needs` step that was not selected must have left its `made` assets on disk, or the run
+  stops before building anything. A need with no `made` (a patch) cannot be checked.
+- An unknown step name is an error too (the message lists them).
+- Proof: `graph_fingerprint.py full` after a full build, `--only weapon_component,health,health_defaults`
+  on top, `graph_fingerprint.py only`: `graph_fingerprint_diff.py full only` differs only in
+  the stock `UI_Thumbstick`'s opaque delegate default (an address, not ours).
+- Time: the full build 156 s (with the editor's cold boot inside it; about 105 s warm); those three
+  steps 122 s (the weapon component is nearly all of it); `--only blood,knife` 1.9 s.
+- A new builder is a new function and a row in `STEPS`, in the order it must run.
+
 ## Tuning
 
 `COMBAT`, a frozen `CombatConfig` in `tuning.py`, is the **one** place global combat numbers

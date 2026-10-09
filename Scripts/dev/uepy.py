@@ -128,6 +128,9 @@ def parse_args():
     ap.add_argument("scripts", nargs="*", help="script paths to execute in order")
     ap.add_argument("-c", "--code", action="append", default=[],
                     help="inline statement(s) to execute")
+    ap.add_argument("--only", metavar="STEPS",
+                    help="a build script's steps to run, comma-separated, and nothing else "
+                         "(sets $UEPY_BUILD_ONLY; Scripts/combat/build_steps.py)")
     ap.add_argument("--cold", action="store_true",
                     help="force a fresh UnrealEditor-Cmd boot ($UEPY_COLD=1 too)")
     ap.add_argument("--remote-only", action="store_true",
@@ -288,6 +291,11 @@ def main():
     targets += [("code", c) for c in args.code]
     if not targets:
         ap.error("nothing to run -- pass a script, -c, --game, --net or --list")
+    if args.only:
+        # An open editor does not see this process's environment: set it there
+        # too, ahead of the script (which takes it back out as it starts).
+        os.environ["UEPY_BUILD_ONLY"] = args.only
+        targets.insert(0, ("code", f"import os; os.environ['UEPY_BUILD_ONLY'] = {args.only!r}"))
     for kind, value in targets:
         if kind == "file" and not os.path.isfile(value):
             sys.exit(f"[uepy] no such script: {value}")

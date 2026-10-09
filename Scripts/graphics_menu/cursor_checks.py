@@ -9,7 +9,6 @@ import unreal
 from graphics_menu import cursor_consts as CC
 from graphics_menu import loot_consts as LC
 from graphics_menu import umg_consts as UC
-from graphics_menu.cursor import cursor_defaults
 from graphics_menu.inv_consts import DRAG_FROM_VAR, INV_AREAS, INV_OVER_VAR, SLOT_BOXES
 from graphics_menu.tune_scroll import hidden_rows, rows_per_window, thumb_half
 from graphics_menu.profile_consts import EXIT_ACTION
@@ -374,14 +373,6 @@ CC_SHOW = "bShowMouseCursor"
 
 
 def check_cursor(check, bp, nodes):
-    names = {str(n) for n in BEL.list_member_variable_names(bp, False)}
-    wanted = set(CC.CURSOR_BOOLS + CC.CURSOR_INTS + CC.CURSOR_REALS + (CC.CURSOR_POS_VAR,))
-    check("the HUD has the cursor's variables", wanted <= names, str(sorted(wanted - names)))
-    cdo = unreal.get_default_object(BEL.generated_class(bp))
-    wrong = {k: cdo.get_editor_property(k) for k, v in cursor_defaults().items()
-             if cdo.get_editor_property(k) != v}
-    check("the cursor starts hidden, over nothing, with nothing clicked or dragged", not wrong,
-          str(wrong))
     _check_widgets(check)
     _check_show(check, nodes)
     _check_rows(check, nodes)

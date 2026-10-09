@@ -320,6 +320,12 @@ the player moves by Epic's motion matching, and zombies and wendigos hunt them.
     variables are a group of that table or a `TABLE` in its constants module
     (`cursor_consts.TABLE`), and it declares them with `declare(ed, TABLE)`: no builder
     calls `_declare` or `add_member_variable` (a dev unit test fails one that does).
+    A row that replicates says so (`rep=REPLICATED`, `rep=REP_NOTIFY`); the builder still
+    calls `net.replicate`.
+  - `uebp.verify_vars`: `check_table(bp, TABLE, check)`, once per Blueprint in its
+    suite's `var_tables` section, holds the Blueprint to its tables: each row's type,
+    default and replication, and no variable beside them. A verifier does not re-state a
+    variable by hand, and a new table (or a fragment's group) is added to that section's join.
 - **No coordinates.** Nothing positions a node: `uebp.layout.arrange(ed)` lays the graph out
   before the compile. A new builder calls it once per graph it authors.
 - **Refactoring the authoring code:** `python3 Scripts/dev/graph_fingerprint.py <label>`

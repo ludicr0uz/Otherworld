@@ -7,7 +7,6 @@ import unreal
 from combat.slot_tuning import SLOT_COUNT
 from graphics_menu import dev_consts as DC
 from graphics_menu import umg_consts as UC
-from graphics_menu.dev_guns import dev_guns_defaults
 from graphics_menu.loot_consts import LOOT_BAG_FULL_VAR
 from graphics_menu.pause_checks import row_serves
 
@@ -55,10 +54,6 @@ def _short(class_path):
 def check_dev_guns(check, bp, nodes):
     check("the M panel lists dev-all-guns",
           DC.DEV_GUNS_ROW_LABEL in UC.PAUSE_ROW_LABELS, str(UC.PAUSE_ROW_LABELS))
-    cdo = unreal.get_default_object(BEL.generated_class(bp))
-    wrong = {k: cdo.get_editor_property(k) for k, v in dev_guns_defaults().items()
-             if cdo.get_editor_property(k) != v}
-    check("dev-all-guns starts unrequested", not wrong, str(wrong))
 
     check("the M panel's dev-all-guns row requests the guns (the row has no key: "
           "only an open panel's row can be taken)",

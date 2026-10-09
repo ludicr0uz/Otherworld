@@ -53,9 +53,6 @@ def check_stats_replicate(bp):
     check("Hunger, Thirst and Temperature replicate to the owning client alone",
           all(kind == net.REPLICATED and cond.upper() == OWNER_ONLY
               for kind, _rep, cond in declared.values()), str(declared))
-    compiled = {str(v): net.compiled_replication(bp, str(v)) for v in REPLICATED}
-    check("...and compiled so", all(kind == net.REPLICATED for kind, _rep in compiled.values()),
-          str(compiled))
     check("BP_SurvivalComponent replicates by default", net.replicates(bp))
 
 

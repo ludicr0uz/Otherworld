@@ -1,5 +1,6 @@
 """The verifiers' checks for where state lives (state.py, state_graph.py):
-the two Blueprints, their replicated variables, the GameMode that names them
+the two Blueprints (their variables are combat/verify/var_tables.py's to
+check against state_consts' tables), the GameMode that names them
 and no longer holds what moved, and the rule the move is for: no graph that
 can run on a client reads the GameMode.
 
@@ -13,7 +14,6 @@ import unreal
 from combat.game_state import MOVED_VARS
 from combat.paths import GAME_MODE_BP_PATH
 from net import state_consts as S
-from uebp import net
 
 BEL = unreal.BlueprintEditorLibrary
 BGE = unreal.BlueprintGraphEditor
@@ -52,13 +52,6 @@ def check_state(check):
         if not bp:
             continue
         cdo = unreal.get_default_object(BEL.generated_class(bp))
-        flags = {str(v): net.compiled_replication(bp, v)[0] for v in table}
-        check(f"{name} holds {whose} state, every variable Replicated: "
-              f"{', '.join(table)}",
-              all(k == net.REPLICATED for k in flags.values()), str(flags))
-        got = {str(v): cdo.get_editor_property(v) for v in table}
-        check(f"{name} starts at its defaults",
-              got == {str(v): v.default for v in table}, str(got))
         check(f"{name} replicates, as the engine's own does",
               bool(cdo.get_editor_property("replicates")))
         check(f"the GameMode names {name}",

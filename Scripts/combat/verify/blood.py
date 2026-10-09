@@ -156,11 +156,6 @@ def check_blood():
           not by_pins(bg, "InString"),
           "a PrintString per droplet per frame is 19 lines a frame")
 
-    blood_vars = {str(v) for v in BEL.list_member_variable_names(blood_bp, False)}
-    check("the splash keeps the three per-droplet tables it fills at BeginPlay",
-          {"Blobs", "Velocity", "Size", "Fall", "Age"} <= blood_vars,
-          str(sorted(blood_vars)))
-
     # And the half that makes the direction mean anything: the impact has to turn
     # the splash onto the surface normal it hit, and size it by the round.
     check("impacts point the splash down the surface normal",

@@ -37,8 +37,6 @@ def check_replication():
         got = net.variable_replication(wc, var)
         check(f"{var} is Replicated to everyone but the owner, who has the keys",
               got == want, str(got))
-        check(f"...and compiled so", net.compiled_replication(wc, var)[0] == net.REPLICATED,
-              str(net.compiled_replication(wc, var)))
     others = [str(v) for v in TABLE if v not in REPLICATED
               and net.variable_replication(wc, v)[0] != net.NONE]
     extra = [v for v in (WV.Held, WV.Inventory, WV.Aiming, WV.SightAiming, WV.SightBlend,

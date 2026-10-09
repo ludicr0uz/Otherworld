@@ -1,4 +1,5 @@
-"""BP_DayNightCycle: config defaults, the components, the graph's key nodes."""
+"""BP_DayNightCycle: the components, the graph's key nodes. Its variables and
+their defaults (world_config's) are var_tables.py's to check."""
 
 import unreal
 
@@ -10,28 +11,13 @@ from net.players_consts import LIVING_TITLE, PLAYERS_PIN
 from world import world_config as cfg
 from world.day_night_blueprint import (
     AMBIENT_SCALE_VAR, COMPONENTS, FOG_SCALE_VAR, LOOK_SCALE_VARS, MOON_DISC_SCALE_VAR,
-    ITEM_HIGHLIGHT_VAR, MOON_SCALE_VAR, NIGHT_COLD_VAR, RANDOM_START_VAR, STAR_SCALE_VAR,
+    ITEM_HIGHLIGHT_VAR, MOON_SCALE_VAR, NIGHT_COLD_VAR, STAR_SCALE_VAR,
     SUN_DISC_SCALE_VAR, SUN_SCALE_VAR,
 )
 from combat.glimmer_tuning import (
     HIGHLIGHT_DEFAULT, MPC_ITEM_GLIMMER, MPC_NAME, PARAM_HIGHLIGHT,
 )
 from world.paths import DAY_NIGHT_BP_PATH, SKY_MATERIAL_PATH, SKY_SPHERE_MESH_PATH, STATIC_SKY_TAG
-
-
-def _check_defaults(bp):
-    d = cdo(bp)
-    for var, want in (("DayLengthSeconds", cfg.DAY_LENGTH_S),
-                      ("NightLengthSeconds", cfg.NIGHT_LENGTH_S),
-                      ("Clock", cfg.START_CLOCK_S),
-                      (NIGHT_COLD_VAR, cfg.NIGHT_TEMPERATURE_DROP_PER_S),
-                      (ITEM_HIGHLIGHT_VAR, cfg.ITEM_HIGHLIGHT)):
-        got = d.get_editor_property(var)
-        check(f"BP_DayNightCycle.{var} defaults to world_config ({want})",
-              isinstance(got, float) and abs(got - want) < 1e-6, repr(got))
-    got = d.get_editor_property(RANDOM_START_VAR)
-    check(f"BP_DayNightCycle.{RANDOM_START_VAR} defaults to world_config "
-          f"({cfg.RANDOM_START})", got is cfg.RANDOM_START, repr(got))
 
 
 def _check_components(bp):
@@ -236,7 +222,6 @@ def run():
     if bp is None:
         return
     check("BP_DayNightCycle compiles", BEL.compile_blueprint(bp))
-    _check_defaults(bp)
     _check_components(bp)
     _check_graph(bp)
     _check_item_highlight(bp)

@@ -22,7 +22,7 @@ and takes them again once the two agree. A shot the server refused is counted
 served too, which is what hands its round back.
 """
 
-from uebp.vars import BOOL, INT, VECTOR, Var
+from uebp.vars import BOOL, INT, REP_NOTIFY, VECTOR, Var
 
 SERVER_FIRE = "Server_Fire"
 AIM_PARAM = "AimPoint"
@@ -36,7 +36,7 @@ SERVER_EVENTS = (SERVER_FIRE, SERVER_RELOAD)
 # The owning client's: fire and reload asks it has sent.
 AsksSent = Var("AsksSent", INT, 0)
 # The server's, replicated to the owner: asks it has answered, fired or not.
-AsksServed = Var("AsksServed", INT, 0)
+AsksServed = Var("AsksServed", INT, 0, rep=REP_NOTIFY)
 # A probe's stand-in for the reload key (tick.py's FireForced is the trigger's).
 ReloadForced = Var("ReloadForced", BOOL, False)
 

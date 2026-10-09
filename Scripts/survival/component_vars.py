@@ -4,17 +4,17 @@ STATS, TABLE and LINKS, in that order (the order they have always been
 declared in).
 """
 
-from uebp.vars import FLOAT, Var, cls, obj
+from uebp.vars import FLOAT, REPLICATED, Var, cls, obj
 from survival.paths import ASC_COMPONENT
 from survival.tuning import DEBUFFS, SURVIVAL
 
 # The three needs, each with its ceiling. Replicated to their owner alone
 # (survival_component.REPLICATED).
-Hunger = Var("Hunger", FLOAT, SURVIVAL.max_hunger)
+Hunger = Var("Hunger", FLOAT, SURVIVAL.max_hunger, rep=REPLICATED)
 MaxHunger = Var("MaxHunger", FLOAT, SURVIVAL.max_hunger)
-Thirst = Var("Thirst", FLOAT, SURVIVAL.max_thirst)
+Thirst = Var("Thirst", FLOAT, SURVIVAL.max_thirst, rep=REPLICATED)
 MaxThirst = Var("MaxThirst", FLOAT, SURVIVAL.max_thirst)
-Temperature = Var("Temperature", FLOAT, SURVIVAL.start_temperature)
+Temperature = Var("Temperature", FLOAT, SURVIVAL.start_temperature, rep=REPLICATED)
 MaxTemperature = Var("MaxTemperature", FLOAT, SURVIVAL.max_temperature)
 STATS = (Hunger, MaxHunger, Thirst, MaxThirst, Temperature, MaxTemperature)
 

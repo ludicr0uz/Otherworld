@@ -36,6 +36,7 @@ from npc.verify_ward_roar import run as run_ward_roar             # noqa: E402
 from npc.verify_drawn import run as run_drawn                     # noqa: E402
 from npc.verify_on_hit import run as run_on_hit                   # noqa: E402
 from npc.verify_voice import run as run_voice                     # noqa: E402
+from npc.verify_vars import run as run_vars                       # noqa: E402
 
 run()
 run_tree()
@@ -47,6 +48,7 @@ run_ward_roar()
 run_drawn()
 run_voice()
 run_on_hit()
+run_vars()
 unreal.log_warning(f"[VERIFY] {len(PASS)} passed, {len(FAIL)} failed")
 for f in FAIL:
     unreal.log_warning(f"[VERIFY]   FAILED: {f}")

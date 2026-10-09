@@ -178,6 +178,8 @@ and it never relies on a variable another section left behind.
   weapon_layers  the weapon layers' anim Blueprint (G4): its one pose in and
               three slots, the weapon component's reach to its linked
               instance, and no clip played into a slot having root motion
+
+  var_tables  verify.var_tables -- every combat Blueprint's variables against the tables its builders declare from ...
 """
 
 SECTIONS = (
@@ -185,4 +187,5 @@ SECTIONS = (
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "melee_clips", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
+    "var_tables",
 )

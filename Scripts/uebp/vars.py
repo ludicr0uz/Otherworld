@@ -20,14 +20,22 @@ a table is plain Python to a probe or a host-side tool.
 
 UNSET = object()
 
+# How a row replicates: the names of EOtherworldVarReplication's entries, as
+# ``uebp.net.compiled_replication`` reads them back. The builder still makes
+# it so (``net.replicate``, ``net.rep_notify``); the row is what a verifier
+# holds it to (``uebp.verify_vars``).
+NONE, REPLICATED, REP_NOTIFY = "NONE", "REPLICATED", "REP_NOTIFY"
+
 
 class Var(str):
-    """A member variable: its name (the string itself), pin type, default."""
+    """A member variable: its name (the string itself), pin type, default,
+    and how it replicates."""
 
-    def __new__(cls, name, pin_type=None, default=UNSET):
+    def __new__(cls, name, pin_type=None, default=UNSET, rep=NONE):
         self = super().__new__(cls, name)
         str.__setattr__(self, "pin_type", pin_type)
         str.__setattr__(self, "default", default)
+        str.__setattr__(self, "rep", rep)
         return self
 
     def __setattr__(self, key, value):

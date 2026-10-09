@@ -10,7 +10,6 @@ from combat.slot_tuning import HAS_ROOM_VAR
 from graphics_menu.ask_checks import asks, fed
 from graphics_menu import loot_consts as LC
 from graphics_menu import umg_consts as UC
-from graphics_menu.loot_tick import loot_defaults
 from graphics_menu.umg_checks import _tree
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.pose_weights import SEARCHING_VAR
@@ -121,10 +120,6 @@ def _check_kneel(check, nodes):
 
 
 def check_loot(check, bp, nodes):
-    cdo = unreal.get_default_object(BEL.generated_class(bp))
-    wrong = {k: cdo.get_editor_property(k) for k, v in loot_defaults().items()
-             if cdo.get_editor_property(k) != v}
-    check("the loot window starts shut, with nothing asked", not wrong, str(wrong))
     _check_widgets(check)
 
     scans = [n for n in nodes if "ActorClass" in _pins(n)

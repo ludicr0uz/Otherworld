@@ -4,6 +4,7 @@ TABLE. A name a constants module owns (``*_tuning.py``) is imported from it.
 """
 
 from uebp.vars import (
+    REPLICATED,
     BOOL, FLOAT, INT, ROTATOR, STRING, VECTOR, ZERO_ROTATOR, ZERO_VECTOR, Var, array, obj,
     struct,
 )
@@ -80,17 +81,17 @@ ShotVolume = Var("ShotVolume", FLOAT)
 # A thrown blade left in a tree or a body (throw_strike.py sets it as it sets
 # the item in). The pick-up reads it: taken back with empty hands, it goes to
 # the hand, not to a slot (pickup.py), and stops being Lodged.
-Lodged = Var("Lodged", BOOL)
+Lodged = Var("Lodged", BOOL, rep=REPLICATED)
 # Loose in the world, in the air or lying: set by the server as the item
 # leaves a hand for it and lowered by the take (item_world.py). Replicated: a
 # client's copy of the item is shown only while it is.
-InWorld = Var("InWorld", BOOL, False)
+InWorld = Var("InWorld", BOOL, False, rep=REPLICATED)
 # Whether the server has put the actor to sleep (NetDormancy DormantAll): an item
 # lying still, or carried. Its own Tick decides (item_world.py); not replicated.
 Dormant = Var("Dormant", BOOL, False)
 DisplayName = Var("DisplayName", STRING)
 PelletCount = Var("PelletCount", INT)
-Dropped = Var("Dropped", BOOL)
+Dropped = Var("Dropped", BOOL, rep=REPLICATED)
 # Ammunition. UsesAmmo false means the other four are never read (the
 # consumables), and the fire gate short-circuits on it. InfiniteReserve is the
 # pistol: a real magazine to reload, over a reserve that is never charged and
@@ -126,11 +127,11 @@ HasSights = Var(HAS_SIGHTS_VAR, BOOL)
 # Lit at a campfire by the use key, and burning: the stick (stick.py,
 # weapon_component/torch.py).
 Burns = Var(BURNS_VAR, BOOL)
-Lit = Var(LIT_VAR, BOOL)
+Lit = Var(LIT_VAR, BOOL, rep=REPLICATED)
 # Heated at a campfire by the interact key, and hot: the knife and the axe
 # (heat.py, weapon_component/heat.py).
 Heats = Var(HEATS_VAR, BOOL)
-Hot = Var(HOT_VAR, BOOL)
+Hot = Var(HOT_VAR, BOOL, rep=REPLICATED)
 # The slot a garment is worn in (wear_tuning.WEAR_SLOTS' index), or
 # NOT_CLOTHING: the weapon component wears an item whose slot is >= 0
 # (weapon_component/wear.py). Scripts/clothing sets it on each garment.

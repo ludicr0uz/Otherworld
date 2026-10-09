@@ -7,8 +7,7 @@ from combat.death import (
 )
 from combat.game_state import (
     DAMAGED_BY_PLAYER_VAR, FELL_LOG_PREFIX, KILL_COUNT_VAR, LAST_DAMAGE_VAR,
-    NEVER_DAMAGED, NPC_ID_VAR, PLAYER_DEAD_VAR, SPAWNED_AT_VAR,
-    SPAWN_COUNT_VAR, SPAWN_LOG_PREFIX,
+    NEVER_DAMAGED, PLAYER_DEAD_VAR, SPAWNED_AT_VAR, SPAWN_LOG_PREFIX,
 )
 from combat.ragdoll import RAGDOLL_PROFILE
 from combat.respawn import (
@@ -17,14 +16,13 @@ from combat.respawn import (
 )
 from net.players_consts import POINT_PIN
 from combat.verify.fixtures import (
-    _montages, drain_writes, exec_reach, gm, h, health_bp, hg, wg,
+    _montages, drain_writes, exec_reach, h, health_bp, hg, wg,
 )
 from net.pause_checks import check_standalone_pause
 from net.state_checks import check_state
-from net.state_consts import PLAYER_STATE_BP_PATH
 from combat.verify.common import (
     HEALTH_SETS,
-    BEL, PIN, by_pins, check, graph, in_pins, load, num_pin, out_pins, pin_value,
+    BEL, PIN, by_pins, check, graph, in_pins, num_pin, out_pins, pin_value,
     titled,
 )
 
@@ -66,9 +64,6 @@ def check_health_death_respawn():
              if pin_value(n, "Z") == str(RESPAWN_LIFT)]
     check("the spawn is lifted from the ground to the capsule's centre",
           bool(lifts), f"expected a MakeVector with Z = {RESPAWN_LIFT}")
-    check("the chosen point is stored, so the random draw is evaluated once",
-          "RespawnPoint" in {str(v) for v in BEL.list_member_variable_names(
-              health_bp, False)})
 
     # The respawn band. A replacement wanderer has to keep the "75-100 m away" rule
     # the level generator spawns the pack under, or the rule holds only until the
@@ -137,11 +132,6 @@ def check_spawn_numbering():
     # Every wanderer takes a number as it spawns and logs where it appeared; the HUD
     # draws that number beside its health bar. The pair is what makes a fall-through
     # reportable, so both halves are guarded here.
-    check("the GameMode carries the spawn counter",
-          SPAWN_COUNT_VAR in {str(v) for v in BEL.list_member_variable_names(gm, False)})
-    check("the health component carries the wanderer's number",
-          NPC_ID_VAR in {str(v) for v in BEL.list_member_variable_names(
-              health_bp, False)})
     logs = [n for n in hg if "InString" in in_pins(n)]
     # Exactly three, all deliberate: the spawn log, the safety net's, and the
     # player's death. Any more is a probe left behind -- and this graph is the one
@@ -158,9 +148,6 @@ def check_spawn_numbering():
     # highest it has: PrintWarning takes InString and nothing else.
     check("the fall is reported at warning severity, not a plain print",
           any("bPrintToScreen" not in in_pins(n) for n in logs))
-    check("the wanderer remembers where it was spawned",
-          SPAWNED_AT_VAR in {str(v) for v in BEL.list_member_variable_names(
-              health_bp, False)})
     # Both lines quote the stored SpawnedAt, so they cannot disagree.
 
     reads = [n for n in hg if SPAWNED_AT_VAR in out_pins(n)]
@@ -175,15 +162,9 @@ def check_spawn_numbering():
 # ─── The damage stamp ────────────────────────────────────────────────────────
 
 def check_damage_stamp():
-    health_vars = {str(v) for v in BEL.list_member_variable_names(health_bp, False)}
-    check("the health component records when it was last hurt",
-          LAST_DAMAGE_VAR in health_vars, str(sorted(health_vars)))
     check("nothing starts the game looking recently hurt",
           abs(float(h.get_editor_property(LAST_DAMAGE_VAR)) - NEVER_DAMAGED) < 1e-6,
           str(h.get_editor_property(LAST_DAMAGE_VAR)))
-    check("LastDamageTime is a float, not an int",
-          isinstance(h.get_editor_property(LAST_DAMAGE_VAR), float),
-          type(h.get_editor_property(LAST_DAMAGE_VAR)).__name__)
     # Both are TakeHit's now, in the component's own graph, on the server
     # (verify/damage.py reads the event); the weapon's graph writes neither.
     check("a blow stamps the time it landed",
@@ -203,11 +184,6 @@ def check_kill_counter():
     # Where state lives (net/state_checks.py): both are one player's, on
     # their PlayerState, where their own machine's HUD can read them.
     check_state(check)
-    ps_vars = {str(v) for v in BEL.list_member_variable_names(
-        load(PLAYER_STATE_BP_PATH), False)}
-    check("the PlayerState carries the kill counter", KILL_COUNT_VAR in ps_vars,
-          str(sorted(ps_vars)))
-    check("the PlayerState carries the player-death flag", PLAYER_DEAD_VAR in ps_vars)
     check("a death adds one to the kill counter",
           bool(titled(hg, f"SET {KILL_COUNT_VAR}"))
           or bool(titled(hg, f"Set {KILL_COUNT_VAR}")))

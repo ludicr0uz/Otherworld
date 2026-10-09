@@ -45,6 +45,13 @@ net.replicate_component(component_bp)           # a component Blueprint's own de
 Kinds are `net.SERVER`, `CLIENT`, `MULTICAST`, `LOCAL`, and `net.REPLICATED`, `REP_NOTIFY`,
 `NONE`. Every setter reads its own write back and raises.
 
+**A replicated variable's row says so:** `Var("Dead", BOOL, False, rep=REPLICATED)` in its
+`<blueprint>_vars.py` table (`uebp.vars.REPLICATED`, `REP_NOTIFY`; a row that says nothing
+is local). The builder still calls `replicate`/`rep_notify`; the suite's `var_tables`
+section (`uebp.verify_vars.check_table`) fails a row whose compiled property disagrees,
+either way round. The lifetime condition is not in the row: the section that owns the
+variable checks it with `variable_replication`.
+
 **The check:** `python3 Scripts/dev/uepy.py --summary Scripts/dev/check_net_authoring.py`
 builds a scratch actor and a scratch component with all of the above and reads each flag back
 off the graph, off the compiled class and after a reload from disk. Run it after changing

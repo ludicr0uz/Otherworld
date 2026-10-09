@@ -6,7 +6,9 @@ module's ``*_VAR`` is this row. A default the builder alone can make (a class
 it was handed, a clip it loads) is in its own short dict.
 """
 
-from uebp.vars import BOOL, FLOAT, INT, KEY, NAME, VECTOR, Var, array, cls, key, obj
+from uebp.vars import (
+    BOOL, FLOAT, INT, KEY, NAME, REPLICATED, REP_NOTIFY, VECTOR, Var, array, cls, key, obj,
+)
 from combat.paths import FIRE_WARD_VAR, ITEM_CLASS_PATH, THROW_ARC_CLASS_PATH
 from combat.ask_consts import (
     EXIT_AT_VAR, EXIT_CALLED_OFF_VAR, EXIT_DUE_VAR, EXIT_PENDING_VAR, EXIT_STARTED_VAR, NEVER)
@@ -58,13 +60,13 @@ AimValid = Var("AimValid", BOOL)
 AimBlocked = Var("AimBlocked", BOOL)
 # When a round or a thrown blade last struck a head (headshot.py): the HUD
 # draws an X round the reticle for a moment after it.
-HeadshotTime = Var(HEADSHOT_TIME_VAR, FLOAT, HEADSHOT_NEVER)
+HeadshotTime = Var(HEADSHOT_TIME_VAR, FLOAT, HEADSHOT_NEVER, rep=REP_NOTIFY)
 Stamina = Var("Stamina", FLOAT, COMBAT.max_stamina)
 MaxStamina = Var("MaxStamina", FLOAT, COMBAT.max_stamina)
 Sprinting = Var("Sprinting", BOOL, False)
 # The guard (block.py). Read by the fire gate, and by every wanderer's
 # swing, which also writes Stamina here when the guard takes the hit.
-Blocking = Var("Blocking", BOOL, False)
+Blocking = Var("Blocking", BOOL, False, rep=REPLICATED)
 # Aiming down the sights. BaseFOV is cached off the camera at BeginPlay for
 # the same reason BaseSpeed is cached off the movement component; CurrentFOV
 # is stored because FInterpTo's input is its own previous output, and
@@ -301,7 +303,7 @@ CrouchForced = Var("CrouchForced", BOOL, False)
 ThrowAiming = Var("ThrowAiming", BOOL, False)
 ThrowKeyForced = Var("ThrowKeyForced", BOOL, False)
 ThrowClickForced = Var("ThrowClickForced", BOOL, False)
-Thrown = Var("Thrown", _ITEM)
+Thrown = Var("Thrown", _ITEM, rep=REPLICATED)
 ThrowStart = Var("ThrowStart", VECTOR)
 ThrowVelocity = Var("ThrowVelocity", VECTOR)
 ThrowLast = Var("ThrowLast", VECTOR)

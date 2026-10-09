@@ -169,10 +169,6 @@ def check_impact_burst():
               for n in by_pins(bg, "InLifespan")),
           f"{IMPACT_LIFETIME}s")
     check("no probe survives in the impact's Tick", not by_pins(bg, "InString"))
-    have_vars = {str(v) for v in BEL.list_member_variable_names(bp, False)}
-    check("the impact keeps the per-piece tables it fills at BeginPlay",
-          {"Blobs", "Velocity", "Size", "Fall", "Age"} <= have_vars,
-          str(sorted(have_vars)))
 
 
 # ─── The fire graph: scenery chips, bodies bleed, never both ─────────────────

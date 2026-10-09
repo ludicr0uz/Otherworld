@@ -36,12 +36,8 @@ def _upstream(n, limit=400):
 
 def check_loot_roll():
     bp = load(HEALTH_BP_PATH)
-    names = {str(n) for n in BEL.list_member_variable_names(bp, False)}
-    want = (LOOT_CHANCES_VAR, *(v for pair in LOOT_ARRAYS for v in pair))
-    check("BP_HealthComponent declares the loot table and the body's Loot",
-          all(v in names for v in want), str([v for v in want if v not in names]))
     body = unreal.get_default_object(BEL.generated_class(bp))
-    check("...and a body starts carrying nothing",
+    check("a body starts carrying nothing",
           all(len(body.get_editor_property(v)) == 0 for v in BODY_ARRAYS))
 
     nodes = graph(bp).list_all_nodes()

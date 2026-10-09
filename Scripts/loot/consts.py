@@ -16,7 +16,7 @@ because Python cannot author a Blueprint struct:
                        what this body does carry, filled at the kill
 """
 
-from uebp.vars import FLOAT, STRING, Var, array, cls, obj, struct
+from uebp.vars import FLOAT, REPLICATED, STRING, Var, array, cls, obj, struct
 
 # The classes are class-of-Actor, for DropClasses' reason: the health component
 # compiles before any item it names exists.
@@ -27,12 +27,12 @@ _TINT = array(struct("/Script/CoreUObject.LinearColor"))
 LOOT_TABLE_VAR = Var("LootTable", _ITEM)
 LOOT_CHANCES_VAR = Var("LootChances", array(FLOAT))
 LOOT_TABLE_NAMES_VAR = Var("LootTableNames", _TEXT)
-LOOT_VAR = Var("Loot", _ITEM)
-LOOT_NAMES_VAR = Var("LootNames", _TEXT)
+LOOT_VAR = Var("Loot", _ITEM, rep=REPLICATED)
+LOOT_NAMES_VAR = Var("LootNames", _TEXT, rep=REPLICATED)
 LOOT_TABLE_ICONS_VAR = Var("LootTableIcons", _ICON)
 LOOT_TABLE_TINTS_VAR = Var("LootTableTints", _TINT)
-LOOT_ICONS_VAR = Var("LootIcons", _ICON)
-LOOT_TINTS_VAR = Var("LootTints", _TINT)
+LOOT_ICONS_VAR = Var("LootIcons", _ICON, rep=REPLICATED)
+LOOT_TINTS_VAR = Var("LootTints", _TINT, rep=REPLICATED)
 # BP_HealthComponent's loot rows, in the order loot/roll.py has always declared
 # them.
 TABLE = (LOOT_TABLE_VAR, LOOT_CHANCES_VAR, LOOT_TABLE_NAMES_VAR, LOOT_VAR, LOOT_NAMES_VAR,

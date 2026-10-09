@@ -18,7 +18,8 @@ so the two suites read the same way.
   server        M26: the stats replicate to their owner, the components
                 replicate on the player, every write is behind authority,
                 and GA_ConsumeItem is server only
+  var_tables    each Blueprint's variables against its table (uebp/verify_vars.py)
 """
 
 SECTIONS = ("tags", "items", "debuffs", "bleeding", "ability", "hooks", "install", "forage", "loot",
-            "campfire", "server")
+            "campfire", "server", "var_tables")

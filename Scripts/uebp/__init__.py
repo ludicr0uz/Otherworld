@@ -18,4 +18,6 @@
              takes it back out for the builders, fed(pin) reads through it
   nodes/     the one catalog of node paths (FN_*, NODE_*, MACRO_*), a module
              per engine library; its own __init__ maps them
+
+  verify_vars  A verifier's check of a Blueprint's variables against their table
 """

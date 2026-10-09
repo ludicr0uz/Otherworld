@@ -106,4 +106,6 @@ step_task/tree -> controller -> character -> entry point. No module imports
 the entry point. The only combat imports are its data modules (game_state,
 paths, tuning): the player's Blocking and FireWard are read by name. The
 only survival imports are its paths (the campfire's class) and on_hit.
+
+  verify_vars  Every wanderer controller's variables, and its step task's, against the tables their fragments declare from ...
 """

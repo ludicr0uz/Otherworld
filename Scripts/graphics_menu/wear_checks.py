@@ -13,8 +13,7 @@ from graphics_menu import umg_consts as UC
 from graphics_menu.ask_checks import asks, fed
 from graphics_menu import wear_consts as WC
 from graphics_menu.umg_checks import _tree
-from graphics_menu.wear_tick import WEAR_STILL_VAR, wear_defaults
-from graphics_menu.inv_carry import carry_defaults
+from graphics_menu.wear_tick import WEAR_STILL_VAR
 from graphics_menu.inv_consts import (
     DRAG_FROM_VAR, DRAG_ICON, INV_OVER_VAR, LOOK_HELD_VAR, NO_SLOT)
 from item_icons.items import UI_ART_DIR, icon_name
@@ -177,9 +176,6 @@ def _check_carry(check, bp, nodes):
     check("while a drag is on the mouse does not turn the view: SetIgnoreLookInput, "
           "told on the drag's edges only",
           len(holds) == 1 and edge == [f"Set {LOOK_HELD_VAR}"], str(edge))
-    cdo = unreal.get_default_object(BEL.generated_class(bp))
-    wrong = {k: v for k, v in carry_defaults().items() if cdo.get_editor_property(k) != v}
-    check("...and the look starts free", not wrong, str(wrong))
 
 
 def check_wear(check, bp, nodes):
@@ -188,6 +184,3 @@ def check_wear(check, bp, nodes):
     _check_keys(check, nodes)
     _check_draw(check, nodes)
     _check_carry(check, bp, nodes)
-    cdo = unreal.get_default_object(BEL.generated_class(bp))
-    wrong = {k: v for k, v in wear_defaults().items() if cdo.get_editor_property(k) != v}
-    check("the I panel's variables start shut, on the first slot", not wrong, str(wrong))

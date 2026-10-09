@@ -9,7 +9,6 @@ from graphics_menu import profile_consts as PC
 from combat import ask_consts as AC
 from graphics_menu.ask_checks import asks, fed, feeders
 from graphics_menu.pause_checks import row_gates
-from graphics_menu.save_exit import profile_defaults
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -44,33 +43,12 @@ def _check_asset(check):
           bp is not None
           and BEL.get_blueprint_parent_class(bp) == unreal.SaveGame.static_class(),
           PC.PROFILE_BP_PATH)
-    if not bp:
-        return
-    cdo = unreal.get_default_object(BEL.generated_class(bp))
-    stats = {f: cdo.get_editor_property(f) for f, _o, _v in PC.STAT_FIELDS}
-    check("the profile holds Health, Stamina, Hunger, Thirst and Temperature as floats",
-          all(isinstance(v, float) for v in stats.values()),
-          str({k: type(v).__name__ for k, v in stats.items()}))
-    ints = [cdo.get_editor_property(f) for f in (PC.KILLS_FIELD, PC.EQUIPPED_FIELD)]
-    check("...the kill count and the equipped slot as ints",
-          all(isinstance(v, int) and not isinstance(v, bool) for v in ints),
-          str([type(v).__name__ for v in ints]))
-    arrays = [PC.ITEM_CLASSES_FIELD] + [f for f, _v in PC.ITEM_FIELDS]
-    check("...and the inventory as class/Loaded/Reserve arrays",
-          all(isinstance(cdo.get_editor_property(f), unreal.Array) for f in arrays))
-    names = {str(n) for n in BEL.list_member_variable_names(bp, False)}
-    expected = (set(stats) | {PC.KILLS_FIELD, PC.EQUIPPED_FIELD} | set(arrays))
-    check("...and nothing else: no location is stored",
-          names == expected, str(sorted(names ^ expected)))
+    # What it holds, and that no location is among it, is PROFILE_TABLE's
+    # (var_checks.py): the stats as floats, the counts as ints, the arrays.
 
 
 def check_profile(check, bp, nodes):
     _check_asset(check)
-    cdo = unreal.get_default_object(BEL.generated_class(bp))
-    wrong = {k: cdo.get_editor_property(k) for k, v in profile_defaults().items()
-             if cdo.get_editor_property(k) != v}
-    check("the countdown starts idle and the profile unlooked-for", not wrong, str(wrong))
-
     starts = asks(nodes, AC.ASK_SAVE_EXIT)
     check("the M panel's save-and-exit row asks the weapon component for the exit "
           f"({AC.ASK_SAVE_EXIT}; the row has no key: only an open panel's row can be "

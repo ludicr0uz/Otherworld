@@ -16,7 +16,6 @@ import unreal
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_graphics_menu as G
 from graphics_menu.difficulty_checks import check_difficulty
-from graphics_menu import fps as F
 from graphics_menu import menu_nav as N
 from graphics_menu import reticle as R
 from graphics_menu import settings_rows as S
@@ -56,6 +55,7 @@ from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
 from graphics_menu.legal_checks import check_legal
 from graphics_menu.umg_checks import check_hud_graph, check_trees, text_literal
+from graphics_menu.var_checks import check_var_tables
 from combat.tuning import COMBAT, SHOT_VOLUME_CM
 from item_icons.checks import check_item_icons
 
@@ -103,12 +103,9 @@ def main():
     check("compiles without node warnings", not ed.list_nodes_with_warnings(),
           str(len(ed.list_nodes_with_warnings())))
 
-    # --- member variables
-    names = {str(n) for n in BEL.list_member_variable_names(bp, False)}
-    check("MenuOpen variable", "MenuOpen" in names)
-    check("Quality variable", "Quality" in names)
+    # --- member variables: every Blueprint of the menu against its tables
+    check_var_tables(check)
     cdo = unreal.get_default_object(BEL.generated_class(bp))
-    check("menu starts closed", cdo.get_editor_property("MenuOpen") is False)
     check(f"Quality defaults to {G.DEFAULT_PRESET} ({G.PRESETS[G.DEFAULT_PRESET][0]})",
           cdo.get_editor_property("Quality") == G.DEFAULT_PRESET,
           str(cdo.get_editor_property("Quality")))
@@ -638,8 +635,6 @@ def main():
     check("the wanderer's number is gated on the copy, and the FPS readout is not",
           sum(1 for t in titles if t == "Get DebugOn") == 3,
           str(sum(1 for t in titles if t == "Get DebugOn")))
-    for var in (F.FPS_FRAMES_VAR, F.FPS_SINCE_VAR, F.FPS_SHOWN_VAR):
-        check(f"{var} variable", var in names)
     check("the FPS readout counts real time, so it runs under the paused menus",
           any("Real Time" in t or "RealTime" in t for t in titles),
           str(sorted({t for t in titles if "Time" in t})))
@@ -651,8 +646,6 @@ def main():
     # The requirement these serve is "loadable across future game runs", so the
     # checks are about the disk and about the wiring, not about the drawing:
     # the page can look perfect and still be a session-only settings screen.
-    for var in ("Settings", "MenuPage", "MenuRow", "Capturing", "KeyPool"):
-        check(f"{var} variable", var in names)
     check("the menu opens on its own rows, not the settings page, with the caret "
           "at the top",
           cdo.get_editor_property("MenuPage") == G.PAGE_TITLE

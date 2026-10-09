@@ -5,12 +5,12 @@ they have always been declared in. The defaults of DAMAGE and STATE are the
 builder's and the graph modules' (health_component.py writes them).
 """
 
-from uebp.vars import BOOL, FLOAT, INT, NAME, VECTOR, Var, array, cls, obj
+from uebp.vars import BOOL, FLOAT, INT, NAME, REPLICATED, REP_NOTIFY, VECTOR, Var, array, cls, obj
 from combat.tuning import COMBAT
 
-Health = Var("Health", FLOAT, COMBAT.start_health)
-MaxHealth = Var("MaxHealth", FLOAT, COMBAT.start_health)
-Dead = Var("Dead", BOOL, False)
+Health = Var("Health", FLOAT, COMBAT.start_health, rep=REP_NOTIFY)
+MaxHealth = Var("MaxHealth", FLOAT, COMBAT.start_health, rep=REPLICATED)
+Dead = Var("Dead", BOOL, False, rep=REPLICATED)
 DespawnOnDeath = Var("DespawnOnDeath", BOOL, False)
 RespawnClass = Var("RespawnClass", cls("/Script/Engine.Actor"))
 # What a killed wanderer leaves on the ground. Typed as a class rather than
@@ -45,7 +45,7 @@ LastCause = Var("LastCause", obj("/Script/Engine.Actor"))
 # How many blows have taken health off this body. Replicated beside Health,
 # and what tells a client a blow from a drain; SeenHits is the count a client
 # has already answered.
-HitCount = Var("HitCount", INT, 0)
+HitCount = Var("HitCount", INT, 0, rep=REPLICATED)
 SeenHits = Var("SeenHits", INT, 0)
 # This machine has run the death path. Its own, never replicated: Dead is the
 # server's word and can arrive before this copy's Tick has seen Health at 0.
@@ -74,7 +74,7 @@ DAMAGE = (LastDamageTime, DamagedByPlayer)
 RespawnDelay = Var("RespawnDelay", FLOAT)
 # The number this wanderer was given at spawn. The HUD draws it beside the
 # health bar; the spawn's log line records where that number appeared.
-NpcId = Var("NpcId", INT)
+NpcId = Var("NpcId", INT, rep=REPLICATED)
 # Where this wanderer was put. Recorded for diagnosis, not for gameplay --
 # the respawn point is computed from the player, not from here (the old
 # SpawnOrigin, which anchored respawns to it, is gone on purpose). It is
@@ -93,7 +93,7 @@ LimbMultiplier = Var("LimbMultiplier", FLOAT)
 # than on either character, because both of them react the same way and
 # neither of their Blueprints has a graph this could be written into.
 HitReactions = Var("HitReactions", array(obj("/Script/Engine.AnimSequenceBase")))
-LastHitFrom = Var("LastHitFrom", VECTOR)
+LastHitFrom = Var("LastHitFrom", VECTOR, rep=REPLICATED)
 PrevHealth = Var("PrevHealth", FLOAT)
 NextReactTime = Var("NextReactTime", FLOAT)
 ReactIndex = Var("ReactIndex", INT)

@@ -16,11 +16,12 @@ offline copy of a Blueprint.
 import unreal
 
 from uebp.graph import BEL, BGE, _component_object, _find_handle
+from uebp.vars import NONE, REPLICATED, REP_NOTIFY
 
 # How an event replicates: the names of EOtherworldRpc's entries.
 LOCAL, MULTICAST, SERVER, CLIENT = "NOT_REPLICATED", "MULTICAST", "SERVER", "CLIENT"
-# How a variable replicates: the names of EOtherworldVarReplication's entries.
-NONE, REPLICATED, REP_NOTIFY = "NONE", "REPLICATED", "REP_NOTIFY"
+# How a variable replicates (NONE, REPLICATED, REP_NOTIFY) is uebp.vars',
+# where a table's row says it: the names of EOtherworldVarReplication's entries.
 
 
 def _lib():

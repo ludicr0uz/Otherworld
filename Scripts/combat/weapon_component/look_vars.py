@@ -4,14 +4,15 @@ what the owning machine last reported, and the Server event.
 """
 
 from uebp.vars import BOOL, INT, Var, obj
+from uebp.vars import REPLICATED as _REPLICATED
 
 POSE_TYPE = obj("/Script/Engine.AnimSequence")
 HIP, SHOULDER, SIGHTS = 0, 1, 2
 
 # Replicated, to everyone but the owner.
-LookAim = Var("LookAim", INT, HIP)
-LookLowered = Var("LookLowered", BOOL, False)
-LookPose = Var("LookPose", POSE_TYPE)
+LookAim = Var("LookAim", INT, HIP, rep=_REPLICATED)
+LookLowered = Var("LookLowered", BOOL, False, rep=_REPLICATED)
+LookPose = Var("LookPose", POSE_TYPE, rep=_REPLICATED)
 REPLICATED = (LookAim, LookLowered, LookPose)
 # The pose the hand's item is held in, on this copy: what the equip plays.
 HandPose = Var("HandPose", POSE_TYPE)

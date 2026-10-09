@@ -140,19 +140,10 @@ def check_replication():
     got = net.variable_replication(health_bp, HV.Health)
     check("Health is a RepNotify, to everyone", got == (net.REP_NOTIFY, "OnRep_Health",
                                                         "COND_NONE"), str(got))
-    check("...and compiled so",
-          net.compiled_replication(health_bp, HV.Health)[:2] == (net.REP_NOTIFY, "OnRep_Health"),
-          str(net.compiled_replication(health_bp, HV.Health)))
     for var in REPLICATED:
         got = net.variable_replication(health_bp, var)
         check(f"{var} is Replicated", got == (net.REPLICATED, "None", "COND_NONE")
               and net.compiled_replication(health_bp, var)[0] == net.REPLICATED, str(got))
-    local = (LAST_DAMAGE_VAR, DAMAGED_BY_PLAYER_VAR, PREV_HEALTH_VAR, HV.LastInstigator,
-             HV.LastCause, HV.SeenHits, HV.DeathPlayed, HV.HeardDamageTime)
-    kinds = {str(v): net.compiled_replication(health_bp, v)[0] for v in local}
-    check("nothing else of a blow travels: the time is each machine's own clock, the "
-          "instigator and the cause the server's, the latches each copy's",
-          set(kinds.values()) == {net.NONE}, str(kinds))
     check("BP_HealthComponent replicates by default", net.replicates(health_bp))
     check("...and on the player's character and on the wanderer, which replicate",
           net.replicates(char, "HealthComponent") and net.replicates(char)
@@ -245,7 +236,6 @@ def check_player_kill_credit():
     if not tallies:
         return
     above = _upstream(tallies[0])
-    titles = [_title(n) for n in above]
     whose = [n for n in above if "PlayerController" in _title(n).replace(" ", "")
              and any(_title(f) == f"Get {HV.LastInstigator}"
                      for f in _feeds(BEL.find_input_pin(n, "Object")))]

@@ -18,7 +18,7 @@ the probes share.
 
 from combat.difficulty import DIFFICULTY_VAR
 from combat.game_state import DEBUG_MODE_VAR, KILL_COUNT_VAR, PLAYER_DEAD_VAR
-from uebp.vars import BOOL, INT, Var
+from uebp.vars import BOOL, INT, REPLICATED, Var
 
 # Beside the health component whose death graph writes them: the weapons
 # build makes both, and forest_generator/asset_sources.py names one builder
@@ -30,21 +30,21 @@ GAME_STATE_CLASS_PATH = f"{GAME_STATE_BP_PATH}.BP_OtherworldGameState_C"
 
 # --- BP_OtherworldPlayerState ------------------------------------------------
 # The wanderers this player killed: the HUD's corner and the death menu's score.
-Kills = Var(KILL_COUNT_VAR, INT, 0)
+Kills = Var(KILL_COUNT_VAR, INT, 0, rep=REPLICATED)
 # This player's character is dead: what their HUD draws the death menu from.
-Dead = Var(PLAYER_DEAD_VAR, BOOL, False)
+Dead = Var(PLAYER_DEAD_VAR, BOOL, False, rep=REPLICATED)
 # The other players' characters this player killed (combat/player_kill.py):
 # a count of its own beside the wanderers', since a fight between players is
 # scored apart from the forest's.
 PLAYER_KILL_COUNT_VAR = "PlayerKillCount"
-PlayerKills = Var(PLAYER_KILL_COUNT_VAR, INT, 0)
+PlayerKills = Var(PLAYER_KILL_COUNT_VAR, INT, 0, rep=REPLICATED)
 PLAYER_TABLE = (Kills, Dead, PlayerKills)
 
 # --- BP_OtherworldGameState --------------------------------------------------
 # The developer overlays (tracers, sight cones, wanderer numbers) are on.
-DebugMode = Var(DEBUG_MODE_VAR, BOOL, False)
+DebugMode = Var(DEBUG_MODE_VAR, BOOL, False, rep=REPLICATED)
 # The world's difficulty (combat/difficulty.py; 0 is EASY).
-Difficulty = Var(DIFFICULTY_VAR, INT, 0)
+Difficulty = Var(DIFFICULTY_VAR, INT, 0, rep=REPLICATED)
 GAME_TABLE = (DebugMode, Difficulty)
 
 # The GameMode's class defaults that name the two.

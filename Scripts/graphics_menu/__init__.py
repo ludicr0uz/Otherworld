@@ -248,4 +248,6 @@ verify_graphics_menu.py's checks, beside it because it is over budget
                      graph, then gfx_save_checks
   gfx_save_checks    BP_GraphicsSave, its load and save in the HUD graph, the
                      CSV's default preset, the graphics tab's SAVE DEFAULT row
+
+  var_checks  The verifier's check of the menu's Blueprints against their variable tables (uebp/verify_vars.py): each row ...
 """

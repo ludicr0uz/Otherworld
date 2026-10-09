@@ -18,6 +18,10 @@ architecture.
        instead. The one exception is a Fab asset (see "Fab assets" below).
        It reads the task file again after each task, so an item added to `tasks.md` during a
        run is run in that run, and a waiting one ticked or deleted there is not.
+     - The gate also runs a probe set beside the verifiers (`Scripts/probes/sets.py`: `SMOKE`
+       by default, `--gate-probes FULL|none`): `probe:<name>` rows in the baseline table, a probe
+       that newly fails fails the task. A probe that fails in its batch is re-run alone and the
+       solo verdict stands (`devteam/probe_gate.py`).
      - Their unit tests: `python3 -m unittest discover -s Scripts/dev/tests`. Run them after
        changing anything in `Scripts/dev` or `Scripts/probes`.
    - `Scripts/probes/` holds probes: checks that run inside a headless game (see below).

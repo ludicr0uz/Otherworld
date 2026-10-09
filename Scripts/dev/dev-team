@@ -51,7 +51,11 @@ asking for a Fab asset, and at the end of the run.
 and puts the numbers in the prompt; after the session it runs them again. A
 suite that newly fails -- or fails more checks than before -- sends the
 session back (``--resume``) with the failures, up to --fix-attempts times,
-then fails the task. --no-gate skips both sweeps.
+then fails the task. --no-gate skips both sweeps. Beside the verifiers the
+gate runs a named probe set (Scripts/probes/sets.py), batched per boot: SMOKE
+by default (one --game launch, one --net --clients 2 launch), FULL, or none
+(--gate-probes); each probe is a ``probe:<name>`` row in the table and a probe
+that newly fails fails the task like a verifier.
 
 Sessions run unattended, so they cannot ask questions. The default permission
 mode is ``auto`` (a classifier approves or blocks each action); pass
@@ -122,6 +126,7 @@ from devteam.work import (                                          # noqa: E402
     LOG_ROOT, ROOT, SERVE_DIR, close_editors, park_task, resume, run_one,
     tree_state, write_up,
 )
+from probes import sets                                              # noqa: E402
 from uepylib import server                                          # noqa: E402
 
 DEFAULT_TASKS = os.path.join(ROOT, "Scripts", "dev", "tasks.md")
@@ -154,6 +159,9 @@ def parse_args():
     p.add_argument("--budget", type=float, metavar="USD", help="per-task spending cap")
     p.add_argument("--no-gate", dest="gate", action="store_false",
                    help="skip the verifier sweeps before and after each task")
+    p.add_argument("--gate-probes", default="SMOKE", metavar="SET",
+                   help="probe set the gate runs beside the verifiers: SMOKE (default), "
+                        "FULL or none (Scripts/probes/sets.py)")
     p.add_argument("--fix-attempts", type=int, default=1, metavar="N",
                    help="times a session is sent back to fix a gate regression (default 1)")
     p.add_argument("--dry-run", action="store_true",
@@ -224,6 +232,12 @@ def reread(task_file, pending, attempted, args, n):
 
 def main():
     args = parse_args()
+    args.probe_set = None
+    if args.gate and args.gate_probes.lower() != "none":
+        try:
+            args.probe_set = sets.resolve(args.gate_probes)
+        except ValueError as err:
+            sys.exit(f"dev-team: {err}")
     # Fab assets are asked for at the terminal; '-' has used stdin up.
     args.interactive = sys.stdin.isatty() and args.tasks != ["-"]
     # 'pause' is typed at the same terminal (devteam/pause.py).

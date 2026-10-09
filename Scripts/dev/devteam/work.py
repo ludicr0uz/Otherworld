@@ -12,7 +12,7 @@ import hashlib
 import os
 import time
 
-from devteam import fab, gate, limits, pause
+from devteam import fab, gate, limits, pause, probe_gate
 from devteam.accounting import (
     describe_time, describe_tokens, git, git_head, merge_results, tag_commit,
     token_usage,
@@ -62,15 +62,22 @@ def tree_fingerprint():
     return digest.hexdigest()
 
 
-def sweep(label, log_path, pauser=None):
-    """One verifier sweep. A pause typed meanwhile is heard, and acted on by
-    the caller once the sweep is back."""
+def _sweep_and_probes(log_path, probe_set):
+    rows = gate.run_sweep(ROOT, log_path)
+    if rows is not None and probe_set:
+        rows.update(probe_gate.run_probes(ROOT, probe_set, log_path))
+    return rows
+
+
+def sweep(label, log_path, pauser=None, probe_set=None):
+    """One verifier sweep, then the probe set if there is one. A pause typed
+    meanwhile is heard, and acted on by the caller once the sweep is back."""
     started = time.time()
     if pauser:
         with pauser.watching():
-            rows = gate.run_sweep(ROOT, log_path)
+            rows = _sweep_and_probes(log_path, probe_set)
     else:
-        rows = gate.run_sweep(ROOT, log_path)
+        rows = _sweep_and_probes(log_path, probe_set)
     if rows is None:
         print(f"    gate: {label} sweep failed to run ({time.time() - started:.0f}s)")
     else:
@@ -93,6 +100,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     env = session_env(os.environ, SERVE_DIR)
     ask = dict(interactive=args.interactive)
     baseline = parked.get("baseline") if parked else None
+    probes = getattr(args, "probe_set", None)
 
     def paused(stage, result=None, reports=None):
         if pauser and pauser.requested:
@@ -144,7 +152,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
             return False, [blocked], {}, None, None
         if args.gate:
             state = tree_state()
-            baseline = cache.get(state) or sweep("baseline", sweep_log, pauser)
+            baseline = cache.get(state) or sweep("baseline", sweep_log, pauser, probes)
         limits.wait(meter, pauser)
         paused("start")
         prompt = build_prompt(task, n, total, progress,
@@ -180,7 +188,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     if not (ok and args.gate):
         return ok, reports, result, gate_table, None
     close_editors()
-    after = sweep("after", sweep_log, pauser)
+    after = sweep("after", sweep_log, pauser, probes)
     paused("gate", result, reports)
     problems = gate.regressions(baseline, after, gate.load_known())
     attempts = 0
@@ -202,7 +210,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         paused("session", result, reports)
         if not ok:
             break
-        after = sweep("after fix", sweep_log, pauser)
+        after = sweep("after fix", sweep_log, pauser, probes)
         paused("gate", result, reports)
         problems = gate.regressions(baseline, after, gate.load_known())
     gate_table = gate.table(baseline, after)

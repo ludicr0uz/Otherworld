@@ -52,7 +52,10 @@ work unverified and uncommitted. Give a long run a timeout instead (up to \
 rather than one launch each. While you work, run `uepy.py --probes-for` \
 (no paths: the probes your `git diff` can affect, one --game and one --net \
 launch; `--dry-run` lists them) instead of choosing probes by hand or \
-repeating one; the full regression is the gate's, not yours.
+repeating one. Do not run the regression yourself: dev-team's gate runs a \
+smoke set of probes beside the verifiers before and after you, and fails the \
+task on a probe that newly fails. End when your change is proven by its own \
+probe.
 
 {gate}
 
@@ -81,11 +84,11 @@ task may depend on them.
 """
 
 GATE = """\
-Before this session started, dev-team ran the verifier suite:
+Before this session started, dev-team ran the verifier suite and a smoke set of probes (the `probe:` rows):
 
 {table}
 
-When you finish, dev-team runs the same suite again. A verifier that newly \
+When you finish, dev-team runs the same suite again. A verifier or probe that newly \
 fails, or fails more checks than above, fails this task, so run the suites \
 you touched before you commit.
 

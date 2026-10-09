@@ -443,6 +443,62 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 
 ## Measured at scale (A1, 2026-10-07)
 
+**Where the server's tick goes (W0, 2026-10-09).** One run of `uepy.py --net --clients 2
+--bots 32 --trace --probe Scripts/probes/probe_net_load.py` (world tick 29.3 ms mean, 26.9 Hz,
+64 characters). The game thread over 80 s of its window, 2 160 frames: 13.7 s the tick-rate
+sleep, **66.3 s worked (30.7 ms a frame)**, which the shares below are of. Inclusive time;
+a row marked ⊂ lies inside the row it names.
+
+| # | cost | s | share | ms a frame | what it is |
+|---|---|---|---|---|---|
+| 1 | the mannequin's mesh, `CharacterMesh0` | 38.90 | 58.7% | 18.0 | the pose of every living body: `USkinnedMeshComponent_TickComponent` 35.3 s (13.6 s its own), 69 ticks a frame. 2.6 s of the row is the mesh moved by rows 5 and 9 |
+| 2 | ⊂ 1: the motion-matching anim Blueprint, `SandboxCharacter_CMC_ABP_C` | 17.98 | 27.1% | 8.3 | 9.3 s its own (the graph's update and evaluation), 4.7 s its Blueprint functions (below), the chooser and the trajectory under them |
+| 3 | the tick dispatch's own time, `ProcessUntilTasksComplete` | 4.17 | 6.3% | 1.9 | exclusive: 859 tick functions a frame handed out and waited on |
+| 4 | the weapon component's Tick | 4.21 | 6.3% | 1.95 | all of it the Blueprint VM, 51 ticks a frame at 38 µs: 1.6 s bytecode, the rest the natives it calls, most of them the body-parts loops' (`weapon_component/body_parts.py` under `head_hide.py` and `sights.py`: `GetChildrenComponents` 17 times a tick, 0.47 s; `UnHideBoneByName` 0.56 s; 4.0 M `Array_Get`) |
+| 5 | the character movement | 2.70 | 4.1% | 1.25 | 1.3 s of it moving the mesh and the MetaHuman's parts under it |
+| 6 | the wanderers' behaviour trees | 2.44 | 3.7% | 1.13 | the zombie's step 1.81 s (918 calls, 2.0 ms each), the wendigo's 0.59 s (705) |
+| 7 | `Tick_Core` (timers, RPCs) | 2.33 | 3.5% | 1.08 | `SpawnAIFromClass` 1.12 s (21 wanderers, 53 ms each); `Server_Fire` 0.09 s for 861 shots |
+| 8 | the health component | 2.14 | 3.2% | 0.99 | 1.54 s is `RestartPlayerAtPlayerStart` (25 respawns, 62 ms each: a new body); its Tick 0.57 s |
+| 9 | the AI controllers' tick | 1.58 | 2.4% | 0.73 | native: 1.42 s turning the capsule with the mesh and the MetaHuman's parts under it |
+| 10 | the net driver | 1.24 | 1.9% | 0.57 | the replication graph 1.01 s |
+
+Below them: the world's post-actor-tick delegates 1.10 s (the hit history among them, not
+split), the six item Blueprints' Ticks 0.92 s together (33 ticks a frame each), the survival
+component 0.42 s, the footsteps 0.29 s, `ShotTrace` 0.04 s for 6 880 pellets.
+
+**The Blueprint VM is 15.8 s, 24% of the worked time** (each script scope counted once, at
+its outermost; natives it calls included):
+
+| class | s | share | of it |
+|---|---|---|---|
+| `SandboxCharacter_CMC_ABP` (the anim Blueprint) | 4.73 | 7.1% | `BlueprintThreadSafeUpdateAnimation` 2.40, `BlueprintUpdateAnimation` 1.06, post-evaluate 0.52, exposed inputs 0.75; `ABP_WeaponLayers` 0.21 more |
+| `BP_WeaponComponent` | 4.29 | 6.5% | Tick 4.20, `Server_Fire` 0.09 |
+| the NPC controllers (`BP_ForestWandererAI_Zombie`, `_Wendigo`, entered from their BT step tasks) | 2.40 | 3.6% | zombie 1.81, wendigo 0.59; not split further (natives called that deep carry no scope) |
+| `BP_HealthComponent` | 2.11 | 3.2% | 1.54 the respawn's native call, Tick 0.57 |
+| the item Blueprints (`BP_Knife`, `_Stick`, `_Axe`, `_Pistol`, `_Matches`, `_Shotgun`) | 0.92 | 1.4% | their Ticks |
+| `BP_SurvivalComponent`, `BP_FootstepComponent` | 0.58 | 0.9% | their Ticks |
+| the record component (`InventoryRecord`, C++) | 0.03 | 0.0% | no script: 73 400 ticks |
+
+- **The guess was wrong in rank.** `serversupportsysdesign.md` 4 expected the weapon
+  component's Tick to sink the server; it is 6.3%. The pose is 58.7% against A4's 24%:
+  A4's trace had `ABP_Unarmed_C` under the mesh (0.73 s of 20 s), this one the
+  motion-matching graph (18.0 s of 80 s), whose chooser and trajectory a server runs for
+  every body.
+- **No port reaches the 25 ms line alone.** Every component, item and controller graph
+  run for nothing would give back 9.3 s, 4.3 ms of the 30.7 ms frame.
+- **The first port is the weapon component's Tick** (the largest script cost off the anim
+  graph), and in it first the body-parts loops, which a server runs each frame for a head
+  only the owner's camera sees. `Server_Fire` alone is 0.1%.
+- **The trace costs something itself:** `-trace=cpu` names every scope, 82.6 M on the game
+  thread in the 80 s, heaviest where a graph calls many natives, so the weapon component's
+  row is its ceiling. The numbers are one run's.
+- **How:** `UnrealInsights -OpenTraceFile=<trace> -NoUI -AutoQuit
+  -ExecOnAnalysisCompleteCmd="TimingInsights.ExportTimingEvents events.csv -threads=GameThread
+  -startTime=80 -endTime=160 -columns=ThreadId,TimerId,StartTime,EndTime,Depth"` (2 min, a
+  2.6 GB csv), `TimingInsights.ExportTimers timers.csv` for the names in a second invocation,
+  then summed per timer down the depth column (a timer already on the stack not counted
+  again). The trace: `Saved/traces/net_load_32bots_w0_2026-10-09.utrace`.
+
 
 - A1 measured at scale: docs/history/multiplayer.md#a1
 

@@ -212,44 +212,15 @@ python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's 
 - **`--game`** counts `Blueprint Runtime Error`, `Accessed None`, `NPC-SPAWN` and `NPC-FELL`,
   and `INVENTORY-RECORD-STALE` (in `--net` too): what a player carries changed and nothing
   marked its record (`Scripts/combat/dirty.py`). Any of the last fails the run.
-- **`--title`** (with `--game` or `--net`) keeps the title menu: no `-nomenu`, so the game
-  opens paused on it and a probe works it (`Scripts/probes/title.py`). With `--net` each
-  client starts alone on the level and its probe joins through the Multiplayer page
-  (`probe_net_title.py`). Every `--game` and `--net` process is told the run's level is
-  `GameDefaultMap`, which is where a failed join or a left server returns it.
+- **`--title`** (with `--game` or `--net`) keeps the title menu for a probe to work:
+  `docs/headless_runs.md#title`.
 - **`--net --clients N [--windowed] [--probe <probe>] [--seconds S]`** is the multiplayer
   check (`uepylib/net.py`): one dedicated server (the editor binary, `-server`) on `--map`
   (default `Lvl_Forest_200m`) and N clients that join it on `127.0.0.1` (`--port`, default
   17777), all started at once, about 40 s for a server and two clients.
-  - **The report:** one row per process (its joins, Blueprint runtime errors, `Accessed None`
-    and network failures), then each probe's checks, process by process. Any error, a client
-    that did not join, a process that died or a failed check fails the run. One
-    exception: a client the server's RPC guard kicked (`RPC-KICKED` in the server's log)
-    is forgiven its lost connection, and its row says so (`probe_net_guard.py`).
-  - **`--lag MS`** delays every packet a client sends (the engine's `Net PktLag`), and the
-    row's last column counts the movement corrections that process logged
-    (`MOVE-CORRECTION`: the server pulling a client back, rubber-banding when the client
-    predicted wrong). The count fails nothing by itself; a probe says how many a run may
-    have (`probe_net_move_states.py`: none through a sprint, prone or an aim).
-  - **`--bots N`** has the server spawn N more player characters driven by simple AI
-    (`probes/bots.py`: walk, crouch, fire at the nearest body through the same Server events
-    a client asks with), the load test's players; `--trace` writes the server's Unreal
-    Insights trace (`-trace=net,cpu`) as `server.utrace` in the run's folder.
-    `probe_net_load.py` records the numbers (frame and world-tick time, bytes and actor
-    channels per connection, the hit history's size); `Scripts/net/CLAUDE.md`, "Measured at
-    scale", holds them for N = 8, 16, 32 and 62 and the three largest costs. Every
-    performance decision is made against a number from this harness.
-  - **The files:** one log per process (`server.log`, `client1.log`, ...) in
-    `Saved/uepy/net/<stamp>/`, the last ten runs kept.
-  - **Clients are `-nullrhi`** unless `--windowed`. With no probe everyone plays for
-    `--seconds` (default 20) after the last join; with one the run ends when the last process
-    has finished its probes.
-  - **Memory:** the report has a line per process with what it used (`uepylib/net_memory.py`).
-    Measured on the 200 m map before the motion matching: a server or a `-nullrhi` client
-    was 1.9 GB, a `--windowed` client 5.8 GB. With the sample's databases loaded (G3) a
-    server or a `-nullrhi` client peaks at 4.2–4.3 GB, so a server and two `-nullrhi`
-    clients are 12.9 GB of this machine's 16; a rendered client was not measured again.
-    Close the editor first, and run one at a time.
+  Its report, `--lag MS`, `--bots N` and `--trace`, the log files and the memory it takes
+  (a server and two `-nullrhi` clients are 12.9 GB of this machine's 16: close the editor
+  first, and run one at a time): `docs/headless_runs.md#net`.
 - **PIE:** `uepy.py` refuses to run while PIE is running, unless given `--allow-pie`
   (`--net` too). Never rebuild Blueprints under a running game.
 - **Log prefixes:** builders log with `[GEN]`, verifiers with `[VERIFY]`.
@@ -299,100 +270,11 @@ editor.
 
 ## Current state
 
-- **The player:** a Meshy-generated adventurer in skin-tight shorts (`SKM_Adventurer03`; which body is one setting, `asset_pipeline/player_body.py`) holding an issued shotgun, pistol, knife, axe, box of matches and stick. The SMG,
-  assault rifle and sniper are found as drops. The rifle is the FPS Weapon Bundle's AK 47 and
-  the sniper its AS Val with a scope and the SMG its SMG11 (Fab models); the shotgun and pistol are Quaternius's
-  Shotgun_3 and Pistol_1 (CC0, `asset_pipeline/import_quaternius.py`). A gun is carried lowered, in the hand of the stock idle and jog, and comes up into its
-  ready pose (Lyra's rifle or pistol ADS idle: `Scripts/combat/CLAUDE.md`, "The gun poses") for an aim, a shot, a reload or the guard (`combat/weapon_component/carry.py`).
-  The player's default movement is a jog, at 4 m/s, and its animation is Epic's Game Animation Sample motion matching on the hidden UEFN mannequin (idles, starts, stops, pivots, strafes in every direction, sprint, jump and land, picked from the sample's databases; nothing of it is hand-animated: `combat/gas_locomotion.py`, `Scripts/combat/CLAUDE.md`, "The motion-matching base"), and they can sprint at 6 (the sprint, prone, the aim's slower walk and the stamina are the C++ movement component's, predicted by the owning client and decided by the server: `combat/player_move.py`, `Source/CLAUDE.md`) (a full stamina bar lasts 8 s and refills in a little over 8: `combat/player_tuning.csv`; forwards only: within 60° of the way they face, `combat/sprint_tuning.py`), aim over the shoulder or, with a gun, down
-  the sights (the sniper's is its scope; the knife, the axe and the other items have none, so with one of them in hand the sights key is the use key and does not aim: `combat/weapon_component/use.py`), reload and eat, block (F; a swing from the front does a
-  quarter damage and costs stamina), punch with empty hands (left click, Lyra's `MM_Pistol_Melee`: `asset_pipeline/import_lyra.py`), stab with the knife in hand (left click,
-  Mixamo's `Stabbing`, held ready in Mixamo's `Knife Idle`; the knife is the FPS Weapon Bundle's M9; the axe, Quaternius's Survival Pack one, chops down from overhead, Mixamo's Pro Melee Axe Pack `standing melee attack downward`, held in that pack's `standing idle`; the four clips are imported by `asset_pipeline/import_mixamo.py` and baked for the game by `combat/melee_clips.py`, nothing of them keyed by hand; the axe's blow is still the knife's, same reach and damage; and every third blow of it on a tree leaves a piece of wood beside the trunk, a pick-up for the bag: `combat/weapon_component/chop.py`), light a campfire (left click with the matches in hand and wood in the bag: the wood is spent and a fire stands in front of the player for 3 minutes, warming them within 4 m: `combat/weapon_component/light.py`, `survival/campfire.py`), light the stick at a campfire (the use key with it in hand, within 3 m of a fire: it burns for 2 minutes, carried up like a torch and lighting the ground round it, then is a stick again) and hold the burning stick out in front (the use key held: `combat/stick.py`, `combat/weapon_component/torch.py`), heat the knife or the axe at a campfire (E on the fire with it in hand: its metal glows red for 20 s, and while it does the use key cauterises a bleed and its blow does double damage to a wendigo: `combat/heat.py`, `combat/weapon_component/heat.py`, `cauterize.py`, `hot_blow.py`), crouch (C) and go prone (Z), both quieter and slower (the crouch is the Game Animation Sample's own crouch set, picked by its motion matching; prone is a Quaternius Universal Animation Library
-  clip: the crawl is its face-down swim, the packs have no crawl), slide (C in a sprint: a second's coast along the way they were running, slowing to the crouch's pace and ending crouched, predicted by the C++ movement and posed by the sample's slide loop: `combat/gas_moves_tuning.py`), mantle, vault or hurdle a traversable block (the jump key in front of one: the sample's `AC_TraversalLogic`, `combat/gas_traversal.py`; it climbs the sample's `LevelBlock_Traversable` alone, and the forest has none placed, so for now the key jumps everywhere), throw whatever is in hand (hold V to
-  cock the arm and see the arc, click to throw, let V go to call it off; the throw goes where the reticle is: the knife is held by its blade for it (`combat/knife.py` `knife_throw_grip`); the arc stands under the reticle and ends on the point it rests on, and only at a point out of the item's reach, or at the sky, is it the lob tipped over the view (`combat/weapon_component/throw_launch.py`); while V is held the arm waits cocked, in Quaternius UAL2's `OverhandThrow` stopped where its hand is furthest back, and the click plays the clip on from there (`throw_ready.py`, `combat/throw_pose.py`), the item leaving the hand 0.12 s later, tumbling end over end through the air and landing as a pick-up; the knife and the axe go out flat and fast instead of lobbed, spinning forward edge first like a throwing axe, and a thrown knife or axe takes 50 or 75 HP off a body it strikes (1.75 times that in the head, as a bullet does) and stays in it, attached to the bone it struck, alive or dead, and stays lodged in a tree it strikes within reach; E within reach of the blade takes it back: `combat/weapon_component/throw_windup.py`, `throw_flight.py`, `throw_strike.py`, `combat/throw_tuning.py`), interact with one thing at a time (E: of those in reach, the one nearest the
-  point the reticle rests on; an item lying there is picked up, and a campfire heats the knife or the axe in hand: `combat/weapon_component/interact.py`; an item lying on the ground glimmers while the player is near it (within about 3 m, gone by 6), a slight star that appears and is gone every few seconds, unless the WORLD SETTINGS tab's item highlight is off: `combat/glimmer.py`), and carries
-  things in slots (`combat/slot_tuning.py`): the hand (the held item, centre bottom of the screen), four weapon slots under it (primary and secondary for the long guns, the pistol's, the melee's; no captions: an empty one shows a translucent silhouette of its kind, a rifle, a rifle, a pistol, a knife; 1-4 bring one to hand and the same key again puts it away) and a 10-slot backpack, bottom right under the worn garments, always shown (5-9 bring its first five to hand, and Q the next item in it, round the bag, never a weapon slot's; **I** opens the I panel, where the arrows and Enter, or a click, bring a bag slot's item to hand, and an item is dragged from slot to slot, only a weapon into a weapon slot; a dragged item's icon is carried on the mouse cursor, the mouse does not turn the view meanwhile, and one let go outside the inventory is set down on the ground in front of the player: `graphics_menu/inv_carry.py`, `combat/weapon_component/drop_request.py`). A pick-up goes into the bag, or into empty hands with the bag full; with the bag full and something in hand nothing is picked up. A weapon picked up or looted goes to a free weapon slot of its kind before the bag, and a knife or axe taken back out of the tree or the body it was thrown into goes to empty hands (`combat/weapon_component/slot_sync.py`, `pickup.py`). A gun in hand goes back to its weapon slot when another item is brought up. The guard is a procedural pose (no clip exists), as are crouch and prone on the mannequin fallback.
-  Each gun has its own accuracy cloud and recoil, both steadied by the shoulder aim, crouch and
-  prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.
-  The reticle is always white; a headshot (a round, or a thrown knife or axe) draws an X round
-  it for a moment (`graphics_menu/hit_marker.py`, `combat/weapon_component/headshot.py`).
-  Down the sights the view runs along the gun's own sight line (the front sight's tip is the
-  centre of the screen, in any pose), so there the reticle is drawn only in debug mode; the
-  hip and the shoulder aim keep it. Bringing the sights up is one motion from the key: the camera
-  travels from where it is onto the sights, zooming as it goes, and the view stays on the
-  target while the gun rises into it
-  (`combat/weapon_component/seat.py`). Down any gun's sights the player's own head is
-  hidden, so it never stands in the sight picture (`combat/weapon_component/head_hide.py`).
-  The aim sways slowly, sights and shot together
-  (`combat/sway_tuning.py`; steadier crouched and prone; how fast is each gun's `sway_rate` on the
-  GUN SETTINGS tab). Holding Left Alt down the sights holds the breath, all but stilling the sway for up to 5 s,
-  after which the player is winded and sways harder until it refills (`combat/weapon_component/breath.py`). Down the sights the left hand is
-  held on the gun (an IK onto a point in the right hand's space), so both hands move with
-  it (`combat/support_hand.py`). A hit taken down the sights plays
-  no flinch, so the view stays on the target (`combat/weapon_component/steady.py`).
-  The pistol reloads every 8 shots from an endless reserve. A bullet that hits a body throws
-  blood; one that hits the scenery throws chips and dust off the surface (`BP_BulletImpact`).
-  A body is hit only where its physics bodies are, and those are fitted to the model
-  (`combat/hit_bodies.py`): a round past the head, inside the capsule, is a miss.
-- **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
-  chase and melee, each driven by a Behavior Tree (`BT_ForestWandererAI_<Creature>`). Between two
-  swings a wanderer backs off a little and sidesteps round the player, facing them. A campfire draws the zombies: one on patrol within 200 m of a burning fire is Drawn, walks to it at its patrol walk and stands by it until it burns out, and still goes aggro if it notices the player on the way (`npc/drawn.py`, `forest_generator/npc_drawn.py`). A zombie growls every 4–9 s while it patrols (heard from 25 m: `PATROL_VOICE_HEARD_CM`, `Sound/sound_monsters.py`), gives one growl of its own as it notices the player (heard as far as the wendigo's roar) and snarls at each swing; hunting, it is otherwise silent but for its feet (`Sound/sound_monsters.py`). A wendigo on patrol makes no sound: its 4–9 s growl starts only once it has noticed the player (`forest_generator/npc_voice.py`, `npc/stats.py`). A wendigo
-  hunts before it chases: aggro, it roars (the Mixamo zombie scream, and one of its roar
-  sounds), comes in round the player in an arc, tree to tree, waiting behind each trunk, and
-  from 10 m charges straight at them, roaring again as it breaks into the charge (the sound alone: it does not stop for it) (`npc/stalk.py`, `forest_generator/npc_stalk.py`). It runs the arc at 169% of its run speed (faster than the player sprints), and the way round turns about every 4–9 s. Only a tree whose trunk is at least 45 cm wide is cover (never a sapling); with no such tree ahead it runs on in the open without stopping; and further than 150 m from the player it runs straight at them, at that same speed (`npc/stalk_cover.py`). A player who runs more than 30 m from where they stood when it roared is charged at once: no more trees (`npc/stalk.py`, `StalkOrigin`). One the player has shot is enraged: no roar and no arc, it charges straight at them, for good. Fire held out at a wendigo (the player's `FireWard`: the burning stick, raised by the use key) keeps it from attacking: within 7 m and in front of the player it circles them instead, turning about every 2–4.5 s, attacks once it is more than 90° round the fire, and after 30 s of being held off runs away for 12 s and hunts again (`npc/ward.py`, `forest_generator/npc_ward.py`). Held off, it roars twice, standing: once 13–17 s in, and once at the 30 s, before it runs; a blow it lands on the player starts the 30 s over (`npc/ward_roar.py`). A wendigo's blow has a 33% chance of leaving the player bleeding: 50 HP drained over 3 minutes, named BLEEDING on the HUD; a second wound restarts it, and a heated blade stops it (`survival/on_hit.py`, the on-hit table any attack can be given a row in). A killed one is replaced 10 s later, 75–100 m away, and leaves a ragdoll corpse.
-  The zombie idles, shambles, runs and swings with Mixamo's zombie packs
-  (`asset_pipeline/import_mixamo.py`, zips in `assets/cache/mixamo/`); the wendigo keeps the
-  mannequin's set, plus that pack's scream for its roar.
-- **Corpse loot:** a wanderer the player kills carries what its loot table rolls (for now, water:
-  a canteen at 50%). Near any body, loot or none, **Tab** kneels the player over it (Quaternius
-  UAL's `Fixing_Kneeling`) and opens a loot window showing what it carries as item icons;
-  Up/Down pick and Enter takes the item into the bag (`Scripts/loot/CLAUDE.md`).
-- **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature
-  bars, a kill counter, an FPS readout that is always on (debug mode or not), the inventory grid, the menu, the death menu
-  and a settings page, all of them worked by the mouse cursor as well as the keys (hover picks a row, a click takes it, and a scrolling list's bar is dragged; the wheel does nothing in a menu). There is one menu, off the top left: the game opens on it, paused, and M brings the same one up in play, where it pauses nothing (`graphics_menu/menu_main.py`). The title offers the two modes, single player and multiplayer, as its first two rows; a client of a server has no title (it is in its game, however it joined), and in play the menu says which mode this is. Pausing is single player's alone: the title's pause and death's are behind a Branch on IsStandalone, and as a client of a server the same screens are overlays over a running world (`net/pause.py`). Its rows have no hotkeys: Up/Down and Enter, or a click, take one (the caret goes round: Down on the bottom row is the top one, Up on the top the bottom, in the menu, the settings page and every tab: `graphics_menu/menu_nav.py`), Escape goes back a step (out of a tab or the controls page, and in play out of the menu: `graphics_menu/escape_checks.py`), and while it is open the arrows do not walk the character. Its rows: single player, which on the title opens a page holding new game (continue game while a saved profile exists), which starts the game, and in play reads resume and shuts the menu; multiplayer, which on the title opens a page with the server's address (typed on its row, default `127.0.0.1:7777`, kept in the local settings) and join server, which says it is connecting and, when the join fails or the server later drops the player, brings them back to this page with the reason (`graphics_menu/mode_tick.py`, `net/game_instance.py`); controls, which opens the settings page in the rows' place; debug mode, which draws each pellet's trajectory and each wanderer's aggro cone in the world; save and exit (as a client of a server it reads leave server, and returns to the title without touching the single-player profile); a dev-all-guns cheat; a GUN SETTINGS tab that changes each gun's numbers live, and the knife's and the axe's throw (its arc and the damage a thrown one does), and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads; a MONSTER SETTINGS tab that does the same for each creature's senses, patrol, speed, melee and health, and for the wendigo's hunt (charge range, catch-up range, how far the player may run before it charges, hunting speed, the wait behind a tree, how often it turns) and what fire does to it (range, cone, ring, circling speed, how often it turns, how long it is held off and runs), a scrolling list saved to `Scripts/npc/monster_tuning.csv`, which the NPC build reads; a PLAYER SETTINGS tab that changes the jog's and the sprint's speed and how long the stamina bar lasts and refills, saved to `Scripts/combat/player_tuning.csv`, which the weapons build reads; a SOUND SETTINGS tab, a scrolling list, that changes each sound's volume live (the footsteps, each gun's shot and reload, the dry click, the melee hit and swing, the axe's chop, the zombie's growl, its attack and aggro growls, the wendigo's roar, the monsters' footsteps, the player's hit and death, the match, the campfire, the three beds: day birds, night, wind, and the bush rustle, breath, heartbeat, eating and item handling; each from 0 to 4, the engine's ceiling; the footsteps start at 0.4 of their recording), saved to `Scripts/Sound/sound_tuning.csv`, which the sound build (and the menu build) reads (`Sound/mix.py`, `graphics_menu/sound_tune_tick.py`); a WORLD SETTINGS tab that sets the time of day the day's and night's lengths and how fast the night cools the player, and switches the item highlight (the glimmer over items on the ground) on or off, all but the hour saved to `Scripts/world/world_tuning.csv`; and a GRAPHICS SETTINGS tab, the one place the Low / Medium / High / Custom preset is picked, that changes each preset's numbers live (resolution, shadows, view distance in percent, grass and tree draw distance in metres, grass density, leaves, fog) and the look shared by all four (brightness, sun, moon, stars, ambient light, fog density), saved by its SAVE DEFAULT row to `Scripts/graphics_menu/graphics_tuning.csv`, which holds every default: each preset's numbers and which preset a new player starts on; and exit game, which quits to the desktop, saving nothing. Save and exit and the cheat need a game in play, and say so on the title. Custom is the player's own: it and the picked preset persist between sessions (`graphics_menu/gfx_save.py`). Every tab's table but the graphics one's also persists between sessions in a save slot of its own, over the CSV's defaults and with no Python, so in a packaged build too (`graphics_menu/tune_keep.py`). An open tab stands in place of the menu's rows and has a BACK row, its top row, as the settings page does; the graphics tab sits bottom right, five rows at a time behind a scroll bar. The settings page holds the difficulty (EASY / MEDIUM / SURVIVOR,
-  default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
-- **Clothing:** a hat, glasses, a shirt, a jacket, gloves, pants, boots and a backpack, one
-  slot each. A garment picked up goes into the bag; the fire key with it in hand wears it
-  (out of the bag, into its slot; one already worn there goes back into the bag). The worn
-  garments are shown bottom right, always, over the backpack, as icons: one inventory slot per
-  garment, its icon in it or, while nothing is worn there, its translucent silhouette. With **I**
-  open, Up/Down and Enter (or a click) take one off into the bag, the mouse drags a worn garment
-  onto the hand or a bag slot and a carried one onto the worn slots to wear it
-  (`combat/weapon_component/wear_drag.py`), and a portrait of the character, facing
-  forward, stands left of the panel (a render of the player's body: `item_icons/portrait.py`). Only the state exists: nothing is drawn worn and wearing changes nothing. The body
-  the garments will be drawn on is generated: the adventurer in skin-tight shorts
-  (`SKM_Adventurer03`, Meshy), which the player now wears
-  (`Scripts/asset_pipeline/CLAUDE.md`). One of
-  each lies 3 m in front of the start on `Lvl_Forest_200m` (`Scripts/clothing/CLAUDE.md`).
-- **Item icons:** every item's icon, in the inventory grid and in the loot window, is a
-  picture of its own 3D model, lit as a studio shot (its own shadows, gloss), fitted to the
-  slot and given a thin black contour by `Scripts/build_item_icons.py`, and drawn untinted (`Scripts/item_icons/CLAUDE.md`). A new or re-modelled item gets its
-  icon from a re-run.
-- **Proprietary notices:** the game is Ellivian Inc.'s (`LICENSE.txt`). The title and settings
-  pages carry a copyright and confidentiality notice, and every screen a faint
-  `ELLIVIAN INC. · CONFIDENTIAL` watermark, bottom right; `WATERMARK_RECIPIENT`
-  (`graphics_menu/legal_consts.py`) stamps a shared build with who it was given to.
-- **Sound:** every sound is a recording chosen by ear on an audition page; `Scripts/Sound/sound_candidates/selection.py` is the table of which take is which sound, and `Scripts/Sound/docs/missing_sounds.md` what is still missing or chosen and not yet played. The game plays: each gun's shot, reload and dry click, footsteps, a swing and the blow landing (a fist's thud, a blade's stab), the axe on a tree, anything thrown leaving the hand and a thrown blade going into a body or a tree (a thrown axe that kills by the head has a gorier sound of its own), an item's own sound as it is moved between slots or brought to hand (a gun's, a blade's, a garment's, anything else's: `Scripts/Sound/sound_items.py`), food eaten, a match, a campfire's crackle, the zombie's growls (on patrol, as it goes aggro, as it swings: heard from further than it sees) and the wendigo's roar (which carries on a curve of its own, to be heard from as far as it can see), the wanderers' footsteps (takes of their own on the footstep component the player wears too, heard within 20 m), the player's grunt at a blow and cry at death, their heartbeat under 30% health and their breath while the run key is held with no stamina left, the rustle of a bush as the player or a wanderer goes through it (anyone's is heard from 30 m: `RUSTLE_HEARD_CM`, `Sound/sound_world.py`), and the forest itself: birds by day, crickets and owls by night, faded by the day/night clock (`Scripts/Sound/sound_world.py`; the wind bed is silent by default). Every sound's definition and logic is the `Sound` package (`Scripts/Sound/__init__.py`): one module per area (`sound_weapons`, `sound_monsters`, `sound_items`, `sound_world`), each a table of sounds and of the Blueprint variables that play them. To change a sound, a mapping, a profile or a volume: edit it (a take: the selection, then `python3 Scripts/Sound/install_selected_sounds.py`), then `uepy.py Scripts/build_sound.py`; no other build is needed unless a Blueprint gains a new variable or play site.
-- **Wind:** the grass and the trees sway in the wind (world-position offset in their materials,
-  `forest_generator/wind.py`), each clump and tree along a heading of its own that veers about
-  the prevailing wind, in gusts that cross the map in patches; the graphics menu's GRAPHICS SETTINGS tab switches it on or off
-  per preset, sets how far off it still moves, and its strength and speed
-  (`graphics_menu/gfx_tuner_wind.py`).
-- **The maps:** `Lvl_Forest_200m` (the editor's startup map, for debugging) and
-  `Lvl_Forest_1000m` (`GameDefaultMap`: what a packaged game boots). Food and water lie
-  in both.
-- **Day and night:** a clock turns the sun and the moon across the sky. The day and the night
-  are 4 minutes each for now (`Scripts/world/world_config.py`). The night is moonlit, dim and
-  starry: the stars are the real ones (the Yale Bright Star Catalogue, as seen from 45° north:
-  Orion, the Pleiades, the Pole Star), small dots beside the moon (`Scripts/world/star_map.py`). A level starts at a random time of day. At night the player's temperature falls
-  slowly (0.1 a second; `Scripts/world/night_cold.py`); beside a campfire it rises (1 a second).
-- **Save and exit:** the menu's save-and-exit row saves the character's stats and inventory, but not its
-  location, after 15 s, then returns to the main menu. The character stands still meanwhile. A hit calls it off. The next game loads
-  the profile, and death deletes it (`Scripts/graphics_menu/CLAUDE.md`).
-- **Death:** once the player or a wanderer is dead (or at 0 HP), nothing it could do runs: the
-  weapon component's Tick stops at its dead gate, the loot window shuts, and every step of a
-  wanderer's tree refuses (`probes/probe_dead_no_actions.py`). What a player's death is depends on the mode. In single player it is the end of that game: the world pauses on the death menu, the profile is deleted, and the restart reopens the level. As a client of a server the player stays in the session: everything carried and worn goes onto the body, which anyone can search with the loot window (`combat/weapon_component/shed.py`), the death menu says a respawn is coming, and 10 s later the server gives the player a new character at a random PlayerStart with the starting inventory, the body lying 60 s more (`combat/player_respawn.py`, `probes/probe_net_death.py`). Players can hurt each other there, with everything that hurts a wanderer and the same hit boxes (no teams yet, so anyone can hurt anyone); a player killed by another is counted for the killer as a player kill, apart from the monster kills, and the death menu shows both (`combat/player_kill.py`, `probes/probe_net_pvp.py`).
-- **Known gaps:** a low temperature does nothing yet. Traversal has nothing to climb (no traversable block is placed in either map) and is not proven as a client of a server (`Scripts/net/CLAUDE.md`, "The slide, and traversal"). The guns' ready poses are Lyra's ADS idles (C3; the shotgun is held in the rifle's, its left hand moved onto the pump down the sights only: `combat/shotgun_hold.py`; Lyra's hipfire idles are not played); the player's hold poses, flinches, crouch, crawl, kneel and throw are the clips the game had before the motion matching, retargeted onto the sample's shorter mannequin (`asset_pipeline/retarget_to_uefn.py`); none of it has been played by hand (`Scripts/combat/CLAUDE.md`, "The weapon layers"). Feel checks that need a play session are listed per package.
+The whole of it, system by system, is `docs/current_state.md` (the player, the wanderers,
+corpse loot, the HUD and menu, clothing, item icons, sound, wind, the maps, day and night,
+save and exit, death, the known gaps). In a line: a third-person survival shooter in a
+generated forest, single player or as a client of a dedicated server from one code path;
+the player moves by Epic's motion matching, and zombies and wendigos hunt them.
 
 ## Gotchas learned the hard way
 
@@ -542,81 +424,11 @@ editor.
 
 ### Headless runs and probes
 
-**Checking behaviour in the running game: write a probe.** Don't hand-roll a `-game` run plus
-inbox polling. One command boots the level, runs the probe once the player exists, prints each
-check and ends the run as soon as the probe does (about 20 s):
-
-```bash
-python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py
-```
-
-- **Shape:** a probe defines `probe(p)`, a generator. `yield 0.3` waits 0.3 s of game time,
-  `yield lambda: cond()` waits for a condition, and `p.check(label, ok, detail)` records a
-  result. `p` has the lookups (`pawn`, `component`, `game_mode`, `hud`, `actor_of`,
-  `send_event`, `get`, `set`). `Scripts/probes/probe_consume_heal.py` is the model.
-- **Writing a Blueprint variable on a live instance:** list it in the probe's
-  `WRITABLE = [(bp_path, var)]`. `probes/boot.py` makes it Instance Editable and recompiles, in
-  memory for that run only, before the level loads. Nothing on disk changes and no builder
-  re-run is needed.
-- **A network probe** (`uepy.py --net`) is the same file run in every process, the server and
-  each client. `Scripts/probes/probe_net_join.py` is the model; `probes/net.py` has the rules.
-  - **Where it runs:** `RUNS_ON = ("server", "client")`, or `"client 1"` for that client alone.
-    Absent, it runs everywhere, single player too. A file may define `probe_server(p)` and
-    `probe_client(p)` instead of one `probe(p)`.
-  - **Where it is:** `p.where` (`"server"`, `"client 2"`, `"standalone"`), `p.is_server`,
-    `p.client` (1..N), `p.clients`. `p.players()` is every player's controller: all of them on
-    the server, its own on a client.
-  - **When it starts:** on the server once every client's player has joined, on a client once
-    it has its pawn.
-  - **From one process to another:** `p.post("shot")` on one side,
-    `yield lambda: p.posted("server", "shot")` on the other. The processes share nothing else.
-  - **A dedicated server has no Slate,** so nothing registered with
-    `register_slate_post_tick_callback` ever runs there. Use `unreal.register_ticker_callback`
-    (the callback returns True to keep ticking), as `probes/boot.py` does.
-- **Keep probes:** they are checked in, so the next change to the same behaviour re-runs them.
-- **Poking a running game by hand:** start `uepy.py --game --seconds 120` and send scripts with
-  `uepy.py --in-game <script>`. A game has its own inbox, `Saved/uepy/game`, so it never takes a
-  job meant for the editor.
-
-- **World time in `-nullrhi -game` advances by a fixed tiny step per frame.**
-  - A 2–3 s `Delay` may never elapse in a 30 s run. Keep probe delays well under a second, and
-    measure upstream of long delays.
-  - Heavy per-frame logging slows the game itself, so gate probes down to one actor.
-  - Cross-check `GetTimeSeconds` against wall clock before reading "it did not happen".
-- **Isolate the thing under test.** For example, kill the player at BeginPlay rather than waiting
-  for the pack: 40 decisive seconds instead of 3 inconclusive minutes.
-- **A `-game` process runs `init_unreal.py`.** That is how probes start, and how
-  `uepy.py --in-game` reaches a running game.
-  - There is no world context there, and `EditorLevelLibrary.get_game_world` SIGSEGVs. Use
-    `unreal.find_object(None, "/Game/Maps/<L>.<L>")` to get the world.
-- **Python can't write a Blueprint variable on an instance** unless it is Instance Editable, and
-  the `Set*PropertyByName` functions aren't exported. Probes handle this with `WRITABLE` (above).
-  What that rests on:
-  - **Instance Editable plus compile, unsaved, works in `-game`**, but only if the Blueprint
-    stays referenced. Opening a level garbage-collects an unreferenced Blueprint, and it
-    reloads from disk without the edit. `boot.py` holds them.
-  - **Write with `set_editor_property(name, value, PropertyAccessChangeNotifyMode.NEVER)`.**
-    The default notifies PostEditChange, which on a live component re-runs the owner's
-    construction script. The actor gets fresh components, so the one you wrote is a dead copy
-    that never ticks again.
-  - **Never use the console's `set <Class> <Prop> <value>` in a game.** It writes every object
-    of the class, including the CDO, and re-runs construction scripts: it set off an endless
-    NPC respawn storm. `setnopec` did nothing to a PIE instance and logged nothing.
-  - PIE started from Python begins **paused**. Call `GameplayStatics.set_game_paused(w, False)`.
-- **A `-game` inbox heartbeat can go quiet for seconds.** The game beats once a frame, and a
-  headless frame can be slow. uepy allows a game 30 s (an editor 6 s), and it treats a beat from
-  a dead pid as silence.
-- **In a cold run, `print()` doesn't reach the log.** Use `unreal.log_warning`. The inbox captures
-  both.
-- **Sort numbered actors on their trailing integer, never on the label string,** or `_10` lands
-  between `_1` and `_2`.
-- **Killing a `-game` run on a timer** produces a `SIGSEGV` with `GracefulTerminationHandler` in
-  the stack. That isn't a gameplay fault.
-- **`-nullrhi` can't prove anything that touches the window or viewport.** `--game
-  --windowed` renders: widgets get their geometry and the engine calls `DrawHUD` itself
-  (`probe_menu_cursor_window.py`). Python still reads a widget's cached geometry as zeros.
-- **Diagnosing a frozen editor:** run `sample <pid> 5 -file /tmp/hang.txt` and read the
-  `GameThread` stack. `ps -o %cpu` separates a spin (100%) from a deadlock (0%).
+**Checking behaviour in the running game: write a probe** (`probe(p)`, a generator; the
+model is `Scripts/probes/probe_consume_heal.py`, for `--net` `probe_net_join.py`), never a
+hand-rolled `-game` run. The probe's shape, `WRITABLE`, network probes and every trap of a
+headless game (world time under `-nullrhi`, writing a variable on a live instance, the
+console's `set`, the inbox heartbeat): `docs/headless_runs.md#probes`.
 
 ### Config
 

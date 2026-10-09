@@ -7,6 +7,9 @@ which runs the combat.verify package.
 One module per responsibility. Find the owner here before opening anything;
 each module's docstring says what it owns and why it is shaped that way.
 
+BUILD ORDER
+  build_steps       the weapons build as a table of steps; UEPY_BUILD_ONLY / uepy.py --only runs some
+
 DATA (constants and pure tables -- no Blueprint authoring)
   paths             /Game asset paths and generated-class paths
   health_vars, item_vars, settings_vars, burst_vars, ammo_vars, footstep_vars

@@ -34,9 +34,9 @@ from uebp.nodes.math import (
 from uebp.nodes.system import FN_IS_VALID
 from combat.weapon_component import vars as WV
 
-INTERACT_TARGET_VAR = "InteractTarget"   # the nearest candidate so far, or None
-INTERACT_GAP_VAR = "InteractGap"         # its distance to AimPoint, cm
-INTERACT_FORCED_VAR = "InteractForced"   # a probe pressing the key
+INTERACT_TARGET_VAR = WV.InteractTarget   # the nearest candidate so far, or None
+INTERACT_GAP_VAR = WV.InteractGap         # its distance to AimPoint, cm
+INTERACT_FORCED_VAR = WV.InteractForced   # a probe pressing the key
 # What InteractGap starts a search at: farther than any candidate can be from
 # the aim point, which is at most the aim trace's kilometre out.
 INTERACT_NO_GAP = 1.0e9

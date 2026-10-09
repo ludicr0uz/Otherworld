@@ -66,7 +66,7 @@ from uebp.nodes.math import (
 from uebp.nodes.system import FN_IS_VALID
 from combat.weapon_component import vars as WV
 
-WEAR_SLOT_VAR = "WearSlot"     # the slot WearItem goes into (declared in build.py)
+WEAR_SLOT_VAR = WV.WearSlot     # the slot WearItem goes into (a row of vars.py)
 
 
 def _worn_at(g, slot):

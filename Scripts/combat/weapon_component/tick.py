@@ -72,7 +72,7 @@ from combat.weapon_component import vars as WV
 
 # A probe's stand-in for the fire key's press: no key can be injected into a
 # headless game (probes/probe_dead_no_actions.py). False in every real game.
-FIRE_FORCED_VAR = "FireForced"
+FIRE_FORCED_VAR = WV.FireForced
 
 
 def _author_wc_tick(ed, tick):

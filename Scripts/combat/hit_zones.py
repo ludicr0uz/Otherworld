@@ -8,6 +8,7 @@ import unreal
 from combat.log import _log
 from uebp.graph import _component_object, _find_handle, _handles
 from combat.tuning import COMBAT
+from combat.weapon_component import vars as WV
 
 
 # --- hit boxes ---------------------------------------------------------------
@@ -42,11 +43,11 @@ LIMB_MULT_VAR = "LimbMultiplier"
 # The bone the current pellet struck, on the weapon component. A variable
 # because it is written on three different exec arms (struck a body, threaded
 # between the limbs, hit something that is not a Character) and read by one.
-HIT_BONE_VAR = "HitBone"
+HIT_BONE_VAR = WV.HitBone
 # Where the current pellet landed, on the weapon component: the trace's own
 # hit, moved onto the struck body once the body trace finds one. The capsule
 # stands up to 25 cm off the skin, and blood belongs on the skin.
-HIT_POINT_VAR = "HitPoint"
+HIT_POINT_VAR = WV.HitPoint
 
 
 def make_shootable(bp):

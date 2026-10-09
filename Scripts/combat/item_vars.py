@@ -1,9 +1,25 @@
 """BP_WeaponItem's member variables, named once: each row is
 the name, the pin type and the default (uebp/vars.py). The builder declares
-TABLE; a row with no type is a component, or a variable declared elsewhere.
+TABLE. A name a constants module owns (``*_tuning.py``) is imported from it.
 """
 
-from uebp.vars import BOOL, FLOAT, VECTOR, Var, array, obj, struct
+from uebp.vars import (
+    BOOL, FLOAT, INT, ROTATOR, STRING, VECTOR, ZERO_ROTATOR, ZERO_VECTOR, Var, array, obj,
+    struct,
+)
+from combat.chop_tuning import CHOPS_VAR
+from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
+from combat.light_tuning import LIGHTS_VAR
+from combat.seat_tuning import HAS_SIGHTS_VAR
+from combat.slot_tuning import NOT_A_WEAPON, SLOT_VAR, UNPLACED, WEAPON_KIND_VAR
+from combat.sway_tuning import SWAY_RATE, SWAY_RATE_VAR
+from combat.throw_tuning import (
+    LODGE_POINT_VAR, LODGE_TURN_VAR, THROW_DAMAGE_VAR, THROW_EDGE_ON_VAR,
+    THROW_GRIP_LOC_VAR, THROW_GRIP_ROT_VAR, THROW_GRIP_VAR, THROW_PITCH_UP_DEG,
+    THROW_PITCH_VAR, THROW_SPEED, THROW_SPEED_VAR, THROW_SPIN_DEG_S, THROW_SPIN_VAR,
+)
+from combat.torch_tuning import BURN_OUT_VAR, BURNS_VAR, LIT_VAR, USE_POSE_VAR
+from combat.wear_tuning import CLOTHING_SLOT_VAR, NOT_CLOTHING
 
 Damage = Var("Damage", FLOAT)
 SpreadDegrees = Var("SpreadDegrees", FLOAT)
@@ -61,10 +77,6 @@ Scoped = Var("Scoped", BOOL)
 # SHOT_VOLUME_CM in tuning.py). On the item so the shot's noise is read off
 # Held like every other per-weapon number.
 ShotVolume = Var("ShotVolume", FLOAT)
-Automatic = Var("Automatic")
-Consumable = Var("Consumable")
-DisplayName = Var("DisplayName")
-Dropped = Var("Dropped")
 # A thrown blade left in a tree or a body (throw_strike.py sets it as it sets
 # the item in). The pick-up reads it: taken back with empty hands, it goes to
 # the hand, not to a slot (pickup.py), and stops being Lodged.
@@ -76,21 +88,121 @@ InWorld = Var("InWorld", BOOL, False)
 # Whether the server has put the actor to sleep (NetDormancy DormantAll): an item
 # lying still, or carried. Its own Tick decides (item_world.py); not replicated.
 Dormant = Var("Dormant", BOOL, False)
-InfiniteReserve = Var("InfiniteReserve")
-Loaded = Var("Loaded")
-MagazineSize = Var("MagazineSize")
-Melee = Var("Melee")
-PelletCount = Var("PelletCount")
-PelletSpreadDegrees = Var("PelletSpreadDegrees")
-RecoilPitch = Var("RecoilPitch")
-RecoilSightsScale = Var("RecoilSightsScale")
-RecoilYaw = Var("RecoilYaw")
-Reserve = Var("Reserve")
-UsesAmmo = Var("UsesAmmo")
+DisplayName = Var("DisplayName", STRING)
+PelletCount = Var("PelletCount", INT)
+Dropped = Var("Dropped", BOOL)
+# Ammunition. UsesAmmo false means the other four are never read (the
+# consumables), and the fire gate short-circuits on it. InfiniteReserve is the
+# pistol: a real magazine to reload, over a reserve that is never charged and
+# never credited by shell pickups.
+UsesAmmo = Var("UsesAmmo", BOOL)
+MagazineSize = Var("MagazineSize", INT)
+Loaded = Var("Loaded", INT)
+Reserve = Var("Reserve", INT)
+InfiniteReserve = Var("InfiniteReserve", BOOL)
+# Held trigger or tapped trigger. Read only behind the fire gate, where Held
+# is known valid -- a pure Get off a null self is an Accessed None every
+# frame, and the outer gate's condition is pulled on frames where nothing is
+# equipped at all.
+Automatic = Var("Automatic", BOOL)
+# Used rather than fired: the fire key sends CONSUME_EVENT_TAG and the item is
+# spent (see weapon_component/consume.py). On the base class, not on
+# BP_ConsumableItem, so the weapon component can ask without naming a class
+# that is built after it.
+Consumable = Var("Consumable", BOOL)
+# Swung rather than fired: the fire key slashes with it
+# (weapon_component/knife.py). The knife (knife.py).
+Melee = Var("Melee", BOOL)
+# Its blow bites a tree (weapon_component/chop.py): the axe. Read behind the
+# blow's own IsValid(Held).
+Chops = Var(CHOPS_VAR, BOOL)
+# Struck rather than fired: the fire key lights a campfire with it
+# (weapon_component/light.py). The matches. Read behind the fire gate, as
+# Melee is.
+Lights = Var(LIGHTS_VAR, BOOL)
+# Aimed down its sights by the sights key: a gun. False on everything else,
+# which that key aims over the shoulder (weapon_component/ads.py).
+HasSights = Var(HAS_SIGHTS_VAR, BOOL)
+# Lit at a campfire by the use key, and burning: the stick (stick.py,
+# weapon_component/torch.py).
+Burns = Var(BURNS_VAR, BOOL)
+Lit = Var(LIT_VAR, BOOL)
+# Heated at a campfire by the interact key, and hot: the knife and the axe
+# (heat.py, weapon_component/heat.py).
+Heats = Var(HEATS_VAR, BOOL)
+Hot = Var(HOT_VAR, BOOL)
+# The slot a garment is worn in (wear_tuning.WEAR_SLOTS' index), or
+# NOT_CLOTHING: the weapon component wears an item whose slot is >= 0
+# (weapon_component/wear.py). Scripts/clothing sets it on each garment.
+ClothingSlot = Var(CLOTHING_SLOT_VAR, INT, NOT_CLOTHING)
+# Where it is carried (slot_tuning: the hand, a weapon slot, a bag slot, or
+# UNPLACED), and which weapon slot it belongs in (NOT_A_WEAPON on everything
+# but the guns and the blades). weapon_component/slot_*.py.
+Slot = Var(SLOT_VAR, INT, UNPLACED)
+WeaponKind = Var(WEAPON_KIND_VAR, INT, NOT_A_WEAPON)
+BurnOutTime = Var(BURN_OUT_VAR, FLOAT)
+CoolTime = Var(COOL_VAR, FLOAT)
+# The overlay a hot blade's model wears (heat.py). None on everything that
+# does not heat.
+HeatMaterial = Var(HEAT_MATERIAL_VAR, obj("/Script/Engine.MaterialInterface"))
+# The pose a lit stick is raised in while the use key holds it out
+# (weapon_component/torch.py). None on everything else.
+UsePose = Var(USE_POSE_VAR, obj("/Script/Engine.AnimSequence"))
+# Where this gun's ready pose has the left hand, in the right hand's bone
+# space (support_hand.py): down the sights the hand is held there. Zero on the
+# base; nothing holds a hand on an item that has no sights.
+SupportPoint = Var("SupportPoint", VECTOR)
+# Accuracy: the cloud a shot is drawn in and the kick it puts on the view,
+# with their stance and aim factors. One variable per GUN_ACCURACY column
+# (weapon_specs.ACCURACY_VARS says which), on the item for the same reason
+# AdsZoom is. SpreadDegrees is above, with Damage.
+SpreadShoulderScale = Var("SpreadShoulderScale", FLOAT)
+SpreadCrouchScale = Var("SpreadCrouchScale", FLOAT)
+SpreadProneScale = Var("SpreadProneScale", FLOAT)
+PelletSpreadDegrees = Var("PelletSpreadDegrees", FLOAT)
+RecoilPitch = Var("RecoilPitch", FLOAT)
+RecoilYaw = Var("RecoilYaw", FLOAT)
+RecoilShoulderScale = Var("RecoilShoulderScale", FLOAT)
+RecoilSightsScale = Var("RecoilSightsScale", FLOAT)
+RecoilCrouchScale = Var("RecoilCrouchScale", FLOAT)
+RecoilProneScale = Var("RecoilProneScale", FLOAT)
+# How fast the sights wander down them (sway_tuning.py): the component copies
+# Held's each frame. The default is on the base, so an item with no sights has
+# one too, though it never sways.
+SwayRate = Var(SWAY_RATE_VAR, FLOAT, SWAY_RATE)
+# How far a throw of this item is tipped up from the view, where the reticle
+# rests on nothing it can reach (throw_launch.py reads it off Held). The
+# default is on the base, so the knife, the food and the water throw on it
+# too; a gun's own comes from its spec.
+ThrowArcDegrees = Var(THROW_PITCH_VAR, FLOAT, THROW_PITCH_UP_DEG)
+# How fast it leaves the hand and how fast it tumbles in the air, and whether
+# it leaves squared up to the throw, edge first: a melee weapon's are its own
+# (throw_tuning.MELEE_THROW).
+ThrowSpeed = Var(THROW_SPEED_VAR, FLOAT, THROW_SPEED)
+ThrowSpinDegS = Var(THROW_SPIN_VAR, FLOAT, THROW_SPIN_DEG_S)
+ThrowEdgeOn = Var(THROW_EDGE_ON_VAR, BOOL, False)
+# What a throw of it takes off a body it strikes, and how it sits lodged in a
+# tree (weapon_component/throw_strike.py): a blade's are its own, and the
+# base's 0 damage is what keeps every other item from doing either.
+ThrowDamage = Var(THROW_DAMAGE_VAR, FLOAT, 0.0)
+LodgeTurn = Var(LODGE_TURN_VAR, ROTATOR, ZERO_ROTATOR)
+LodgePoint = Var(LODGE_POINT_VAR, VECTOR, ZERO_VECTOR)
+# Held by the blade while the throw is cocked (throw_tuning.THROW_GRIP_VAR).
+ThrowGrip = Var(THROW_GRIP_VAR, BOOL, False)
+ThrowGripLocation = Var(THROW_GRIP_LOC_VAR, VECTOR, ZERO_VECTOR)
+ThrowGripRotation = Var(THROW_GRIP_ROT_VAR, ROTATOR, ZERO_ROTATOR)
 
 TABLE = (
     Damage, SpreadDegrees, WeaponRange, FireInterval, NextFireTime, ReloadSeconds,
     MuzzleOffset, SightOffset, SightAim, GripLocation, GripRotation, SlotColor, Icon,
     FireSound, DryFireSound, ReloadSound, HandleSounds, UseSounds, AimPose, TwoHanded, AdsZoom, Scoped, ShotVolume,
     Lodged, InWorld, Dormant,
+    DisplayName, PelletCount, Dropped, UsesAmmo, MagazineSize, Loaded, Reserve,
+    InfiniteReserve, Automatic, Consumable, Melee, Chops, Lights, HasSights, Burns, Lit,
+    Heats, Hot, ClothingSlot, Slot, WeaponKind, BurnOutTime, CoolTime, HeatMaterial, UsePose,
+    SupportPoint, SpreadShoulderScale, SpreadCrouchScale, SpreadProneScale,
+    PelletSpreadDegrees, RecoilPitch, RecoilYaw, RecoilShoulderScale, RecoilSightsScale,
+    RecoilCrouchScale, RecoilProneScale, SwayRate, ThrowArcDegrees, ThrowSpeed, ThrowSpinDegS,
+    ThrowEdgeOn, ThrowDamage, LodgeTurn, LodgePoint, ThrowGrip, ThrowGripLocation,
+    ThrowGripRotation,
 )

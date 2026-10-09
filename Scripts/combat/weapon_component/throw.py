@@ -106,11 +106,11 @@ from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
 from combat.weapon_component import vars as WV
 
-THROW_AIMING_VAR = "ThrowAiming"      # the arc was drawn last frame
-THROW_FORCED_VAR = "ThrowKeyForced"   # a probe holding the key
-THROW_CLICK_FORCED_VAR = "ThrowClickForced"   # a probe clicking the fire key
-THROW_ARC_VAR = "ThrowArc"            # the BP_ThrowArc, spawned on first aim
-THROW_ARC_CLASS_VAR = "ThrowArcClass"
+THROW_AIMING_VAR = WV.ThrowAiming      # the arc was drawn last frame
+THROW_FORCED_VAR = WV.ThrowKeyForced   # a probe holding the key
+THROW_CLICK_FORCED_VAR = WV.ThrowClickForced   # a probe clicking the fire key
+THROW_ARC_VAR = WV.ThrowArc            # the BP_ThrowArc, spawned on first aim
+THROW_ARC_CLASS_VAR = WV.ThrowArcClass
 
 
 def _author_throw_key(ed, pc_out, key_pin):

@@ -49,12 +49,13 @@ from uebp.graph import (
     BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _palette, _pin, _struct_type,
     out)
 from uebp.layout import arrange
+from combat import item_vars as IV
 from uebp.nodes.palette import NODE_TWO_BONE_IK
 
 SUPPORT_HAND_VAR = "SupportHand"
 # The point, on the anim BP; and under the same name, each gun's own on
 # BP_WeaponItem.
-SUPPORT_POINT_VAR = "SupportPoint"
+SUPPORT_POINT_VAR = IV.SupportPoint
 
 BONE_SPACE = unreal.BoneControlSpace.BCS_BONE_SPACE
 

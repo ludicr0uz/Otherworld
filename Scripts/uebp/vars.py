@@ -13,7 +13,8 @@ table (``<package>/<blueprint>_vars.py``) is what its builder declares from:
     ed.add_get_member_variable_node(HV.Health)         # in a fragment
 
 A row with no type is a name only: a component, or a variable its builder
-declares itself. Nothing here imports ``unreal`` until a type is resolved, so
+declares itself. A default only the editor can make (a key, a zero vector)
+is a ``lazy``, made when ``defaults`` is called. Nothing here imports ``unreal`` until a type is resolved, so
 a table is plain Python to a probe or a host-side tool.
 """
 
@@ -88,10 +89,43 @@ def cls(path):
 
 
 VECTOR = struct("/Script/CoreUObject.Vector")
+ROTATOR = struct("/Script/CoreUObject.Rotator")
+KEY = struct("/Script/InputCore.Key")
 
 
 def array(of):
     return lambda: _bel().get_array_type(of())
+
+
+# ─── Defaults only the editor can make: resolved by ``defaults`` ─────────────
+
+class lazy:
+    """A default made when the builder applies it, not when the table loads."""
+
+    def __init__(self, make):
+        self.make = make
+
+
+def _zero_vector():
+    import unreal
+    return unreal.Vector(0.0, 0.0, 0.0)
+
+
+def _zero_rotator():
+    import unreal
+    return unreal.Rotator(0.0, 0.0, 0.0)
+
+
+ZERO_VECTOR = lazy(_zero_vector)
+ZERO_ROTATOR = lazy(_zero_rotator)
+
+
+def key(name):
+    """An FKey by its name: ``key("LeftMouseButton")``."""
+    def make():
+        from uebp.graph import _key
+        return _key(name)
+    return lazy(make)
 
 
 # ─── What a builder does with a table ────────────────────────────────────────
@@ -106,4 +140,5 @@ def declare(ed, table):
 
 def defaults(table):
     """{name: default} for the rows that have one, for ``_apply_defaults``."""
-    return {var: var.default for var in table if var.default is not UNSET}
+    return {var: var.default.make() if isinstance(var.default, lazy) else var.default
+            for var in table if var.default is not UNSET}

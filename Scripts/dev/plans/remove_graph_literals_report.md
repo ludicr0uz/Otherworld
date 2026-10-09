@@ -163,6 +163,8 @@ Layout, as logged per graph (nodes, columns, most rows in a column):
   component 29 of 35, health 8 of 8, weapon item 21 of 36, HUD 8 of 8, NPC
   controller 1 of 1, settings 4, burst 5, footsteps 5, ammo pickup 2, survival 3 of
   9, day/night 0 of 10 (names only).
+  Since V1 the weapon component (186 rows) and the weapon item (73) are typed in
+  full, and their builders declare nothing themselves.
 - **Bare variable names remain outside the builders:** `get_editor_property("...")`
   in the verifiers, `p.get`/`p.set` in the probes, the per-item default dicts' keys
   that the codemod did not reach, and `(GAME_MODE_BP_PATH, "PlayerDead")` in two

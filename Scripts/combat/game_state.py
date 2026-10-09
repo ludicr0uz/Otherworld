@@ -17,6 +17,7 @@ from uebp.graph import BEL, BGE, _assets, _declare, _float_type, _struct_type
 from uebp.layout import arrange
 from combat.difficulty import DIFFICULTY_VAR
 from combat.paths import GAME_MODE_BP_PATH
+from combat.weapon_component import vars as WV
 
 
 # --- debug mode --------------------------------------------------------------
@@ -25,7 +26,7 @@ from combat.paths import GAME_MODE_BP_PATH
 # wanderer's number beside its health bar and its sight cone
 # (npc/sight_cone.py). Off by default -- they are all instrumentation, and
 # instrumentation is not what the game looks like.
-DEBUG_MODE_VAR = "DebugMode"
+DEBUG_MODE_VAR = WV.DebugMode
 
 # --- combat trace ------------------------------------------------------------
 # A second developer switch on the GameMode, and a log rather than an overlay:

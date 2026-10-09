@@ -1,14 +1,48 @@
 """BP_WeaponComponent's member variables, named once: each row is
 the name, the pin type and the default (uebp/vars.py). The builder declares
-TABLE; a row with no type is a component, or a variable declared elsewhere.
+TABLE. A name a constants module owns (``*_tuning.py``, ``paths.py``) is
+imported from it; one a graph module used to own is named here, and that
+module's ``*_VAR`` is this row. A default the builder alone can make (a class
+it was handed, a clip it loads) is in its own short dict.
 """
 
-from uebp.vars import BOOL, FLOAT, INT, VECTOR, Var, array, cls, obj
-from combat.paths import ITEM_CLASS_PATH
+from uebp.vars import BOOL, FLOAT, INT, KEY, NAME, VECTOR, Var, array, cls, key, obj
+from combat.paths import FIRE_WARD_VAR, ITEM_CLASS_PATH, THROW_ARC_CLASS_PATH
 from combat.ask_consts import (
     EXIT_AT_VAR, EXIT_CALLED_OFF_VAR, EXIT_DUE_VAR, EXIT_PENDING_VAR, EXIT_STARTED_VAR, NEVER)
 from combat.headshot_tuning import HEADSHOT_NEVER, HEADSHOT_TIME_VAR
-from combat.tuning import COMBAT
+from combat.breath_tuning import (
+    BREATH_FORCED_VAR, BREATH_HELD_VAR, BREATH_HOLD_S, BREATH_SCALE_VAR, BREATH_VAR,
+    WINDED_VAR,
+)
+from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR, RAISE_FORCED_VAR
+from combat.chop_tuning import (
+    CHOP_COUNT_VAR, CHOP_ITEM_VAR, CHOP_TREE_VAR, WOOD_CLASS_VAR, WOOD_SPOT_VAR,
+)
+from combat.heat_tuning import BLOW_DAMAGE_VAR
+from combat.light_tuning import CAMPFIRE_CLASS_VAR, LIGHT_WOOD_VAR, MATCHES_CLASS_VAR
+from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR, SIGHTS_FORCED_VAR
+from combat.slot_tuning import (
+    DROP_ITEM_VAR, DROP_REQUEST_VAR, DROP_WANT_VAR, HAND_FROM_VAR, HAS_ROOM_VAR,
+    MOVE_DST_VAR, MOVE_FROM_VAR, MOVE_SRC_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, NO_REQUEST,
+    SLOT_ITEMS_VAR, SLOT_KEYS, SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_WANT_VAR,
+    STARTER_HAND_FROM,
+)
+from combat.sprint_tuning import (
+    BASE_SPEED_VAR, SPRINT_AHEAD_VAR, SPRINT_FORCED_VAR, SPRINT_SPEED_VAR,
+    STAMINA_DRAIN_VAR, STAMINA_REGEN_VAR,
+)
+from combat.sway_tuning import SWAY_RATE, SWAY_RATE_VAR, SWAY_VARS
+from combat.torch_tuning import NEAR_FIRE_VAR, STICK_CLASS_VAR, WARD_CARRY_VAR, WARD_ITEM_VAR
+from combat.tuning import BIND_VARS, COMBAT
+from combat.use_tuning import USE_PRESSED_VAR, USE_WAS_VAR, USING_VAR
+from combat.wear_tuning import (
+    NOT_CLOTHING, TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_ITEM_VAR, WEAR_REQUEST_VAR, WORN_VAR,
+)
+
+_ITEM = obj(ITEM_CLASS_PATH)
+_CLIP = obj("/Script/Engine.AnimSequenceBase")
+_ACTOR = obj("/Script/Engine.Actor")
 
 Inventory = Var("Inventory", array(obj(ITEM_CLASS_PATH)))
 Held = Var("Held", obj(ITEM_CLASS_PATH))
@@ -77,12 +111,6 @@ RecoilYawKick = Var("RecoilYawKick", FLOAT, 0.0)
 ReloadTake = Var("ReloadTake", INT, 0)
 ItemClass = Var("ItemClass", cls(ITEM_CLASS_PATH))
 BloodClass = Var("BloodClass", cls("/Script/Engine.Actor"))
-AxeClass = Var("AxeClass")
-KnifeClass = Var("KnifeClass")
-PistolClass = Var("PistolClass")
-ReticleSpread = Var("ReticleSpread")
-ShotgunClass = Var("ShotgunClass")
-Stance = Var("Stance")
 # The component's own sounds, a few takes each (Sound/sound_weapons.py, sound_items.py).
 SwingSounds = Var("SwingSounds", array(obj("/Script/Engine.SoundBase")))
 ChopSounds = Var("ChopSounds", array(obj("/Script/Engine.SoundBase")))
@@ -115,7 +143,197 @@ ExitStartedAt = Var(EXIT_STARTED_VAR, FLOAT, NEVER)
 ExitCalledOffAt = Var(EXIT_CALLED_OFF_VAR, FLOAT, NEVER)
 ExitDue = Var(EXIT_DUE_VAR, BOOL, False)
 
-TABLE = (
+# Sprint. The HUD reads Stamina/MaxStamina for the bar under the player's HP
+# bar; BaseSpeed is overwritten on the first frame of BeginPlay with the
+# character's own walk speed, which is this same number (player_pace.py). The
+# sprint's speed and the stamina's two rates are variables so the PLAYER
+# SETTINGS tab can write them.
+BaseSpeed = Var(BASE_SPEED_VAR, FLOAT, COMBAT.jog_speed_cms)
+SprintSpeed = Var(SPRINT_SPEED_VAR, FLOAT, COMBAT.sprint_speed_cms)
+StaminaDrain = Var(STAMINA_DRAIN_VAR, FLOAT, COMBAT.stamina_drain_per_s)
+StaminaRegen = Var(STAMINA_REGEN_VAR, FLOAT, COMBAT.stamina_regen_per_s)
+SprintSpent = Var("SprintSpent", BOOL, False)
+SprintAhead = Var(SPRINT_AHEAD_VAR, BOOL, False)
+# Fire held out in front of the player: a lit stick, raised by the use key
+# (torch.py writes it every frame). Read only by the wanderers afraid of fire
+# (npc/ward.py).
+FireWard = Var(FIRE_WARD_VAR, BOOL, False)
+# The use key (use.py): held on an item with no sights, its press, and last
+# frame's answer. And its one kind, the stick (torch.py): whether a press
+# found a campfire in reach, the stick that is raised and the pose to put
+# back on it.
+Using = Var(USING_VAR, BOOL, False)
+UsePressed = Var(USE_PRESSED_VAR, BOOL, False)
+UseWas = Var(USE_WAS_VAR, BOOL, False)
+NearFire = Var(NEAR_FIRE_VAR, BOOL, False)
+WardItem = Var(WARD_ITEM_VAR, _ITEM)
+WardCarryPose = Var(WARD_CARRY_VAR, obj("/Script/Engine.AnimSequence"))
+# Standing, crouched or prone (stance.py, whose STAND the builder defaults it
+# to). Written only by the stance block; the movement component and the
+# footsteps are told from it.
+Stance = Var("Stance", INT)
+# Held.TwoHanded, or false with nothing held: copied behind an IsValid Branch
+# once a frame so the guard pose never reads a null Held. And Held.SupportPoint,
+# copied beside it (weapon_component/support_hand.py).
+HeldTwoHanded = Var("HeldTwoHanded", BOOL, False)
+HeldSupportPoint = Var("HeldSupportPoint", VECTOR)
+# A body is being searched: the HUD writes it while its loot window is open,
+# and the pose weights kneel the body from it.
+Searching = Var("Searching", BOOL, False)
+# The camera's own share of the sights (seat.py): the latch that says the gun
+# is up, how far the camera has gone onto it and turned onto its sight line,
+# and the probes' stand-in for the sights key.
+SightSeated = Var(SEATED_VAR, BOOL, False)
+SightSeat = Var(SEAT_VAR, FLOAT, 0.0)
+SightLook = Var(LOOK_VAR, FLOAT, 0.0)
+SightsForced = Var(SIGHTS_FORCED_VAR, BOOL, False)
+# The sight sway (sway.py): its clock, and how far it has turned the view.
+SWAY = tuple(Var(name, FLOAT, 0.0) for name in SWAY_VARS)
+# Its rate (the held gun's) and the held breath (breath.py): the breath left,
+# held this frame, winded, the scale it puts on the sway's width, and the
+# probes' stand-in for the key.
+SwayRate = Var(SWAY_RATE_VAR, FLOAT, SWAY_RATE)
+Breath = Var(BREATH_VAR, FLOAT, BREATH_HOLD_S)
+BreathScale = Var(BREATH_SCALE_VAR, FLOAT, 1.0)
+BreathHeld = Var(BREATH_HELD_VAR, BOOL, False)
+Winded = Var(WINDED_VAR, BOOL, False)
+BreathForced = Var(BREATH_FORCED_VAR, BOOL, False)
+# The polled keys, as variables rather than as pin literals. Nothing in this
+# component loads them: the HUD pushes the player's binds in every DrawHUD
+# frame (graphics_menu/settings_page._author_push_settings), which keeps the
+# component free of any cast to the HUD and of any knowledge that a save file
+# exists. The defaults are therefore also the standalone fallback: a weapon
+# component on an actor with no HUD in front of it still plays with the keys
+# tuning.py documents.
+BINDS = tuple(Var(name, KEY, key(k)) for name, k in BIND_VARS)
+# The slots (slot_tuning.py): the number keys, SlotItems (the sync's view),
+# where the hand's item came from (the issued shotgun's slot), whether a
+# pick-up fits, and the requests, all NO_REQUEST at rest.
+SLOT_BINDS = tuple(Var(name, KEY, key(k)) for name, k, _slot in SLOT_KEYS)
+SlotItems = Var(SLOT_ITEMS_VAR, array(_ITEM))
+HandFrom = Var(HAND_FROM_VAR, INT, STARTER_HAND_FROM)
+SLOT_REQUESTS = tuple(Var(name, INT, NO_REQUEST) for name in (
+    SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_WANT_VAR, MOVE_FROM_VAR, MOVE_TO_VAR,
+    MOVE_SRC_VAR, MOVE_DST_VAR, DROP_REQUEST_VAR, DROP_WANT_VAR, NEXT_REQUEST_VAR))
+HasRoom = Var(HAS_ROOM_VAR, BOOL, True)
+# What the ready pose should reflect (carry.py writes it) and what it
+# currently does. The pair is what makes the pose edge-triggered (see
+# ready_pose.py); the two match, so the first frame sees no edge and does not
+# re-equip for nothing.
+Lowered = Var(LOWERED_VAR, BOOL, False)
+PoseLowered = Var(POSE_LOWERED_VAR, BOOL, False)
+RaiseForced = Var(RAISE_FORCED_VAR, BOOL, False)
+# Accuracy (accuracy.py): the cloud, the kick's scale and the reticle's size,
+# written once a frame. ShotDirection is the one draw of a shot's direction
+# inside the cloud, stored because the cone is pure and every pellet of the
+# shotgun must share it.
+AimSpread = Var("AimSpread", FLOAT, 0.0)
+RecoilScale = Var("RecoilScale", FLOAT, 0.0)
+ReticleSpread = Var("ReticleSpread", FLOAT, 0.0)
+ShotDirection = Var("ShotDirection", VECTOR)
+# The fire press that ate an item, until it is released; see consume.py.
+TriggerSpent = Var("TriggerSpent", BOOL, False)
+# The clothing worn, one entry per wear_tuning.WEAR_SLOTS slot (grown by the
+# first wear into it), the I panel's take-off request, and the garment and
+# slot a wear or a take-off is moving (wear.py).
+Worn = Var(WORN_VAR, array(_ITEM))
+WearItem = Var(WEAR_ITEM_VAR, _ITEM)
+# The item a drag out of the inventory is setting down (drop_request.py).
+DropItem = Var(DROP_ITEM_VAR, _ITEM)
+TakeOffSlot = Var(TAKE_OFF_VAR, INT, NOT_CLOTHING)
+TakeOffTo = Var(TAKE_OFF_TO_VAR, INT, NOT_CLOTHING)
+WearRequest = Var(WEAR_REQUEST_VAR, INT, NOT_CLOTHING)
+WearSlot = Var("WearSlot", INT, NOT_CLOTHING)
+# The dead gate's answer (dead.py), and a probe's stand-ins for the fire, the
+# sprint and the aim keys.
+OwnerDead = Var("OwnerDead", BOOL, False)
+FireForced = Var("FireForced", BOOL, False)
+SprintForced = Var(SPRINT_FORCED_VAR, BOOL, False)
+AimForced = Var("AimForced", BOOL, False)
+# The GameMode's DebugMode, cached at the moment of firing so the pellet loop
+# can branch on a plain bool instead of casting eight times.
+DebugMode = Var("DebugMode", BOOL, False)
+# The bone the current pellet struck and where it landed (hit_zones.py).
+HitBone = Var("HitBone", NAME)
+HitPoint = Var("HitPoint", VECTOR)
+# What the player is issued (inventory.STARTER_CLASS_VARS), the builder's to
+# fill. Typed as "class of BP_WeaponItem", not "class of Actor": SpawnActor's
+# return pin takes its type from its Class pin, and an Actor-typed return
+# cannot be added to an array of BP_WeaponItem.
+ShotgunClass = Var("ShotgunClass", cls(ITEM_CLASS_PATH))
+PistolClass = Var("PistolClass", cls(ITEM_CLASS_PATH))
+KnifeClass = Var("KnifeClass", cls(ITEM_CLASS_PATH))
+AxeClass = Var("AxeClass", cls(ITEM_CLASS_PATH))
+MatchesClass = Var(MATCHES_CLASS_VAR, cls(ITEM_CLASS_PATH))
+StickClass = Var(STICK_CLASS_VAR, cls(ITEM_CLASS_PATH))
+# BP_BulletImpact, and what a strike of the matches spawns (light.py): that
+# one is left None here, build_survival.py fills it in.
+ImpactClass = Var("ImpactClass", cls("/Script/Engine.Actor"))
+CampfireClass = Var(CAMPFIRE_CLASS_VAR, cls("/Script/Engine.Actor"))
+# The empty-handed punch (punch.py): its clip on the worn rig, the press
+# queued for the swing, the cooldown, and the blow still to land.
+PunchAnim = Var("PunchAnim", _CLIP)
+PunchQueued = Var("PunchQueued", BOOL, False)
+PunchPending = Var("PunchPending", BOOL, False)
+NextPunchTime = Var("NextPunchTime", FLOAT, 0.0)
+PunchDueTime = Var("PunchDueTime", FLOAT, 0.0)
+# What the knife's blow takes off the body it met (hot_blow.py).
+BlowDamage = Var(BLOW_DAMAGE_VAR, FLOAT, 0.0)
+# The knife's slash (knife.py): the same four, on the knife's own clip; and
+# the axe's own clip, with the ready pose that says the axe is in hand.
+KnifeAnim = Var("KnifeAnim", _CLIP)
+AxeAnim = Var("AxeAnim", _CLIP)
+AxePose = Var("AxePose", _CLIP)
+KnifeQueued = Var("KnifeQueued", BOOL, False)
+KnifePending = Var("KnifePending", BOOL, False)
+NextKnifeTime = Var("NextKnifeTime", FLOAT, 0.0)
+KnifeDueTime = Var("KnifeDueTime", FLOAT, 0.0)
+# Interact (interact.py): the candidate nearest the reticle's point so far
+# (any actor: an item is one kind of it), its distance to that point (the
+# builder defaults it to interact.INTERACT_NO_GAP), and the probe's stand-in
+# for the key.
+InteractTarget = Var("InteractTarget", _ACTOR)
+InteractGap = Var("InteractGap", FLOAT)
+InteractForced = Var("InteractForced", BOOL, False)
+CrouchForced = Var("CrouchForced", BOOL, False)
+# The throw (throw.py): the aim and the launch it stores, the item in the
+# air, and the arc actor it draws on.
+ThrowAiming = Var("ThrowAiming", BOOL, False)
+ThrowKeyForced = Var("ThrowKeyForced", BOOL, False)
+ThrowClickForced = Var("ThrowClickForced", BOOL, False)
+Thrown = Var("Thrown", _ITEM)
+ThrowStart = Var("ThrowStart", VECTOR)
+ThrowVelocity = Var("ThrowVelocity", VECTOR)
+ThrowLast = Var("ThrowLast", VECTOR)
+ThrowTime = Var("ThrowTime", FLOAT, 0.0)
+# What the thrown item's fall to the ground ignores (throw_strike.py), the
+# bone of the body the blade is set into, None for no bone, and where on that
+# bone's body.
+ThrowPast = Var("ThrowPast", array(_ACTOR))
+ThrowBone = Var("ThrowBone", NAME)
+ThrowSkin = Var("ThrowSkin", VECTOR)
+# Its wind-up (throw_windup.py): the clip, the item it is throwing and when
+# the hand lets go; and the pose the arm waits in while the key is held
+# (throw_ready.py). The builder fills the clips where the skin has them.
+ThrowAnim = Var("ThrowAnim", _CLIP)
+ThrowReadyAnim = Var("ThrowReadyAnim", _CLIP)
+ThrowWinding = Var("ThrowWinding", _ITEM)
+ThrowDueTime = Var("ThrowDueTime", FLOAT, 0.0)
+# Chopping a tree (chop.py): the tree being cut, the blows on it, where the
+# wood lands, and the wood.
+ChopTree = Var(CHOP_TREE_VAR, obj("/Script/Engine.PrimitiveComponent"))
+ChopItem = Var(CHOP_ITEM_VAR, INT, -1)
+ChopCount = Var(CHOP_COUNT_VAR, INT, 0)
+WoodSpot = Var(WOOD_SPOT_VAR, VECTOR)
+WoodClass = Var(WOOD_CLASS_VAR, cls(ITEM_CLASS_PATH))
+# Lighting a campfire (light.py): the piece of wood the strike burns.
+LightWood = Var(LIGHT_WOOD_VAR, _ITEM)
+ThrowArc = Var("ThrowArc", obj(THROW_ARC_CLASS_PATH))
+ThrowArcClass = Var("ThrowArcClass", cls(THROW_ARC_CLASS_PATH))
+
+# Declared first, before the other tables of the component (fx, look, record,
+# shot, strike): the builder keeps that order.
+CORE = (
     Inventory, Held, EquippedIndex, NeedsRefresh, OwnerMesh, AimPoint, AimValid, AimBlocked,
     Stamina, MaxStamina, Sprinting, Blocking, BaseFOV, CurrentFOV, TargetFOV, Aiming,
     SightAiming, AimZoom, SightBlend, MouseSensitivity, ScopeSensitivity, BaseYawScale,
@@ -125,3 +343,22 @@ TABLE = (
     HandledItem, TakeItem, LocalPC, LocalInput, LocalReady, ExitPending, ExitAt, ExitStartedAt,
     ExitCalledOffAt, ExitDue,
 )
+# ...and these after them.
+STATE = (
+    BaseSpeed, SprintSpeed, StaminaDrain, StaminaRegen, SprintSpent, SprintAhead, FireWard,
+    Using, UsePressed, UseWas, NearFire, WardItem, WardCarryPose, Stance, HeldTwoHanded,
+    HeldSupportPoint, Searching, SightSeated, SightSeat, SightLook, SightsForced, *SWAY,
+    SwayRate, Breath, BreathScale, BreathHeld, Winded, BreathForced, *BINDS, *SLOT_BINDS,
+    SlotItems, HandFrom, *SLOT_REQUESTS, HasRoom, Lowered, PoseLowered, RaiseForced,
+    AimSpread, RecoilScale, ReticleSpread, ShotDirection, TriggerSpent, Worn, WearItem,
+    DropItem, TakeOffSlot, TakeOffTo, WearRequest, WearSlot, OwnerDead, FireForced,
+    SprintForced, AimForced, DebugMode, HitBone, HitPoint, ShotgunClass, PistolClass,
+    KnifeClass, AxeClass, MatchesClass, StickClass, ImpactClass, CampfireClass, PunchAnim,
+    PunchQueued, PunchPending, NextPunchTime, PunchDueTime, BlowDamage, KnifeAnim, AxeAnim,
+    AxePose, KnifeQueued, KnifePending, NextKnifeTime, KnifeDueTime, InteractTarget,
+    InteractGap, InteractForced, CrouchForced, ThrowAiming, ThrowKeyForced, ThrowClickForced,
+    Thrown, ThrowStart, ThrowVelocity, ThrowLast, ThrowTime, ThrowPast, ThrowBone, ThrowSkin,
+    ThrowAnim, ThrowReadyAnim, ThrowWinding, ThrowDueTime, ChopTree, ChopItem, ChopCount,
+    WoodSpot, WoodClass, LightWood, ThrowArc, ThrowArcClass,
+)
+TABLE = CORE + STATE

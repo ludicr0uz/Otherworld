@@ -30,8 +30,8 @@ from uebp.nodes.math import FN_DEG_TAN, FN_DIV_FF, FN_EQ_II, FN_MUL_FF, FN_SELEC
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
-AIM_SPREAD_VAR = "AimSpread"
-RECOIL_SCALE_VAR = "RecoilScale"
+AIM_SPREAD_VAR = WV.AimSpread
+RECOIL_SCALE_VAR = WV.RecoilScale
 RETICLE_SPREAD_VAR = WV.ReticleSpread
 ACCURACY_OUT_VARS = (AIM_SPREAD_VAR, RECOIL_SCALE_VAR, RETICLE_SPREAD_VAR)
 

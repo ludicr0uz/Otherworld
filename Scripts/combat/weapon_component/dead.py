@@ -50,7 +50,7 @@ from uebp.nodes.palette import NODE_CAST_HEALTH
 from combat import health_vars as HV
 from combat.weapon_component import vars as WV
 
-OWNER_DEAD_VAR = "OwnerDead"   # this Tick found its owner dead and did nothing
+OWNER_DEAD_VAR = WV.OwnerDead   # this Tick found its owner dead and did nothing
 
 # What a dead owner is no longer doing. Others read these: the wanderers'
 # swing reads Blocking, the HUD's reticle the aim, a wendigo FireWard, the

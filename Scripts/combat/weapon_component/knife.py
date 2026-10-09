@@ -44,15 +44,15 @@ from uebp.nodes.system import FN_TIME_SECONDS
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
-KNIFE_ANIM_VAR = "KnifeAnim"
-KNIFE_QUEUED_VAR = "KnifeQueued"
-KNIFE_PENDING_VAR = "KnifePending"
-NEXT_KNIFE_VAR = "NextKnifeTime"
-KNIFE_DUE_VAR = "KnifeDueTime"
+KNIFE_ANIM_VAR = WV.KnifeAnim
+KNIFE_QUEUED_VAR = WV.KnifeQueued
+KNIFE_PENDING_VAR = WV.KnifePending
+NEXT_KNIFE_VAR = WV.NextKnifeTime
+KNIFE_DUE_VAR = WV.KnifeDueTime
 MELEE_VAR = IV.Melee
 # The axe's own clip, and the ready pose that says the axe is in hand.
-AXE_ANIM_VAR = "AxeAnim"
-AXE_POSE_VAR = "AxePose"
+AXE_ANIM_VAR = WV.AxeAnim
+AXE_POSE_VAR = WV.AxePose
 AXE_CLIP_VARS = (AXE_ANIM_VAR, AXE_POSE_VAR)
 
 KNIFE = Strike("knife", KNIFE_ANIM_VAR, KNIFE_QUEUED_VAR, KNIFE_PENDING_VAR,

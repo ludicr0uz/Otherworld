@@ -111,13 +111,13 @@ from combat import health_vars as HV
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
-THROW_PAST_VAR = "ThrowPast"          # the actors the fall to the ground ignores
+THROW_PAST_VAR = WV.ThrowPast          # the actors the fall to the ground ignores
 # The bone of the body the blade is set into, a Name on the component: None
 # for a body it cannot be set into. Written before the wound, which reads it
 # for the head, and read again after it by the attach. ThrowSkin is the point
 # of that bone's body the blade struck: where it is set.
-THROW_BONE_VAR = "ThrowBone"
-THROW_SKIN_VAR = "ThrowSkin"
+THROW_BONE_VAR = WV.ThrowBone
+THROW_SKIN_VAR = WV.ThrowSkin
 
 
 def _hit(brk, name):

@@ -7,6 +7,7 @@ muzzle and sight come from weapon_models.py.
 import unreal
 
 from combat.log import _log
+from combat import item_vars as IV
 from combat.gun_tuning import read_table
 from combat.grip import _grip_location, _grip_rotation
 from combat.paths import (
@@ -105,17 +106,17 @@ GUN_ACCURACY = {
 
 # Each accuracy column and the BP_WeaponItem variable it becomes.
 ACCURACY_VARS = (
-    ("spread", "SpreadDegrees"),
-    ("spread_shoulder", "SpreadShoulderScale"),
-    ("spread_crouch", "SpreadCrouchScale"),
-    ("spread_prone", "SpreadProneScale"),
-    ("pellet_spread", "PelletSpreadDegrees"),
-    ("recoil", "RecoilPitch"),
-    ("recoil_yaw", "RecoilYaw"),
-    ("recoil_shoulder", "RecoilShoulderScale"),
-    ("recoil_sights", "RecoilSightsScale"),
-    ("recoil_crouch", "RecoilCrouchScale"),
-    ("recoil_prone", "RecoilProneScale"),
+    ("spread", IV.SpreadDegrees),
+    ("spread_shoulder", IV.SpreadShoulderScale),
+    ("spread_crouch", IV.SpreadCrouchScale),
+    ("spread_prone", IV.SpreadProneScale),
+    ("pellet_spread", IV.PelletSpreadDegrees),
+    ("recoil", IV.RecoilPitch),
+    ("recoil_yaw", IV.RecoilYaw),
+    ("recoil_shoulder", IV.RecoilShoulderScale),
+    ("recoil_sights", IV.RecoilSightsScale),
+    ("recoil_crouch", IV.RecoilCrouchScale),
+    ("recoil_prone", IV.RecoilProneScale),
 )
 
 

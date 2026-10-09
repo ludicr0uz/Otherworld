@@ -23,9 +23,10 @@ from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_BREAK_HIT
 from uebp.nodes.shot import FN_SHOT_TRACE
 from uebp.nodes.system import FN_TIME_SECONDS
 from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 # The shot's direction, drawn once per trigger pull inside AimSpread.
-SHOT_DIRECTION_VAR = "ShotDirection"
+SHOT_DIRECTION_VAR = WV.ShotDirection
 
 
 def _author_fire(ed, held, muzzle, aim, exec_in):

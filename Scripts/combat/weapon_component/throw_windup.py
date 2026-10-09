@@ -41,9 +41,9 @@ from uebp.nodes.math import FN_EQ_OO, FN_GE_FF
 from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
 from combat.weapon_component import vars as WV
 
-THROW_ANIM_VAR = "ThrowAnim"          # the skin's throw clip, or None
-THROW_WINDING_VAR = "ThrowWinding"    # the item being thrown, until it leaves
-THROW_DUE_VAR = "ThrowDueTime"        # world time the hand lets go
+THROW_ANIM_VAR = WV.ThrowAnim          # the skin's throw clip, or None
+THROW_WINDING_VAR = WV.ThrowWinding    # the item being thrown, until it leaves
+THROW_DUE_VAR = WV.ThrowDueTime        # world time the hand lets go
 
 
 def _winding(ed):

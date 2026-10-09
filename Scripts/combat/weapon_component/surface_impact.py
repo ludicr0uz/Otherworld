@@ -5,8 +5,9 @@ health cast's failed arm.
 
 from uebp.graph import _connect, _palette, _pin, _set, out
 from uebp.nodes.palette import NODE_SPAWN
+from combat.weapon_component import vars as WV
 
-IMPACT_CLASS_VAR = "ImpactClass"   # BP_BulletImpact, a default set by build.py
+IMPACT_CLASS_VAR = WV.ImpactClass   # BP_BulletImpact, a default set by build.py
 
 
 def _author_surface_impact(ed, where, exec_in):

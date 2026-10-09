@@ -24,7 +24,7 @@ from uebp.nodes.move import (
 from combat.weapon_component import vars as WV
 
 # Set when a held sprint runs Stamina out, cleared by letting the key go.
-SPRINT_SPENT_VAR = "SprintSpent"
+SPRINT_SPENT_VAR = WV.SprintSpent
 
 
 def _author_sprint(ed, pc_out, owner_out, key_pin, exec_ins):

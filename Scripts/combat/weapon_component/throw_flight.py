@@ -49,12 +49,13 @@ from uebp.nodes.math import (
 from uebp.nodes.palette import NODE_BREAK_HIT
 from uebp.nodes.system import FN_DELTA_SECONDS, FN_IS_VALID, FN_TIME_SECONDS, FN_TRACE
 from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
-THROWN_VAR = "Thrown"                 # the item in the air, or None
-THROW_START_VAR = "ThrowStart"
-THROW_VELOCITY_VAR = "ThrowVelocity"
-THROW_TIME_VAR = "ThrowTime"          # world time at release
-THROW_LAST_VAR = "ThrowLast"          # where the flight was last frame
+THROWN_VAR = WV.Thrown                 # the item in the air, or None
+THROW_START_VAR = WV.ThrowStart
+THROW_VELOCITY_VAR = WV.ThrowVelocity
+THROW_TIME_VAR = WV.ThrowTime          # world time at release
+THROW_LAST_VAR = WV.ThrowLast          # where the flight was last frame
 FLIGHT_GROUND_CM = 5000.0             # how far down a wall-stopped item looks for ground
 
 

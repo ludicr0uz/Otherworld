@@ -41,7 +41,7 @@ from uebp.nodes.math import FN_AND, FN_NOT
 from uebp.nodes.system import FN_IS_VALID
 from combat.weapon_component import vars as WV
 
-THROW_READY_ANIM_VAR = "ThrowReadyAnim"   # A_ThrowReady, or None
+THROW_READY_ANIM_VAR = WV.ThrowReadyAnim   # A_ThrowReady, or None
 
 
 def _author_throw_ready(ed, item, exec_in):

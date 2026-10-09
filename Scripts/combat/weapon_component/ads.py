@@ -23,7 +23,7 @@ from combat.weapon_component import vars as WV
 
 # A probe's hand on the shoulder-aim key (ORed with it): no key can be pressed
 # in a headless game.
-AIM_FORCED_VAR = "AimForced"
+AIM_FORCED_VAR = WV.AimForced
 
 
 def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,

@@ -37,10 +37,10 @@ from uebp.nodes.move import FN_REQUEST_SLIDE, FN_SET_STANCE
 from uebp.nodes.palette import NODE_CAST_FOOTSTEP
 from combat.weapon_component import vars as WV
 
-STANCE_VAR = "Stance"
+STANCE_VAR = WV.Stance
 # A probe's press of the crouch key: read with the key, and spent by the
 # frame that read it, so one write is one press (probes/probe_gas_traversal.py).
-CROUCH_FORCED_VAR = "CrouchForced"
+CROUCH_FORCED_VAR = WV.CrouchForced
 STAND, CROUCH, PRONE = 0, 1, 2
 FOOTSTEP_CLASS_PATH = f"{FOOTSTEP_BP_PATH}.BP_FootstepComponent_C"
 

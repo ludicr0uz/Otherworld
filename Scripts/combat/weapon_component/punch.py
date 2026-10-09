@@ -69,11 +69,11 @@ from combat.weapon_component import look_vars as LV
 from combat.weapon_component import vars as WV
 from Sound.play import _author_sound
 
-PUNCH_ANIM_VAR = "PunchAnim"
-PUNCH_QUEUED_VAR = "PunchQueued"
-PUNCH_PENDING_VAR = "PunchPending"
-NEXT_PUNCH_VAR = "NextPunchTime"
-PUNCH_DUE_VAR = "PunchDueTime"
+PUNCH_ANIM_VAR = WV.PunchAnim
+PUNCH_QUEUED_VAR = WV.PunchQueued
+PUNCH_PENDING_VAR = WV.PunchPending
+NEXT_PUNCH_VAR = WV.NextPunchTime
+PUNCH_DUE_VAR = WV.PunchDueTime
 PUNCH_BLEND_S = 0.1
 
 

@@ -49,7 +49,7 @@ from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
 # The fire press that used an item, still held. Declared in build.py.
-TRIGGER_SPENT = "TriggerSpent"
+TRIGGER_SPENT = WV.TriggerSpent
 
 
 def _author_trigger_latch(ed, holding, exec_ins):

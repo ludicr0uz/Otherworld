@@ -48,12 +48,12 @@ from uebp.nodes.system import FN_TIME_SECONDS
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
-HELD_TWO_HANDED = "HeldTwoHanded"
+HELD_TWO_HANDED = WV.HeldTwoHanded
 # Held.SupportPoint, copied beside it: where the held gun's ready pose has the
 # left hand (support_hand.py). Kept with nothing held; nothing reads it then.
-HELD_SUPPORT_POINT = "HeldSupportPoint"
+HELD_SUPPORT_POINT = WV.HeldSupportPoint
 # The loot window is open (the HUD writes it, graphics_menu/loot_kneel.py).
-SEARCHING_VAR = "Searching"
+SEARCHING_VAR = WV.Searching
 
 
 def _author_held_two_handed(ed, held, armed_out, exec_ins):

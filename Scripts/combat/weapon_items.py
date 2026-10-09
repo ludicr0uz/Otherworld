@@ -21,37 +21,26 @@ import unreal
 from Sound.bind import defaults_for
 from Sound.sound_items import BINDINGS as ITEM_SOUNDS
 from Sound.sound_weapons import DRY_FIRE
-from combat.chop_tuning import CHOPS_VAR
 from combat.glimmer import add_glimmer, author_glimmer
 from combat.glimmer_tuning import GLIMMER
 from combat.item_world import relevance_item, replicate_item
-from combat.light_tuning import LIGHTS_VAR
 from combat.log import _log
 from uebp.graph import (
-    BEL, BGE, _add_component, _apply_defaults, _assets, _component_object, _create_blueprint,
-    _declare, _drop_components, _events, _find_handle, _float_type, _handles, _must_load,
-    _root_handle, _struct_type, then)
+    BEL, BGE, _add_component, _apply_defaults, _assets, _component_object,
+    _create_blueprint, _drop_components, _events, _find_handle, _handles, _must_load,
+    _root_handle, then,
+)
 from uebp.layout import arrange
 from combat.paths import ITEM_BP_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR
 from combat.support_hand import SUPPORT_POINT_VAR
-from combat.slot_tuning import (
-    GUN_KINDS, LONG_GUN, NOT_A_WEAPON, SLOT_VAR, UNPLACED, WEAPON_KIND_VAR,
-)
-from combat.sway_tuning import SWAY_RATE, SWAY_RATE_COLUMN, SWAY_RATE_VAR
-from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
-from combat.torch_tuning import BURN_OUT_VAR, BURNS_VAR, LIT_VAR, USE_POSE_VAR
-from combat.throw_tuning import (
-    LODGE_POINT_VAR, LODGE_TURN_VAR, THROW_DAMAGE_VAR,
-    THROW_GRIP_LOC_VAR, THROW_GRIP_ROT_VAR, THROW_GRIP_VAR,
-    THROW_EDGE_ON_VAR, THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR,
-    THROW_SPEED, THROW_SPEED_VAR, THROW_SPIN_DEG_S, THROW_SPIN_VAR,
-)
+from combat.slot_tuning import GUN_KINDS, LONG_GUN, WEAPON_KIND_VAR
+from combat.sway_tuning import SWAY_RATE_COLUMN, SWAY_RATE_VAR
+from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_VAR
 from combat.tuning import COMBAT
-from combat.wear_tuning import CLOTHING_SLOT_VAR, NOT_CLOTHING
 from combat.weapon_specs import ACCURACY_VARS, _weapon_icon
 from item_icons.items import ICON_TINT
-from uebp.vars import declare
+from uebp.vars import declare, defaults
 from combat import item_vars as IV
 
 
@@ -78,111 +67,6 @@ def build_weapon_item():
     add_glimmer(bp, body)
 
     declare(ed, IV.TABLE)
-    for name, kind in (("DisplayName", "string"),
-                       ("PelletCount", "int"),
-                       ("Dropped", "bool"),
-                       # Ammunition. UsesAmmo false means the other four are
-                       # never read (the consumables), and the fire gate
-                       # short-circuits on it. InfiniteReserve is the pistol:
-                       # a real magazine to reload, over a reserve that is
-                       # never charged and never credited by shell pickups.
-                       ("UsesAmmo", "bool"),
-                       ("MagazineSize", "int"),
-                       ("Loaded", "int"),
-                       ("Reserve", "int"),
-                       ("InfiniteReserve", "bool"),
-                       # Held trigger or tapped trigger. Read only behind the
-                       # fire gate, where Held is known valid -- a pure Get off
-                       # a null self is an Accessed None every frame, and the
-                       # outer gate's condition is pulled on frames where
-                       # nothing is equipped at all.
-                       ("Automatic", "bool"),
-                       # Used rather than fired: the fire key sends
-                       # CONSUME_EVENT_TAG and the item is spent (see
-                       # weapon_component/consume.py). On the base class, not
-                       # on BP_ConsumableItem, so the weapon component can ask
-                       # without naming a class that is built after it.
-                       ("Consumable", "bool"),
-                       # Swung rather than fired: the fire key slashes with it
-                       # (weapon_component/knife.py). The knife (knife.py).
-                       ("Melee", "bool"),
-                       # Its blow bites a tree (weapon_component/chop.py): the
-                       # axe. Read behind the blow's own IsValid(Held).
-                       (CHOPS_VAR, "bool"),
-                       # Struck rather than fired: the fire key lights a
-                       # campfire with it (weapon_component/light.py). The
-                       # matches. Read behind the fire gate, as Melee is.
-                       (LIGHTS_VAR, "bool"),
-                       # Aimed down its sights by the sights key: a gun. False
-                       # on everything else, which that key aims over the
-                       # shoulder (weapon_component/ads.py).
-                       (HAS_SIGHTS_VAR, "bool"),
-                       # Lit at a campfire by the use key, and burning: the
-                       # stick (stick.py, weapon_component/torch.py).
-                       (BURNS_VAR, "bool"),
-                       (LIT_VAR, "bool"),
-                       # Heated at a campfire by the interact key, and hot:
-                       # the knife and the axe (heat.py,
-                       # weapon_component/heat.py).
-                       (HEATS_VAR, "bool"),
-                       (HOT_VAR, "bool")):
-        _declare(ed, name, BEL.get_basic_type_by_name(kind))
-    # The slot a garment is worn in (wear_tuning.WEAR_SLOTS' index), or
-    # NOT_CLOTHING: the weapon component wears an item whose slot is >= 0
-    # (weapon_component/wear.py). Scripts/clothing sets it on each garment.
-    _declare(ed, CLOTHING_SLOT_VAR, BEL.get_basic_type_by_name("int"))
-    # Where it is carried (slot_tuning: the hand, a weapon slot, a bag slot,
-    # or UNPLACED), and which weapon slot it belongs in (NOT_A_WEAPON on
-    # everything but the guns and the blades). weapon_component/slot_*.py.
-    _declare(ed, SLOT_VAR, BEL.get_basic_type_by_name("int"))
-    _declare(ed, WEAPON_KIND_VAR, BEL.get_basic_type_by_name("int"))
-    _declare(ed, BURN_OUT_VAR, _float_type())
-    _declare(ed, COOL_VAR, _float_type())
-    # The overlay a hot blade's model wears (heat.py). None on everything
-    # that does not heat.
-    _declare(ed, HEAT_MATERIAL_VAR, BEL.get_object_reference_type(
-        unreal.MaterialInterface.static_class()))
-    # The pose a lit stick is raised in while the use key holds it out
-    # (weapon_component/torch.py). None on everything else.
-    _declare(ed, USE_POSE_VAR,
-             BEL.get_object_reference_type(unreal.AnimSequence.static_class()))
-    # Where this gun's ready pose has the left hand, in the right hand's bone
-    # space (support_hand.py): down the sights the hand is held there. Zero
-    # on the base; nothing holds a hand on an item that has no sights.
-    _declare(ed, SUPPORT_POINT_VAR, _struct_type(unreal.Vector.static_struct()))
-    # Accuracy: the cloud a shot is drawn in and the kick it puts on the view,
-    # with their stance and aim factors. One variable per GUN_ACCURACY column
-    # (weapon_specs.py says what each means), on the item for the same reason
-    # AdsZoom is: the component reads them off Held and knows nothing about
-    # which weapon it is holding. SpreadDegrees is declared above with Damage.
-    for _col, name in ACCURACY_VARS:
-        if name != "SpreadDegrees":
-            _declare(ed, name, _float_type())
-    # How fast the sights wander down them (sway_tuning.py): the component
-    # copies Held's each frame. The default is on the base, so an item with
-    # no sights has one too, though it never sways.
-    _declare(ed, SWAY_RATE_VAR, _float_type())
-    # How far a throw of this item is tipped up from the view, where the
-    # reticle rests on nothing it can reach (throw_launch.py reads it off
-    # Held). The default is on the base, so the knife, the food and the
-    # water throw on it too; a gun's own comes from its spec.
-    _declare(ed, THROW_PITCH_VAR, _float_type())
-    # How fast it leaves the hand and how fast it tumbles in the air, and
-    # whether it leaves squared up to the throw, edge first: a melee weapon's
-    # are its own (throw_tuning.MELEE_THROW).
-    _declare(ed, THROW_SPEED_VAR, _float_type())
-    _declare(ed, THROW_SPIN_VAR, _float_type())
-    _declare(ed, THROW_EDGE_ON_VAR, BEL.get_basic_type_by_name("bool"))
-    # What a throw of it takes off a body it strikes, and how it sits lodged
-    # in a tree (weapon_component/throw_strike.py): a blade's are its own, and
-    # the base's 0 damage is what keeps every other item from doing either.
-    _declare(ed, THROW_DAMAGE_VAR, _float_type())
-    _declare(ed, LODGE_TURN_VAR, _struct_type(unreal.Rotator.static_struct()))
-    _declare(ed, LODGE_POINT_VAR, _struct_type(unreal.Vector.static_struct()))
-    # Held by the blade while the throw is cocked (throw_tuning.THROW_GRIP_VAR).
-    _declare(ed, THROW_GRIP_VAR, BEL.get_basic_type_by_name("bool"))
-    _declare(ed, THROW_GRIP_LOC_VAR, _struct_type(unreal.Vector.static_struct()))
-    _declare(ed, THROW_GRIP_ROT_VAR, _struct_type(unreal.Rotator.static_struct()))
 
     # What an item loose in the world shows every client (item_world.py):
     # after the declares, which drop the flags.
@@ -194,21 +78,7 @@ def build_weapon_item():
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
-    _apply_defaults(bp, {**defaults_for(ITEM_BP_PATH, ITEM_SOUNDS),
-                         CLOTHING_SLOT_VAR: NOT_CLOTHING,
-                         SLOT_VAR: UNPLACED,
-                         WEAPON_KIND_VAR: NOT_A_WEAPON,
-                         THROW_PITCH_VAR: THROW_PITCH_UP_DEG,
-                         SWAY_RATE_VAR: SWAY_RATE,
-                         THROW_SPEED_VAR: THROW_SPEED,
-                         THROW_SPIN_VAR: THROW_SPIN_DEG_S,
-                         THROW_EDGE_ON_VAR: False,
-                         THROW_DAMAGE_VAR: 0.0,
-                         LODGE_TURN_VAR: unreal.Rotator(0.0, 0.0, 0.0),
-                         LODGE_POINT_VAR: unreal.Vector(0.0, 0.0, 0.0),
-                         THROW_GRIP_VAR: False,
-                         THROW_GRIP_LOC_VAR: unreal.Vector(0.0, 0.0, 0.0),
-                         THROW_GRIP_ROT_VAR: unreal.Rotator(0.0, 0.0, 0.0)})
+    _apply_defaults(bp, {**defaults(IV.TABLE), **defaults_for(ITEM_BP_PATH, ITEM_SOUNDS)})
     # How far an item in the world is sent, and how often (task A2): a class
     # default, after the compile _apply_defaults ends with; every child's.
     relevance_item(bp)

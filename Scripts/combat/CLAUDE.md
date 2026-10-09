@@ -98,12 +98,32 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
 - **There is no reloading state.** `NextFireTime` is one world-time deadline. Both the fire
   interval and the reload push it out.
 - **The shot and the reload are server requests**: `docs/history/combat.md#the-shot-and-the-reload-are`
+- **The shot's server half is C++** (W1; `weapon_component/native.py`,
+  `uebp/nodes/weapon.py`, `Source/Otherworld`'s `OtherworldWeaponComponentBase`, which
+  `BP_WeaponComponent` is a child of). `Server_Fire(AimPoint)` is a native reliable Server
+  RPC: it asks the guard, counts `AsksServed`, refuses what the graph refused, spends the
+  round and stamps the cooldown, then raises `ShotFired`. The graph under `ShotFired`
+  tells the sound, finds the muzzle, draws `ShotDirection` in the cloud and calls
+  `FirePellets`, which traces each pellet, reads the zone off the target's tables and
+  calls its `TakeHit`, then raises `PelletFlew` per pellet for the tracer, the blood or
+  chips, the headshot's stamp and the readout (impact.py).
+  - **The graph has no event named `Server_Fire`.** A check or a probe finds the shot
+    under `event_nodes(SHOT_FIRED)` and the pellets with `verify.common.pellet_calls`.
+  - **`Loaded`, `Reserve` and `NextFireTime` are still the item Blueprint's variables**
+    (a magazine is a gun's, not the component's). C++ reads and writes them by name;
+    the names are the base's class defaults, written by `native.write_names` from the
+    builders' constants and held to them by `verify/shot.check_native`. A name that
+    names nothing reads as 0 or false in C++ with nothing logged.
+  - **A write of a carried item's state from C++ marks the record itself**
+    (`MarkInventoryDirty`, by the carrier): `dirty.py`'s pass sees graph nodes only.
+  - **A Blueprint built before W1** has a custom event named as the base's function,
+    which the reparent's compile refuses: `native.reparent` removes that node first.
 - **The pellet is judged where the shooter saw the target** (M22; `lag_tuning.py`,
   `uebp/nodes/shot.py`; the C++ is `Source/Otherworld`'s `OtherworldHitHistory` and
-  `OtherworldShotLibrary`; `Scripts/net/CLAUDE.md`, "Lag compensation"). firing.py's
-  pellet trace is one C++ node, `ShotTrace`: the Visibility trace and, for a struck
-  character, its bodies along the same line (`bBodyHit`, `BodyBone`, `BodyPoint`, which
-  impact.py's hit zone reads in place of its own `K2_LineTraceComponent`). On a server a
+  `OtherworldShotLibrary`; `Scripts/net/CLAUDE.md`, "Lag compensation"). The
+  pellet's trace is one C++ call, `ShotTrace`: the Visibility trace and, for a struck
+  character, its bodies along the same line (`bBodyHit`, `BodyBone`, `BodyPoint`). Since
+  W1 it is made in C++ too, by `FirePellets` (below), which reads the zone off them. On a server a
   remote shooter's pellets are traced against where every character stood its round
   trip ago (plus `EXTRA_REWIND_S`, at most `MAX_REWIND_S`); a local shooter's, so single
   player's, against the present, the same two engine traces as before.

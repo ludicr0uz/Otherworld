@@ -259,8 +259,9 @@ def check_player_kill_credit():
 
 def check_blows():
     calls = take_hits(_wg_all)
-    check("the weapon component's blows each call the target's TakeHit: the pellet, the "
-          "fist, the blade and the thrown blade", len(calls) == 4, str(len(calls)))
+    check("the weapon component's blows each call the target's TakeHit: the fist, the "
+          "blade and the thrown blade (the pellet's is the native base's FirePellets, "
+          "by name: verify/shot.py)", len(calls) == 3, str(len(calls)))
     fed = [{pin: bool(PIN.list_connected_pins(BEL.find_input_pin(c, pin)))
             for pin in ("self", "From", "InstigatedBy", "Cause")} for c in calls]
     check("...each on the target's health component, with a direction, an instigator "

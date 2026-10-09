@@ -18,9 +18,9 @@ import unreal
 
 from uebp import net
 from combat.paths import WEAPON_COMP_BP_PATH
-from combat.shot_vars import AIM_PARAM, SERVER_FIRE
+from combat.shot_vars import AIM_PARAM, SERVER_FIRE, SHOT_FIRED
 from combat.verify.common import BEL, PIN, check, component_template, graph, in_pins, pin_value
-from combat.verify.fixtures import _is_exec, char, wc
+from combat.verify.fixtures import _is_exec, char, wc, wc_cdo
 from combat.verify.record import _feeders, _title, _upstream
 from combat.weapon_component.firing import SHOT_DIRECTION_VAR
 from net import guard_consts as GC
@@ -127,7 +127,10 @@ def check_component():
 def check_in_step():
     found = scan_blueprints()
     here = WEAPON_COMP_BP_PATH.rsplit("/", 1)[-1]
-    events = sorted(found.get(here, []))
+    # The graph's Server events, and the native base's one (W1): the shot's
+    # request is a C++ RPC, which asks the guard itself.
+    native = [SERVER_FIRE] if net.compiled_rpc(wc, SERVER_FIRE) == (net.SERVER, True) else []
+    events = sorted(found.get(here, []) + native)
     check("every Server event of the weapon component has a row in the guard's table, "
           "and every row an event", events == sorted(GC.RATES),
           f"no row: {sorted(set(events) - set(GC.RATES))}; "
@@ -147,20 +150,19 @@ def check_fragment():
     check(f"every Server event ({len(events)}) asks the guard first: Allow, with its own "
           "name, on the owner's guard, and a Branch on the answer before anything else",
           bool(events) and not bare, f"without the fragment: {bare}")
-    fire = graph(wc).find_event_node(SERVER_FIRE)
-    guard = guard_of(fire) if fire else None
-    if not guard:
-        return
-    allowed = [PIN.get_owning_node(q)
-               for q in PIN.list_connected_pins(BEL.find_then_pin(guard[1]))]
-    aims = [n for n in allowed if _title(n).replace(" ", "") == "AimAllowed"]
+    # Server_Fire is the native base's (W1): it asks Allow with its own name
+    # and AimAllowed of the client's AimPoint in C++, before the round is
+    # spent (probes/probe_net_guard.py sends it both). What the graph may do
+    # of a shot hangs off ShotFired, which only a shot let through raises.
+    fired = graph(wc).find_event_node(SHOT_FIRED)
     draws = [n for n in graph(wc).list_all_nodes() if _title(n) == f"Set {SHOT_DIRECTION_VAR}"]
-    gated = [b for a in aims for b in _execs_out(a) if a in _feeders(b, "Condition")]
-    check(f"{SERVER_FIRE} asks AimAllowed of the client's {AIM_PARAM} next, and the shot "
-          "is drawn only behind its Branch",
-          len(aims) == 1 and fire in _feeders(aims[0], AIM_PARAM) and len(gated) == 1
-          and len(draws) == 1 and gated[0] in _upstream(draws[0]),
-          f"{len(aims)} AimAllowed, {len(gated)} Branch")
+    name = str(wc_cdo.get_editor_property("fire_event_name"))
+    check(f"{SERVER_FIRE} is the native base's, which asks the guard by that name "
+          f"(Allow, then AimAllowed of the client's {AIM_PARAM}), and the shot is drawn "
+          f"only under {SHOT_FIRED}",
+          graph(wc).find_event_node(SERVER_FIRE) is None and name == SERVER_FIRE
+          and fired is not None and len(draws) == 1 and fired in _upstream(draws[0]),
+          f"asks as {name!r}, {len(draws)} draw(s)")
 
 
 def run():

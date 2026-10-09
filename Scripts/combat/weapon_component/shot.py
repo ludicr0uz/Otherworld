@@ -1,15 +1,21 @@
 """The shot and the reload as server requests (combat/shot_vars.py has the
-picture): the two Server events, the reload both machines run, and the local
-arm's asks, which are also the owning client's prediction.
+picture): what the graph hangs on the native Server_Fire, the reload's
+Server event, the reload both machines run, and the local arm's asks, which
+are also the owning client's prediction.
 
-    Server_Fire(AimPoint)   the server's: the guard's Allow (net/guard.py),
-                            counted served whatever it said, then its
-                            AimAllowed of the client's AimPoint; refused unless
-                            Held is valid, the owner alive, the item a gun
-                            (not Melee, Consumable or Lights), a round in it
-                            and its cooldown over (within FIRE_GRACE_S); then
-                            firing.py's shot from the server's own muzzle to
-                            the client's AimPoint, and its noise
+    Server_Fire(AimPoint)   the native base's (task W1; C++,
+                            OtherworldWeaponComponentBase, a reliable Server
+                            RPC with a _Validate): the guard's Allow, counted
+                            served whatever it said, then its AimAllowed of
+                            the client's AimPoint; refused unless Held is
+                            valid, the owner alive, the item a gun (not
+                            Melee, Consumable or Lights), a round in it and
+                            its cooldown over (within FIRE_GRACE_S); then the
+                            round, the cooldown and the record's mark
+    ShotFired(AimPoint)     the base's event for a shot it let through, and
+                            this graph's: the sound told, firing.py's shot
+                            from the server's own muzzle to the client's
+                            AimPoint, and its noise
     Server_Reload           the guard's Allow, counted served, then ReloadNow
     ReloadNow               Held valid and the owner alive: ammo.py's reload
 
@@ -21,9 +27,9 @@ arm's asks, which are also the owning client's prediction.
                             Server_Reload
 
 What everyone else sees and hears of it is fx.py's (task M21,
-combat/fx_vars.py): Server_Fire tells Multicast_Shot before it traces, and
-ReloadNow announces Multicast_Reload after a reload that moved rounds; each
-plays Held's sound on every copy that did not predict it.
+combat/fx_vars.py): ShotFired tells Multicast_Shot before the pellets fly,
+and ReloadNow announces Multicast_Reload after a reload that moved rounds;
+each plays Held's sound on every copy that did not predict it.
 
 In single player the one machine has authority, so the asks predict nothing
 and the Server events are plain calls: one shot, one reload, as before.
@@ -34,16 +40,15 @@ block are the server's, and a sprint's end and the shot behind it travel
 separately, so the server would refuse honest shots.
 """
 
-from net.guard import author_aim_guard, author_allow
+from net.guard import author_allow
 from uebp import net
 from uebp.g import _G
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, out, then
 from combat import health_vars as HV
 from combat import item_vars as IV
-from combat.light_tuning import LIGHTS_VAR
 from combat.paths import HEALTH_CLASS_PATH, ITEM_CLASS_PATH
 from combat.shot_vars import (
-    AIM_PARAM, FIRE_GRACE_S, FIRE_PARAMS, RELOAD_NOW, SERVER_FIRE, SERVER_RELOAD,
+    AIM_PARAM, FIRE_GRACE_S, RELOAD_NOW, SERVER_FIRE, SERVER_RELOAD, SHOT_FIRED,
     AsksSent, AsksServed)
 from combat.weapon_component import vars as WV
 from combat.fx_vars import RELOAD, SHOT
@@ -51,13 +56,14 @@ from combat.weapon_component import fx
 from combat.weapon_component.ammo import _author_reload
 from combat.weapon_component.carry import _author_shot_origin
 from combat.weapon_component.firing import _author_fire
+from combat.weapon_component.impact import author_pellet_flew
 from combat.weapon_component.record import authority, rep_dirty
 from combat.weapon_component.shot_noise import _author_shot_noise
-from combat.weapon_component.slot_nodes import not_, op, valid
+from combat.weapon_component.slot_nodes import op, valid
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_GET_OWNER
-from uebp.nodes.math import (
-    FN_ADD_FF, FN_ADD_II, FN_AND, FN_GE_FF, FN_GREATER_II, FN_LE_FF, FN_OR, FN_SUB_II)
+from uebp.nodes.math import FN_ADD_FF, FN_ADD_II, FN_LE_FF, FN_OR, FN_SUB_II
 from uebp.nodes.palette import NODE_CAST_HEALTH
+from uebp.nodes.weapon import FN_SERVER_FIRE, NODE_EVENT_SHOT_FIRED
 from uebp.nodes.system import FN_PLAY_SOUND, FN_TIME_SECONDS
 
 import unreal
@@ -91,36 +97,23 @@ def _author_alive(g, execs):
     return [alive, _pin(cast, "CastFailed", is_input=False)]
 
 
-def _author_server_fire(ed):
+def _author_shot_fired(ed):
+    """ShotFired, the native base's event: Server_Fire (C++) asked the guard,
+    counted the ask served, refused what it refuses, spent the round and
+    stamped the cooldown. What is left is the graph's."""
     g = _G(ed, ITEM_CLASS_PATH)
-    event = g.keep(net.server_event(ed, SERVER_FIRE, FIRE_PARAMS))
-    # Asked first, and counted served either way: a refused shot's round is
-    # handed back like any other the server did not fire.
-    flow, allowed = author_allow(g, SERVER_FIRE, [then(event)])
-    flow = _count(g, AsksServed, [flow])
-    go, _refused = g.branch(allowed, [flow])
-    aimed, _behind = author_aim_guard(g, out(event, AIM_PARAM), [go])
+    event = g.keep(_palette(ed, NODE_EVENT_SHOT_FIRED))
     held = g.get(WV.Held)
-    armed, _empty = g.branch(valid(g, held), [aimed])
-    alive = _author_alive(g, [armed])
-    # Only a gun is fired: the knife, food and the matches have the fire key's
-    # other arms, which are not this request.
-    tool = op(g, FN_OR, op(g, FN_OR, g.iget(held, IV.Melee), g.iget(held, IV.Consumable)),
-              g.iget(held, LIGHTS_VAR))
-    _tool, gun = g.branch(tool, alive)
-    has_ammo = op(g, FN_OR, not_(g, g.iget(held, IV.UsesAmmo)),
-                  op(g, FN_GREATER_II, g.iget(held, IV.Loaded), 0))
-    soon = op(g, FN_ADD_FF, out(g.call(FN_TIME_SECONDS)), str(FIRE_GRACE_S))
-    cooled = op(g, FN_GE_FF, soon, g.iget(held, IV.NextFireTime))
-    fire, _refused = g.branch(op(g, FN_AND, has_ammo, cooled), [gun])
     ed.add_comment_to_nodes(
-        f"{SERVER_FIRE} (shot.py): the owning client's trigger. The guard is asked "
-        "(net/guard.py: how often, and an AimPoint its view could rest on); counted "
-        "served either way, then refused unless there is a gun in a living hand with a round in it and its "
-        f"cooldown over (within {FIRE_GRACE_S:g} s: packets do not arrive evenly). The "
-        "shot is traced from this machine's muzzle to the client's AimPoint.", g.made)
+        f"{SHOT_FIRED} (shot.py): a shot the server let through. {SERVER_FIRE} is the "
+        "native base's (OtherworldWeaponComponentBase): it asked the guard "
+        "(how often, and an AimPoint its view could rest on), counted the ask served "
+        "either way, refused unless there is a gun in a living hand with a round in it "
+        f"and its cooldown over (within {FIRE_GRACE_S:g} s: packets do not arrive evenly), "
+        "then spent the round and stamped the cooldown. The shot is traced from this "
+        "machine's muzzle to the client's AimPoint.", g.made)
     # Heard by everyone who did not predict it, before the pellets fly.
-    told = fx.tell(g, SHOT, [fire])
+    told = fx.tell(g, SHOT, [then(event)])
     # The server's own muzzle: where the gun is here, not where a client says.
     muzzle = _author_shot_origin(ed, held)
     fired, flew = _author_fire(ed, held, muzzle, out(event, AIM_PARAM), told)
@@ -173,7 +166,8 @@ def author_shot_events(ed):
     for name, sound in ((SHOT, IV.FireSound), (RELOAD, IV.ReloadSound)):
         fx.pair(ed, name, (), _author_heard_on_gun(ed, sound), fx.UNPREDICTED,
                 item_class=ITEM_CLASS_PATH)
-    _author_server_fire(ed)
+    author_pellet_flew(ed)
+    _author_shot_fired(ed)
     _author_reload_now(ed)
     _author_server_reload(ed)
 
@@ -190,7 +184,7 @@ def _author_shot_ask(ed, held, muzzle, exec_in):
     again = op(g, FN_ADD_FF, out(g.call(FN_TIME_SECONDS)), g.iget(held, IV.FireInterval))
     flow = g.iput(held, IV.NextFireTime, again, [flow])
     flow = _count(g, AsksSent, [flow])
-    ask = g.keep(_node(ed, SERVER_FIRE))
+    ask = g.keep(_node(ed, FN_SERVER_FIRE))
     _connect(g.get(WV.AimPoint), _pin(ask, AIM_PARAM))
     for e in (owns, flow):
         _connect(e, _pin(ask, "execute"))

@@ -1,6 +1,7 @@
 """verify.ammo_graph -- what the weapon component's graph does with a gun's
-ammunition: the round spent and the deadline pushed under Server_Fire and as
-the owning client's prediction, the reload's one stored take under ReloadNow,
+ammunition: the round spent and the deadline pushed as the owning client's
+prediction (the server's are the native Server_Fire's since W1: C++,
+verify/shot.py), the reload's one stored take under ReloadNow,
 a client's picture under ViewRow, and the click and the clack.
 
 The numbers themselves (magazines, reserves, intervals) are the weapons' own
@@ -10,7 +11,7 @@ or variable (verify/anchor.py), none from a count of the graph.
 
 from combat import fx_vars as FX
 from combat.record_vars import VIEW_ROW
-from combat.shot_vars import RELOAD_NOW, SERVER_FIRE
+from combat.shot_vars import RELOAD_NOW, SERVER_FIRE, SHOT_FIRED
 from combat.verify.anchor import (
     event, event_nodes, feeders, in_event, pure_feeds, reads, runs, title,
 )
@@ -39,28 +40,29 @@ def _predicted_round():
 def check_ammunition_graph():
     # Each write is found under the event that owns it (shot.py, view.py), so
     # a write another feature adds elsewhere is that feature's to check.
-    spent = _writes(event_nodes(SERVER_FIRE), "Loaded")
+    # The server's round and deadline are the native Server_Fire's (C++): the
+    # graph it lets a shot through to writes neither.
+    spent = _writes(event_nodes(SHOT_FIRED), "Loaded")
     filled = _writes(event_nodes(RELOAD_NOW), "Loaded")
     seen = _writes(event_nodes(VIEW_ROW), "Loaded")
     predicted = _predicted_round()
-    check("firing spends a round, on the server and as the owning client's "
-          "prediction, and reloading puts rounds back (and a client's picture takes "
-          "the record's)",
-          bool(spent) and bool(predicted) and bool(filled) and bool(seen)
-          and all("int - int" in reads(n) for n in spent + predicted)
+    check(f"firing spends a round as the owning client's prediction (the server's is "
+          f"the native {SERVER_FIRE}'s, not {SHOT_FIRED}'s), and reloading puts rounds "
+          "back (and a client's picture takes the record's)",
+          not spent and bool(predicted) and bool(filled) and bool(seen)
+          and all("int - int" in reads(n) for n in predicted)
           and all("int + int" in reads(n) for n in filled)
           and all(f == event(VIEW_ROW) for n in seen for f in feeders(n, "Loaded")),
-          f"{SERVER_FIRE} {len(spent)}, predicted {len(predicted)}, "
+          f"{SHOT_FIRED} {len(spent)}, predicted {len(predicted)}, "
           f"{RELOAD_NOW} {len(filled)}, {VIEW_ROW} {len(seen)}")
     # The predicted deadline is the one written after the predicted round.
     next_predicted = [n for p in predicted for n in past_marks(runs(p, "then"))
                       if title(n) == "Set NextFireTime"]
-    deadlines = {SERVER_FIRE: _writes(event_nodes(SERVER_FIRE), "NextFireTime"),
-                 "predicted": next_predicted,
+    deadlines = {"predicted": next_predicted,
                  RELOAD_NOW: _writes(event_nodes(RELOAD_NOW), "NextFireTime")}
-    check("the interval (the server's, and the owning client's predicted one) and the "
-          "reload push the same NextFireTime deadline",
-          all(deadlines.values())
+    check("the interval (the owning client's predicted one; the server's is the native "
+          f"{SERVER_FIRE}'s) and the reload push the same NextFireTime deadline",
+          all(deadlines.values()) and not _writes(event_nodes(SHOT_FIRED), "NextFireTime")
           and all({"float + float", "GetTimeSeconds"} <= reads(n)
                   for v in deadlines.values() for n in v),
           ", ".join(f"{k} {len(v)}" for k, v in deadlines.items()))
@@ -107,10 +109,9 @@ def check_ammunition_graph():
     # The gate is nested, not folded: every one of these reads a property off Held,
     # and the outer condition is pulled on frames where nothing is equipped.
     asks = {"the fire gate": [g for d in _dry_plays() for g in feeders(d, "execute")],
-            SERVER_FIRE: [n for n in event_nodes(SERVER_FIRE) if title(n) == "Branch"],
             RELOAD_NOW: gates}
-    check("the fire gate, the server's own test of the shot and the reload each ask "
-          "the weapon whether it uses ammo",
+    check("the fire gate and the reload each ask the weapon whether it uses ammo (the "
+          "server's own test of the shot is the native base's: verify/shot.py)",
           all(any("Get UsesAmmo" in reads(g) for g in v) for v in asks.values()),
           str({k: any("Get UsesAmmo" in reads(g) for g in v) for k, v in asks.items()}))
     fire_gate = asks["the fire gate"]

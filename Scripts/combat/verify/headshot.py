@@ -7,7 +7,8 @@ the X the HUD draws off it is verify_graphics_menu's (reticle_checks.py).
 """
 
 from combat.headshot_tuning import HEADSHOT_NEVER, HEADSHOT_TIME_VAR
-from combat.hit_zones import HEAD_BONES_VAR, HIT_BONE_VAR
+from combat.hit_zones import HEAD_BONES_VAR
+from combat.shot_vars import PELLET_FLEW
 from combat.verify.common import BEL, PIN, check, in_pins
 from combat.verify.fixtures import w, wg
 from combat.verify.sights import _feeds, _title
@@ -39,17 +40,24 @@ def check_headshot_stamp():
         a = {_title(m) for m in _feeds(BEL.find_input_pin(pick, "A"))} if ok else set()
         b = {_title(m) for m in _feeds(BEL.find_input_pin(pick, "B"))} if ok else set()
         cond = {_title(m) for m in _feeds(BEL.find_input_pin(pick, "bPickA"))} if ok else set()
-        bone = sorted(t for t in cond if t in (f"Get {HIT_BONE_VAR}", f"Get {THROW_BONE_VAR}"))
+        # The pellet's is the native base's answer (PelletFlew's bHead: the
+        # bone looked up in C++, verify/player_body.py); the blade's is the
+        # graph's own lookup of its ThrowBone.
+        flew = [str(PIN.get_pin_name(q)) for q in PIN.list_connected_pins(
+            BEL.find_input_pin(pick, "bPickA"))] if ok else []
+        pellet = ok and cond == {f"Event {PELLET_FLEW}"} and flew == ["bHead"]
+        bone = ["PelletFlew's bHead"] if pellet else sorted(
+            t for t in cond if t == f"Get {THROW_BONE_VAR}")
         bones.update(bone)
         check(f"...{' / '.join(bone) or 'a write'}: the game's time if that "
               f"bone is one of the target's {HEAD_BONES_VAR}, else what "
               f"{HEADSHOT_TIME_VAR} was",
               ok and any("Time" in t for t in a) and b == {f"Get {HEADSHOT_TIME_VAR}"}
-              and len(bone) == 1 and any(HEAD_BONES_VAR in t for t in cond)
+              and len(bone) == 1 and (pellet or any(HEAD_BONES_VAR in t for t in cond))
               and bool(PIN.list_connected_pins(BEL.find_input_pin(n, "execute"))),
               f"A {sorted(a)}, B {sorted(b)}, pick {sorted(cond)}")
-    check(f"...one off the pellet's {HIT_BONE_VAR}, one off the blade's {THROW_BONE_VAR}",
-          bones == {f"Get {HIT_BONE_VAR}", f"Get {THROW_BONE_VAR}"}, str(sorted(bones)))
+    check(f"...one off the pellet's bHead, one off the blade's {THROW_BONE_VAR}",
+          bones == {"PelletFlew's bHead", f"Get {THROW_BONE_VAR}"}, str(sorted(bones)))
 
 
 def run():

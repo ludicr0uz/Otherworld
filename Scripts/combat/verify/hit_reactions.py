@@ -22,7 +22,7 @@ from combat.verify.fixtures import (
 from combat.verify.knife import is_melee_write
 from combat.verify.throw_strike import is_strike_node
 from combat.verify.common import (
-    take_hits,
+    pellet_calls, take_hits,
     BEL, PIN, _mesh_asset, by_pins, check, component_template, has_in_pin,
     load, num_pin, pin_value, titled,
 )
@@ -201,7 +201,7 @@ def check_flinching():
         # played something: skipping it on the cooldown arm makes the next hit
         # compare against a health from before this one and fire for nothing.
         _arms = PIN.list_connected_pins(BEL.find_execute_pin(_prev_writes[0]))
-        check(f"...and written on every arm, including the ones that did not react",
+        check("...and written on every arm, including the ones that did not react",
               len(_arms) >= 4, f"{len(_arms)} exec links")
 
     # Direction: two dot products against the owner's own axes, and nothing else.
@@ -251,17 +251,14 @@ def check_flinching():
     # A blow tells the target's TakeHit (combat/damage.py), which writes it.
     _from_writes = [n for n in take_hits(wg)
                     if not is_melee_write(n, "From") and not is_strike_node(n)]
-    check(f"the pellet loop tells the target which way it came ({LAST_HIT_FROM_VAR}) "
-          "where it lands",
-          len(_from_writes) == 1, str(len(_from_writes)))
-    if _from_writes:
-        _src_pin = PIN.list_connected_pins(
-            BEL.find_input_pin(_from_writes[0], "From"))
-        check("...off the hit's own impact normal, which already points back up the "
-              "shot",
-              [str(PIN.get_pin_name(q)).replace(" ", "") for q in _src_pin]
-              == ["ImpactNormal"],
-              str([str(PIN.get_pin_name(q)) for q in _src_pin]))
+    # The pellet's is the native base's since W1 (FirePellets, C++): it hands
+    # TakeHit the hit's own impact normal, which already points back up the
+    # shot. The graph has no pellet TakeHit; probes/probe_hit_react.py has
+    # the flinch.
+    check(f"the pellets tell the target which way they came ({LAST_HIT_FROM_VAR}) from "
+          "the native FirePellets, not from a TakeHit in the graph",
+          len(_from_writes) == 0 and len(pellet_calls(wg)) == 1,
+          f"{len(_from_writes)} graph TakeHit(s), {len(pellet_calls(wg))} FirePellets")
 
     # THE PROBE IS GONE. "A gate that never opens looks identical to one that
     # works", so the reaction was proved at runtime with a PrintWarning on the end
@@ -305,7 +302,7 @@ def check_flinching():
         check(f"{_who} carries all six reactions, or none at all",
               len(_clips) in (0, len(HIT_REACTION_CLIPS)), str(len(_clips)))
         if _clips:
-            check(f"...in HIT_REACTION_CLIPS order",
+            check("...in HIT_REACTION_CLIPS order",
                   # A_Zombie01_MM_HitReact_... on a body with a skeleton of
                   # its own, MM_HitReact_... (Epic's originals) on one bound
                   # to the mannequin's.

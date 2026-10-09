@@ -9,6 +9,8 @@ from combat.game_state import (
     DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS, TRACER_HIT_COLOR, TRACER_MISS_COLOR,
     TRACER_POINT_SIZE, TRACER_THICKNESS,
 )
+from combat.shot_vars import PELLET_FLEW
+from combat.verify.anchor import event
 from combat.verify.fixtures import wg
 from combat.verify.common import BEL, PIN, by_pins, check, num_pin, pin_value
 
@@ -48,15 +50,12 @@ def _upstream(node):
     return list(seen.values())
 
 
-def _is_hit_result(n):
-    return _title(n).replace(" ", "") == "BreakHitResult"
-
-
-def _by_the_trace(node, pin_name):
-    """Is this pin wired from the pellet trace's own "did it hit"?"""
-    wired = _wired(node, pin_name)
-    return len(wired) == 1 and ("TraceChannel" in _in_names(wired[0])
-                                or "MaxRewindSeconds" in _in_names(wired[0]))
+def _from_pellet(node, pin_name):
+    """The PelletFlew parameters wired into one input pin ("?" for a link
+    from anything else)."""
+    flew = event(PELLET_FLEW)
+    return [str(PIN.get_pin_name(q)) if PIN.get_owning_node(q) == flew else "?"
+            for q in PIN.list_connected_pins(BEL.find_input_pin(node, pin_name))]
 
 
 def check_tracer():
@@ -73,27 +72,20 @@ def check_tracer():
               if "Random" in _title(n)]
     check("nothing the tracer reads is drawn at random -- a pure cone read "
           "again is a different pellet", not random, str(sorted(set(random))))
-    starts = _wired(line, "LineStart")
-    check("the line starts where the pellet's trace did (the hit result's TraceStart)",
-          len(starts) == 1 and _is_hit_result(starts[0]),
-          str([_title(n) for n in starts]))
-    ends = _wired(line, "LineEnd")
-    picked = len(ends) == 1 and {"A", "B", "bPickA"} <= _in_names(ends[0])
-    check("...and ends at the impact, or at the trace's end on a miss",
-          picked and all(len(_wired(ends[0], pin)) == 1
-                         and _is_hit_result(_wired(ends[0], pin)[0])
-                         for pin in ("A", "B"))
-          and _by_the_trace(ends[0], "bPickA"),
-          str([_title(n) for n in ends]))
+    # Both ends are PelletFlew's own parameters: the pellet is flown in C++
+    # (FirePellets), which tells where it started and where it stopped.
+    check("the line starts where the pellet did (PelletFlew's Start)",
+          _from_pellet(line, "LineStart") == ["Start"], str(_from_pellet(line, "LineStart")))
+    check("...and ends at the impact, or at the trace's end on a miss (its Stop)",
+          _from_pellet(line, "LineEnd") == ["Stop"], str(_from_pellet(line, "LineEnd")))
     check("...the point sits on that same end",
-          [n.get_path_name() for n in _wired(point, "Position")]
-          == [n.get_path_name() for n in ends])
+          _from_pellet(point, "Position") == ["Stop"])
 
     tints = _wired(line, "LineColor")
     check("a pellet that connected is drawn in the hit colour, a miss in the other",
           len(tints) == 1 and pin_value(tints[0], "A") == TRACER_HIT_COLOR
           and pin_value(tints[0], "B") == TRACER_MISS_COLOR
-          and _by_the_trace(tints[0], "bPickA")
+          and _from_pellet(tints[0], "bPickA") == ["bStopped"]
           and [n.get_path_name() for n in _wired(point, "PointColor")]
           == [tints[0].get_path_name()],
           str([pin_value(t, "A") for t in tints]))

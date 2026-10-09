@@ -9,9 +9,9 @@ impacts) and, in single player, probes/probe_headshot.py.
 """
 
 from combat import fx_vars as FX
-from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
+from combat.hit_zones import HIT_POINT_VAR
 from combat.verify import fx as fxv
-from combat.verify.common import BEL, PIN, check, in_pins, pin_value
+from combat.verify.common import BEL, PIN, check, in_pins, pellet_calls, pin_value
 from combat.verify.fixtures import exec_reach, wc, wg
 from combat.verify.record import _feeders, _title
 from uebp import net
@@ -115,23 +115,24 @@ def check_notes():
              {_title(f) for f in _feeders(n, "NewItem")}}
     check(f"...each at {HIT_POINT_VAR}: the pellet's own hit, moved onto the body it struck",
           spots == {f"Get {HIT_POINT_VAR}"}, str(spots))
-    # Each note starts at its Set ShotHitScale: the chips' hangs off the health
-    # cast's failed arm, the blood's behind the hit zone (verify/hit_bodies.py).
+    # Each note starts at its Set ShotHitScale: the blood's off the Branch on
+    # PelletFlew's bHurt, the chips' off the Branch on its bScenery, which
+    # hangs off the first one's False (verify/hit_bodies.py).
     starts = [n for n in wg if _title(n) == f"Set {FX.ShotHitScale}"]
-    feeds = [[(PIN.get_owning_node(q), str(PIN.get_pin_name(q)))
-              for q in PIN.list_connected_pins(BEL.find_input_pin(n, "execute"))] for n in starts]
-    chips = [f for f in feeds if [pin for _n, pin in f] == ["CastFailed"]]
-    blood = [f for f in feeds if f not in chips]
-    cast = chips[0][0][0] if len(chips) == 1 else None
-    zone = ([_title(PIN.get_owning_node(q))
-             for q in PIN.list_connected_pins(BEL.find_then_pin(cast))] if cast else [])
-    check("...the chips off the health cast's failed arm (what has no health), the "
-          "blood off that cast's other arm, behind the hit zone: a pellet never notes both",
-          len(starts) == 2 and cast is not None and zone == [f"Set {HIT_BONE_VAR}"]
-          and len(blood) == 1 and all(n.get_path_name() != cast.get_path_name()
-                                      for n, _pin in blood[0]),
-          f"chips off {[pin for f in chips for _n, pin in f]}; the cast's then -> {zone}; "
-          f"blood off {[pin for f in blood for _n, pin in f]}")
+
+    def gate(n):
+        """(the flag the Branch that runs ``n`` asks, the arm it runs it off)."""
+        links = PIN.list_connected_pins(BEL.find_input_pin(n, "execute"))
+        if len(links) != 1:
+            return None
+        branch = PIN.get_owning_node(links[0])
+        asks = [str(PIN.get_pin_name(q)) for q in PIN.list_connected_pins(
+            BEL.find_input_pin(branch, "Condition"))] if "Condition" in in_pins(branch) else []
+        return (asks[0] if len(asks) == 1 else None, str(PIN.get_pin_name(links[0])))
+    gates = sorted(str(gate(n)) for n in starts)
+    check("...the blood where the pellet hurt a body (bHurt), the chips where it struck "
+          "what has no health (bScenery): a pellet never notes both",
+          gates == sorted([str(("bHurt", "then")), str(("bScenery", "then"))]), str(gates))
 
 
 def check_flush():
@@ -143,8 +144,11 @@ def check_flush():
     calls = fxv._calls_named(FX.FLUSH_SHOT_HITS)
     after = [str(PIN.get_pin_name(q)) for n in calls
              for q in PIN.list_connected_pins(BEL.find_input_pin(n, "execute"))]
-    check("...called once, when the pellet loop has traced its last pellet (Completed)",
-          len(calls) == 1 and after == ["Completed"], f"{len(calls)} call(s) off {after}")
+    callers = [PIN.get_owning_node(q) for n in calls
+               for q in PIN.list_connected_pins(BEL.find_input_pin(n, "execute"))]
+    check("...called once, when the native FirePellets has flown its last pellet",
+          len(calls) == 1 and after == ["then"] and callers == pellet_calls(wg),
+          f"{len(calls)} call(s) off {after}")
     body = _reach(flush)
     gates = [n for n in fxv._feeders_then(flush) if _title(n) == "Branch"]
     tells = fxv._calls_named(CAST)

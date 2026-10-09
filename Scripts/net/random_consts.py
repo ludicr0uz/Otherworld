@@ -62,9 +62,10 @@ AUDIT = (
          "the AIController, as the patrol", ""),
     Roll("combat/weapon_component/firing.py", STATE,
          "where in the gun's cloud a round or a pellet goes",
-         "inside Server_Fire, which only the server runs (single player: a "
-         "plain call); the owning client draws nothing, and what the pellets "
-         "did replicates as health", ""),
+         "under ShotFired, which only the server's Server_Fire raises (single "
+         "player: a plain call), and each pellet's inside the gun's pattern in "
+         "the native FirePellets it calls; the owning client draws nothing, and "
+         "what the pellets did replicates as health", ""),
     Roll("combat/weapon_component/chop.py", STATE,
          "where the wood lands beside the trunk, and how it lies",
          "the weapon component of whoever chops, on the server alone: the "

@@ -4,7 +4,8 @@ Two modules and four targets. The runtime module, `Otherworld`, holds what multi
 needs and a Blueprint cannot do (`serversupportsysdesign.md` 4.3): the player's
 predicted movement states (M12), the lag compensation of shots (M22), the server's
 replication graph (A2), how often a dedicated server poses a body (A4), the record of
-what a player carries (A3a, A3b) and what a Server event checks before it runs (A5). The editor-only
+what a player carries (A3a, A3b), what a Server event checks before it runs (A5) and the
+first slice of the weapon component, the shot's server half (W1). The editor-only
 module, `OtherworldEditor`, holds what the Python builders need and Python cannot reach.
 Everything else stays in the Python builders.
 
@@ -25,6 +26,7 @@ Everything else stays in the Python builders.
 | `Otherworld/Private/OtherworldInventoryBytes.cpp` | The record's saved form: `FOtherworldInventoryRecord::ToBytes` and `FromBytes`, a version first, classes by path; the layout is the file's first comment |
 | `Otherworld/Private/OtherworldInventoryLibrary.cpp` | `UOtherworldInventoryLibrary` (Python: `unreal.OtherworldInventoryLibrary`; declared in the record's header): `MarkInventoryDirty` and `MarkCarriedItemDirty` for the graphs (`Scripts/uebp/nodes/inventory.py`, placed by `Scripts/combat/dirty.py`), the view's reads of the record (`InventoryRow`, `WornRow`, `HandRow`, for `Scripts/combat/weapon_component/view.py`), the save's (`InventoryRecordOf`, `InventoryRecordToBytes`, `InventoryRecordFromBytes`), and the probes' reads and the audit's switch |
 | `Otherworld/Public/OtherworldRpcGuard.h`, `Private/….cpp` | `UOtherworldRpcGuard` (A5; `Scripts/net/CLAUDE.md`, "Every Server event asks the guard first"): a component on the player with the two checks a Blueprint Server event has no `_Validate` for. `Allow(Name)`, a token bucket per event name per connection (the state is keyed by the `UNetConnection`, so it outlives a character), which logs `RPC-REFUSED` and past `KickRefusals` in `KickSeconds` closes the connection (`ENetCloseResult::Extended`, `ClosedByRpcGuard`); and `AimAllowed(AimPoint)`, the cone along `GetBaseAimRotation` a shot's point must lie in. Both pass uncounted unless the owner's controller is a remote player's. Its numbers are `EditAnywhere`, written by `combat/install.py` from `Scripts/net/guard_consts.py`; `Counted`, `Refused`, `AimRefused` and `bKicked` (Python: `kicked`) are for the probes |
+| `Otherworld/Public/OtherworldWeaponComponentBase.h`, `Private/….cpp` | `UOtherworldWeaponComponentBase` (W1; "The weapon component's native parent" below): the class `BP_WeaponComponent` is a child of. `Server_Fire(AimPoint)`, a reliable Server RPC with a `_Validate`: the guard's `Allow` and `AimAllowed`, the shot's own refusals, the round and the deadline, the record's mark, then the event `ShotFired`. `FirePellets(...)`: each pellet's `ShotTrace`, the zone off the target's tables, its `TakeHit`, then the event `PelletFlew`. `ShotsFired` and `ShotsRefused` are for the probes. Its nodes are `Scripts/uebp/nodes/weapon.py`; the graph's side is `Scripts/combat/weapon_component/shot.py`, `firing.py`, `impact.py` |
 | `OtherworldEditor/OtherworldEditor.Build.cs` | the editor module's dependencies (adds `UnrealEd`, `BlueprintGraph`); only the Editor target lists it, so no game or server build carries it |
 | `Otherworld/Public/OtherworldLoadLibrary.h`, `Private/….cpp` | `UOtherworldLoadLibrary` (Python: `unreal.OtherworldLoadLibrary`): what the load test reads off a server or a client (A1, `Scripts/probes/probe_net_load.py`): each connection's bytes and packets in and out, open actor channels and lag (`FOtherworldConnectionStats`, read with `get_editor_property`), the frame and world-tick times sampled between `StartFrameTiming` and `StopFrameTiming`, and the hit history's characters and samples; and `SpawnActorAt`, a spawn for a probe that needs a thing the level lacks (Python has none in a game; `probe_gas_traversal.py`'s block) |
 | `Otherworld/Public/OtherworldReplicationGraph.h`, `Private/….cpp` | `UOtherworldReplicationGraph` (A2, `Scripts/net/CLAUDE.md` "Relevancy, update rates and dormancy"): the server's replication driver, named for the `IpNetDriver` in `Config/DefaultEngine.ini`. A grid-spatialisation node for everything with a place in the world, an always-relevant list for `bAlwaysRelevant` actors, and `UOtherworldReplicationGraphNode_ForConnection` per connection (the engine's viewer and view target, plus the viewer's PlayerState). Each class's cull distance and period are read off its CDO, which the builders write from `Scripts/net/relevancy_consts.py`; `CellSizeCm` is its one config value |
@@ -139,6 +141,41 @@ numbers, which the fire graph hands `ShotTrace` as pin literals.
 - **The ping is a second old:** `UNetConnection::AvgLag` is averaged over its stat period
   and the PlayerState's over four seconds, so the first shot after a join is rewound by
   the join's inflated round trip (measured 90-250 ms on the loopback). The cap bounds it.
+
+## The weapon component's native parent (`UOtherworldWeaponComponentBase`, W1)
+
+The weapon component is ported out of its graph a slice at a time; the header's first
+comment has the picture of the first, the shot's server half.
+
+- **`BP_WeaponComponent` is reparented by its own builder** (`weapon_component/native.py`,
+  called from `build.py` before the graph is authored): the shot's nodes are the base's.
+  The reparent keeps every variable (checked by name).
+- **What the base does not hold yet.** `Held` and `AsksServed` are still the Blueprint's
+  variables, `Loaded`, `Reserve` and `NextFireTime` the item Blueprint's (a magazine and a
+  deadline are a gun's own, and the item has no native parent), and the health component
+  is a Blueprint until W3. The base reads and writes them by name, and calls `TakeHit` by
+  name, its parameters by position and kind. The names are `EditAnywhere` properties of
+  the class defaults, written from the builders' constants (`native.NAMES`) and checked
+  by `combat/verify/shot.check_native`, which also checks each names a variable.
+- **A write from C++ of what a player carries marks the record itself**
+  (`UOtherworldInventoryLibrary::MarkInventoryDirty`, by the carrier: by the item, `MarkCarriedItemDirty` searches every carrier's inventory, 55 µs a shot at 64 characters): `Scripts/combat/dirty.py` finds
+  graph nodes only. The audit (`INVENTORY-RECORD-STALE`) catches one that forgets.
+- **The graph hangs on two `BlueprintImplementableEvent`s**, `ShotFired` and `PelletFlew`.
+  From Python an event of the native parent comes from the palette under its category:
+  `AddEvent|Otherworld|Shot|EventShotFired` (`uebp/nodes/weapon.py`), and
+  `find_event_node("ShotFired")` finds it.
+- **A Blueprint custom event may not share a name with a function of its native parent**:
+  the compile fails. A component built before W1 had `Server_Fire` as a custom event, so
+  the reparent removes that node first.
+- **Python has no method for the base's functions** (`dir()` of its default object lists
+  neither): a probe calls `wc.call_method("Server_Fire", (aim,))`, which travels from a
+  client as the Blueprint event did, and `SendServerEvent` sends it too.
+- **`_Validate` returning false closes the connection.** It refuses only what no honest
+  client sends (an `AimPoint` that is not a number); how often and where a shot may aim
+  are the guard's, whose refusals are quiet until its own threshold.
+- **The next slices** (W2, the reload; W3, the health component) take names out of
+  `native.NAMES` as their state becomes native. Moving `Loaded` and `Reserve` to
+  `UPROPERTY`s needs a native parent for `BP_WeaponItem`, which nothing has yet.
 
 ## Traps
 

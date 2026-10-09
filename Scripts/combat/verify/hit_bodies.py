@@ -11,7 +11,9 @@ from combat.hit_bodies import (
 from combat.fx_vars import ShotHitScale
 from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.ragdoll import RAGDOLL_MESH_ROOT
-from combat.verify.common import BEL, PIN, check, in_pins, shot_traces, titled
+from combat.shot_vars import PELLET_FLEW
+from combat.verify.anchor import event
+from combat.verify.common import BEL, PIN, check, in_pins, titled
 from combat.verify.fixtures import wg
 
 
@@ -93,38 +95,36 @@ def check_body_miss_is_a_miss():
     # trace used to pick the multiplier only, so a round through the air
     # beside the head still bled and still did its damage at 1x.
     # (A thrown blade's stage has a body trace of its own: verify/throw_strike.)
-    # Since M22 the pellet's trace and the body's are one C++ node, ShotTrace
-    # (uebp/nodes/shot.py), whose bBodyHit, BodyBone and BodyPoint are the
-    # body trace's answer.
-    traces = shot_traces(wg)
-    if not check_one("one shot trace (ShotTrace, C++) in the fire graph: the pellet's "
-                     "line, and the struck character's bodies along it", traces):
+    # Since W1 the pellet is flown in C++ (FirePellets: one ShotTrace, the
+    # capsule and the bodies on the one line), which hurts only a body it
+    # struck and says what the pellet did as PelletFlew: bHurt, bScenery, or
+    # neither for one that crossed a capsule and passed the body by.
+    flew = event(PELLET_FLEW)
+    if not check_one("one PelletFlew event in the fire graph: the native base's word "
+                     "of each pellet it flew", [flew] if flew is not None else []):
         return
-    trace = traces[0]
     branches = [n for n in wg if "Condition" in in_pins(n)
-                and ("bBodyHit", trace) in _fed_pins(n, "Condition")]
-    if not check_one("one Branch asks it whether a body was struck (bBodyHit)", branches):
+                and ("bHurt", flew) in _fed_pins(n, "Condition")]
+    if not check_one("one Branch asks it whether a body was hurt (bHurt)", branches):
         return
     struck = branches[0]
-    missed = PIN.list_connected_pins(BEL.find_else_pin(struck))
-    check("a pellet that strikes no body ends there: no blood, no damage",
-          len(missed) == 0, f"{len(missed)} link(s) on the Branch's False")
+    spared = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(BEL.find_else_pin(struck))]
+    scenery = [n for n in spared if ("bScenery", flew) in _fed_pins(n, "Condition")]
+    missed = [q for n in scenery for q in PIN.list_connected_pins(BEL.find_else_pin(n))]
+    check("a pellet that strikes no body and no scenery ends there: no blood, no chips",
+          len(spared) == 1 and len(scenery) == 1 and len(missed) == 0,
+          f"{len(spared)} node(s) on bHurt's False, {len(missed)} link(s) on bScenery's False")
 
-    hit = _then(struck)
-    check("a pellet that strikes one records the bone",
-          [_title(n) for n in hit] == [f"Set {HIT_BONE_VAR}"],
-          str([_title(n) for n in hit]))
     marks = titled(wg, f"Set {HIT_POINT_VAR}")
-    fed = sorted(str(sorted(_fed_by(n, HIT_POINT_VAR))) for n in marks)
-    check("HitPoint is written twice: the pellet's own hit, then the body's",
-          len(marks) == 2 and any("Break Hit Result" in f or "BreakHitResult" in f
-                                  for f in fed)
-          and any("Trace" in f for f in fed), str(fed))
-    onto = [n for n in marks if hit and n in _then(hit[0])]
-    if not check_one("...the body's straight after the bone", onto):
-        return
-    noted = _then(onto[0])
-    check("...and the blood is noted after it, for the shot's one Multicast "
+    bones = titled(wg, f"Set {HIT_BONE_VAR}")
+    check("HitPoint and HitBone are written once a pellet, from PelletFlew's Point and "
+          "Bone: the body's where a body was struck, the trace's own otherwise",
+          len(marks) == 1 and len(bones) == 1
+          and _fed_pins(marks[0], HIT_POINT_VAR) == {("Point", flew)}
+          and _fed_pins(bones[0], HIT_BONE_VAR) == {("Bone", flew)},
+          f"{len(marks)} point write(s), {len(bones)} bone write(s)")
+    noted = _then(struck)
+    check("...and the blood is noted off bHurt, for the shot's one Multicast "
           "(verify/shot_hits.py)",
           [_title(n) for n in noted] == [f"Set {ShotHitScale}"],
           str([_title(n) for n in noted]))

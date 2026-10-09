@@ -39,6 +39,7 @@ CONTEXTS = (
     ("Widget", "/Script/UMG.UserWidget", "EventGraph"),
     ("BTTask", "/Script/AIModule.BTTask_BlueprintBase", "EventGraph"),
     ("Ability", "/Script/GameplayAbilities.GameplayAbility", "EventGraph"),
+    ("WeaponComponent", "/Script/Otherworld.OtherworldWeaponComponentBase", "EventGraph"),
 )
 
 

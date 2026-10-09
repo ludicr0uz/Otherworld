@@ -11,9 +11,10 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   ```
   - **The gate is the local player's; the shot is the server's** (M19,
     `weapon_component/shot.py`). Past the inner gate the Tick kicks the view, plays the
-    shot's sound and calls `Server_Fire(AimPoint)`, which asks again for itself (a valid
+    shot's sound and calls `Server_Fire(AimPoint)` (C++ since W1:
+    `OtherworldWeaponComponentBase`), which asks again for itself (a valid
     `Held`, a living owner, a gun, a round, the cooldown with 0.1 s of grace) before it
-    spends and traces. A client of a server also spends its own copy's round and stamps
+    spends and raises `ShotFired`, where the graph traces. A client of a server also spends its own copy's round and stamps
     its own cooldown, so its next frame's gate is right before any answer comes.
   - Anything read off `Held` must stay inside the outer gate, per the nested-Branch gotcha in the
     root CLAUDE.md. The verifier pins that exactly one Branch reads `Automatic`, together with

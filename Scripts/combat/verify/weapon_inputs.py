@@ -14,15 +14,15 @@ from combat.tuning import (
     SHOTGUN_RESERVE,
 )
 from combat.weapon_specs import _weapon_specs
-from combat.shot_vars import AIM_PARAM, SERVER_FIRE
+from combat.shot_vars import AIM_PARAM, SHOT_FIRED
 from combat.strike_vars import SERVER_TAKE
 from combat.verify.anchor import (
     event, event_nodes, feeders, pure_feeds, reads, title,
 )
 from combat.verify.fixtures import w, wg
 from combat.verify.common import (
-    BEL, PIN, by_pins, cdo, check, in_pins, load, out_pins, past_marks, pin_value,
-    shot_traces, titled,
+    BEL, PIN, by_pins, cdo, check, in_pins, load, out_pins, past_marks, pellet_calls,
+    pin_value, titled,
 )
 from combat.weapon_component import vars as WV
 from combat.weapon_component.look_vars import HandPose
@@ -137,40 +137,42 @@ def check_keys_are_variables():
     # a compile error -- it is a gun that shoots from behind the player's shoulder.
     # Each trace is found where its fragment puts it, not by how many the
     # graph holds: the aim's by the camera it starts at, the clearance by the
-    # AimPoint it ends on, the pellets' under Server_Fire, the drop's behind
-    # the item being let go.
+    # AimPoint it ends on, the drop's behind the item being let go. The
+    # pellets' are the native base's (FirePellets, C++), called under ShotFired.
     lines = by_pins(wg, "Start", "End", "TraceChannel")
     aim = [t for t in lines
            if any(title(f) == "GetCameraLocation" for f in feeders(t, "Start"))]
     clearance = [t for t in lines
                  if [title(f) for f in feeders(t, "End")] == [f"Get {AIM_PARAM}"]]
-    pellets = shot_traces(event_nodes(SERVER_FIRE))
+    pellets = pellet_calls(event_nodes(SHOT_FIRED))
     drop = [t for t in lines
             if any(title(f) == f"Get {DROP_ITEM_VAR}"
                    for b in feeders(t, "execute") for f in feeders(b, "self"))]
     traces = aim + clearance + pellets + drop
-    check("there are four traces (camera aim, muzzle clearance, the pellets' ShotTrace "
-          "and the one that sets a dropped item on the ground: the drop key's and "
-          "the dragged drop's are one, the server's)",
+    check("there are four traces (camera aim, muzzle clearance, the pellets' in the "
+          "native FirePellets and the one that sets a dropped item on the ground: the "
+          "drop key's and the dragged drop's are one, the server's)",
           all((aim, clearance, pellets, drop)),
           f"aim {len(aim)}, clearance {len(clearance)}, pellets {len(pellets)}, "
           f"drop {len(drop)}")
 
-    def _from_muzzle(t):
+    def _from_muzzle(t, pin):
         # The muzzle comes through the carry's SelectVector (verify/carry.py):
         # its B is the muzzle, its A where the muzzle will be once raised.
         return any({"A", "B", "bPickA"} <= in_pins(n) and all(
             {"T", "Location"} <= in_pins(f)  # TransformLocation
             for side in ("A", "B") for f in feeders(n, side))
-            for n in feeders(t, "Start"))
+            for n in feeders(t, pin))
 
     check("two traces start at the weapon's muzzle: the clearance check and the pellets",
           bool(clearance) and bool(pellets)
-          and all(_from_muzzle(t) for t in clearance + pellets),
-          str([title(f) for t in clearance + pellets for f in feeders(t, "Start")]))
+          and all(_from_muzzle(t, "Start") for t in clearance)
+          and all(_from_muzzle(t, "Muzzle") for t in pellets),
+          str([title(f) for t in clearance for f in feeders(t, "Start")]
+              + [title(f) for t in pellets for f in feeders(t, "Muzzle")]))
     check("exactly one trace starts at the camera -- the one that picks the target",
           bool(aim) and not [t for t in clearance + pellets + drop if t in aim],
-          str([title(f) for t in clearance + pellets + drop for f in feeders(t, "Start")]))
+          str([title(f) for t in clearance + drop for f in feeders(t, "Start")]))
     # Built as a MakeVector, not as a pin literal: that operator's B pin is a
     # struct pin when nothing is connected, and struct pins take no literal at all.
     check("the camera's ray reaches AIM_TRACE_RANGE when it hits nothing",
@@ -183,12 +185,12 @@ def check_keys_are_variables():
                   for axis in "XYZ")
               for n in titled(wg, "MakeVector")),
           f"{DROP_FORWARD:.0f} cm ahead")
-    # The pellet flies along ShotDirection, which Server_Fire draws once
+    # The pellets fly around ShotDirection, which ShotFired draws once
     # around a subtraction off the shooter's AimPoint, its own parameter
     # (shot.py), since the shot is traced by the machine that owns it. (The
     # throw's launch takes its own, from the variable: verify/throw_aim.py.)
-    fire_event = event(SERVER_FIRE)
-    drawn = [n for n in event_nodes(SERVER_FIRE) if title(n) == f"Set {WV.ShotDirection}"]
+    fire_event = event(SHOT_FIRED)
+    drawn = [n for n in event_nodes(SHOT_FIRED) if title(n) == f"Set {WV.ShotDirection}"]
     deltas = [n for d in drawn for n in pure_feeds(d)
               if title(n) == "vector - vector"
               and any(PIN.get_owning_node(q) == fire_event
@@ -197,10 +199,10 @@ def check_keys_are_variables():
     check("the pellet direction is muzzle -> the AimPoint the shooter sent, not camera "
           "forward",
           bool(deltas) and bool(pellets)
-          and all(f"Get {WV.ShotDirection}" in reads(f)
-                  for t in pellets for f in feeders(t, "End")),
-          f"{len(deltas)} vector subtractions driven by {SERVER_FIRE}'s {AIM_PARAM} "
-          f"behind {WV.ShotDirection}, which the pellet's End reads")
+          and all([title(f) for f in feeders(t, "Direction")] == [f"Get {WV.ShotDirection}"]
+                  for t in pellets),
+          f"{len(deltas)} vector subtractions driven by {SHOT_FIRED}'s {AIM_PARAM} "
+          f"behind {WV.ShotDirection}, which the pellets' Direction reads")
 
     # A held weapon is rigidly attached and never rotated on its own. Driving its
     # rotation from the aim was tried and reverted: the gun swivelled out of the

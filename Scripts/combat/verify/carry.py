@@ -17,7 +17,7 @@ from combat.verify.fixtures import titles, w, wg
 from combat.verify.knife import is_melee_play
 from combat.torch_tuning import BURNS_VAR
 from combat.verify.common import (
-    BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, out_pins, shot_traces,
+    BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, out_pins, pellet_calls,
 )
 
 
@@ -133,16 +133,19 @@ def check_shot_origin():
     picks = [n for n in by_pins(wg, "A", "B", "bPickA")
              if LOWERED_VAR in _reads(_feeds(BEL.find_input_pin(n, "bPickA"), 2))]
     # Two, the same sub-graph twice: the aim resolve's, on the machine with the
-    # keys, and Server_Fire's own (shot.py), since the shot leaves the server's
+    # keys, and ShotFired's own (shot.py), since the shot leaves the server's
     # muzzle. Each is checked below.
     check(f"a SelectVector picks the shot's start on {LOWERED_VAR}: the aim resolve's, "
           "and the server's own for the shot it traces", len(picks) == 2,
           f"{len(picks)} found")
     for pick in picks:
         _check_origin_pick(pick)
-    starts = [len([n for n in by_pins(wg, "Start", "End", "TraceChannel") + shot_traces(wg)
+    # The wall check is a trace in the graph; the pellets' are the native
+    # base's (FirePellets), handed the muzzle.
+    starts = [len([n for n, pin in [(t, "Start") for t in by_pins(wg, "Start", "End", "TraceChannel")]
+                   + [(c, "Muzzle") for c in pellet_calls(wg)]
                    if BEL.find_output_pin(pick, "ReturnValue")
-                   in PIN.list_connected_pins(BEL.find_input_pin(n, "Start"))])
+                   in PIN.list_connected_pins(BEL.find_input_pin(n, pin))])
               for pick in picks]
     check("...and the wall check starts at the one and the pellets at the other: the "
           "same sub-graph on the machine that runs each, so the reticle and the shot "

@@ -68,21 +68,27 @@ _author_* fragment per concern, each in its own module:
               and PoseKneel from Searching (the HUD's loot window), with KneelTime
   accuracy    once a frame: AimSpread (the shot's cloud), RecoilScale and
               ReticleSpread from Held's GUN_ACCURACY factors, stance and aim
+  native      the component's native parent (W1; C++, Source/Otherworld,
+              OtherworldWeaponComponentBase): the reparent, and the names its
+              Server_Fire and FirePellets read the Blueprints' variables by
   shot        the shot and the reload as server requests (combat/shot_vars.py):
-              Server_Fire and Server_Reload with their refusals, ReloadNow, and
-              the local arm's asks, which are the owning client's prediction;
-              Fx_Shot and Fx_Reload, Held's sound at the gun
+              ShotFired (what the graph hangs on the native Server_Fire),
+              Server_Reload with its refusals, ReloadNow, and the local arm's
+              asks, which are the owning client's prediction; Fx_Shot and
+              Fx_Reload, Held's sound at the gun
   fx          the fight as everyone sees and hears it (combat/fx_vars.py): the
               Fx_<Name>/Multicast_<Name> pair every cosmetic is, its three
               gates, tell / predict / announce, the point bursts' transform
               and the chop's body (chips and the axe in the wood)
-  firing      the shot on the machine that owns it (Server_Fire's body): the
-              round and cooldown, the one draw inside AimSpread
-              (ShotDirection), the pellet traces around it
-  tracer      debug mode: the line each pellet flew, off the trace's own hit
-              result (red to an impact, blue out to the range), and a point
-  impact      a pellet that connected: damage, hit zones, debug readout, and
-              Fx_PelletHit (blood on a body, chips on the scenery), noted
+  firing      the shot on the machine that owns it (ShotFired's body): the one
+              draw inside AimSpread (ShotDirection) and the call that flies
+              the pellets around it (FirePellets, C++)
+  tracer      debug mode: the line each pellet flew, off PelletFlew's own
+              Start and Stop (red to an impact, blue out to the range), and
+              a point
+  impact      what a pellet shows (PelletFlew, the native base's word of each):
+              HitPoint and HitBone, the headshot's stamp, the debug readout,
+              and Fx_PelletHit (blood on a body, chips on the scenery), noted
               for the shot's batch
   shot_hits   a shot's impacts told once (A4): the note onto three arrays,
               FlushShotHits after the pellet loop, Multicast_ShotHits and

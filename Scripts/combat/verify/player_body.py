@@ -8,15 +8,18 @@ from combat.game_state import DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS
 from uebp.graph import _component_object, _handles
 from combat.grip import _mesh_bone_names
 from combat.hit_zones import (
-    HEAD_BONES_VAR, HEAD_MULT_VAR, HIT_BONE_VAR, HIT_POINT_VAR, LIMB_BONES_VAR, hit_zones,
+    HEAD_BONES_VAR, HEAD_MULT_VAR, HIT_BONE_VAR, HIT_POINT_VAR, LIMB_BONES_VAR, LIMB_MULT_VAR,
+    hit_zones,
 )
+from combat.shot_vars import PELLET_FLEW
 from combat.lag_tuning import EXTRA_REWIND_S, MAX_REWIND_S
 from combat.skin import SKIN_QUINN, player_skin
 from combat.tuning import COMBAT
-from combat.verify.fixtures import char, npc, wg
+from combat.verify.anchor import event as graph_event
+from combat.verify.fixtures import char, npc, wc_cdo, wg
 from combat.verify.common import (
-    take_hits,
-    BEL, PIN, _mesh_asset, check, in_pins, load, num_pin, pin_value, shot_traces, titled,
+    pellet_calls, take_hits,
+    BEL, PIN, _mesh_asset, check, in_pins, load, num_pin, pin_value, titled,
     zone_tables,
 )
 
@@ -119,52 +122,59 @@ def check_player_body():
 
 
     wt = wg
-    # The pellet's trace and the struck character's body trace are one C++
-    # node since M22 (ShotTrace, uebp/nodes/shot.py): the one line serves
-    # both, so the body cannot be tested along a line the pellet did not fly.
-    zone_traces = shot_traces(wt)
-    check("one trace per pellet, which judges the capsule and the struck character's "
-          "bodies on the one line (ShotTrace, C++)",
-          len(zone_traces) == 1, f"{len(zone_traces)} ShotTrace node(s)")
-    if zone_traces:
-        zt = zone_traces[0]
-        shooter = {str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
-                   for q in PIN.list_connected_pins(BEL.find_input_pin(zt, "Shooter"))}
-        check("its shooter is this component's owner, whom the pellet ignores and whose "
-              "round trip sets the rewind", any("Owner" in t for t in shooter), str(shooter))
+    # The pellets are the native base's since W1 (FirePellets, C++:
+    # uebp/nodes/weapon.py). Each is one ShotTrace there, so the one line
+    # serves the capsule and the struck character's bodies both (M22), and
+    # comes back to the graph as PelletFlew.
+    flown = pellet_calls(wt)
+    flew = graph_event(PELLET_FLEW)
+    check("the pellets are flown by the native base: one FirePellets call, whose every "
+          "pellet comes back as PelletFlew",
+          len(flown) == 1 and flew is not None, f"{len(flown)} FirePellets call(s)")
+    if flown and flew is not None:
+        zt = flown[0]
+
+        def fed(pin):
+            return {str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
+                    for q in PIN.list_connected_pins(BEL.find_input_pin(zt, pin))}
+        handed = {pin: fed(pin) for pin in ("Gun", "Pellets", "Range", "Damage")}
+        check("it is handed Held as the gun, and Held's own pellets, range and damage",
+              handed == {"Gun": {"Get Held"}, "Pellets": {"Get PelletCount"},
+                         "Range": {"Get WeaponRange"}, "Damage": {"Get Damage"}}, str(handed))
 
         def reads(var, pin):
-            """The Set ``var`` nodes fed from the trace's ``pin``."""
+            """The Set ``var`` nodes fed from PelletFlew's ``pin``."""
             return [n for n in titled(wt, f"Set {var}")
-                    if any(PIN.get_owning_node(q) == zt and str(PIN.get_pin_name(q)) == pin
+                    if any(PIN.get_owning_node(q) == flew and str(PIN.get_pin_name(q)) == pin
                            for q in PIN.list_connected_pins(BEL.find_input_pin(n, var)))]
-        check("the struck bone is the trace's own (BodyBone -> HitBone)",
-              len(reads(HIT_BONE_VAR, "BodyBone")) == 1, f"{len(reads(HIT_BONE_VAR, 'BodyBone'))}")
-        check("...and its point on the body moves HitPoint onto the body (BodyPoint)",
-              len(reads(HIT_POINT_VAR, "BodyPoint")) == 1,
-              f"{len(reads(HIT_POINT_VAR, 'BodyPoint'))}")
+        check("the struck bone is the pellet's own (PelletFlew's Bone -> HitBone)",
+              len(reads(HIT_BONE_VAR, "Bone")) == 1, f"{len(reads(HIT_BONE_VAR, 'Bone'))}")
+        check("...and its point on the body is HitPoint (PelletFlew's Point)",
+              len(reads(HIT_POINT_VAR, "Point")) == 1,
+              f"{len(reads(HIT_POINT_VAR, 'Point'))}")
         got = (num_pin(zt, "MaxRewindSeconds"), num_pin(zt, "ExtraRewindSeconds"))
         check(f"the rewind is capped at {MAX_REWIND_S:g} s, and allows {EXTRA_REWIND_S:g} s "
               "over the round trip (combat/lag_tuning.py)",
               got == (MAX_REWIND_S, EXTRA_REWIND_S), str(got))
-    contains = [n for n in wt if {"TargetArray", "ItemToFind"} <= in_pins(n)]
-    tables = {str(BEL.get_node_title(PIN.get_owning_node(q)))
-              for n in contains
-              for q in PIN.list_connected_pins(BEL.find_input_pin(n, "TargetArray"))}
-    check("the struck bone is looked up in both of the TARGET's tables",
-          {f"Get {HEAD_BONES_VAR}", f"Get {LIMB_BONES_VAR}"} <= tables, str(tables))
-    # What the pellet's TakeHit is told must be Damage x multiplier, not raw Damage.
-    scaled = False
-    for n in take_hits(wt):
-        for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Amount")):
-            mul = PIN.get_owning_node(q)
-            if "*" not in str(BEL.get_node_title(mul)):
-                continue
-            srcs = {str(BEL.get_node_title(PIN.get_owning_node(r)))
-                    for pin in ("A", "B")
-                    for r in PIN.list_connected_pins(BEL.find_input_pin(mul, pin))}
-            scaled |= "Get Damage" in srcs and any("Select" in s for s in srcs)
-    check("health loses Damage x the zone's multiplier, not raw Damage", scaled)
+    # The zone is read in C++, off the target's health component, by name:
+    # the names are the base's class defaults, and must be the builders'.
+    names = {p: str(wc_cdo.get_editor_property(p))
+             for p in ("head_bones_var", "limb_bones_var", "head_multiplier_var",
+                       "limb_multiplier_var")}
+    check("the struck bone is looked up in both of the TARGET's tables, by the names "
+          "the native base holds",
+          names == {"head_bones_var": str(HEAD_BONES_VAR), "limb_bones_var": str(LIMB_BONES_VAR),
+                    "head_multiplier_var": str(HEAD_MULT_VAR),
+                    "limb_multiplier_var": str(LIMB_MULT_VAR)}, str(names))
+    # What the pellet's TakeHit is told is Damage x multiplier, in C++
+    # (probes/probe_net_pvp.py and probe_headshot.py measure it); the graph
+    # hands over the raw Damage once and deals none of its own.
+    check("health loses Damage x the zone's multiplier, not raw Damage: no TakeHit of "
+          "the graph's is fed Held's Damage",
+          not any("Get Damage" in {str(BEL.get_node_title(PIN.get_owning_node(q)))
+                                    for q in PIN.list_connected_pins(
+                                        BEL.find_input_pin(n, "Amount"))}
+                  for n in take_hits(wt)))
 
 
     def upstream(node, depth=8):
@@ -203,16 +213,20 @@ def check_player_body():
                   and any(DEBUG_MODE_VAR in str(BEL.get_node_title(PIN.get_owning_node(q)))
                           for q in PIN.list_connected_pins(BEL.find_input_pin(g, "Condition")))
                   for g in gates))
-        check("...at the impact point",
-              any("BreakHitResult" in str(BEL.get_node_title(PIN.get_owning_node(q)))
-                  for q in PIN.list_connected_pins(BEL.find_input_pin(ro, "TextLocation"))))
+        check("...at the impact point (PelletFlew's Stop)",
+              [(PIN.get_owning_node(q), str(PIN.get_pin_name(q)))
+               for q in PIN.list_connected_pins(BEL.find_input_pin(ro, "TextLocation"))]
+              == [(graph_event(PELLET_FLEW), "Stop")])
         check("...for as long as the tracer",
               abs((num_pin(ro, "Duration") or 0.0) - TRACE_DEBUG_SECONDS) < 1e-6,
               pin_value(ro, "Duration"))
         fed = upstream(ro)
-        check("...showing the damage dealt (Damage x zone), not the weapon's raw Damage",
-              "Get Damage" in fed and any("*" in t for t in fed)
-              and f"Get {HEAD_MULT_VAR}" in fed, str(sorted(fed)))
+        shown = {str(PIN.get_pin_name(q)) for n in wt if "InDouble" in in_pins(n)
+                 for q in PIN.list_connected_pins(BEL.find_input_pin(n, "InDouble"))
+                 if PIN.get_owning_node(q) == graph_event(PELLET_FLEW)}
+        check("...showing the damage dealt (PelletFlew's Damage, the zone already in "
+              "it, and its Worth), not the weapon's raw Damage",
+              "Get Damage" not in fed and {"Damage", "Worth"} <= shown, str(sorted(fed)))
 
     # And the geometry: put a wanderer in the editor world and fire the same
     # component trace through each part of it. This is what proves the physics

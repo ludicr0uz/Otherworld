@@ -1,27 +1,20 @@
-"""Pulling the trigger: the round and the cooldown, the shot's one draw
-inside the accuracy cloud, and one trace per pellet around it. What a pellet
-that connects does is impact.py.
+"""A shot the server let through: the shot's one draw inside the accuracy
+cloud, and the call that flies its pellets around it (FirePellets, C++:
+Source/Otherworld, OtherworldWeaponComponentBase). The round and the cooldown
+are that class's Server_Fire's; what each pellet shows is impact.py.
 """
 
 from combat.game_state import DEBUG_MODE_VAR
 from uebp.g import _G
-from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
-from combat.paths import ITEM_CLASS_PATH
+from uebp.graph import _connect, _node, _pin, _set, out, then
 from net.state_consts import GAME_STATE_CLASS_PATH
 from net.state_graph import game_state
 from combat.weapon_component.accuracy import AIM_SPREAD_VAR
 from combat.lag_tuning import EXTRA_REWIND_S, MAX_REWIND_S
 from combat.weapon_component.common import _prop
 from combat.weapon_component import shot_hits
-from combat.weapon_component.impact import _author_impact
-from combat.weapon_component.tracer import _author_tracer
-from uebp.nodes.math import (
-    FN_ADD_FF, FN_ADD_VV, FN_DEG2RAD, FN_MAX_FF, FN_MUL_VF, FN_NORMAL, FN_RAND_CONE, FN_SUB_II,
-    FN_SUB_VV)
-from uebp.nodes.actor import FN_GET_OWNER
-from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_BREAK_HIT
-from uebp.nodes.shot import FN_SHOT_TRACE
-from uebp.nodes.system import FN_TIME_SECONDS
+from uebp.nodes.math import FN_DEG2RAD, FN_NORMAL, FN_RAND_CONE, FN_SUB_VV
+from uebp.nodes.weapon import FN_FIRE_PELLETS
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
@@ -30,23 +23,22 @@ SHOT_DIRECTION_VAR = WV.ShotDirection
 
 
 def _author_fire(ed, held, muzzle, aim, exec_in):
-    """One shot, on the machine that owns it (the body of Server_Fire,
-    shot.py): the round and the cooldown, then one trace per pellet from the
-    muzzle. ``aim`` is where the shooter's reticle rested, the event's
-    parameter; the sound is the shooter's own machine's (shot.py).
+    """One shot the server let through (the body of ShotFired, shot.py): the
+    draw inside the accuracy cloud, then the pellets. ``aim`` is where the
+    shooter's reticle rested, the event's parameter; the sound is the
+    shooter's own machine's (shot.py).
 
-    All the aiming was done in _author_resolve_aim; what is left here is the
+    The round and the cooldown are not here: the native Server_Fire spent
+    and stamped them before it raised the event, so nothing downstream can
+    leave the weapon having fired for free.
+
+    All the aiming was done in _author_resolve_aim; what is left is the
     spread, in two layers. The shot draws ONE direction inside the accuracy
     cloud (AimSpread, around the muzzle-to-AimPoint line) into ShotDirection;
-    then each pellet jitters that inside the weapon's own PelletSpreadDegrees
-    and traces the weapon's own range. A single-round gun has no pattern, so
-    its round flies down the draw -- the same code path as the eight-pellet
-    shotgun, which is why the pistol needed no second implementation.
-
-    Ammunition is spent here rather than in the gate that allowed the shot: the
-    gate decides, this does. Both the round and the cooldown are written before
-    a single pellet is traced, so nothing downstream can leave the weapon
-    having fired for free.
+    then FirePellets (C++) jitters each pellet inside the weapon's own
+    PelletSpreadDegrees, traces the weapon's own range and hands a body it
+    strikes its damage. A single-round gun has no pattern, so its round flies
+    down the draw: the same code path as the eight-pellet shotgun.
     """
     made = []
 
@@ -54,44 +46,12 @@ def _author_fire(ed, held, muzzle, aim, exec_in):
         made.append(n)
         return n
 
-    # --- what the shot costs -------------------------------------------------
-    # Unconditional, on every weapon. Loaded is only ever *read* behind
-    # UsesAmmo, so letting a weapon without ammunition count into the negatives costs
-    # nothing and saves a branch on the one path that runs eight traces.
-    was = keep(ed.add_get_member_variable_node(IV.Loaded, ITEM_CLASS_PATH))
-    _connect(held, _pin(was, "self"))
-    spent = keep(_node(ed, FN_SUB_II))
-    _connect(out(was, IV.Loaded), _pin(spent, "A"))
-    _set(spent, "B", 1)
-    burn = keep(ed.add_set_member_variable_node(IV.Loaded, ITEM_CLASS_PATH))
-    _connect(held, _pin(burn, "self"))
-    _connect(out(spent), _pin(burn, IV.Loaded))
-    _connect(exec_in, _pin(burn, "execute"))
-
-    now = keep(_node(ed, FN_TIME_SECONDS))
-    every, every_n = _prop(ed, IV.FireInterval, held)
-    keep(every_n)
-    # From the later of now and the old deadline: the server lets a shot in a
-    # little early (shot_vars.FIRE_GRACE_S), and that must not raise the rate.
-    due, due_n = _prop(ed, IV.NextFireTime, held)
-    keep(due_n)
-    start = keep(_node(ed, FN_MAX_FF))
-    _connect(out(now), _pin(start, "A"))
-    _connect(due, _pin(start, "B"))
-    again = keep(_node(ed, FN_ADD_FF))
-    _connect(out(start), _pin(again, "A"))
-    _connect(every, _pin(again, "B"))
-    cool = keep(ed.add_set_member_variable_node(IV.NextFireTime, ITEM_CLASS_PATH))
-    _connect(held, _pin(cool, "self"))
-    _connect(out(again), _pin(cool, IV.NextFireTime))
-    _connect(then(burn), _pin(cool, "execute"))
-
     # --- is anyone watching the tracers? -------------------------------------
     # Read once per shot and cached on this component, rather than read per
-    # pellet: the pellet loop needs a plain bool it can branch on, and a
+    # pellet: PelletFlew needs a plain bool it can branch on, and a
     # GetGameState plus a cast eight times over for one flag is eight times the
     # work for the same answer. Off the GameState, which every machine has.
-    state = game_state(ed, [then(cool)])
+    state = game_state(ed, [exec_in])
     for n in state.nodes:
         keep(n)
     flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH))
@@ -101,7 +61,7 @@ def _author_fire(ed, held, muzzle, aim, exec_in):
     _connect(state.then, _pin(note, "execute"))
     # A GameState of the wrong class cannot say; not drawing is the safe answer,
     # and the component's own default is already false.
-    after_cost = [then(note), *state.fails]
+    ready = [then(note), *state.fails]
 
     delta = keep(_node(ed, FN_SUB_VV))
     _connect(aim, _pin(delta, "A"))
@@ -109,86 +69,38 @@ def _author_fire(ed, held, muzzle, aim, exec_in):
     direction_n = keep(_node(ed, FN_NORMAL))
     _connect(out(delta), _pin(direction_n, "A"))
     direction = out(direction_n)
+    drawn = _author_shot_direction(ed, direction, ready, keep)
 
-    pel_pin, pel_n = _prop(ed, IV.PelletCount, held)
-    keep(pel_n)
-    last = keep(_node(ed, FN_SUB_II))
-    _connect(pel_pin, _pin(last, "A"))
-    _set(last, "B", 1)
-
-    loop = ed.add_macro_node(MACRO_FOR_LOOP)
-    if not loop:
-        raise RuntimeError("could not create the ForLoop macro node")
-    keep(loop)
-    _loose_pin(loop, "FirstIndex").set_pin_value("0")
-    _connect(out(last), _loose_pin(loop, "LastIndex"))
-    _connect(_author_shot_direction(ed, direction, after_cost, keep), _loose_pin(loop, "execute"))
-
-    # Each pellet: the weapon's own pattern around the shot's direction. Zero
-    # on a single-round gun, so its one pellet flies exactly down the draw.
-    pattern, pattern_n = _prop(ed, IV.PelletSpreadDegrees, held)
-    keep(pattern_n)
-    rad = keep(_node(ed, FN_DEG2RAD))
-    _connect(pattern, _pin(rad, "A"))
+    # The pellets (C++, uebp/nodes/weapon.py): each inside the weapon's own
+    # pattern around the stored draw, one ShotTrace each from the muzzle.
+    # On a server a remote shooter's are judged against where every character
+    # stood when it fired, by its round trip, within the cap
+    # (combat/lag_tuning.py); a local shooter's against the present.
+    pellets = keep(_node(ed, FN_FIRE_PELLETS))
+    _connect(held, _pin(pellets, "Gun"))
+    _connect(muzzle, _pin(pellets, "Muzzle"))
     shot_get = keep(ed.add_get_member_variable_node(SHOT_DIRECTION_VAR))
-    cone = keep(_node(ed, FN_RAND_CONE))
-    _connect(out(shot_get, SHOT_DIRECTION_VAR), _pin(cone, "ConeDir"))
-    _connect(out(rad), _pin(cone, "ConeHalfAngleInRadians"))
-    rng_pin, rng_n = _prop(ed, IV.WeaponRange, held)
-    keep(rng_n)
-    reach = keep(_node(ed, FN_MUL_VF))
-    _connect(out(cone), _pin(reach, "A"))
-    _connect(rng_pin, _pin(reach, "B"))
-    end = keep(_node(ed, FN_ADD_VV))
-    _connect(muzzle, _pin(end, "A"))
-    _connect(out(reach), _pin(end, "B"))
-
-    # The pellet's one trace (C++, uebp/nodes/shot.py): Visibility, simple
-    # collision, the shooter ignored; and if it stops on a character, that
-    # character's physics bodies along the same line (bBodyHit, BodyBone,
-    # BodyPoint). On a server a remote shooter's shot is judged against
-    # where every character stood when it fired, by its round trip, within
-    # the cap (combat/lag_tuning.py); a local shooter's against the present.
-    trace = keep(_node(ed, FN_SHOT_TRACE))
-    shooter = keep(_node(ed, FN_GET_OWNER))
-    _connect(out(shooter), _pin(trace, "Shooter"))
-    _connect(muzzle, _pin(trace, "Start"))
-    _connect(out(end), _pin(trace, "End"))
-    _set(trace, "MaxRewindSeconds", MAX_REWIND_S)
-    _set(trace, "ExtraRewindSeconds", EXTRA_REWIND_S)
-    _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(trace, "execute"))
-    body = (out(trace, "bBodyHit"), out(trace, "BodyBone"), out(trace, "BodyPoint"))
-
-    brk = keep(_palette(ed, NODE_BREAK_HIT))
-    _connect(out(trace, "OutHit"), _loose_pin(brk, "Hit"))
-
-    # The tracer, in debug mode only (tracer.py). It starts at the barrel, so
-    # what you see is the line the pellet took and not a line from the camera
-    # -- which is what makes it worth having while tuning the aim solve, and
-    # what makes it wrong to leave switched on in the game.
-    drawn, after_tracer = _author_tracer(ed, trace, brk)
-    made.extend(drawn)
-
-    hit = keep(ed.add_branch_node())
-    _connect(out(trace), _pin(hit, "Condition"))
-    # Both arms of the tracer branch carry on: whether a line was drawn has
-    # nothing to do with whether the pellet connected.
-    for tail in after_tracer:
-        _connect(tail, _pin(hit, "execute"))
+    _connect(out(shot_get, SHOT_DIRECTION_VAR), _pin(pellets, "Direction"))
+    for pin, var in (("Pellets", IV.PelletCount), ("SpreadDegrees", IV.PelletSpreadDegrees),
+                     ("Range", IV.WeaponRange), ("Damage", IV.Damage)):
+        value, value_n = _prop(ed, var, held)
+        keep(value_n)
+        _connect(value, _pin(pellets, pin))
+    _set(pellets, "MaxRewindSeconds", MAX_REWIND_S)
+    _set(pellets, "ExtraRewindSeconds", EXTRA_REWIND_S)
+    _connect(drawn, _pin(pellets, "execute"))
 
     ed.add_comment_to_nodes(
-        "Fire, on the machine that owns the shot: one round and one cooldown stamp "
-        "first, then origin at the muzzle, direction muzzle -> the shooter's "
-        "AimPoint drawn once inside AimSpread, "
-        "then each pellet inside the weapon's own pattern, each judged where "
-        "the shooter saw the others (ShotTrace: C++, lag compensation). "
-        "The tracer leaves the barrel and ends where the pellet stopped "
-        "-- when DebugMode is on, which is the only time it is drawn at all.",
+        "A shot the server let through (its round and cooldown are the native "
+        "Server_Fire's): origin at the muzzle, direction muzzle -> the shooter's "
+        "AimPoint drawn once inside AimSpread, then FirePellets (C++): each pellet "
+        "inside the weapon's own pattern, judged where the shooter saw the others "
+        "(ShotTrace, lag compensation), a body struck handed the round's damage "
+        "times its zone. Each pellet comes back as PelletFlew (impact.py).",
         made)
 
-    _author_impact(ed, brk, held, then(hit), body)
     # What the pellets struck, told to every screen at once (shot_hits.py).
-    told = shot_hits.flush(_G(ed), [_loose_pin(loop, "Completed", is_input=False)])
+    told = shot_hits.flush(_G(ed), [then(pellets)])
     # The direction goes back too, so the shot's noise cone is the pellets' line.
     return told, direction
 

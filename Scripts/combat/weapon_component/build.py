@@ -31,6 +31,7 @@ from combat.weapon_component.view_worn import author_view_worn_event
 from combat.weapon_component.consume import author_consume_event
 from combat.weapon_component.wear import author_wear_event
 from combat.weapon_component.shot import author_shot_events, replicate_shot
+from combat.weapon_component import native
 from combat.weapon_component.headshot import replicate_headshot
 from combat.weapon_component.chop import author_chop_fx
 from combat.weapon_component.fire import author_fire_events
@@ -76,10 +77,14 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         if not _assets().load_asset(path):
             raise RuntimeError(f"could not load {path} for its cast node")
 
-    bp = _create_blueprint(WEAPON_COMP_BP_PATH, unreal.ActorComponent)
+    # A child of the native base (native.py): the shot's server half is C++.
+    bp = _create_blueprint(WEAPON_COMP_BP_PATH, native.base_class())
     # Re-declaring a variable empties it, and this one is build_survival.py's
     # to fill: what an earlier build was given is put back below.
     campfire_class = _kept_class(bp, WV.CampfireClass)
+    ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
+    native.reparent(bp, ed)
+    # The reparent compiled the Blueprint: the graph is asked for again.
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
 
@@ -156,6 +161,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponComponent failed to compile")
+    # The names the native base reads the Blueprints by, baked in with the rest.
+    native.write_names(bp)
     _apply_defaults(bp, {**defaults(WV.TABLE), **defaults(LOOK_TABLE), **defaults(RECORD_TABLE), **defaults(SHOT_TABLE), **defaults(FX.TABLE), **defaults_for(WEAPON_COMP_BP_PATH, WEAPON_SOUNDS + ITEM_SOUNDS + WORLD_SOUNDS),
         # What the table cannot name: a constant of a graph module, a class
         # this build was handed, a clip it loads.
@@ -186,6 +193,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     net.replicate_component(bp)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponComponent failed to compile")
+    if native.wrong_names(bp):
+        raise RuntimeError(f"the native base's names did not hold: {native.wrong_names(bp)}")
     _assets().save_loaded_asset(bp)
     _log(f"built {WEAPON_COMP_BP_PATH}")
     return bp

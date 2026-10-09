@@ -162,6 +162,14 @@ Shooting has to feel immediate to the shooter while the server stays the judge o
 timing and hits. `combat/shot_vars.py` has the picture; the graphs are
 `combat/weapon_component/shot.py`.
 
+- **`Server_Fire` is a C++ RPC since W1** (`UOtherworldWeaponComponentBase`, the weapon
+  component's native parent; `Source/CLAUDE.md`). Reliable, with a `_Validate` that
+  closes the connection only for an `AimPoint` that is not a number. Its
+  implementation asks the guard, counts the ask served, refuses quietly (no gun, a dead
+  owner, no round, the cooldown), spends the round, stamps the deadline, marks the
+  record, and raises `ShotFired` for the graph; the pellets' traces and `TakeHit` are its
+  `FirePellets`. `Server_Reload` and everything else are still Blueprint Server events.
+
 - **The client sends one thing: where its reticle rests.** The server traces from its own
   copy's muzzle (`carry._author_shot_origin`) and draws the shot inside its own copy's
   `AimSpread`, so a client cannot shoot from where it is not, nor choose its place in
@@ -500,6 +508,35 @@ its outermost; natives it calls included):
   again). The trace: `Saved/traces/net_load_32bots_w0_2026-10-09.utrace`.
 
 
+**The shot's server half in C++ (W1, 2026-10-09): before and after.** The same run
+(`--bots 32 --trace`), and one export for both traces: `TimingInsights.ExportTimerStatistics
+stats.csv -threads=GameThread` in place of W0's events export (one row a timer, a 1 MB
+csv, a minute), over the whole trace, so W0's own trace reads 0.127 s for 1 205 shots
+where its 80 s window read 0.09 s for 861.
+
+| | before (W0's trace) | after |
+|---|---|---|
+| `Server_Fire`, inclusive | 0.127 s, 1 205 calls, **105 µs** each | 0.135 s, 1 178 calls, **114 µs** each |
+| of it | all Blueprint VM; `ShotTrace` 0.059 s (9 624 pellets, 6 µs) | its own C++ 10 µs; the graph under `ShotFired` 25 µs (the sound told, the muzzle, the draw, the batch, the noise); `FirePellets` 79 µs (the traces about 49, eight `PelletFlew` events 16) |
+| the weapon component's Tick, a call | 37 µs (`ExecuteUbergraph_BP_WeaponComponent`) | 38 µs |
+| the mesh's tick, a call | 176 µs | 188 µs |
+| world tick, mean | 29.3 ms, 26.9 Hz, 64 characters | 38.2 ms, 24.3 Hz, 76 characters (two more runs: 36.4 ms at 75, 35.6 ms at 67) |
+
+- **The port does not move the tick, as W0 said it would not.** A shot costs what it
+  did: the validation and the spend went from the VM to 10 µs of C++, and the pellets'
+  loop from the VM to a call, but each pellet comes back to the graph as an event for
+  its tracer and its blood or chips, which costs what the loop's own nodes did.
+- **The world tick is not comparable between the two days.** What nobody touched costs
+  the same a call (the rows above), and the later runs carry more bodies a frame (99
+  mesh ticks against 89; 59 weapon component ticks against 49): more wanderers and bots
+  alive, and the pose is 59% of the frame. The three processes peaked at 15.3-15.6 GB
+  of this machine's 16.
+- **Marking the record by the item cost 55 µs a shot** (`MarkCarriedItemDirty` searches
+  every carrier's inventory: 154 µs a shot in the run before it was changed). C++ that
+  knows its carrier marks by the carrier (`MarkInventoryDirty`).
+- The trace: `Saved/traces/net_load_32bots_w1_after_2026-10-09.utrace`.
+
+
 - A1 measured at scale: docs/history/multiplayer.md#a1
 
 ## Every Server event asks the guard first (A5, done)
@@ -512,9 +549,12 @@ asks) asks first, one way:
 
 - **The fragment is `net/guard.py`:** `allowed, refused = author_guard(g, NAME,
   [then(event)])` is the first thing after `net.server_event(...)`, and the event's body
-  hangs off `allowed`. `Server_Fire` and `Server_Reload` use `author_allow` (the answer
+  hangs off `allowed`. `Server_Reload` uses `author_allow` (the answer
   and the exec apart) so that `AsksServed` is counted between the ask and its Branch: a
-  refused shot hands its round back like any other the server did not fire.
+  refused reload is answered like any other the server did not do.
+- **`Server_Fire` asks in C++** (W1): `Allow` by its own name (the base's
+  `FireEventName`, the row's key), the count, then `AimAllowed`. It is a row of `RATES`
+  like the rest, and `verify/guard.py` counts it among the component's Server events.
 - **A new Server event** gets a row in `RATES` and the fragment; `combat/verify/guard.py`
   fails on an event with no row, a row with no event, a builder that makes a Server
   event and does not name the fragment, and an event whose first node is not its own

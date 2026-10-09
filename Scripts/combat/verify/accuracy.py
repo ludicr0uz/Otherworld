@@ -5,7 +5,7 @@ ReticleSpread, and the shot's one draw inside the cloud (firing.py).
 """
 
 from combat.verify.common import (
-    BEL, PIN, cdo, check, in_pins, load, num_pin,
+    BEL, PIN, cdo, check, in_pins, load, num_pin, pellet_calls,
 )
 from combat.verify.fixtures import w, wg
 from combat.weapon_component.accuracy import (
@@ -122,9 +122,13 @@ def check_shot_draw():
     check("the shot's direction is drawn once per trigger pull, into "
           "ShotDirection", len(holds) == 1, str(len(holds)))
     cones = [n for n in wg if {"ConeDir", "ConeHalfAngleInRadians"} <= in_pins(n)]
-    check("two cones: the shot inside the cloud, each pellet inside the pattern",
-          len(cones) == 2, str(len(cones)))
-    if len(holds) != 1 or len(cones) != 2:
+    # The pellets' own cone is the native base's (FirePellets, C++), handed
+    # the stored draw and the gun's pattern.
+    pellets = pellet_calls(wg)
+    check("one cone in the graph, the shot's inside the cloud; each pellet's inside "
+          "the pattern is the native FirePellets'",
+          len(cones) == 1 and len(pellets) == 1, f"{len(cones)} cone(s), {len(pellets)} call(s)")
+    if len(holds) != 1 or len(cones) != 1 or len(pellets) != 1:
         return
     readers = [PIN.get_owning_node(q) for c in cones
                for q in PIN.list_connected_pins(BEL.find_output_pin(c, "ReturnValue"))]
@@ -136,7 +140,7 @@ def check_shot_draw():
           len(drawn) == 1 and len([r for r in readers if r == holds[0]]) == 1)
     if len(drawn) != 1:
         return
-    pellet = next(c for c in cones if c != drawn[0])
+    pellet = pellets[0]
 
     def angle_from(cone):
         rad = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
@@ -147,13 +151,13 @@ def check_shot_draw():
           angle_from(drawn[0]) == {f"Get {AIM_SPREAD_VAR}"},
           str(angle_from(drawn[0])))
     check("each pellet flies around ShotDirection inside the gun's own pattern",
-          _sources(pellet, "ConeDir") == {f"Get {SHOT_DIRECTION_VAR}"}
-          and angle_from(pellet) == {"Get PelletSpreadDegrees"},
-          f"{_sources(pellet, 'ConeDir')} / {angle_from(pellet)}")
+          _sources(pellet, "Direction") == {f"Get {SHOT_DIRECTION_VAR}"}
+          and _sources(pellet, "SpreadDegrees") == {"Get PelletSpreadDegrees"},
+          f"{_sources(pellet, 'Direction')} / {_sources(pellet, 'SpreadDegrees')}")
     then = BEL.find_then_pin(holds[0])
-    nxt = {_title(PIN.get_owning_node(q)) for q in PIN.list_connected_pins(then)}
-    check("...drawn before the pellet loop starts", any("For" in t for t in nxt),
-          str(nxt))
+    nxt = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(then)]
+    check("...drawn before the pellets fly", nxt == pellets,
+          str([_title(n) for n in nxt]))
 
 
 def run():

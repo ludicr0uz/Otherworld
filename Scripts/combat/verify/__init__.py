@@ -115,8 +115,9 @@ and it never relies on a variable another section left behind.
               holds it, no graph writing it, every change site marked (the
               weapon component's and every other Blueprint's), a client's
               picture of it (ViewRow, ViewTrim)
-  shot        the shot and the reload as server requests (M19): the Server
-              events, the pellets traced only in Server_Fire, the owning
+  shot        the shot and the reload as server requests (M19): the native
+              base and the names it reads by (W1), the Server events, the
+              pellets flown only under ShotFired, the owning
               client's prediction off authority, the counters and the view
   strike      melee, the guard, the fire held out, the throw and the take as
               server requests (M20): the five Server events, what each asks

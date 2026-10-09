@@ -93,6 +93,14 @@ def shot_traces(nodes):
     return [n for n in nodes if {"Shooter", "Start", "End", "MaxRewindSeconds"} <= in_pins(n)]
 
 
+def pellet_calls(nodes):
+    """The fire graph's FirePellets calls (C++, uebp/nodes/weapon.py): the
+    pellets' traces and the damage they hand over since W1, which ShotTrace
+    and a TakeHit in the graph were."""
+    return [n for n in nodes
+            if {"Gun", "Muzzle", "Direction", "Pellets", "MaxRewindSeconds"} <= in_pins(n)]
+
+
 def take_hits(nodes):
     """The calls of BP_HealthComponent's TakeHit (combat/damage.py): the one
     way a blow takes health. The event itself has these as outputs."""

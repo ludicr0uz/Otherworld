@@ -1,7 +1,8 @@
 """verify.shot -- the shot and the reload as server requests
 (combat/shot_vars.py, weapon_component/shot.py): the events and how they
-travel, that a pellet is traced and a body hurt only inside Server_Fire, what
-the server asks before it fires, the owning client's prediction, and the
+travel, that the shot's server half is the native base's (task W1: the
+class, its Server_Fire and FirePellets, the names it reads the Blueprints
+by), what the graph hangs on it, the owning client's prediction, and the
 counters that keep a client's rounds its own until the server has answered.
 
 Checked on the compiled class and the wiring; probes/probe_net_fire.py has a
@@ -10,13 +11,18 @@ client of a server kill a wanderer and compares the two machines' rounds.
 
 from uebp import net
 from combat.record_vars import VIEW_ROW, ViewDirty
+from combat.paths import HEALTH_BP_PATH, ITEM_BP_PATH
 from combat.shot_vars import (
-    AIM_PARAM, FIRE_GRACE_S, RELOAD_NOW, SERVER_EVENTS, SERVER_FIRE, SERVER_RELOAD,
-    AsksSent, AsksServed, ReloadForced)
-from combat.verify.common import BEL, PIN, by_pins, check, graph, in_pins, num_pin
+    AIM_PARAM, FIRE_GRACE_S, GRAPH_SERVER_EVENTS, PELLET_FLEW, RELOAD_NOW, SERVER_EVENTS,
+    SERVER_FIRE, SERVER_RELOAD, SHOT_FIRED, AsksSent, AsksServed, ReloadForced)
+from combat.verify.common import BEL, PIN, cdo, check, graph, in_pins, num_pin, pellet_calls
 from combat.verify.fixtures import wc, wc_cdo, wg
 from combat.verify.record import _authority_branches, _feeders, _title, _upstream
+from combat.weapon_component import native
 from combat.weapon_component.firing import SHOT_DIRECTION_VAR
+from uebp.nodes.weapon import WEAPON_BASE_CLASS
+
+import unreal
 
 
 def _event(name):
@@ -49,8 +55,48 @@ def _gate_arm(node, gates):
     return ""
 
 
+def check_native():
+    """The shot's server half is C++ (task W1): the class, the function and
+    the names it reads the Blueprints by."""
+    base = unreal.load_class(None, WEAPON_BASE_CLASS)
+    check(f"BP_WeaponComponent is a child of the native base ({WEAPON_BASE_CLASS})",
+          base is not None and BEL.get_blueprint_parent_class(wc) == base,
+          str(BEL.get_blueprint_parent_class(wc)))
+    # Python has no method for either (dir() of the base lists none): the
+    # compiled class is asked, and the graph for an event of the same name.
+    check(f"...which has {SERVER_FIRE}, a reliable Server function, and FirePellets, a "
+          "plain one, and the graph has no event named as either",
+          base is not None
+          and net.compiled_rpc(wc, SERVER_FIRE) == (net.SERVER, True)
+          and net.compiled_rpc(wc, "FirePellets") == (net.LOCAL, False)
+          and _event(SERVER_FIRE) is None and _event("FirePellets") is None,
+          str(net.compiled_rpc(wc, SERVER_FIRE) if base else None))
+    wrong = native.wrong_names(wc)
+    check(f"...told the names it reads the Blueprints by ({len(native.NAMES)}: Held, "
+          "AsksServed, the item's and the health component's, TakeHit), the health "
+          "component's class, and the cooldown's "
+          f"grace ({FIRE_GRACE_S:g} s for uneven packets)", not wrong, str(wrong))
+    # A name that names nothing reads as false or 0 in C++, silently: each
+    # must be a variable of the Blueprint it is read off.
+    item = cdo(unreal.load_asset(ITEM_BP_PATH))
+    health = cdo(unreal.load_asset(HEALTH_BP_PATH))
+    owners = {"held_var": wc_cdo, "asks_served_var": wc_cdo}
+    owners.update({p: item for p in native.NAMES if p.startswith("item_")})
+    owners.update({p: health for p in native.NAMES
+                   if p.startswith(("health_", "head_", "limb_"))})
+    missing = []
+    for prop, owner in owners.items():
+        try:
+            owner.get_editor_property(native.NAMES[prop])
+        except Exception:                                         # noqa: BLE001
+            missing.append(native.NAMES[prop])
+    takes = net.compiled_rpc(unreal.load_asset(HEALTH_BP_PATH), native.NAMES["take_hit_event"])
+    check("...each a variable of the Blueprint it is read off, and TakeHit an event of "
+          "the health component's", not missing and takes == (net.LOCAL, False), str(missing))
+
+
 def check_events():
-    for name in SERVER_EVENTS:
+    for name in GRAPH_SERVER_EVENTS:
         check(f"{name} is a reliable Server event: the owning client asks, the server "
               "does", _event(name) is not None
               and net.compiled_rpc(wc, name) == (net.SERVER, True),
@@ -77,57 +123,43 @@ def check_events():
 
 
 def check_server_fires():
-    fire = _event(SERVER_FIRE)
-    if fire is None:
+    fired = _event(SHOT_FIRED)
+    flew = _event(PELLET_FLEW)
+    check(f"the graph hangs a shot on the native base's two events: {SHOT_FIRED} (a shot "
+          f"{SERVER_FIRE} let through) and {PELLET_FLEW} (each pellet it flew)",
+          fired is not None and flew is not None)
+    if fired is None:
         return
     draws = [n for n in wg if _title(n) == f"Set {SHOT_DIRECTION_VAR}"]
-    check(f"the shot's draw in the cloud is made in {SERVER_FIRE} alone: one draw, by "
+    check(f"the shot's draw in the cloud is made under {SHOT_FIRED} alone: one draw, by "
           "the machine that owns the shot", len(draws) == 1
-          and fire in _upstream(draws[0])
+          and fired in _upstream(draws[0])
           and not any("Tick" in _title(n) for n in _upstream(draws[0])),
           f"{len(draws)} draw(s)")
-    hits = [n for n in wg if _title(n).replace(" ", "") == "TakeHit" and fire in _upstream(n)]
-    check("...and the pellets' damage is dealt there", len(hits) >= 1, str(len(hits)))
+    flown = pellet_calls(wg)
+    check("...and the pellets are flown there, by the native FirePellets, which deals "
+          "their damage: one call, behind the draw", len(flown) == 1 and bool(draws)
+          and draws[0] in _upstream(flown[0]), str(len(flown)))
     served = [n for n in wg if _title(n).startswith("Set")
               and _title(n).endswith(f" {AsksServed}")]
     # Behind the guard's Allow and before its Branch (verify/guard.py): a
-    # shot the guard refuses is counted served too.
+    # reload the guard refuses is counted served too. The shot's count is the
+    # native Server_Fire's, by the name check_native holds it to.
     first = [e for n in served for f in _feeders(n, "execute") if _title(f) == "Allow"
              for e in _feeders(f, "execute")]
-    check(f"both Server events count themselves served first, fired or refused, by "
-          f"the guard too ({AsksServed})", len(served) == 2 and len(first) == 2
-          and all(_event(e) in first for e in SERVER_EVENTS), f"{len(served)} write(s)")
-    if not draws:
-        return
-    above = _upstream(draws[0])
-    asked = {v for n in above if _title(n) == "Branch"
-             for c in _feeders(n, "Condition")
-             for v in _reads_behind(c)}
-    want = {"Held", "Dead", "Health", "Melee", "Consumable", "Lights", "UsesAmmo", "Loaded",
-            "NextFireTime"}
-    check("the server asks before it fires: a valid Held, a living owner, a gun (not "
-          "Melee, Consumable or Lights), a round and the cooldown", want <= asked,
-          f"missing {sorted(want - asked)}")
-    graces = [n for n in by_pins(wg, "A", "B") if abs((num_pin(n, "B") or 0.0) - FIRE_GRACE_S)
-              < 1e-9 and any("GetTimeSeconds" in _title(f).replace(" ", "")
-                             for f in _feeders(n, "A"))
-              # ...the shot's: a swing's Server event has a grace too (verify/strike.py).
-              and any(_title(f) == "Get NextFireTime"
-                      for q in PIN.list_connected_pins(BEL.find_output_pin(n, "ReturnValue"))
-                      for f in _feeders(PIN.get_owning_node(q), "B"))]
-    check(f"...the cooldown with {FIRE_GRACE_S:g} s of grace for uneven packets",
-          len(graces) == 1, str(len(graces)))
-    stamps = [n for n in wg if _title(n) == "Set NextFireTime" and fire in _upstream(n)]
-    late = [f for n in stamps for a in _feeders(n, "NextFireTime") for f in _feeders(a, "A")
-            if _title(f).lower().startswith("max")]
-    check("...and stamped from the later of now and the old deadline, so the grace "
-          "never raises the gun's rate", len(stamps) == 1 and len(late) == 1,
-          f"{len(stamps)} stamp(s), {len(late)} Max")
-    aims = [q for q in PIN.list_connected_pins(BEL.find_output_pin(fire, AIM_PARAM))]
-    asked = [q for q in aims
-             if _title(PIN.get_owning_node(q)).replace(" ", "") == "AimAllowed"]
-    check(f"the shooter's {AIM_PARAM} is read twice: the guard's AimAllowed, and the "
-          "pellets' direction", len(aims) == 2 and len(asked) == 1, str(len(aims)))
+    check(f"{SERVER_RELOAD} counts itself served first, done or refused, by the guard "
+          f"too ({AsksServed}); the shot's count is the native {SERVER_FIRE}'s",
+          len(served) == 1 and first == [_event(SERVER_RELOAD)], f"{len(served)} write(s)")
+    # What the server asks before it fires (a valid Held, a living owner, a
+    # gun, a round, the cooldown with its grace), the round and the stamp
+    # are C++ now: the graph under ShotFired must not spend a second round.
+    again = [_title(n) for n in wg if _title(n) in ("Set Loaded", "Set NextFireTime")
+             and fired in _upstream(n)]
+    check(f"the round and the cooldown are the native {SERVER_FIRE}'s: nothing under "
+          f"{SHOT_FIRED} writes Loaded or NextFireTime", not again, str(again))
+    aims = [q for q in PIN.list_connected_pins(BEL.find_output_pin(fired, AIM_PARAM))]
+    check(f"the shooter's {AIM_PARAM} is read once in the graph: the pellets' direction",
+          len(aims) == 1, str(len(aims)))
 
 
 def _reads_behind(node, depth=4):
@@ -194,6 +226,7 @@ def check_view_waits():
 
 
 def run():
+    check_native()
     check_events()
     check_server_fires()
     check_client_predicts()

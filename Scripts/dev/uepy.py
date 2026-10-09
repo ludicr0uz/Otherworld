@@ -48,7 +48,7 @@ import re
 import sys
 import time
 
-from uepylib import cold, editors, game, inbox, net, net_plan, remote, server, warm
+from uepylib import cold, editors, game, inbox, net, net_plan, probe_map, remote, server, warm
 from uepylib.paths import (
     editor_inbox, engine_dir, game_inbox, log, saved_uepy, serve_inbox, set_project,
 )
@@ -140,6 +140,12 @@ def parse_args():
                     help="list editors, games and inboxes, then exit")
     ap.add_argument("--list-probes", action="store_true",
                     help="list each probe and the systems it declares, then exit (no editor)")
+    ap.add_argument("--probes-for", nargs="*", metavar="PATH",
+                    help="run the probes the changed PATHS can affect (default: git diff "
+                         "--name-only): one --game launch and one --net launch "
+                         "(uepylib/probe_map.py)")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="with --probes-for: print the launches, run nothing")
     ap.add_argument("--close-editors", action="store_true",
                     help="save and quit (or kill) this project's editors, then exit")
     ap.add_argument("--game", action="store_true",
@@ -209,6 +215,37 @@ def list_probes():
     return 0
 
 
+def probes_for(engine, args):
+    """Run the probes the given (or git-changed) paths can affect, one launch per kind."""
+    paths = args.probes_for or probe_map.changed_paths()
+    plan = probe_map.plan(paths)
+    names = lambda ps: " ".join(os.path.basename(p)[:-3] for p in ps) or "-"
+    log(f"paths: {len(paths)}; systems: {', '.join(sorted(plan['systems'])) or '-'}")
+    for p in plan["unmapped"]:
+        log(f"no probe rule for {p}")
+    if plan["load"]:
+        log(f"skipped (need --bots): {names(plan['load'])}")
+    launches = [("game", "--game", plan["game"]), ("title", "--game --title", plan["title"]),
+                ("net", f"--net --clients {plan['clients']}", plan["net"]),
+                ("net-title", "--net --title", plan["net-title"])]
+    ok = True
+    for kind, flags, probes in launches:
+        if not probes:
+            continue
+        log(f"{flags}: {names(probes)}")
+        if args.dry_run:
+            continue
+        if kind == "game" or kind == "title":
+            ok &= game.run_game(engine, args.map, args.seconds or max(game.PROBE_SECONDS, 30 * len(probes) + 60), [],
+                                probes, args.probe_timeout, args.windowed, kind == "title")
+        else:
+            clients = plan["clients"] if kind == "net" else 1
+            ok &= net.run_net(engine, args.map, clients, args.port, args.seconds, probes,
+                              args.probe_timeout, args.windowed, args.allow_pie,
+                              kind == "net-title", args.lag, 0, False)
+    return 0 if ok else 1
+
+
 def main():
     ap, args = parse_args()
     set_project(args.project)
@@ -216,6 +253,8 @@ def main():
 
     if args.list_probes:
         return list_probes()
+    if args.probes_for is not None:
+        return probes_for(engine, args)
     if args.list:
         list_listeners(engine)
         return 0

@@ -174,6 +174,7 @@ python3 Scripts/dev/uepy.py -c "import unreal; unreal.log_warning('hi')"
 python3 Scripts/dev/uepy.py --list                 # which editors are listening
 python3 Scripts/dev/uepy.py --game --seconds 25    # headless -game run + error summary
 python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py   # see below
+python3 Scripts/dev/uepy.py --probes-for [paths]   # the probes a change can affect (default: git diff); --dry-run lists them
 python3 Scripts/dev/uepy.py --game --windowed --probe <probe>   # rendered, in a 1280x720 window
 python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_join.py   # a server and 2 clients, see below
 python3 Scripts/dev/uepy.py --net --clients 1 --lag 120 --probe Scripts/probes/probe_net_move_states.py   # with 120 ms of lag

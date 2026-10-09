@@ -31,6 +31,7 @@ Join order varies, so a player is known by its player id, never by index.
 """
 
 SYSTEMS = ('net', 'health')
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # on the 50 m level the wanderers hurt the respawned character before client 1 reads its full health
 
 import time
 

@@ -17,6 +17,7 @@ FireForced stands in for the fire key. Any profile on disk is set aside first.
 """
 
 SYSTEMS = ('weapons',)
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # on the 50 m level the ten wanderers reach the player and kill them between two rounds
 
 import os
 import shutil

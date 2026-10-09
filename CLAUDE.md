@@ -283,7 +283,7 @@ editor.
    the same script, or grep the engine's plugin sources.
 2. **Right-size `-game` runs.** 25 s is enough for spawn bugs. A probe launch boots
    `Lvl_Probe_50m` (18 trees, no grass), unless the probe declares `LEVEL = "/Game/Maps/..."`
-   at module level (28 do, on `Lvl_Forest_200m`, each with its reason; the perf audits on theirs)
+   at module level (34 do, on `Lvl_Forest_200m`, each with its reason; the perf audits on theirs)
    or `--map` is given; probes on one level share one launch (`uepylib/probe_level.py`).
    **The fixed cost per launch** (measured, one cheap probe, 16 GB Mac): `--game` 40 s on the
    200 m level, 38 s on the probe level; `--net --clients 2` 74 s and 73 s. The level is only

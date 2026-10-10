@@ -1,12 +1,15 @@
-"""metahuman_retarget -- the two pieces every bridge onto the MetaHuman body
+"""metahuman_retarget -- the pieces every bridge onto the MetaHuman body
 is made of: a retargeter between two A-posed rigs, and the retargeting anim
-blueprint pointed at it.  Shared by build_metahuman_retarget.py (the
-mannequin's bridge) and build_gas_bridge.py (the UEFN mannequin's).
+blueprint pointed at it; and the material the undressed body wears.  Shared
+by build_metahuman_retarget.py (the mannequin's bridge) and
+build_gas_bridge.py (the UEFN mannequin's).
 """
 
 import unreal
 
-from asset_pipeline.metahuman_paths import ABP_RETARGET, ABP_RETARGET_SAMPLE
+from asset_pipeline.metahuman_paths import (
+    ABP_RETARGET, ABP_RETARGET_SAMPLE, BODY_HIDE_PARAM, BODY_MATERIAL, BODY_MATERIAL_BARE,
+)
 from asset_pipeline.rig_util import _load, _log, _reuse_or_create
 
 EAL = unreal.EditorAssetLibrary
@@ -75,3 +78,22 @@ def build_anim_blueprint(rtg, pkg=ABP_RETARGET):
     _log(f"{pkg}: retargets from the parent component through "
          f"{rtg.get_name()}")
     return bp
+
+
+def build_bare_body_material():
+    """BODY_MATERIAL_BARE: the sample's body material, copied (never edited
+    under /Game/MetaHumans) with the skin no longer pulled in where the
+    clothes were.  The player starts undressed (combat/metahuman_body.py)."""
+    mel = unreal.MaterialEditingLibrary
+    if not EAL.does_asset_exist(BODY_MATERIAL_BARE):
+        if not EAL.duplicate_asset(BODY_MATERIAL, BODY_MATERIAL_BARE):
+            raise RuntimeError(f"could not duplicate {BODY_MATERIAL}")
+    mi = _load(BODY_MATERIAL_BARE)
+    mel.set_material_instance_scalar_parameter_value(mi, BODY_HIDE_PARAM, 0.0)
+    mel.update_material_instance(mi)
+    got = mel.get_material_instance_scalar_parameter_value(mi, BODY_HIDE_PARAM)
+    if got != 0.0:
+        raise RuntimeError(f"{BODY_HIDE_PARAM} did not stick on {BODY_MATERIAL_BARE}: {got}")
+    EAL.save_asset(BODY_MATERIAL_BARE)
+    _log(f"{BODY_MATERIAL_BARE}: {BODY_MATERIAL} with {BODY_HIDE_PARAM} at 0")
+    return mi

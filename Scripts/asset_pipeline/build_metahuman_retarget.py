@@ -24,6 +24,11 @@ Writes, under /Game/Sourced/MetaHuman:
                                    the PARENT skeletal mesh component) and
                                    pointed at the retargeter above.
 
+    MI_BodyUnderwear               the sample's body material, copied with
+                                   BodyHideScale at 0: the body is worn
+                                   undressed, and the sample's pulls the skin
+                                   in where the clothes were.
+
 A MetaHuman body component wearing ABP_MetaHuman_Retarget, attached under a
 mesh component that runs the mannequin's anim blueprint, follows it: every
 clip, slot, blend and Control Rig the mannequin plays reaches the MetaHuman
@@ -48,7 +53,7 @@ from asset_pipeline.metahuman_paths import (                       # noqa: E402
     BODY_MESH, IK_METAHUMAN, RTG_FROM_MANNEQUIN, SOURCED_DIR,
 )
 from asset_pipeline.metahuman_retarget import (                    # noqa: E402
-    build_anim_blueprint, build_retargeter,
+    build_anim_blueprint, build_bare_body_material, build_retargeter,
 )
 from asset_pipeline.retarget_paths import IK_MANNEQUIN, MANNEQUIN_MESH, RIG_DIR  # noqa: E402
 from asset_pipeline.retarget_rig import build_ik_rig              # noqa: E402
@@ -76,6 +81,7 @@ def main():
                        root_motion_bone=ROOT_MOTION_BONE_MANNEQUIN)
     rtg = build_retargeter(src, tgt, RTG_FROM_MANNEQUIN, _load(BODY_MESH))
     build_anim_blueprint(rtg)
+    build_bare_body_material()
     _log("done")
 
 

@@ -35,11 +35,24 @@ def _follow(p, label, mannequin, body, face, torso, legs, feet):
             f"worst {worst[0]} {worst[1]:.1f} cm")
     p.check(f"{label}: the face is on the body's head",
             _gap(body, face, "head") < 1.0, f"{_gap(body, face, 'head'):.1f} cm")
+    # A garment slot with nothing on it has no bones to measure: the body
+    # starts in its underwear (combat/metahuman_body.py).
     for name, comp, bones in (("hoodie", torso, ("spine_02", "spine_04", "upperarm_l", "hand_l")),
                               ("jeans", legs, ("pelvis", "thigh_l", "calf_l", "foot_l")),
                               ("shoes", feet, ("calf_l", "foot_l", "ball_l", "foot_r"))):
+        if comp.get_skeletal_mesh_asset() is None:
+            continue
         gaps = {b: _gap(body, comp, b) for b in bones}
         worst = max(gaps.items(), key=lambda kv: kv[1])
         p.check(f"{label}: the {name} are on the body (within {GARMENT_CM:.0f} cm)",
                 worst[1] < GARMENT_CM,
                 ", ".join(f"{b} {g:.1f}" for b, g in gaps.items()))
+
+
+def _undressed(p, torso, legs, feet):
+    """The three garment components are there, bare and not drawn."""
+    told = {c.get_name(): (c.get_skeletal_mesh_asset().get_name()
+                           if c.get_skeletal_mesh_asset() else None, c.is_visible())
+            for c in (torso, legs, feet)}
+    p.check("Torso, Legs and Feet wear no mesh and are hidden: the body starts in its "
+            "underwear", all(v == (None, False) for v in told.values()), str(told))

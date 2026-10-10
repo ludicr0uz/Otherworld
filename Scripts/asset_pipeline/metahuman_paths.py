@@ -16,6 +16,20 @@ BODY_MESH = f"{ROOT}/Body/m_med_nrw_body"
 BODY_SKELETON = f"{COMMON}/Female/Medium/NormalWeight/Body/metahuman_base_skel"
 BODY_PHYSICS = f"{COMMON}/Male/Medium/NormalWeight/Body/m_med_nrw_ragdoll"
 
+# BODY_MESH is Taro's body as he is dressed: the skin under his hoodie, jeans
+# and shoes is cut out of it (11k vertices; hands and a strip of neck are
+# what is left).  The whole body is the sample's preview mesh, on the same
+# skeleton: 32k vertices, ONE LOD, no material and no physics asset of its
+# own.  It is what the player wears, undressed (combat/metahuman_body.py);
+# the rigs are still built on BODY_MESH (same skeleton, same reference pose).
+BODY_MESH_WHOLE = f"{COMMON}/Common/m_med_nrw_body_preview"
+
+# The body's material as the sample ships it: it paints underwear, and pulls
+# the skin in under where BP_Taro's clothes were (BodyHideScale, -3) so it
+# never pokes through them.
+BODY_MATERIAL = f"{ROOT}/Materials/MI_BodySynthesized"
+BODY_HIDE_PARAM = "BodyHideScale"
+
 # The face, on the face archetype skeleton, animated by Face_AnimBP (a Live
 # Link pose with no subject, and Copy Pose From Mesh off the body it hangs
 # under: that is what carries the head).  Its post-process anim BP (RigLogic)
@@ -68,3 +82,6 @@ SOURCED_DIR = "/Game/Sourced/MetaHuman"
 IK_METAHUMAN = f"{SOURCED_DIR}/IK_MetaHuman"
 RTG_FROM_MANNEQUIN = f"{SOURCED_DIR}/RTG_MetaHuman_from_Mannequin"
 ABP_RETARGET = f"{SOURCED_DIR}/ABP_MetaHuman_Retarget"
+# BODY_MATERIAL copied with BODY_HIDE_PARAM at 0: the whole body, in its
+# underwear.  What the Body component wears (combat/metahuman_body.py).
+BODY_MATERIAL_BARE = f"{SOURCED_DIR}/MI_BodyUnderwear"

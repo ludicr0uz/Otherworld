@@ -9,10 +9,14 @@ import dataclasses
 import unreal
 
 from asset_pipeline import catalog, player_body, quaternius_paths
+from asset_pipeline.metahuman_paths import (
+    BODY_HIDE_PARAM, BODY_MATERIAL_BARE, BODY_MESH_WHOLE, CLOTHING,
+)
 from combat.hit_bodies import _bodies
 from combat.skin import SKIN_ADVENTURER, SKIN_BOUND, SKIN_METAHUMAN, player_skin
 from combat.verify.common import _mesh_asset, check, load
 from combat.verify.fixtures import char
+from uebp.graph import _component_object, _find_handle
 
 
 def _mesh_path(name):
@@ -59,6 +63,35 @@ def check_one_setting():
           player_skin().mesh == want and worn is not None
           and worn.get_path_name().split(".")[0] == hidden,
           f"skin {player_skin().mesh}, worn {worn.get_path_name() if worn else None}")
+    if metahuman:
+        # The MetaHuman starts in its underwear: the three garment
+        # components are there for the LOD sync, bare and not drawn.
+        told = {}
+        for part in CLOTHING:
+            handle = _find_handle(char, part)
+            comp = _component_object(handle) if handle else None
+            told[part] = comp and (comp.get_editor_property("skeletal_mesh_asset"),
+                                   comp.get_editor_property("visible"),
+                                   comp.get_editor_property("hidden_in_game"))
+        check(f"the MetaHuman's {', '.join(CLOTHING)} components wear no mesh and are "
+              "hidden (combat/metahuman_body.py)",
+              all(v == (None, False, True) for v in told.values()), str(told))
+        body = _component_object(_find_handle(char, "Body"))
+        worn_mats = [m.get_path_name().split(".")[0] if m else None
+                     for m in body.get_editor_property("override_materials")]
+        bare = unreal.EditorAssetLibrary.load_asset(BODY_MATERIAL_BARE)
+        hide = (unreal.MaterialEditingLibrary.get_material_instance_scalar_parameter_value(
+            bare, BODY_HIDE_PARAM) if bare else None)
+        body_mesh = body.get_editor_property("skeletal_mesh_asset")
+        check(f"...and its body is the whole one ({BODY_MESH_WHOLE.rsplit('/', 1)[1]}: Taro's "
+              f"has the skin under his clothes cut out) in "
+              f"{BODY_MATERIAL_BARE.rsplit('/', 1)[1]}, the sample's material copied with "
+              f"{BODY_HIDE_PARAM} at 0",
+              body_mesh is not None
+              and body_mesh.get_path_name().split(".")[0] == BODY_MESH_WHOLE
+              and worn_mats == [BODY_MATERIAL_BARE] and hide == 0.0,
+              f"{body_mesh.get_path_name() if body_mesh else None}, {worn_mats}, "
+              f"{BODY_HIDE_PARAM} {hide}")
     if bound or metahuman:
         # What follows is about the per-body skeleton's physics asset.
         return

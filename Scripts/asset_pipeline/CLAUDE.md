@@ -199,6 +199,16 @@ python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_metah
   Face by name, gives the jeans a leader pose and the hoodie and shoes their post-process
   copy-pose anim BPs) and a LODSync. The garments tick only when rendered (the component sets
   that at BeginPlay); a headless probe must set ALWAYS_TICK on them before measuring.
+- **The player starts undressed (K1):** Torso, Legs and Feet are still components (same
+  names, still in the LOD sync) with no mesh, hidden; `metahuman_paths.CLOTHING` is the table
+  of what BP_Taro wore. Taro's own body mesh cannot be worn bare: the skin under his clothes
+  is **cut out of it** (11k vertices; undressed it draws two hands), which `BodyHideScale`
+  (a 3 cm pull along the normal) has nothing to do with. Body wears the sample's whole body,
+  `m_med_nrw_body_preview` (`BODY_MESH_WHOLE`: same skeleton, 32k vertices, **one LOD**, no
+  material), in `MI_BodyUnderwear`, a copy of Taro's `MI_BodySynthesized` under
+  `/Game/Sourced/MetaHuman` with `BodyHideScale` at 0 (`build_metahuman_retarget.py`). With one
+  LOD the body is passive in the LOD sync and the face alone drives. The rigs are still built
+  on `BODY_MESH`.
 - **Five skeletal meshes now, not in tree order**: anything that wants "the player's mesh"
   takes the component named `Mesh` (`skin.mannequin_component`, `verify.common._mesh_asset`),
   never the first SkeletalMeshComponent. Per-view hides (OwnerNoSee behind a scope, the head

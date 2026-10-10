@@ -1,12 +1,16 @@
 """The MetaHuman body hung under the player's mannequin.
 
     Mesh (SK_Mannequin, hidden, runs ABP_Unarmed as it always did)
-    └── Body      m_med_nrw_body, ABP_MetaHuman_Retarget: retargets the
+    └── Body      m_med_nrw_body_preview, the whole body (Taro's own has the
+        │         skin under his clothes cut out), in MI_BodyUnderwear,
+        │         ABP_MetaHuman_Retarget: retargets the
         │         parent's pose every frame (build_metahuman_retarget.py)
         ├── Face  Taro_FaceMesh, Face_AnimBP (copies the body's neck and head)
         │   └── Hair, Eyebrows, Eyelashes, Mustache, Beard, Fuzz  (grooms)
-        ├── Torso, Legs, Feet   clothing; MetaHuman gives them their
-        │                       post-process anim BP, which follows Body
+        ├── Torso, Legs, Feet   where clothing goes: no mesh and hidden, so
+        │                       the body stands in the underwear its own
+        │                       material paints (metahuman_paths.CLOTHING is
+        │                       what BP_Taro wore there)
         MetaHuman   MetaHumanComponentUE: the correctives and the clothing
         LODSync     one LOD for all of it, led by Body and Face
 
@@ -25,7 +29,7 @@ name ("Body", "Face"), and LODSync lists its components by name too.
 import unreal
 
 from asset_pipeline.metahuman_paths import (
-    ABP_RETARGET, BODY_MESH, CLOTHING, CLOTHING_POST_PROCESS, FACE_ANIM_BP, FACE_MESH,
+    ABP_RETARGET, BODY_MATERIAL_BARE, BODY_MESH_WHOLE, CLOTHING, CLOTHING_POST_PROCESS, FACE_ANIM_BP, FACE_MESH,
     GROOMS,
 )
 from combat.log import _log
@@ -34,8 +38,8 @@ from uebp.graph import _add_component, _component_object, _drop_components, _fin
 BODY, FACE, META, LOD_SYNC = "Body", "Face", "MetaHuman", "LODSync"
 COMPONENTS = (BODY, FACE, META, LOD_SYNC) + tuple(CLOTHING) + tuple(GROOMS)
 
-# BP_Taro's LOD sync: eight LODs, the body and the face drive, the rest
-# follow, and the body and clothing (four LODs each) take every face LOD
+# BP_Taro's LOD sync: eight LODs, the face drives (in BP_Taro the body did
+# too), the rest follow, and the body and clothing (four LODs each) take every face LOD
 # in pairs.
 NUM_LODS = 8
 LOD_PAIRS = (0, 0, 1, 1, 2, 2, 3, 3)
@@ -71,6 +75,18 @@ def _skeletal(bp, parent, name, mesh, anim_bp=None):
     return handle, comp
 
 
+def _garment_slot(bp, parent, name):
+    """An undressed garment component: the name the LOD sync and the
+    MetaHuman component know, with no mesh on it and nothing drawn."""
+    comp = _component_object(_add_component(bp, parent, unreal.SkeletalMeshComponent, name))
+    comp.set_editor_property("skeletal_mesh_asset", None)
+    comp.set_editor_property("visible", False)
+    comp.set_editor_property("hidden_in_game", True)
+    if comp.get_editor_property("skeletal_mesh_asset") is not None or comp.is_visible():
+        raise RuntimeError(f"{name} did not come out bare and hidden")
+    return comp
+
+
 def _sync_entry(name, option):
     entry = unreal.ComponentSync()
     entry.set_editor_property("name", name)
@@ -85,10 +101,14 @@ def install(bp, mannequin_handle, retarget=None):
     the mannequin's unless the parent is another mesh (PlayerSkin.retarget)."""
     retarget = retarget or ABP_RETARGET
     _drop_components(bp, COMPONENTS)
-    body, body_comp = _skeletal(bp, mannequin_handle, BODY, BODY_MESH, retarget)
+    body, body_comp = _skeletal(bp, mannequin_handle, BODY, BODY_MESH_WHOLE, retarget)
+    # The whole body has no material of its own. One slot: the sample's,
+    # copied so it does not pull the skin in under the clothes the body no
+    # longer wears (build_metahuman_retarget.py).
+    body_comp.set_editor_property("override_materials", [_must(BODY_MATERIAL_BARE)])
     face, _face_comp = _skeletal(bp, body, FACE, FACE_MESH, FACE_ANIM_BP)
-    for name, mesh in CLOTHING.items():
-        _skeletal(bp, body, name, mesh)
+    for name in CLOTHING:
+        _garment_slot(bp, body, name)
     for name, (groom, binding) in GROOMS.items():
         comp = _component_object(_add_component(bp, face, unreal.GroomComponent, name))
         comp.set_editor_property("groom_asset", _must(groom))
@@ -105,8 +125,10 @@ def install(bp, mannequin_handle, retarget=None):
                                             unreal.LODSyncComponent, LOD_SYNC))
     sync.set_editor_property("num_lods", NUM_LODS)
     drive, passive = unreal.SyncOption.DRIVE, unreal.SyncOption.PASSIVE
+    # The face alone drives: the whole body has one LOD and would ask for
+    # LOD 0 at any distance, and hold the face and the grooms there.
     sync.set_editor_property("components_to_sync", [
-        _sync_entry(BODY, drive), _sync_entry(FACE, drive),
+        _sync_entry(BODY, passive), _sync_entry(FACE, drive),
         *[_sync_entry(n, passive) for n in list(CLOTHING) + list(GROOMS)]])
     mapping = unreal.LODMappingData()
     mapping.set_editor_property("mapping", list(LOD_PAIRS))
@@ -115,7 +137,7 @@ def install(bp, mannequin_handle, retarget=None):
     got = body_comp.get_editor_property("anim_class")
     if got != _anim_class(retarget):
         raise RuntimeError(f"the body's anim class did not stick: {got}")
-    _log(f"player: MetaHuman body, face, {len(CLOTHING)} garments and "
+    _log(f"player: MetaHuman body, face, {len(CLOTHING)} bare garment slots and "
          f"{len(GROOMS)} grooms under the mannequin")
 
 

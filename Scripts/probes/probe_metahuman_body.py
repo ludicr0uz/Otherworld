@@ -5,7 +5,8 @@ motion matching on the UEFN mannequin, or ABP_Unarmed: combat/skin.py); the
 MetaHuman body hangs under it wearing that skin's retargeting anim Blueprint
 (combat/metahuman_body.py) and should land on the same pose every frame: head over head, hands on hands,
 feet on feet, within the proportion difference of two different men. The
-face and the clothing should follow the body. Measured standing, then in a
+face should follow the body, and the three garment components are there
+but bare (the body starts in its underwear). Measured standing, then in a
 fall (the jump clip), then dead, when the mannequin's ragdoll should carry
 the MetaHuman down with it.
 """
@@ -19,7 +20,7 @@ from combat import health_vars as HV
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH
 from combat.skin import skin_of_mesh
 
-from probes.metahuman_follow import _comp, _follow
+from probes.metahuman_follow import _comp, _follow, _undressed
 
 WRITABLE = [(HEALTH_BP_PATH, HV.Health)]
 DROP_CM = 900.0
@@ -31,10 +32,11 @@ def probe(p):
     mannequin = player.get_editor_property("mesh")
     body, face, torso, legs, feet = (_comp(player, n)
                                      for n in ("Body", "Face", "Torso", "Legs", "Feet"))
-    p.check("the player has Body, Face and Torso components",
-            all(c is not None for c in (body, face, torso)))
-    if not all(c is not None for c in (body, face, torso)):
+    p.check("the player has Body, Face, Torso, Legs and Feet components",
+            all(c is not None for c in (body, face, torso, legs, feet)))
+    if not all(c is not None for c in (body, face, torso, legs, feet)):
         return
+    _undressed(p, torso, legs, feet)
     # The garments tick only when rendered (the MetaHuman component sets
     # that at BeginPlay, as the sample does) and a headless game renders
     # nothing: posed always, here, so they can be measured.

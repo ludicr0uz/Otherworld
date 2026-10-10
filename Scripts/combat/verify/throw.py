@@ -24,6 +24,7 @@ from combat.throw_tuning import (
     THROW_START_UP, THROW_WINDUP_S,
 )
 from combat.tuning import BIND_VARS, THROW_KEY
+from combat.weapon_component.vars import FirePressedAt as FIRE_PRESSED_AT
 from combat.verify.common import (
     BEL, PIN, by_pins, check, component_template, has_in_pin, load, num_pin, pin_value,
 )
@@ -238,7 +239,7 @@ def check_click():
           len(gates) == 1, f"{len(spends)} spends, {len(gates)} behind the throw key")
     clicks = [n for n in wg if _title(n) == "Branch"
               and {f"Get {THROW_CLICK_FORCED_VAR}", f"Get {THROW_AIMING_VAR}",
-                   "Get KeyFire"} <= _upstream(n, "Condition")]
+                   f"Get {FIRE_PRESSED_AT}"} <= _upstream(n, "Condition")]
     check("the throw is a click of the fire key (or the probe's) over an arc "
           "already showing", len(clicks) == 1, str(len(clicks)))
     if len(clicks) == 1 and len(gates) == 1:
@@ -251,7 +252,7 @@ def check_click():
                           BEL.find_input_pin(clicks[0], "execute"))))
     # The fire gate: the Branch whose condition reads the trigger both ways.
     fires = [n for n in wg if _title(n) == "Branch"
-             and {"Get KeyFire", "Get Sprinting", "Get Blocking", "Get KeyThrow",
+             and {f"Get {FIRE_PRESSED_AT}", "Get Sprinting", "Get Blocking", "Get KeyThrow",
                   f"Get {THROW_FORCED_VAR}"} <= _upstream(n, "Condition")
              and f"Get {THROW_AIMING_VAR}" not in _upstream(n, "Condition")]
     check("with the throw key down the fire gate stays shut: the click is the "

@@ -228,6 +228,9 @@ _author_* fragment per concern, each in its own module:
               guard, shot or reload is holding up (the ready pose is off)
   ready_pose  restart the ready pose after it is interrupted; re-equip on the
               frames Lowered changes (the pose's edge)
+  trigger     the fire key as an input action (I1): the base's
+              OnFirePressed stamps the press, the Tick's tap and hold
+              read the stamp and the native FireHeld; no KeyFire
   tick        the Tick that calls all of the above
 
 BP_WeaponComponent event graph:
@@ -240,7 +243,7 @@ BP_WeaponComponent event graph:
               --> Equip(0)
 
   [Tick] --> Branch owner Dead or at 0 HP                    --> nothing below runs
-         --> Branch WasInputKeyJustPressed(LeftMouseButton) --> Fire
+         --> Branch the fire action pressed this frame (trigger.py) --> Fire
                                         (or, if Held.Consumable, use it:
                                          a garment is worn, food eaten;
                                          if Held.Melee, slash with it;

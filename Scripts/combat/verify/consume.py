@@ -9,6 +9,7 @@ mouse to hold down.
 from uebp import net
 from combat.tuning import SERVER_CONSUME
 from combat.weapon_component.consume import TRIGGER_SPENT
+from uebp.nodes.weapon import FIRE_HELD
 from combat.verify.fixtures import wc, wc_cdo, wg
 from combat.verify.common import BEL, PIN, by_pins, check, graph, in_pins, out_pins, pin_value
 
@@ -102,10 +103,11 @@ def check_eating_spends_the_press():
     if rearms:
         ands = _feeders(rearms[0], TRIGGER_SPENT)
         feeds = {_title(n) for a in ands for n in _feeders(a, "A") + _feeders(a, "B")}
-        check("...re-armed as TriggerSpent AND fire-key-down, so only a release clears it",
+        check("...re-armed as TriggerSpent AND the fire action down (FireHeld), so only "
+              "a release clears it",
               len(ands) == 1 and "AND" in _title(ands[0]).upper()
               and f"Get {TRIGGER_SPENT}" in feeds
-              and "IsInputKeyDown" in feeds, str(feeds))
+              and f"Get {FIRE_HELD}" in feeds, str(feeds))
 
     # The outer fire gate is the Branch whose True pin leads to the Consumable
     # test. Its condition must refuse a spent press -- which also shuts the

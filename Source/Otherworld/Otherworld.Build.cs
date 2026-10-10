@@ -6,6 +6,6 @@ public class Otherworld : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "NetCore", "ReplicationGraph" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "NetCore", "ReplicationGraph", "InputCore", "EnhancedInput" });
 	}
 }

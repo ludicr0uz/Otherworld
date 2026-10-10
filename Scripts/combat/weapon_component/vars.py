@@ -36,7 +36,7 @@ from combat.sprint_tuning import (
 )
 from combat.sway_tuning import SWAY_RATE, SWAY_RATE_VAR, SWAY_VARS
 from combat.torch_tuning import NEAR_FIRE_VAR, STICK_CLASS_VAR, WARD_CARRY_VAR, WARD_ITEM_VAR
-from combat.tuning import BIND_VARS, COMBAT
+from combat.tuning import COMBAT, POLLED_BINDS
 from combat.use_tuning import USE_PRESSED_VAR, USE_WAS_VAR, USING_VAR
 from combat.wear_tuning import (
     NOT_CLOTHING, TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_ITEM_VAR, WEAR_REQUEST_VAR, WORN_VAR,
@@ -204,7 +204,7 @@ BreathForced = Var(BREATH_FORCED_VAR, BOOL, False)
 # exists. The defaults are therefore also the standalone fallback: a weapon
 # component on an actor with no HUD in front of it still plays with the keys
 # tuning.py documents.
-BINDS = tuple(Var(name, KEY, key(k)) for name, k in BIND_VARS)
+BINDS = tuple(Var(name, KEY, key(k)) for name, k in POLLED_BINDS)
 # The slots (slot_tuning.py): the number keys, SlotItems (the sync's view),
 # where the hand's item came from (the issued shotgun's slot), whether a
 # pick-up fits, and the requests, all NO_REQUEST at rest.
@@ -247,6 +247,8 @@ WearSlot = Var("WearSlot", INT, NOT_CLOTHING)
 # sprint and the aim keys.
 OwnerDead = Var("OwnerDead", BOOL, False)
 FireForced = Var("FireForced", BOOL, False)
+# The world's time at the fire action's last press (trigger.py); never, at rest.
+FirePressedAt = Var("FirePressedAt", FLOAT, -1.0)
 SprintForced = Var(SPRINT_FORCED_VAR, BOOL, False)
 AimForced = Var("AimForced", BOOL, False)
 # The GameMode's DebugMode, cached at the moment of firing so the pellet loop
@@ -351,6 +353,7 @@ STATE = (
     SlotItems, HandFrom, *SLOT_REQUESTS, HasRoom, Lowered, PoseLowered, RaiseForced,
     AimSpread, RecoilScale, ReticleSpread, ShotDirection, TriggerSpent, Worn, WearItem,
     DropItem, TakeOffSlot, TakeOffTo, WearRequest, WearSlot, OwnerDead, FireForced,
+    FirePressedAt,
     SprintForced, AimForced, DebugMode, HitBone, HitPoint, ShotgunClass, PistolClass,
     KnifeClass, AxeClass, MatchesClass, StickClass, ImpactClass, CampfireClass, PunchAnim,
     PunchQueued, PunchPending, NextPunchTime, PunchDueTime, BlowDamage, KnifeAnim, AxeAnim,

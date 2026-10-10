@@ -148,6 +148,9 @@ def main():
     driven_keys = []
     for n in by_pins("Key", "self"):
         pin = BEL.find_input_pin(n, "Key")
+        # Not a poll: the push's write of the fire key (SetFireKey, below).
+        if str(BEL.get_node_title(n)).replace(" ", "") == "SetFireKey":
+            continue
         if pin.list_connected_pins():
             driven_keys.append(n)
         else:
@@ -712,9 +715,19 @@ def main():
     # standalone fallback. So the evidence is a Set per bind, on another class.
     pushes = {t for t in titles
               if t in {f"Set {v}" for v, _k in G.BIND_VARS}}
-    check("every bind is pushed onto BP_WeaponComponent each frame",
-          pushes == {f"Set {v}" for v, _k in G.BIND_VARS},
+    check("every polled bind is pushed onto BP_WeaponComponent each frame",
+          pushes == {f"Set {v}" for v, _k in G.BIND_VARS[1:]},
           str(sorted(pushes)))
+    # The fire key is an input action's (I1): its row goes to the mapping
+    # context, through the component's native SetFireKey.
+    rebinds = [n for n in by_pins("self", "Key")
+               if str(BEL.get_node_title(n)).replace(" ", "") == "SetFireKey"]
+    fed = [PIN.get_owning_node(q) for n in rebinds
+           for q in BEL.find_input_pin(n, "Key").list_connected_pins()]
+    check("...and the fire key's row, Binds[0], into the mapping context (SetFireKey)",
+          len(rebinds) == 1 and len(fed) == 1
+          and str(BEL.find_input_pin(fed[0], "Index").get_pin_value()) in ("0", ""),
+          f"{len(rebinds)} call(s), {len(fed)} feed(s)")
     # Two Sets per slider: the nudge onto BP_Settings, the push onto the component.
     for slider in S.SLIDERS:
         check(f"...and so is {slider.var} (stored by its nudge, pushed each frame)",

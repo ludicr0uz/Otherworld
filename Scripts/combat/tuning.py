@@ -61,11 +61,12 @@ HEALTH_DRAINS = (
 # Polled keys. 1-9 are the inventory's slots (slot_tuning.SLOT_KEYS), M the
 # graphics menu's.
 #
-# Every one of them is polled on the weapon component's Tick rather than bound
-# as an input action, for the same reason: BP_ThirdPersonCharacter's graph is
-# the Enhanced Input template, and adding an IA asset plus an IMC entry is not
-# authorable from Python. Sprint lives on the *weapon* component specifically
-# because that is the thing that has to refuse to fire while it is held down.
+# Every one of them but the fire key is polled on the weapon component's Tick
+# rather than bound as an input action. The fire key is the first that is one
+# (I1: IA_Fire, combat/input_assets.py; weapon_component/trigger.py), and
+# FIRE_KEY is its default in the mapping context. Sprint lives on the *weapon*
+# component specifically because that is the thing that has to refuse to fire
+# while it is held down.
 FIRE_KEY = "LeftMouseButton"
 # Two ways to aim, two keys. AIM_KEY is the over-the-shoulder aim: the camera
 # stays on its boom and zooms. SIGHTS_KEY is aiming down the sights: the camera
@@ -450,6 +451,11 @@ BIND_VARS = (("KeyFire", FIRE_KEY),
              ("KeyProne", PRONE_KEY),
              ("KeyThrow", THROW_KEY),
              ("KeyHoldBreath", HOLD_BREATH_KEY))
+# The bind that is an input action (I1): its row of Binds is the mapping
+# context's key for IA_Fire, not a variable the weapon component polls.
+FIRE_BIND = BIND_VARS[0][0]
+# The rest: each a Key variable on the weapon component, pushed from Binds.
+POLLED_BINDS = tuple(b for b in BIND_VARS if b[0] != FIRE_BIND)
 # Shells a killed wanderer leaves behind. Two per kill against five spent per
 # magazine means the shotgun runs down unless most shots land, which is the
 # point of giving it a reserve at all.

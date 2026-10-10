@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
+#include "OtherworldCharacter.h"
 #include "OtherworldHealthComponent.h"
 #include "OtherworldInventoryRecord.h"
 #include "OtherworldRpcGuard.h"
@@ -291,5 +292,23 @@ void UOtherworldWeaponComponentBase::FirePellets(AActor* Gun, FVector Muzzle, FV
 		}
 		PelletFlew(Muzzle, bStopped ? Hit.Location : End, bStopped, Point, Hit.ImpactNormal,
 			bHurt, bScenery, Bone, bHead, Damage * Worth, Worth);
+	}
+}
+
+void UOtherworldWeaponComponentBase::FireInput(bool bDown)
+{
+	FireHeld = bDown;
+	const UWorld* World = GetWorld();
+	if (bDown && World && !World->IsPaused())
+	{
+		OnFirePressed();
+	}
+}
+
+void UOtherworldWeaponComponentBase::SetFireKey(FKey Key)
+{
+	if (AOtherworldCharacter* Character = Cast<AOtherworldCharacter>(GetOwner()))
+	{
+		Character->SetFireKey(Key);
 	}
 }

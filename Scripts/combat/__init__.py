@@ -282,4 +282,9 @@ wrong module.
 
   anim_vars       What the builders add to the player's anim Blueprints' member variables (the weapon layers, and before G4 ...
   game_mode_vars  What the builders add to BP_ThirdPersonGameMode's member variables, named once: each row is the name and the ...
+  input_consts      the Enhanced Input assets' names and paths (I1): IA_Fire,
+                    IMC_Default under /Game/Weapons/Input, the context's rows
+  input_assets      authors IA_Fire and IMC_Default, and names them on the
+                    player character's class defaults (the fire key is an
+                    input action; weapon_component/trigger.py)
 """

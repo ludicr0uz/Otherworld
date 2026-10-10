@@ -18,6 +18,8 @@ from uebp.nodes.array import FN_ARR_GET
 from uebp.nodes.math import FN_ADD_II, FN_GE_II, FN_SELECT_FF
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_WEAPON
 from uebp.nodes.umg import FN_SET_OPACITY
+from uebp.nodes.weapon import FN_SET_FIRE_KEY
+from combat.tuning import FIRE_BIND
 from uebp.nodes.system import FN_FLOAT_TO_STR, FN_IS_VALID, FN_KEY_DISPLAY
 from graphics_menu import hud_vars as MV
 from combat import settings_vars as SV
@@ -81,14 +83,22 @@ def _author_push_settings(ed, in_execs):
         item = keep(_node(ed, FN_ARR_GET))
         _connect(binds_out, _loose_pin(item, "TargetArray"))
         _set(item, "Index", i)
-        put = keep(ed.add_set_member_variable_node(var, WEAPON_COMP_CLASS_PATH))
-        _connect(as_weapon, _pin(put, "self"))
-        _connect(_loose_pin(item, "Item", is_input=False), _pin(put, var))
+        if var == FIRE_BIND:
+            # The fire key is an input action's (I1): its row is the mapping
+            # context's key for IA_Fire, rewritten only when it differs.
+            put = keep(_node(ed, FN_SET_FIRE_KEY))
+            _connect(as_weapon, _pin(put, "self"))
+            _connect(_loose_pin(item, "Item", is_input=False), _pin(put, "Key"))
+        else:
+            put = keep(ed.add_set_member_variable_node(var, WEAPON_COMP_CLASS_PATH))
+            _connect(as_weapon, _pin(put, "self"))
+            _connect(_loose_pin(item, "Item", is_input=False), _pin(put, var))
         _connect(flow, _pin(put, "execute"))
         flow = then(put)
 
     ed.add_comment_to_nodes(
-        "The player's settings, pushed onto BP_WeaponComponent every frame. "
+        "The player's settings, pushed onto BP_WeaponComponent every frame "
+        "(the fire key into the mapping context: SetFireKey). "
         "The component never loads them, never casts back here, and keeps the "
         "CDO defaults build_weapons_and_combat.py gave it as a standalone "
         "fallback -- so a pawn with no HUD in front of it still plays with the "

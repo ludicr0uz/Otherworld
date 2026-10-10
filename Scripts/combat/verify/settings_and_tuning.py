@@ -10,7 +10,7 @@ from combat.difficulty import DEFAULT_DIFFICULTY, DIFFICULTY_LABELS, DIFFICULTY_
 from combat.paths import (
     SETTINGS_BP_PATH, SETTINGS_SLOT, SETTINGS_USER_INDEX)
 from net.state_consts import GAME_STATE_BP_PATH
-from combat.tuning import BIND_VARS, COMBAT, CombatConfig
+from combat.tuning import BIND_VARS, COMBAT, POLLED_BINDS, CombatConfig
 from combat.verify.fixtures import w, wc_cdo, wg
 from combat.verify.common import BEL, PIN, builder_modules, cdo, check, load, titled
 
@@ -103,7 +103,7 @@ def check_settings_savegame():
               f"wrote={wrote}")
         unreal.GameplayStatics.delete_game_in_slot(probe_slot, 0)
 
-    for var, _default in BIND_VARS:
+    for var, _default in POLLED_BINDS:
         check(f"{var} is an FKey on the component, not a string",
               isinstance(w.get_editor_property(var), unreal.Key),
               type(w.get_editor_property(var)).__name__)

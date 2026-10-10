@@ -13,6 +13,7 @@ from asset_pipeline import lyra_paths as LYRA
 from combat.anim_blueprint import AIM_SLOT
 from combat.skin import player_skin
 from combat.tuning import COMBAT
+from combat.weapon_component.vars import FirePressedAt as FIRE_PRESSED_AT
 from combat.verify.common import (
     take_hits,
     BEL, PIN, by_pins, check, in_pins, load, num_pin, pin_value,
@@ -137,7 +138,7 @@ def check_punch_press():
     gates = [n for n in wg if is_punch_gate(n)]
     # Two: the press (the cooldown) and the blow (NextPunchTime is not in it,
     # PunchDueTime is), so filter to the one reading the fire key.
-    press = [g for g in gates if "Get KeyFire"
+    press = [g for g in gates if f"Get {FIRE_PRESSED_AT}"
              in {_title(x) for x in _feeds(BEL.find_input_pin(g, "Condition"))}]
     check("one punch press gate, on the fire key", len(press) == 1, str(len(press)))
     if len(press) != 1:
@@ -145,9 +146,9 @@ def check_punch_press():
     src = _feeds(BEL.find_input_pin(press[0], "Condition"))
     names = {_title(x) for x in src}
     check("...a tap, off cooldown, not sprinting, not blocking, not a spent press",
-          {"Get KeyFire", f"Get {NEXT_PUNCH_VAR}", "Get Sprinting", "Get Blocking",
+          {f"Get {FIRE_PRESSED_AT}", f"Get {NEXT_PUNCH_VAR}", "Get Sprinting", "Get Blocking",
            "Get TriggerSpent"} <= names
-          and any("WasInputKeyJustPressed" in t.replace(" ", "") for t in names),
+          and "FireHeld" not in {t.replace(" ", "")[3:] for t in names},
           str(sorted(names)))
     valid = [x for x in src if "IsValid" in _title(x)]
     check("...with empty hands: IsValid(Held) through a NOT",

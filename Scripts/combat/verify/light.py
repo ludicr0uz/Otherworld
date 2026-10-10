@@ -23,6 +23,7 @@ from combat.paths import (
     AXE_BP_PATH, HOLD_ITEM_ANIM_PATH, ITEM_BP_PATH, KNIFE_BP_PATH, MATCHES_BP_PATH,
     WOOD_BP_PATH,
 )
+from combat.weapon_component.vars import FirePressedAt as FIRE_PRESSED_AT
 from combat.verify.chop import _branches_on, _pure_feeds, _ran_by, _spawns, _squash
 from combat.verify.common import (
     BEL, PIN, before_marks, by_pins, cdo, check, component_template, has_in_pin, is_mark,
@@ -165,7 +166,7 @@ def check_light_gate():
     names = ({_title(x) for x in _feeds(BEL.find_input_pin(press[0], "Condition"))}
              if len(press) == 1 else set())
     check("...then a tap strikes: a held button lights nothing more",
-          "Get KeyFire" in names
+          f"Get {FIRE_PRESSED_AT}" in names
           and not any("IsInputKeyDown" in t.replace(" ", "") for t in names),
           str(sorted(names)))
     if len(press) != 1:

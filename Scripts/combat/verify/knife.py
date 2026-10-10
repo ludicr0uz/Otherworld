@@ -20,6 +20,7 @@ from combat.paths import (
 from combat.skin import player_skin
 from combat.strike_vars import SERVER_SLASH
 from combat.tuning import COMBAT
+from combat.weapon_component.vars import FirePressedAt as FIRE_PRESSED_AT
 from combat.verify.common import (
     take_hits,
     BEL, PIN, by_pins, cdo, check, component_template, graph, in_pins, load, num_pin,
@@ -178,7 +179,7 @@ def check_knife_press():
     names = ({_title(x) for x in _feeds(BEL.find_input_pin(press[0], "Condition"))}
              if len(press) == 1 else set())
     check("...then a tap off the knife's cooldown",
-          f"Get {NEXT_KNIFE_VAR}" in names and "Get KeyFire" in names
+          f"Get {NEXT_KNIFE_VAR}" in names and f"Get {FIRE_PRESSED_AT}" in names
           and not any("IsInputKeyDown" in t.replace(" ", "") for t in names),
           str(sorted(names)))
     after = _exec_next(press[0]) if len(press) == 1 else []

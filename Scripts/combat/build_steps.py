@@ -18,6 +18,7 @@ import os
 import unreal
 
 from combat import health_vars as HV
+from combat import input_consts as INPUT
 from combat import paths as P
 from combat.aim_pitch import patch_aim_pitch
 from combat.ammo_pickup import build_ammo_pickup
@@ -30,6 +31,7 @@ from combat.combat_trace import build_combat_trace_switch
 from combat.footsteps import build_footstep_component
 from combat.game_state import ensure_game_mode_vars
 from combat.glimmer import build_glimmer_material
+from combat.input_assets import build_input_assets
 from combat.gas_locomotion import build_gas_locomotion, resave_gas_locomotion
 from combat.heat import build_hot_material
 from combat.health_component import build_health_component
@@ -181,6 +183,11 @@ def _anim_patches(c):
         resave_gas_locomotion()
 
 
+def _input_assets(c):
+    # Before the install, which names them on the player character.
+    build_input_assets()
+
+
 def _glimmer_material(c):
     # Before the items: the base one carries the sprite it is drawn on.
     build_glimmer_material()
@@ -318,6 +325,7 @@ STEPS = (
     Step("body", _body),
     Step("anim_patches", _anim_patches, needs=("body",)),
     Step("glimmer_material", _glimmer_material),
+    Step("input_assets", _input_assets, made=(INPUT.IMC_DEFAULT, INPUT.IA_FIRE)),
     Step("weapon_item", _weapon_item, made=(P.ITEM_BP_PATH,)),
     Step("weapons", _weapons, needs=("weapon_item",), made=_WEAPONS),
     Step("hold_poses", _hold_poses),
@@ -341,7 +349,7 @@ STEPS = (
     Step("ammo_pickup", _ammo_pickup, needs=("weapon_component",), made=(P.AMMO_BP_PATH,)),
     Step("health_defaults", _health_defaults, needs=("health", "weapons", "ammo_pickup")),
     Step("bodies", _bodies),
-    Step("install", _install, needs=("health", "weapon_component", "footsteps")),
+    Step("install", _install, needs=("health", "weapon_component", "footsteps", "input_assets")),
     Step("done", _done),
 )
 BY_NAME = {s.name: s for s in STEPS}

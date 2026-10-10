@@ -169,10 +169,11 @@ def check_automatic_fire():
         str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
         for x in downs
         for q in PIN.list_connected_pins(BEL.find_input_pin(x, "Key")))
-    check("seven keys are polled held rather than tapped: sprint, the two aims "
-          "(the sights key is also the use key, polled once), the guard, the "
-          "trigger, the throw and the held breath",
-          held_binds == ["Get KeyAim", "Get KeyBlock", "Get KeyFire", "Get KeyHoldBreath",
+    check("six keys are polled held rather than tapped: sprint, the two aims "
+          "(the sights key is also the use key, polled once), the guard, "
+          "the throw and the held breath; the trigger is an input action's "
+          "(verify/trigger.py)",
+          held_binds == ["Get KeyAim", "Get KeyBlock", "Get KeyHoldBreath",
                          "Get KeySights", "Get KeySprint", "Get KeyThrow"],
           str(held_binds))
 

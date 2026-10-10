@@ -28,3 +28,10 @@ FN_SERVER_RELOAD = WEAPON_BASE_CLASS + ".Server_Reload"
 FN_RELOAD_NOW = WEAPON_BASE_CLASS + ".ReloadNow"
 # A reload that moved rounds.
 NODE_EVENT_RELOADED = "AddEvent|Otherworld|Shot|EventReloaded"
+# The local player's fire action went down (I1; not told while paused).
+NODE_EVENT_FIRE_PRESSED = "AddEvent|Otherworld|Input|EventOnFirePressed"
+# The base's own property: the fire action is down.
+FIRE_HELD = "FireHeld"
+# self, Key: the mapping context's one key for the fire action (the owner's
+# OtherworldCharacter::SetFireKey; nothing when it already is that key).
+FN_SET_FIRE_KEY = WEAPON_BASE_CLASS + ".SetFireKey"

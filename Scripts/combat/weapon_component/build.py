@@ -50,6 +50,7 @@ from combat.weapon_component.throw import author_throw_event
 from combat.weapon_component.loot_take import author_loot_take
 from combat.weapon_component.save_exit import author_ask_save_exit
 from combat.weapon_component.tick import _author_wc_tick
+from combat.weapon_component import trigger
 from uebp.vars import declare, defaults
 from Sound.bind import defaults_for
 from Sound.sound_items import BINDINGS as ITEM_SOUNDS
@@ -116,7 +117,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     declare(ed, WV.STATE)
     # The names the interact had as the pick-up are taken off a component
     # built before the rename.
-    for name in RETIRED_VARS + native.RETIRED_VARS:
+    for name in RETIRED_VARS + native.RETIRED_VARS + trigger.RETIRED_VARS:
         ed.remove_member_variable(name)
     arc_class = BEL.generated_class(throw_arc_bp)
 
@@ -139,6 +140,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     author_throw_strike_fx(ed)
     author_chop_fx(ed)
     author_shot_events(ed)
+    # The fire action's press, which the Tick reads (trigger.py).
+    trigger.author_fire_pressed(ed)
     # M20's requests: the two swings, the guard and the use key, the throw
     # and the take. Blocking travels to the other players, and Thrown to the
     # owner, whose arc waits for it: flagged here, after every declare.

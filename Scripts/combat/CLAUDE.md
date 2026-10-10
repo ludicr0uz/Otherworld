@@ -52,6 +52,31 @@ actions and runs only the pose, the slots and the equip. Every poll's self is `L
 (`local.local_pc`), never a controller by index, and a new key is polled in a fragment on
 the local arm (`tick._author_wc_tick`'s first half or `_author_actions`).
 
+**The fire key is not polled: it is an Enhanced Input action** (I1; `input_assets.py`,
+`weapon_component/trigger.py`, `verify/trigger.py`, `probes/probe_fire_action.py`,
+`probe_net_fire_action.py`).
+`IA_Fire` and the game's own context, `/Game/Weapons/Input/IMC_Default` (the stock
+`/Game/Input/IMC_Default` is checksummed template content and a different asset), are named
+on the player's class defaults; the native `OtherworldCharacter` adds the context and hands
+the action's press and release to the weapon component's base (`Source/CLAUDE.md`, "The
+fire action").
+- **The tap is a stamp, not a flag.** `OnFirePressed` writes `FirePressedAt` = the world's
+  time; the Tick's tap is `FirePressedAt == now` (or `FireForced`). Input runs before
+  physics and the Tick after it in one frame, so the tap is true for that Tick alone, on
+  every path through it. A flag the Tick cleared would wait out a Tick that returned early.
+- **The hold is the base's `FireHeld`,** which the trigger latch and the automatics read.
+- **`IA_Fire` triggers while paused, and the base drops a press that arrives paused.** With
+  the engine's default a button still down when a pause ends is a fresh `Started`: the
+  click that closed the menu fired a shot.
+- **Rebinding:** `tuning.BIND_VARS[0]` (`FIRE_BIND`) is still the settings' first row and
+  `Binds[0]` is still what a save keeps, but the component has no `KeyFire`: the HUD's push
+  hands that row to `SetFireKey`, which rewrites the context's one key for the action when
+  it differs. `POLLED_BINDS` is the rest.
+- **A probe presses it** with `inject_input_vector_for_action` on the local player's
+  subsystem (found by `unreal.ObjectIterator`: Python has no node for it). Injection skips
+  the key mapping, so a headless run proves the action, not the key under it.
+  `has_mapping_context` returns the priority, or `None`: 0 is "there".
+
 R is shared safely between reload and restart: Tick does not run while paused, and the death
 menu polls its own copy from `DrawHUD`, which does.
 

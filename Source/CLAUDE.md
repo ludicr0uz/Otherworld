@@ -192,6 +192,20 @@ comment has the picture of the first two, the shot's server half (W1) and the re
   (W3 took the health component's three and its class). Moving `Loaded` and `Reserve` to
   `UPROPERTY`s needs a native parent for `BP_WeaponItem`, which nothing has yet.
 
+## The fire action (I1)
+
+The first key that is an Enhanced Input action (the module depends on `EnhancedInput` and
+`InputCore`). `AOtherworldCharacter::SetupPlayerInputComponent` adds `InputContext` to the
+local player's subsystem and binds `FireAction` (both class defaults, written by
+`Scripts/combat/input_assets.py`): Started to `UOtherworldWeaponComponentBase::FireInput(true)`,
+Completed and Canceled to `FireInput(false)`. `FireInput` keeps `FireHeld` and raises the
+Blueprint-implementable `OnFirePressed`, except while the game is paused. The event is on
+the component's base, not the character: a component's graph cannot implement its owner's
+event. `SetFireKey(Key)` (on both; the component's forwards to its owner) makes `Key` the
+context's one key for the action and asks the subsystem to rebuild; it returns at once when
+that is already so, because the HUD calls it every frame. It edits the loaded context
+asset, which a game never saves: the save's `Binds[0]` is what persists.
+
 ## The health component's native parent (`UOtherworldHealthComponent`, W3)
 
 The blow and the mark of a death are C++; what dying is stays in the graph. The header's

@@ -10,7 +10,7 @@ locally controlled; the pose (the second half) and the slots and the equip
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.weapon_component.accuracy import _author_accuracy
-from combat.tuning import BIND_VARS
+from combat.tuning import POLLED_BINDS
 from combat.weapon_component.ads import _author_ads
 from combat.weapon_component.aim import _author_resolve_aim
 from combat.weapon_component.ammo import _author_dry_fire
@@ -63,8 +63,9 @@ from combat.weapon_component.drop_request import _author_drop_keys, _author_drop
 from combat.weapon_component.save_exit import _author_save_exit
 from combat.weapon_component.throw import _author_throw, _author_throw_key
 from combat.weapon_component.throw_flight import _author_throw_flight
+from combat.weapon_component.trigger import _author_trigger
 from combat.shot_vars import ReloadForced
-from uebp.nodes.actor import FN_GET_OWNER, FN_IS_KEY_DOWN, FN_WAS_PRESSED
+from uebp.nodes.actor import FN_GET_OWNER, FN_WAS_PRESSED
 from uebp.nodes.math import FN_AND, FN_GE_FF, FN_GREATER_II, FN_NOT, FN_OR
 from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
 from combat import item_vars as IV
@@ -103,7 +104,7 @@ def _author_wc_tick(ed, tick):
     # which is the whole of rebinding: the HUD writes these variables each
     # frame from the player's save, and a literal cannot be written to.
     key_pins = {}
-    for name, _default in BIND_VARS:
+    for name, _default in POLLED_BINDS:
         getter = ed.add_get_member_variable_node(name)
         key_pins[name] = out(getter, name)
 
@@ -253,7 +254,8 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
     # -- every input is a plain bool read, with no chain behind it that could be
     # pulled by the half that should not have run (unlike the NPC melee gate).
     #
-    # The trigger is polled BOTH ways, and the two are OR'd here rather than
+    # The trigger is read BOTH ways (trigger.py: the fire action's press this
+    # frame, and the action down), and the two are OR'd here rather than
     # chosen between. Which one a given weapon honours is settled further in,
     # behind this gate, because the answer is a property of Held -- and this
     # condition is evaluated on every frame, including the frames where nothing
@@ -264,7 +266,7 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
     # is the player touching the trigger at all? A tap is also a hold on the
     # frame it happens, so the OR is not strictly necessary for the automatics
     # -- it is there so that a semi-automatic still opens the gate on the tap
-    # frame even if IsInputKeyDown were ever to disagree, and so that the two
+    # frame even if the held flag were ever to disagree, and so that the two
     # reads that actually decide are the same two pins the weapon is asked
     # about below.
     steady = _node(ed, FN_NOT)
@@ -275,14 +277,7 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
     guarded = _node(ed, FN_NOT)
     _connect(out(ed.add_get_member_variable_node(WV.Blocking), WV.Blocking), _pin(guarded, "A"))
 
-    tapped = _node(ed, FN_OR)
-    _connect(pressed("KeyFire"), _pin(tapped, "A"))
-    _connect(out(ed.add_get_member_variable_node(FIRE_FORCED_VAR), FIRE_FORCED_VAR), _pin(tapped, "B"))
-    tap = out(tapped)
-    holding = _node(ed, FN_IS_KEY_DOWN)
-    _connect(pc_out, _pin(holding, "self"))
-    _connect(key_pins["KeyFire"], _pin(holding, "Key"))
-    holding_out = out(holding)
+    tap, holding_out = _author_trigger(ed)
     touching = _node(ed, FN_OR)
     _connect(tap, _pin(touching, "A"))
     _connect(holding_out, _pin(touching, "B"))

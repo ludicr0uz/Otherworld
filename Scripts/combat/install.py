@@ -25,6 +25,7 @@ from uebp.graph import (
 from combat.hit_reaction import install_hit_reactions
 from combat.hit_zones import install_hit_zones, make_shootable
 from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH, NPC_CLASS_PATH
+from combat.input_assets import install_input
 from combat.player_move import reparent_player, set_move_numbers
 from combat.player_pace import set_jog_speed
 from combat.skin import player_skin
@@ -163,6 +164,9 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     relevancy.apply(bp, CHARACTER)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
+    # The mapping context and the fire action the native parent adds and
+    # binds (input_assets.py): class defaults, written after the last compile.
+    install_input(bp)
     eas.save_loaded_asset(bp)
     _log("player: HealthComponent + WeaponComponent + FootstepComponent + "
          f"{RECORD_COMPONENT} + {GUARD_COMPONENT} installed")

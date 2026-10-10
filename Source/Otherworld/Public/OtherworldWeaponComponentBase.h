@@ -46,6 +46,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "InputCoreTypes.h"
 #include "OtherworldWeaponComponentBase.generated.h"
 
 class AController;
@@ -120,6 +121,26 @@ public:
 	/** A reload that moved rounds: the graph's clack, told or predicted. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Otherworld|Shot")
 	void Reloaded();
+
+	/**
+	 * The trigger, from the local player's fire action (I1: the owner,
+	 * AOtherworldCharacter, binds it). Keeps FireHeld, and tells the graph a
+	 * press as OnFirePressed. A press while the game is paused is held and
+	 * not told: the click that leaves a menu is not a shot.
+	 */
+	void FireInput(bool bDown);
+
+	/** The trigger was pressed: the graph's Tick takes it this frame, as it took the polled key's tap. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Otherworld|Input")
+	void OnFirePressed();
+
+	/** The trigger is down: what a weapon that fires held reads. The local player's copy alone has it. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Otherworld|Input")
+	bool FireHeld = false;
+
+	/** Rebinds the trigger on the owner (AOtherworldCharacter::SetFireKey), for the settings' push. */
+	UFUNCTION(BlueprintCallable, Category = "Otherworld|Input")
+	void SetFireKey(FKey Key);
 
 	/**
 	 * How many rounds a reload of Gun moves now: the magazine's gap, and no

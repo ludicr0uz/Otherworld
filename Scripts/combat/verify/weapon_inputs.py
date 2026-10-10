@@ -10,7 +10,7 @@ from combat.camera import AIM_TRACE_RANGE
 from combat.paths import PISTOL_BP_PATH, SHOTGUN_BP_PATH
 from combat.slot_tuning import DROP_ITEM_VAR, SLOT_KEYS, SLOT_VAR, UNPLACED
 from combat.tuning import (
-    BIND_VARS, COMBAT, DROP_FORWARD, PISTOL_MAGAZINE, SHOTGUN_MAGAZINE,
+    COMBAT, DROP_FORWARD, PISTOL_MAGAZINE, POLLED_BINDS, SHOTGUN_MAGAZINE,
     SHOTGUN_RESERVE,
 )
 from combat.weapon_specs import _weapon_specs
@@ -74,15 +74,13 @@ def check_keys_are_variables():
         src = PIN.list_connected_pins(BEL.find_input_pin(n, "Key"))
         driven += [str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
                    for q in src]
-    # The fire key appears TWICE and that is the whole of automatic fire: once as
-    # WasInputKeyJustPressed (a tap) and once as IsInputKeyDown (a hold). Sprint
-    # and aim are the other two held keys.
+    # The fire key is not among them: it is an input action's (verify/trigger.py).
     # And the slots' number keys (slot_tuning.SLOT_KEYS), fixed rather than
     # bound, but variables all the same.
-    want_keys = sorted([f"Get {v}" for v, _k in BIND_VARS] + ["Get KeyFire"]
+    want_keys = sorted([f"Get {v}" for v, _k in POLLED_BINDS]
                        + [f"Get {v}" for v, _k, _s in SLOT_KEYS])
     check(f"polls exactly {want_keys}", sorted(driven) == want_keys, str(sorted(driven)))
-    for var, default in BIND_VARS + tuple((v, k) for v, k, _s in SLOT_KEYS):
+    for var, default in POLLED_BINDS + tuple((v, k) for v, k, _s in SLOT_KEYS):
         got = w.get_editor_property(var)
         check(f"{var} defaults to {default}, the key this file documents",
               got is not None and got.export_text() == default,

@@ -1,7 +1,7 @@
 """The shot and the reload as server requests (combat/shot_vars.py has the
-picture): what the graph hangs on the native Server_Fire, the reload's
-Server event, the reload both machines run, and the local arm's asks, which
-are also the owning client's prediction.
+picture): what the graph hangs on the native Server_Fire and the native
+reload, and the local arm's asks, which are also the owning client's
+prediction.
 
     Server_Fire(AimPoint)   the native base's (task W1; C++,
                             OtherworldWeaponComponentBase, a reliable Server
@@ -16,8 +16,14 @@ are also the owning client's prediction.
                             this graph's: the sound told, firing.py's shot
                             from the server's own muzzle to the client's
                             AimPoint, and its noise
-    Server_Reload           the guard's Allow, counted served, then ReloadNow
-    ReloadNow               Held valid and the owner alive: ammo.py's reload
+    Server_Reload           the base's too (task W2): the guard's Allow,
+                            counted served, then ReloadNow
+    ReloadNow               the base's: Held valid and the owner alive, how
+                            many rounds move worked out once (its ReloadTake,
+                            the pistol's endless reserve in it), the
+                            magazine, the reserve, the deadline, the record
+    Reloaded                the base's event for a reload that moved rounds,
+                            and this graph's: the clack, told or predicted
 
     _author_shot_ask        the trigger's gate passed, where the keys are:
                             without authority the shot's sound (Fx_Shot), a
@@ -28,7 +34,7 @@ are also the owning client's prediction.
 
 What everyone else sees and hears of it is fx.py's (task M21,
 combat/fx_vars.py): ShotFired tells Multicast_Shot before the pellets fly,
-and ReloadNow announces Multicast_Reload after a reload that moved rounds;
+and Reloaded announces Multicast_Reload after a reload that moved rounds;
 each plays Held's sound on every copy that did not predict it.
 
 In single player the one machine has authority, so the asks predict nothing
@@ -40,20 +46,17 @@ block are the server's, and a sprint's end and the shot behind it travel
 separately, so the server would refuse honest shots.
 """
 
-from net.guard import author_allow
-from uebp import net
 from uebp.g import _G
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, out, then
 from combat import health_vars as HV
 from combat import item_vars as IV
 from combat.paths import HEALTH_CLASS_PATH, ITEM_CLASS_PATH
 from combat.shot_vars import (
-    AIM_PARAM, FIRE_GRACE_S, RELOAD_NOW, SERVER_FIRE, SERVER_RELOAD, SHOT_FIRED,
+    AIM_PARAM, FIRE_GRACE_S, RELOAD_NOW, RELOADED, SERVER_FIRE, SERVER_RELOAD, SHOT_FIRED,
     AsksSent, AsksServed)
 from combat.weapon_component import vars as WV
 from combat.fx_vars import RELOAD, SHOT
 from combat.weapon_component import fx
-from combat.weapon_component.ammo import _author_reload
 from combat.weapon_component.carry import _author_shot_origin
 from combat.weapon_component.firing import _author_fire
 from combat.weapon_component.impact import author_pellet_flew
@@ -63,7 +66,8 @@ from combat.weapon_component.slot_nodes import op, valid
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_GET_OWNER
 from uebp.nodes.math import FN_ADD_FF, FN_ADD_II, FN_LE_FF, FN_OR, FN_SUB_II
 from uebp.nodes.palette import NODE_CAST_HEALTH
-from uebp.nodes.weapon import FN_SERVER_FIRE, NODE_EVENT_SHOT_FIRED
+from uebp.nodes.weapon import (
+    FN_RELOAD_NOW, FN_SERVER_FIRE, FN_SERVER_RELOAD, NODE_EVENT_RELOADED, NODE_EVENT_SHOT_FIRED)
 from uebp.nodes.system import FN_PLAY_SOUND, FN_TIME_SECONDS
 
 import unreal
@@ -120,19 +124,21 @@ def _author_shot_fired(ed):
     _author_shot_noise(ed, held, muzzle, flew, fired)
 
 
-def _author_reload_now(ed):
+def _author_reloaded(ed):
+    """Reloaded, the native base's event: its ReloadNow (C++) found a gun in
+    a living hand and moved rounds. What is left is the clack."""
     g = _G(ed, ITEM_CLASS_PATH)
-    event = g.keep(net.custom_event(ed, RELOAD_NOW))
-    held = g.get(WV.Held)
-    armed, _empty = g.branch(valid(g, held), [then(event)])
-    alive = _author_alive(g, [armed])
+    event = g.keep(_palette(ed, NODE_EVENT_RELOADED))
+    fx.announce(g, RELOAD, [then(event)])
     ed.add_comment_to_nodes(
-        f"{RELOAD_NOW} (shot.py): the reload, with a valid Held and a living owner. "
-        f"The server's from {SERVER_RELOAD}; the owning client calls it too, as its "
-        "prediction. A reload that moved rounds is heard: told to everyone with "
-        "authority, played here without.", g.made)
-    moved, _nothing = _author_reload(ed, held, alive)
-    fx.announce(g, RELOAD, [moved])
+        f"{RELOADED} (shot.py): a reload that moved rounds, on this machine's copy. "
+        f"{RELOAD_NOW} is the native base's (OtherworldWeaponComponentBase): with a "
+        "valid Held and a living owner it works out how many rounds move once, fills "
+        "the magazine, charges the reserve (never the pistol's endless one) and pushes "
+        f"the gun's ReloadSeconds onto NextFireTime. The server's from {SERVER_RELOAD}; "
+        "the owning client calls it too, as its prediction. The clack: told to "
+        "everyone with authority, played here without. A reload that moved nothing "
+        "raises no event, so it has no sound and no pause.", g.made)
 
 
 def _author_heard_on_gun(ed, sound_var):
@@ -147,29 +153,15 @@ def _author_heard_on_gun(ed, sound_var):
     return body
 
 
-def _author_server_reload(ed):
-    g = _G(ed)
-    event = g.keep(net.server_event(ed, SERVER_RELOAD))
-    flow, allowed = author_allow(g, SERVER_RELOAD, [then(event)])
-    flow = _count(g, AsksServed, [flow])
-    go, _refused = g.branch(allowed, [flow])
-    call = g.keep(_node(ed, RELOAD_NOW))
-    _connect(go, _pin(call, "execute"))
-    ed.add_comment_to_nodes(
-        f"{SERVER_RELOAD} (shot.py): the owning client's R. Counted served, then the "
-        "reload.", g.made)
-
-
 def author_shot_events(ed):
-    """The three events, and the shot's and the reload's cosmetics. Before
-    the Tick, which calls them by name."""
+    """What the graph hangs on the base's events, and the shot's and the
+    reload's cosmetics."""
     for name, sound in ((SHOT, IV.FireSound), (RELOAD, IV.ReloadSound)):
         fx.pair(ed, name, (), _author_heard_on_gun(ed, sound), fx.UNPREDICTED,
                 item_class=ITEM_CLASS_PATH)
     author_pellet_flew(ed)
     _author_shot_fired(ed)
-    _author_reload_now(ed)
-    _author_server_reload(ed)
+    _author_reloaded(ed)
 
 
 def _author_shot_ask(ed, held, muzzle, exec_in):
@@ -203,10 +195,10 @@ def _author_reload_ask(ed, exec_in):
     after the ask."""
     g = _G(ed)
     owns, predicts = g.branch(authority(g), [exec_in])
-    now = g.keep(_node(ed, RELOAD_NOW))
+    now = g.keep(_node(ed, FN_RELOAD_NOW))
     _connect(predicts, _pin(now, "execute"))
     flow = _count(g, AsksSent, [then(now)])
-    ask = g.keep(_node(ed, SERVER_RELOAD))
+    ask = g.keep(_node(ed, FN_SERVER_RELOAD))
     for e in (owns, flow):
         _connect(e, _pin(ask, "execute"))
     ed.add_comment_to_nodes(

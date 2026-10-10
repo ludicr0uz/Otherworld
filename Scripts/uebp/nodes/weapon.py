@@ -2,7 +2,8 @@
 Otherworld module: Source/Otherworld/Public/OtherworldWeaponComponentBase.h),
 which BP_WeaponComponent is a child of (task W1). The shot's server half:
 the request, the pellets, and the two events the graph hangs its cosmetics
-on (combat/weapon_component/shot.py, firing.py, impact.py).
+on (combat/weapon_component/shot.py, firing.py, impact.py); and the reload
+(task W2): its request, the reload itself and the event for its clack.
 """
 
 WEAPON_BASE_CLASS = "/Script/Otherworld.OtherworldWeaponComponentBase"
@@ -19,3 +20,11 @@ NODE_EVENT_SHOT_FIRED = "AddEvent|Otherworld|Shot|EventShotFired"
 # -> Start, Stop, bStopped, Point, Normal, bHurt, bScenery, Bone, bHead,
 # Damage, Worth: one pellet, for the eye.
 NODE_EVENT_PELLET_FLEW = "AddEvent|Otherworld|Shot|EventPelletFlew"
+# self: the owning client's R, a reliable Server RPC. The guard, the count,
+# then ReloadNow.
+FN_SERVER_RELOAD = WEAPON_BASE_CLASS + ".Server_Reload"
+# self: the reload on this machine's copy of the held gun (the take worked
+# out once, the magazine, the reserve, the deadline, the record's mark).
+FN_RELOAD_NOW = WEAPON_BASE_CLASS + ".ReloadNow"
+# A reload that moved rounds.
+NODE_EVENT_RELOADED = "AddEvent|Otherworld|Shot|EventReloaded"

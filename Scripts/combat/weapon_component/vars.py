@@ -108,9 +108,6 @@ BasePitchScale = Var("BasePitchScale", FLOAT, -2.5)
 RecoilDebt = Var("RecoilDebt", FLOAT, 0.0)
 RecoilYawDebt = Var("RecoilYawDebt", FLOAT, 0.0)
 RecoilYawKick = Var("RecoilYawKick", FLOAT, 0.0)
-# How many rounds this reload moves, computed once and read back three
-# times. See _author_reload for why it cannot just be recomputed.
-ReloadTake = Var("ReloadTake", INT, 0)
 ItemClass = Var("ItemClass", cls(ITEM_CLASS_PATH))
 BloodClass = Var("BloodClass", cls("/Script/Engine.Actor"))
 # The component's own sounds, a few takes each (Sound/sound_weapons.py, sound_items.py).
@@ -339,7 +336,7 @@ CORE = (
     Inventory, Held, EquippedIndex, NeedsRefresh, OwnerMesh, AimPoint, AimValid, AimBlocked,
     Stamina, MaxStamina, Sprinting, Blocking, BaseFOV, CurrentFOV, TargetFOV, Aiming,
     SightAiming, AimZoom, SightBlend, MouseSensitivity, ScopeSensitivity, BaseYawScale,
-    BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ReloadTake, ItemClass,
+    BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ItemClass,
     BloodClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds, ThrowSounds, ThrowSharpSounds,
     PunchHitSounds, BladeHitSounds, LodgeSounds, HeadKillSounds, BreathSounds, BreathNextTime,
     HandledItem, TakeItem, LocalPC, LocalInput, LocalReady, ExitPending, ExitAt, ExitStartedAt,

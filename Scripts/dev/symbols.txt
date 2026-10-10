@@ -2194,12 +2194,13 @@ combat/shot_vars.py:32: SERVER_FIRE
 combat/shot_vars.py:33: AIM_PARAM
 combat/shot_vars.py:34: SHOT_FIRED
 combat/shot_vars.py:35: PELLET_FLEW
-combat/shot_vars.py:36: SERVER_RELOAD
-combat/shot_vars.py:39: RELOAD_NOW
-combat/shot_vars.py:40: SERVER_EVENTS
-combat/shot_vars.py:42: GRAPH_SERVER_EVENTS
-combat/shot_vars.py:58: TABLE
-combat/shot_vars.py:65: FIRE_GRACE_S
+combat/shot_vars.py:41: SERVER_RELOAD
+combat/shot_vars.py:42: RELOAD_NOW
+combat/shot_vars.py:43: RELOADED
+combat/shot_vars.py:44: SERVER_EVENTS
+combat/shot_vars.py:46: NATIVE_FUNCTIONS
+combat/shot_vars.py:63: TABLE
+combat/shot_vars.py:70: FIRE_GRACE_S
 combat/shotgun_hold.py:61: THUMB_TIP_CM
 combat/shotgun_hold.py:62: FINGER_TIP_CM
 combat/shotgun_hold.py:65: THUMB_START_CM
@@ -2453,7 +2454,7 @@ combat/tuning.py:558: COMBAT_TRACE_DEFAULT
 combat/use_tuning.py:6: USING_VAR
 combat/use_tuning.py:7: USE_PRESSED_VAR
 combat/use_tuning.py:8: USE_WAS_VAR
-combat/verify/__init__.py:191: SECTIONS
+combat/verify/__init__.py:192: SECTIONS
 combat/verify/accuracy.py:19: _title
 combat/verify/accuracy.py:23: _sources
 combat/verify/accuracy.py:30: _sets
@@ -2471,12 +2472,11 @@ combat/verify/aiming.py:18: check_aiming_down_sights
 combat/verify/aiming.py:83: check_mouse_sensitivity
 combat/verify/aiming.py:106: check_aiming_mobility
 combat/verify/aiming.py:176: check_sprint_drops_ready_pose
-combat/verify/ammo_graph.py:22: _linked
-combat/verify/ammo_graph.py:28: _writes
-combat/verify/ammo_graph.py:33: _predicted_round
-combat/verify/ammo_graph.py:40: check_ammunition_graph
-combat/verify/ammo_graph.py:129: _dry_plays
-combat/verify/ammo_graph.py:135: check_click_and_clack
+combat/verify/ammo_graph.py:23: _writes
+combat/verify/ammo_graph.py:28: _predicted_round
+combat/verify/ammo_graph.py:35: check_ammunition_graph
+combat/verify/ammo_graph.py:102: _dry_plays
+combat/verify/ammo_graph.py:108: check_click_and_clack
 combat/verify/anchor.py:29: title
 combat/verify/anchor.py:33: the
 combat/verify/anchor.py:39: feeders
@@ -2711,7 +2711,7 @@ combat/verify/guard.py:69: scan_blueprints
 combat/verify/guard.py:85: scan_sources
 combat/verify/guard.py:103: check_component
 combat/verify/guard.py:127: check_in_step
-combat/verify/guard.py:147: check_fragment
+combat/verify/guard.py:148: check_fragment
 combat/verify/head_hide.py:20: _on_cast
 combat/verify/head_hide.py:26: _hides
 combat/verify/head_hide.py:31: _shows
@@ -2904,17 +2904,17 @@ combat/verify/settings_and_tuning.py:18: _upstream_titles
 combat/verify/settings_and_tuning.py:40: check_settings_savegame
 combat/verify/settings_and_tuning.py:164: check_combat_config
 combat/verify/settings_and_tuning.py:210: check_difficulty
-combat/verify/shot.py:28: _event
-combat/verify/shot.py:32: _calls
-combat/verify/shot.py:38: _calls_of
-combat/verify/shot.py:43: _gate_arm
-combat/verify/shot.py:58: check_native
-combat/verify/shot.py:98: check_events
-combat/verify/shot.py:125: check_server_fires
-combat/verify/shot.py:165: _reads_behind
-combat/verify/shot.py:185: _asked_above
-combat/verify/shot.py:191: check_client_predicts
-combat/verify/shot.py:217: check_view_waits
+combat/verify/shot.py:29: _event
+combat/verify/shot.py:33: _calls
+combat/verify/shot.py:39: _calls_of
+combat/verify/shot.py:44: _gate_arm
+combat/verify/shot.py:63: check_native
+combat/verify/shot.py:121: check_events
+combat/verify/shot.py:148: check_server_fires
+combat/verify/shot.py:185: _reads_behind
+combat/verify/shot.py:205: _asked_above
+combat/verify/shot.py:211: check_client_predicts
+combat/verify/shot.py:237: check_view_waits
 combat/verify/shot_hits.py:19: FX_EVENT
 combat/verify/shot_hits.py:20: CAST
 combat/verify/shot_hits.py:21: ARRAYS
@@ -3164,8 +3164,7 @@ combat/weapon_component/ads.py:169: _author_zoom
 combat/weapon_component/ads.py:275: _author_aim_slowdown
 combat/weapon_component/ads.py:298: _author_ads
 combat/weapon_component/aim.py:21: _author_resolve_aim
-combat/weapon_component/ammo.py:15: _author_reload
-combat/weapon_component/ammo.py:145: _author_dry_fire
+combat/weapon_component/ammo.py:16: _author_dry_fire
 combat/weapon_component/asks.py:44: RAISED
 combat/weapon_component/asks.py:45: WRITES
 combat/weapon_component/asks.py:55: author_asks
@@ -3293,14 +3292,16 @@ combat/weapon_component/look_vars.py:26: SERVER_SET_LOOK
 combat/weapon_component/look_vars.py:27: LOOK_PARAMS
 combat/weapon_component/loot_take.py:47: ACTOR_CLASS_PATH
 combat/weapon_component/loot_take.py:50: author_loot_take
-combat/weapon_component/native.py:28: NAMES
-combat/weapon_component/native.py:48: NUMBERS
-combat/weapon_component/native.py:51: CLASSES
-combat/weapon_component/native.py:54: _must_load_class
-combat/weapon_component/native.py:61: base_class
-combat/weapon_component/native.py:69: reparent
-combat/weapon_component/native.py:94: write_names
-combat/weapon_component/native.py:104: wrong_names
+combat/weapon_component/native.py:30: NAMES
+combat/weapon_component/native.py:55: NUMBERS
+combat/weapon_component/native.py:58: CLASSES
+combat/weapon_component/native.py:63: RETIRED_VARS
+combat/weapon_component/native.py:66: _must_load_class
+combat/weapon_component/native.py:73: base_class
+combat/weapon_component/native.py:81: retire_events
+combat/weapon_component/native.py:94: reparent
+combat/weapon_component/native.py:112: write_names
+combat/weapon_component/native.py:122: wrong_names
 combat/weapon_component/pickup.py:55: ITEM_CAST
 combat/weapon_component/pickup.py:58: _author_item_candidates
 combat/weapon_component/pickup.py:99: _author_take_item
@@ -3351,16 +3352,15 @@ combat/weapon_component/shed.py:53: CARRIED
 combat/weapon_component/shed.py:54: EMPTY_HANDS
 combat/weapon_component/shed.py:57: _author_shed_all
 combat/weapon_component/shed.py:82: author_shed_gear
-combat/weapon_component/shot.py:72: replicate_shot
-combat/weapon_component/shot.py:78: _count
-combat/weapon_component/shot.py:83: _author_alive
-combat/weapon_component/shot.py:100: _author_shot_fired
-combat/weapon_component/shot.py:123: _author_reload_now
-combat/weapon_component/shot.py:138: _author_heard_on_gun
-combat/weapon_component/shot.py:150: _author_server_reload
-combat/weapon_component/shot.py:163: author_shot_events
-combat/weapon_component/shot.py:175: _author_shot_ask
-combat/weapon_component/shot.py:201: _author_reload_ask
+combat/weapon_component/shot.py:76: replicate_shot
+combat/weapon_component/shot.py:82: _count
+combat/weapon_component/shot.py:87: _author_alive
+combat/weapon_component/shot.py:104: _author_shot_fired
+combat/weapon_component/shot.py:127: _author_reloaded
+combat/weapon_component/shot.py:144: _author_heard_on_gun
+combat/weapon_component/shot.py:156: author_shot_events
+combat/weapon_component/shot.py:167: _author_shot_ask
+combat/weapon_component/shot.py:193: _author_reload_ask
 combat/weapon_component/shot_hits.py:35: NOTED
 combat/weapon_component/shot_hits.py:39: _array_call
 combat/weapon_component/shot_hits.py:47: note
@@ -3476,13 +3476,13 @@ combat/weapon_component/torch.py:174: author_kindle_event
 combat/weapon_component/tracer.py:25: _author_tracer
 combat/weapon_component/use.py:40: KINDS
 combat/weapon_component/use.py:43: _author_use
-combat/weapon_component/vars.py:193: SWAY
-combat/weapon_component/vars.py:210: BINDS
-combat/weapon_component/vars.py:214: SLOT_BINDS
-combat/weapon_component/vars.py:217: SLOT_REQUESTS
-combat/weapon_component/vars.py:338: CORE
-combat/weapon_component/vars.py:349: STATE
-combat/weapon_component/vars.py:366: TABLE
+combat/weapon_component/vars.py:190: SWAY
+combat/weapon_component/vars.py:207: BINDS
+combat/weapon_component/vars.py:211: SLOT_BINDS
+combat/weapon_component/vars.py:214: SLOT_REQUESTS
+combat/weapon_component/vars.py:335: CORE
+combat/weapon_component/vars.py:346: STATE
+combat/weapon_component/vars.py:363: TABLE
 combat/weapon_component/view.py:71: _at
 combat/weapon_component/view.py:76: carrier
 combat/weapon_component/view.py:81: rows_loop
@@ -7432,6 +7432,10 @@ probes/probe_record_bytes.py:56: _name
 probes/probe_record_bytes.py:60: _rows
 probes/probe_record_bytes.py:67: _worn
 probes/probe_record_bytes.py:71: _item
+probes/probe_reload.py:33: HOLD
+probes/probe_reload.py:34: SPARE
+probes/probe_reload.py:37: _rounds
+probes/probe_reload.py:41: _press
 probes/probe_respawn_calm.py:29: PROBE_DELAY_S
 probes/probe_respawn_calm.py:30: SETTLE
 probes/probe_respawn_calm.py:31: REOPEN_SETTLE
@@ -8594,11 +8598,14 @@ uebp/nodes/umg.py:31: FN_MODE_GAME
 uebp/nodes/umg.py:32: FN_MODE_GAME_UI
 uebp/nodes/umg.py:34: FN_MOUSE_POS
 uebp/nodes/umg.py:35: FN_VIEWPORT
-uebp/nodes/weapon.py:8: WEAPON_BASE_CLASS
-uebp/nodes/weapon.py:12: FN_SERVER_FIRE
-uebp/nodes/weapon.py:16: FN_FIRE_PELLETS
-uebp/nodes/weapon.py:18: NODE_EVENT_SHOT_FIRED
-uebp/nodes/weapon.py:21: NODE_EVENT_PELLET_FLEW
+uebp/nodes/weapon.py:9: WEAPON_BASE_CLASS
+uebp/nodes/weapon.py:13: FN_SERVER_FIRE
+uebp/nodes/weapon.py:17: FN_FIRE_PELLETS
+uebp/nodes/weapon.py:19: NODE_EVENT_SHOT_FIRED
+uebp/nodes/weapon.py:22: NODE_EVENT_PELLET_FLEW
+uebp/nodes/weapon.py:25: FN_SERVER_RELOAD
+uebp/nodes/weapon.py:28: FN_RELOAD_NOW
+uebp/nodes/weapon.py:30: NODE_EVENT_RELOADED
 uebp/pose_share.py:38: SAVE_CLASS
 uebp/pose_share.py:39: USE_CLASS
 uebp/pose_share.py:42: PREFIX
@@ -8946,11 +8953,14 @@ Source/Otherworld/Public/OtherworldShotLibrary.h:68: UFUNCTION static float Last
 Source/Otherworld/Public/OtherworldShotLibrary.h:72: UFUNCTION static void LastShotLine(const UObject* WorldContextObject, FVector& S
 Source/Otherworld/Public/OtherworldShotLibrary.h:76: UFUNCTION static int32 RewoundShots(const UObject* WorldContextObject);
 Source/Otherworld/Public/OtherworldShotLibrary.h:79: UFUNCTION static int32 RewoundHits(const UObject* WorldContextObject);
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:39: UCLASS class OTHERWORLD_API UOtherworldWeaponComponentBase : public UActorCom
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:51: UFUNCTION void Server_Fire(FVector AimPoint);
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:59: UFUNCTION void ShotFired(FVector AimPoint);
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:70: UFUNCTION void FirePellets(AActor* Gun, FVector Muzzle, FVector Direction, int32
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:82: UFUNCTION void PelletFlew(FVector Start, FVector Stop, bool bStopped, FVector Po
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:52: UCLASS class OTHERWORLD_API UOtherworldWeaponComponentBase : public UActorCom
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:64: UFUNCTION void Server_Fire(FVector AimPoint);
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:72: UFUNCTION void ShotFired(FVector AimPoint);
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:83: UFUNCTION void FirePellets(AActor* Gun, FVector Muzzle, FVector Direction, int32
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:95: UFUNCTION void PelletFlew(FVector Start, FVector Stop, bool bStopped, FVector Po
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:104: UFUNCTION void Server_Reload();
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:115: UFUNCTION void ReloadNow();
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:119: UFUNCTION void Reloaded();
 Source/OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h:36: UCLASS class OTHERWORLDEDITOR_API UOtherworldBlueprintNetLibrary : public UBl
 Source/OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h:43: UFUNCTION static bool SetCustomEventRpc(UEdGraphNode* EventNode, EOtherworldRpc 
 Source/OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h:47: UFUNCTION static bool GetCustomEventRpc(const UEdGraphNode* EventNode, EOtherwor

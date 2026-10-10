@@ -13,8 +13,9 @@ from uebp import net
 from combat.record_vars import VIEW_ROW, ViewDirty
 from combat.paths import HEALTH_BP_PATH, ITEM_BP_PATH
 from combat.shot_vars import (
-    AIM_PARAM, FIRE_GRACE_S, GRAPH_SERVER_EVENTS, PELLET_FLEW, RELOAD_NOW, SERVER_EVENTS,
-    SERVER_FIRE, SERVER_RELOAD, SHOT_FIRED, AsksSent, AsksServed, ReloadForced)
+    AIM_PARAM, FIRE_GRACE_S, NATIVE_FUNCTIONS, PELLET_FLEW, RELOAD_NOW, RELOADED,
+    SERVER_EVENTS, SERVER_FIRE, SERVER_RELOAD, SHOT_FIRED, AsksSent, AsksServed, ReloadForced)
+from combat import fx_vars as FX
 from combat.verify.common import BEL, PIN, cdo, check, graph, in_pins, num_pin, pellet_calls
 from combat.verify.fixtures import wc, wc_cdo, wg
 from combat.verify.record import _authority_branches, _feeders, _title, _upstream
@@ -55,6 +56,10 @@ def _gate_arm(node, gates):
     return ""
 
 
+# The reload's cosmetic pair, as its call nodes are titled.
+_RELOAD_PAIR = FX.events_of(FX.RELOAD)
+
+
 def check_native():
     """The shot's server half is C++ (task W1): the class, the function and
     the names it reads the Blueprints by."""
@@ -71,11 +76,29 @@ def check_native():
           and net.compiled_rpc(wc, "FirePellets") == (net.LOCAL, False)
           and _event(SERVER_FIRE) is None and _event("FirePellets") is None,
           str(net.compiled_rpc(wc, SERVER_FIRE) if base else None))
+    got = {name: net.compiled_rpc(wc, name) for name in (SERVER_RELOAD, RELOAD_NOW)}
+    check(f"...and the reload (task W2): {SERVER_RELOAD}, a reliable Server function, "
+          f"and {RELOAD_NOW}, a plain one (the server's reload and the owning client's "
+          "prediction), and the graph has no event named as either",
+          base is not None and got == {SERVER_RELOAD: (net.SERVER, True),
+                                       RELOAD_NOW: (net.LOCAL, False)}
+          and not [n for n in NATIVE_FUNCTIONS if _event(n) is not None], str(got))
+    # The pure-node trap this was (root CLAUDE.md, "Evaluation order"): the
+    # take is a local of the native ReloadNow, so the graph has nothing to
+    # read twice. By name: a variable, a node or a pin.
+    stored = [str(v) for v in BEL.list_member_variable_names(wc) if "ReloadTake" in str(v)]
+    nodes = [_title(n) for n in wg if "ReloadTake" in _title(n).replace(" ", "")]
+    check("...which works out how many rounds move itself: the graph has no ReloadTake, "
+          "variable or node", base is not None and not stored and not nodes,
+          f"variables {stored}, nodes {nodes}")
     wrong = native.wrong_names(wc)
     check(f"...told the names it reads the Blueprints by ({len(native.NAMES)}: Held, "
           "AsksServed, the item's and the health component's, TakeHit), the health "
           "component's class, and the cooldown's "
-          f"grace ({FIRE_GRACE_S:g} s for uneven packets)", not wrong, str(wrong))
+          f"grace ({FIRE_GRACE_S:g} s for uneven packets), and the guard's two names "
+          f"for its requests ({SERVER_FIRE}, {SERVER_RELOAD})", not wrong
+          and native.NAMES["fire_event_name"] == SERVER_FIRE
+          and native.NAMES["reload_event_name"] == SERVER_RELOAD, str(wrong))
     # A name that names nothing reads as false or 0 in C++, silently: each
     # must be a variable of the Blueprint it is read off.
     item = cdo(unreal.load_asset(ITEM_BP_PATH))
@@ -96,14 +119,14 @@ def check_native():
 
 
 def check_events():
-    for name in GRAPH_SERVER_EVENTS:
-        check(f"{name} is a reliable Server event: the owning client asks, the server "
-              "does", _event(name) is not None
-              and net.compiled_rpc(wc, name) == (net.SERVER, True),
-              str(net.compiled_rpc(wc, name) if _event(name) else None))
-    check(f"{RELOAD_NOW} is a plain event: the server's reload, and the owning "
-          "client's prediction", _event(RELOAD_NOW) is not None
-          and net.compiled_rpc(wc, RELOAD_NOW) == (net.LOCAL, False))
+    reloaded = _event(RELOADED)
+    under = [n for n in wg if reloaded is not None and n != reloaded and reloaded in _upstream(n)]
+    told = sorted(_title(n) for n in under if _title(n) in _RELOAD_PAIR)
+    check(f"the graph hangs a reload on the native base's {RELOADED} (a reload that "
+          "moved rounds): the clack, told with authority and predicted without, and "
+          "no write of anything", reloaded is not None and told == sorted(_RELOAD_PAIR)
+          and not [n for n in under if _title(n).startswith("Set")],
+          f"{told} under it")
     declared = net.variable_replication(wc, str(AsksServed))
     check(f"{AsksServed} replicates to the owning client alone, a RepNotify",
           declared[:2] == (net.REP_NOTIFY, f"OnRep_{AsksServed}")
@@ -142,14 +165,11 @@ def check_server_fires():
           and draws[0] in _upstream(flown[0]), str(len(flown)))
     served = [n for n in wg if _title(n).startswith("Set")
               and _title(n).endswith(f" {AsksServed}")]
-    # Behind the guard's Allow and before its Branch (verify/guard.py): a
-    # reload the guard refuses is counted served too. The shot's count is the
-    # native Server_Fire's, by the name check_native holds it to.
-    first = [e for n in served for f in _feeders(n, "execute") if _title(f) == "Allow"
-             for e in _feeders(f, "execute")]
-    check(f"{SERVER_RELOAD} counts itself served first, done or refused, by the guard "
-          f"too ({AsksServed}); the shot's count is the native {SERVER_FIRE}'s",
-          len(served) == 1 and first == [_event(SERVER_RELOAD)], f"{len(served)} write(s)")
+    # Counted between the guard's Allow and its answer, done or refused, in
+    # C++ for both requests, by the name check_native holds it to
+    # (probes/probe_net_fire.py reads the count come back).
+    check(f"{AsksServed} is counted by the native {SERVER_FIRE} and {SERVER_RELOAD} "
+          "alone: no node of the graph writes it", not served, f"{len(served)} write(s)")
     # What the server asks before it fires (a valid Held, a living owner, a
     # gun, a round, the cooldown with its grace), the round and the stamp
     # are C++ now: the graph under ShotFired must not spend a second round.
@@ -205,9 +225,9 @@ def check_client_predicts():
           == ["Set Loaded", "Set NextFireTime"], str([_title(n) for n in predicted]))
     now = _calls_of(RELOAD_NOW)
     arms = sorted(_gate_arm(n, gates) for n in now)
-    check(f"{RELOAD_NOW} is called by {SERVER_RELOAD}, and by the Tick without "
-          "authority alone", len(now) == 2 and arms == ["", "else"]
-          and any(_event(SERVER_RELOAD) in _upstream(n) for n in now),
+    check(f"{RELOAD_NOW} is called by the graph once, by the Tick without authority: "
+          f"the owning client's prediction (the server's call is the native "
+          f"{SERVER_RELOAD}'s)", len(now) == 1 and arms == ["else"],
           f"{len(now)} call(s), arms {arms}")
     forced = [n for n in wg if _title(n) == f"Get {ReloadForced}"]
     check(f"a probe's {ReloadForced} stands in for the reload key", len(forced) == 1,

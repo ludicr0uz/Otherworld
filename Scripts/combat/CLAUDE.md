@@ -97,6 +97,12 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   it; the HUD shows `5 / ∞`.
 - **There is no reloading state.** `NextFireTime` is one world-time deadline. Both the fire
   interval and the reload push it out.
+- **The reload is C++** (W2; `UOtherworldWeaponComponentBase`): `Server_Reload` (the guard,
+  the count), `ReloadNow` (the take worked out once, the magazine, the reserve, the pistol's
+  endless one, the deadline, the record's mark) and `Reloaded`, the event the graph hangs the
+  clack on (`shot._author_reloaded`). The graph keeps the key (`tick.py`), the owning
+  client's call of `ReloadNow` as its prediction, and the sound. It has no `ReloadTake`,
+  variable or node, and reads no `InfiniteReserve` (`verify/shot.py`, `verify/ammo_graph.py`).
 - **The shot and the reload are server requests**: `docs/history/combat.md#the-shot-and-the-reload-are`
 - **The shot's server half is C++** (W1; `weapon_component/native.py`,
   `uebp/nodes/weapon.py`, `Source/Otherworld`'s `OtherworldWeaponComponentBase`, which
@@ -116,8 +122,9 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
     names nothing reads as 0 or false in C++ with nothing logged.
   - **A write of a carried item's state from C++ marks the record itself**
     (`MarkInventoryDirty`, by the carrier): `dirty.py`'s pass sees graph nodes only.
-  - **A Blueprint built before W1** has a custom event named as the base's function,
-    which the reparent's compile refuses: `native.reparent` removes that node first.
+  - **A Blueprint built before a slice** has a custom event named as one of the base's
+    functions (`shot_vars.NATIVE_FUNCTIONS`), which the compile refuses:
+    `native.retire_events` removes those nodes before the reparent and the build.
 - **The pellet is judged where the shooter saw the target** (M22; `lag_tuning.py`,
   `uebp/nodes/shot.py`; the C++ is `Source/Otherworld`'s `OtherworldHitHistory` and
   `OtherworldShotLibrary`; `Scripts/net/CLAUDE.md`, "Lag compensation"). The

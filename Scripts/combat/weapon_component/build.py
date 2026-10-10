@@ -83,6 +83,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # to fill: what an earlier build was given is put back below.
     campfire_class = _kept_class(bp, WV.CampfireClass)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
+    native.retire_events(ed)
     native.reparent(bp, ed)
     # The reparent compiled the Blueprint: the graph is asked for again.
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
@@ -114,7 +115,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     declare(ed, WV.STATE)
     # The names the interact had as the pick-up are taken off a component
     # built before the rename.
-    for name in RETIRED_VARS:
+    for name in RETIRED_VARS + native.RETIRED_VARS:
         ed.remove_member_variable(name)
     arc_class = BEL.generated_class(throw_arc_bp)
 

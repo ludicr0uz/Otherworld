@@ -18,7 +18,7 @@ import unreal
 
 from uebp import net
 from combat.paths import WEAPON_COMP_BP_PATH
-from combat.shot_vars import AIM_PARAM, SERVER_FIRE, SHOT_FIRED
+from combat.shot_vars import AIM_PARAM, SERVER_EVENTS, SERVER_FIRE, SERVER_RELOAD, SHOT_FIRED
 from combat.verify.common import BEL, PIN, check, component_template, graph, in_pins, pin_value
 from combat.verify.fixtures import _is_exec, char, wc, wc_cdo
 from combat.verify.record import _feeders, _title, _upstream
@@ -127,9 +127,10 @@ def check_component():
 def check_in_step():
     found = scan_blueprints()
     here = WEAPON_COMP_BP_PATH.rsplit("/", 1)[-1]
-    # The graph's Server events, and the native base's one (W1): the shot's
-    # request is a C++ RPC, which asks the guard itself.
-    native = [SERVER_FIRE] if net.compiled_rpc(wc, SERVER_FIRE) == (net.SERVER, True) else []
+    # The graph's Server events, and the native base's two (W1, W2): the
+    # shot's and the reload's requests are C++ RPCs, which ask the guard
+    # themselves.
+    native = [e for e in SERVER_EVENTS if net.compiled_rpc(wc, e) == (net.SERVER, True)]
     events = sorted(found.get(here, []) + native)
     check("every Server event of the weapon component has a row in the guard's table, "
           "and every row an event", events == sorted(GC.RATES),
@@ -157,6 +158,11 @@ def check_fragment():
     fired = graph(wc).find_event_node(SHOT_FIRED)
     draws = [n for n in graph(wc).list_all_nodes() if _title(n) == f"Set {SHOT_DIRECTION_VAR}"]
     name = str(wc_cdo.get_editor_property("fire_event_name"))
+    reload_name = str(wc_cdo.get_editor_property("reload_event_name"))
+    check(f"{SERVER_RELOAD} is the native base's too, which asks the guard by that name "
+          "(Allow, and counts the ask served before it looks at the answer)",
+          graph(wc).find_event_node(SERVER_RELOAD) is None and reload_name == SERVER_RELOAD,
+          f"asks as {reload_name!r}")
     check(f"{SERVER_FIRE} is the native base's, which asks the guard by that name "
           f"(Allow, then AimAllowed of the client's {AIM_PARAM}), and the shot is drawn "
           f"only under {SHOT_FIRED}",

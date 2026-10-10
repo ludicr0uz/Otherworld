@@ -13,8 +13,8 @@ and it never relies on a variable another section left behind.
   anchor      how a check finds its node without counting the graph: a named
               event's nodes, the step along a link, the() node it arrives at
   ammo_graph  what the graph does with a gun's ammunition, under the events
-              that own each write (Server_Fire, ReloadNow, ViewRow), and the
-              click and the clack
+              that own each write (the predicted round, ViewRow), that the
+              reload's arithmetic is not in it (W2), the click and the clack
   fixtures    shared loaded assets (health, weapon component, characters, ...)
   anim_blueprint  weapons  grip_fit  audio  health  weapon_inputs  install
   player_body  blood  hit_reactions  ragdoll  aiming  settings_and_tuning
@@ -116,7 +116,8 @@ and it never relies on a variable another section left behind.
               weapon component's and every other Blueprint's), a client's
               picture of it (ViewRow, ViewTrim)
   shot        the shot and the reload as server requests (M19): the native
-              base and the names it reads by (W1), the Server events, the
+              base and the names it reads by (W1), its reload and no
+              ReloadTake in the graph (W2), the
               pellets flown only under ShotFired, the owning
               client's prediction off authority, the counters and the view
   strike      melee, the guard, the fire held out, the throw and the take as

@@ -145,7 +145,7 @@ numbers, which the fire graph hands `ShotTrace` as pin literals.
 ## The weapon component's native parent (`UOtherworldWeaponComponentBase`, W1)
 
 The weapon component is ported out of its graph a slice at a time; the header's first
-comment has the picture of the first, the shot's server half.
+comment has the picture of the first two, the shot's server half (W1) and the reload (W2).
 
 - **`BP_WeaponComponent` is reparented by its own builder** (`weapon_component/native.py`,
   called from `build.py` before the graph is authored): the shot's nodes are the base's.
@@ -173,7 +173,19 @@ comment has the picture of the first, the shot's server half.
 - **`_Validate` returning false closes the connection.** It refuses only what no honest
   client sends (an `AimPoint` that is not a number); how often and where a shot may aim
   are the guard's, whose refusals are quiet until its own threshold.
-- **The next slices** (W2, the reload; W3, the health component) take names out of
+- **The reload (W2)**: `Server_Reload` (a reliable Server RPC with no `_Validate`: it has
+  no argument to refuse; the guard's `Allow` by `ReloadEventName`, `AsksServed` counted
+  either way), `ReloadNow` (a `BlueprintCallable` the owning client calls too, as its
+  prediction) and `Reloaded`, the event for a reload that moved rounds. `ReloadTake(Gun)`
+  is a plain C++ method, deliberately not a `UFUNCTION`: as a pure Blueprint node, read
+  again after `Loaded` rose, it charged the reserve less than the magazine gained. The
+  pistol's endless reserve (`InfiniteReserve`) is read there and nowhere in the graph.
+  `ReloadNow` marks the record itself, which does nothing on a client. `Reloads` counts
+  the ones that moved rounds on this machine.
+- **A custom event named as a function a new slice adds** is removed by
+  `native.retire_events` (the names are `shot_vars.NATIVE_FUNCTIONS`) before the build:
+  add the slice's functions to that tuple.
+- **The next slices** (W3, the health component) take names out of
   `native.NAMES` as their state becomes native. Moving `Loaded` and `Reserve` to
   `UPROPERTY`s needs a native parent for `BP_WeaponItem`, which nothing has yet.
 

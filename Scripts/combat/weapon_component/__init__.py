@@ -70,11 +70,12 @@ _author_* fragment per concern, each in its own module:
               ReticleSpread from Held's GUN_ACCURACY factors, stance and aim
   native      the component's native parent (W1; C++, Source/Otherworld,
               OtherworldWeaponComponentBase): the reparent, and the names its
-              Server_Fire and FirePellets read the Blueprints' variables by
+              Server_Fire, FirePellets and reload read the Blueprints'
+              variables by; the events and the variable it retires
   shot        the shot and the reload as server requests (combat/shot_vars.py):
               ShotFired (what the graph hangs on the native Server_Fire),
-              Server_Reload with its refusals, ReloadNow, and the local arm's
-              asks, which are the owning client's prediction; Fx_Shot and
+              Reloaded (the clack, on the native ReloadNow), and the local
+              arm's asks, which are the owning client's prediction; Fx_Shot and
               Fx_Reload, Held's sound at the gun
   fx          the fight as everyone sees and hears it (combat/fx_vars.py): the
               Fx_<Name>/Multicast_<Name> pair every cosmetic is, its three
@@ -127,7 +128,7 @@ _author_* fragment per concern, each in its own module:
   heat        interact's campfire kind: the fires it offers while the held
               item Heats (the knife, the axe), and what makes that item Hot
               for HEAT_S (the item's own Tick cools it: combat/heat.py)
-  ammo        the reload (ReloadNow's body) and dry fire
+  ammo        dry fire (the reload is the native base's since W2)
   (sounds)    Sound/sound_weapons.py and sound_items.py: the component's own
               sounds, and an item's as a slot move handles it (HandledItem)
               or it is used up; Sound/sound_world.py: the listener at the

@@ -168,7 +168,12 @@ timing and hits. `combat/shot_vars.py` has the picture; the graphs are
   implementation asks the guard, counts the ask served, refuses quietly (no gun, a dead
   owner, no round, the cooldown), spends the round, stamps the deadline, marks the
   record, and raises `ShotFired` for the graph; the pellets' traces and `TakeHit` are its
-  `FirePellets`. `Server_Reload` and everything else are still Blueprint Server events.
+  `FirePellets`.
+- **`Server_Reload` is a C++ RPC since W2**, reliable, on the same base: the guard, the
+  count, then `ReloadNow`, a plain function the owning client also calls as its
+  prediction. It works out how many rounds move once and writes the magazine, the
+  reserve and the deadline; a reload that moved rounds raises `Reloaded` for the graph's
+  clack. Everything else is still a Blueprint Server event.
 
 - **The client sends one thing: where its reticle rests.** The server traces from its own
   copy's muzzle (`carry._author_shot_origin`) and draws the shot inside its own copy's
@@ -549,12 +554,14 @@ asks) asks first, one way:
 
 - **The fragment is `net/guard.py`:** `allowed, refused = author_guard(g, NAME,
   [then(event)])` is the first thing after `net.server_event(...)`, and the event's body
-  hangs off `allowed`. `Server_Reload` uses `author_allow` (the answer
-  and the exec apart) so that `AsksServed` is counted between the ask and its Branch: a
-  refused reload is answered like any other the server did not do.
+  hangs off `allowed`. (`author_allow` gives the answer and the exec apart, for an
+  event that must do something between the ask and its Branch.)
 - **`Server_Fire` asks in C++** (W1): `Allow` by its own name (the base's
-  `FireEventName`, the row's key), the count, then `AimAllowed`. It is a row of `RATES`
-  like the rest, and `verify/guard.py` counts it among the component's Server events.
+  `FireEventName`, the row's key), the count, then `AimAllowed`. **`Server_Reload` asks
+  in C++ too** (W2, `ReloadEventName`): `AsksServed` is counted between the ask and the
+  answer, so a refused reload is answered like any other the server did not do. Each is a
+  row of `RATES` like the rest, and `verify/guard.py` counts them among the component's
+  Server events.
 - **A new Server event** gets a row in `RATES` and the fragment; `combat/verify/guard.py`
   fails on an event with no row, a row with no event, a builder that makes a Server
   event and does not name the fragment, and an event whose first node is not its own

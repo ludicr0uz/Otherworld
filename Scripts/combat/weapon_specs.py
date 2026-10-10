@@ -154,7 +154,7 @@ def _weapon_specs():
 
     That claim has now been tested. The SMG, the assault rifle and the sniper
     were added as three rows here plus three part tables, and not one node in
-    _author_fire, _author_reload or the fire gate changed to accommodate them:
+    _author_fire, the reload or the fire gate changed to accommodate them:
     pellet count, spread, range, interval, magazine and reload time were
     already the parameters those graphs read off Held. The only code the three
     needed is the code for *finding* one, which is a property of the drop and

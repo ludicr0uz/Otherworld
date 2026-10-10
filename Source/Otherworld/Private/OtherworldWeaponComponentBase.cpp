@@ -88,6 +88,14 @@ UActorComponent* UOtherworldWeaponComponentBase::HealthOf(const AActor* Actor) c
 	return Actor && HealthClass ? Actor->FindComponentByClass(HealthClass) : nullptr;
 }
 
+bool UOtherworldWeaponComponentBase::OwnerAlive() const
+{
+	// A request can arrive after the blow that killed: the health itself is
+	// asked. An owner with no health component is alive.
+	const UActorComponent* Health = HealthOf(GetOwner());
+	return !Health || !(ReadBool(Health, HealthDeadVar) || ReadReal(Health, HealthVar) <= 0.0);
+}
+
 bool UOtherworldWeaponComponentBase::MayFire(AActor* Gun) const
 {
 	const UWorld* World = GetWorld();
@@ -95,10 +103,7 @@ bool UOtherworldWeaponComponentBase::MayFire(AActor* Gun) const
 	{
 		return false;
 	}
-	// A request can arrive after the blow that killed: the health itself is
-	// asked. An owner with no health component is alive.
-	const UActorComponent* Health = HealthOf(GetOwner());
-	if (Health && (ReadBool(Health, HealthDeadVar) || ReadReal(Health, HealthVar) <= 0.0))
+	if (!OwnerAlive())
 	{
 		return false;
 	}
@@ -153,6 +158,68 @@ void UOtherworldWeaponComponentBase::Server_Fire_Implementation(FVector AimPoint
 	UOtherworldInventoryLibrary::MarkInventoryDirty(this);
 	++ShotsFired;
 	ShotFired(AimPoint);
+}
+
+void UOtherworldWeaponComponentBase::Server_Reload_Implementation()
+{
+	const AActor* Owner = GetOwner();
+	if (!Owner)
+	{
+		return;
+	}
+	UOtherworldRpcGuard* Guard = Owner->FindComponentByClass<UOtherworldRpcGuard>();
+	// Counted served between the ask and its answer, as the shot is: a
+	// refused reload hands the client's predicted rounds back.
+	const bool bAllowed = !Guard || Guard->Allow(ReloadEventName);
+	WriteInt(this, AsksServedVar, ReadInt(this, AsksServedVar) + 1);
+	if (bAllowed)
+	{
+		ReloadNow();
+	}
+}
+
+int32 UOtherworldWeaponComponentBase::ReloadTake(const AActor* Gun) const
+{
+	if (!IsValid(Gun) || !ReadBool(Gun, ItemUsesAmmoVar))
+	{
+		return 0;
+	}
+	const int32 Gap = ReadInt(Gun, ItemMagazineSizeVar) - ReadInt(Gun, ItemLoadedVar);
+	// Min, so a reserve of one tops a magazine that is four short up by one,
+	// and the reserve is never driven below zero. An endless reserve stands
+	// the whole gap in for itself.
+	const int32 Source = ReadBool(Gun, ItemInfiniteReserveVar) ? Gap : ReadInt(Gun, ItemReserveVar);
+	return FMath::Max(FMath::Min(Gap, Source), 0);
+}
+
+void UOtherworldWeaponComponentBase::ReloadNow()
+{
+	const UWorld* World = GetWorld();
+	AActor* Gun = Cast<AActor>(ReadObject(this, HeldVar));
+	if (!World || !IsValid(Gun) || !OwnerAlive())
+	{
+		return;
+	}
+	// Once, before anything is written: every line below reads this number.
+	const int32 Take = ReloadTake(Gun);
+	if (Take <= 0)
+	{
+		// A full magazine, an empty reserve, a thing without ammunition: no
+		// pause and no sound for a key that did not apply.
+		return;
+	}
+	WriteInt(Gun, ItemLoadedVar, ReadInt(Gun, ItemLoadedVar) + Take);
+	if (!ReadBool(Gun, ItemInfiniteReserveVar))
+	{
+		WriteInt(Gun, ItemReserveVar, ReadInt(Gun, ItemReserveVar) - Take);
+	}
+	// There is no reloading state: the cost is the one deadline the interval
+	// between shots uses.
+	WriteReal(Gun, ItemNextFireTimeVar, World->GetTimeSeconds() + ReadReal(Gun, ItemReloadSecondsVar));
+	// Nothing on a client, whose copy is its prediction.
+	UOtherworldInventoryLibrary::MarkInventoryDirty(this);
+	++Reloads;
+	Reloaded();
 }
 
 void UOtherworldWeaponComponentBase::HandHit(UActorComponent* Health, float Amount, const FVector& From,

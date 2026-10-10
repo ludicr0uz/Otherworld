@@ -1,5 +1,5 @@
-// The native parent of BP_WeaponComponent (task W1): the first slice of the
-// weapon component moved out of its graph. It holds the shot's server half:
+// The native parent of BP_WeaponComponent (task W1): the weapon component
+// moved out of its graph a slice at a time. It holds the shot's server half:
 //
 //     owning client                      server
 //     Server_Fire(AimPoint)  -------->   _Validate: a point that is a number
@@ -16,9 +16,22 @@
 //                                              tracer, blood or chips
 //                                          the batch told, the noise
 //
-// The graph keeps what is for the eye and the ear, the muzzle (the aim's own
-// sub-graph) and the draw inside the accuracy cloud. In single player the one
-// machine has authority and Server_Fire is a plain call.
+// and the reload (task W2):
+//
+//     owning client                      server
+//     R: ReloadNow (its prediction)
+//        Server_Reload       -------->   the guard's Allow, AsksServed + 1
+//                                        ReloadNow
+//                                          a gun in a living hand?
+//                                          ReloadTake, worked out ONCE
+//                                          Loaded, Reserve, the deadline,
+//                                          the record
+//                                          Reloaded()               (graph)
+//                                            the clack, told or predicted
+//
+// The graph keeps what is for the eye and the ear, the keys, the muzzle (the
+// aim's own sub-graph) and the draw inside the accuracy cloud. In single
+// player the one machine has authority and each request is a plain call.
 //
 // What is carried stays where it was: Held is the component's Blueprint
 // variable, and Loaded, Reserve and NextFireTime are the item's (one magazine
@@ -83,6 +96,38 @@ public:
 	void PelletFlew(FVector Start, FVector Stop, bool bStopped, FVector Point, FVector Normal, bool bHurt,
 		bool bScenery, FName Bone, bool bHead, float Damage, float Worth);
 
+	/**
+	 * The owning client's R. Asks the guard, counts the ask served whatever
+	 * it said (a refused reload is answered like any other the server did
+	 * not do), then ReloadNow.
+	 */
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Otherworld|Shot")
+	void Server_Reload();
+
+	/**
+	 * The reload, on this machine's copy of the held gun: the server's from
+	 * Server_Reload, and the owning client's own call, its prediction.
+	 * Nothing without a gun in a living hand, or when no round would move
+	 * (no pause either). Otherwise the magazine, the reserve, the deadline
+	 * (the gun's ReloadSeconds from now, on the one NextFireTime the
+	 * interval between shots uses), the record's mark, and Reloaded.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Otherworld|Shot")
+	void ReloadNow();
+
+	/** A reload that moved rounds: the graph's clack, told or predicted. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Otherworld|Shot")
+	void Reloaded();
+
+	/**
+	 * How many rounds a reload of Gun moves now: the magazine's gap, and no
+	 * more than the reserve holds. A gun with an endless reserve (the
+	 * pistol) fills the whole gap, even from a count below zero. 0 for a
+	 * thing without ammunition. Not a Blueprint node: a pure one read again
+	 * after Loaded rose charged the reserve less than the magazine gained.
+	 */
+	int32 ReloadTake(const AActor* Gun) const;
+
 	// How early, by the server's clock, a shot may arrive and still be fired
 	// (Scripts/combat/shot_vars.py, FIRE_GRACE_S).
 	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot")
@@ -91,6 +136,10 @@ public:
 	// The guard's name for the shot (Scripts/net/guard_consts.py's row).
 	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot")
 	FName FireEventName = TEXT("Server_Fire");
+
+	// The guard's name for the reload.
+	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot")
+	FName ReloadEventName = TEXT("Server_Reload");
 
 	// The component's own Blueprint variables.
 	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
@@ -120,6 +169,18 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
 	FName ItemFireIntervalVar = TEXT("FireInterval");
+
+	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
+	FName ItemMagazineSizeVar = TEXT("MagazineSize");
+
+	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
+	FName ItemReserveVar = TEXT("Reserve");
+
+	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
+	FName ItemInfiniteReserveVar = TEXT("InfiniteReserve");
+
+	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
+	FName ItemReloadSecondsVar = TEXT("ReloadSeconds");
 
 	// The health component (the shooter's own, and a struck body's): its
 	// class, which a body is asked for as the graph asked
@@ -156,9 +217,17 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Otherworld|Shot")
 	int32 ShotsRefused = 0;
 
+	// ...and reloads that moved rounds on this machine (a client's are its
+	// predictions).
+	UPROPERTY(BlueprintReadOnly, Category = "Otherworld|Shot")
+	int32 Reloads = 0;
+
 private:
 	/** The actor's component that takes hits (its HealthClass one), or none. */
 	UActorComponent* HealthOf(const AActor* Actor) const;
+
+	/** Whether the owner lives: an owner with no health component does. */
+	bool OwnerAlive() const;
 
 	/** Whether the shot may be fired now: a gun in a living hand, a round in it, cooled. */
 	bool MayFire(AActor* Gun) const;

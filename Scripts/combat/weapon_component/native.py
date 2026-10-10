@@ -3,7 +3,8 @@ OtherworldWeaponComponentBase (C++, Source/Otherworld; uebp/nodes/weapon.py
 has its nodes), and the names it finds the Blueprints' variables by.
 
 The base holds the shot's server half: Server_Fire's guard, refusals, round
-and deadline, the pellets' traces and the damage they hand over. Held is
+and deadline, the pellets' traces and the damage they hand over; and the
+reload (task W2): Server_Reload, ReloadNow, and how many rounds move. Held is
 still this Blueprint's variable, the round and the deadline the item's, and
 the health component a Blueprint, so C++ reads and writes them by name
 (Source/CLAUDE.md, "A Blueprint variable read or written from C++ is found
@@ -19,7 +20,8 @@ from combat.damage import TAKE_HIT
 from combat.light_tuning import LIGHTS_VAR
 from combat.log import _log
 from combat.paths import HEALTH_CLASS_PATH
-from combat.shot_vars import FIRE_GRACE_S, SERVER_FIRE, AsksServed
+from combat.shot_vars import (
+    FIRE_GRACE_S, NATIVE_FUNCTIONS, SERVER_FIRE, SERVER_RELOAD, AsksServed)
 from combat.weapon_component import vars as WV
 from uebp.graph import BEL
 from uebp.nodes.weapon import WEAPON_BASE_CLASS
@@ -27,6 +29,7 @@ from uebp.nodes.weapon import WEAPON_BASE_CLASS
 # The base's property -> the name it reads by.
 NAMES = {
     "fire_event_name": SERVER_FIRE,
+    "reload_event_name": SERVER_RELOAD,
     "held_var": str(WV.Held),
     "asks_served_var": str(AsksServed),
     "item_melee_var": str(IV.Melee),
@@ -36,6 +39,10 @@ NAMES = {
     "item_loaded_var": str(IV.Loaded),
     "item_next_fire_time_var": str(IV.NextFireTime),
     "item_fire_interval_var": str(IV.FireInterval),
+    "item_magazine_size_var": str(IV.MagazineSize),
+    "item_reserve_var": str(IV.Reserve),
+    "item_infinite_reserve_var": str(IV.InfiniteReserve),
+    "item_reload_seconds_var": str(IV.ReloadSeconds),
     "take_hit_event": TAKE_HIT,
     "health_var": str(HV.Health),
     "health_dead_var": str(HV.Dead),
@@ -49,6 +56,11 @@ NUMBERS = {"fire_grace_seconds": FIRE_GRACE_S}
 # The class a body is asked for its health by, as the graphs ask
 # (GetComponentByClass): {property: class path}.
 CLASSES = {"health_class": HEALTH_CLASS_PATH}
+
+
+# The graph's stored take, until the reload was the base's (W2): taken off a
+# component built before it.
+RETIRED_VARS = ("ReloadTake",)
 
 
 def _must_load_class(path):
@@ -66,22 +78,28 @@ def base_class():
     return cls
 
 
+def retire_events(ed):
+    """A component built before a slice has a custom event named as one of
+    the base's functions (Server_Fire before W1; Server_Reload and ReloadNow
+    before W2), which the compile refuses: those event nodes go first (their
+    calls then find the base's function, and the build that follows replaces
+    the whole graph)."""
+    for name in NATIVE_FUNCTIONS:
+        old = ed.find_event_node(name)
+        if old:
+            ed.remove_nodes([old])
+            _log(f"BP_WeaponComponent: the graph's {name} event removed (the base's now)")
+
+
 def reparent(bp, ed):
     """Make ``bp`` a child of the native base, keeping its variables. Before
-    the graph is authored: the shot's nodes are the base's.
-
-    A component built before W1 has a custom event named as the base's
-    Server_Fire, which the compile on the new parent refuses: that event
-    node goes first (its calls then find the base's function, and the build
-    that follows replaces the whole graph).
+    the graph is authored: the shot's nodes are the base's. After
+    retire_events, which clears the names the base takes.
     """
     parent = base_class()
     if BEL.get_blueprint_parent_class(bp) == parent:
         return
     before = {str(v) for v in BEL.list_member_variable_names(bp)}
-    old = ed.find_event_node(SERVER_FIRE)
-    if old:
-        ed.remove_nodes([old])
     BEL.reparent_blueprint(bp, parent)
     if BEL.get_blueprint_parent_class(bp) != parent:
         raise RuntimeError(f"{bp.get_name()} did not take {WEAPON_BASE_CLASS}")

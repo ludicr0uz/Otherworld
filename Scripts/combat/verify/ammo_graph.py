@@ -1,8 +1,9 @@
 """verify.ammo_graph -- what the weapon component's graph does with a gun's
 ammunition: the round spent and the deadline pushed as the owning client's
 prediction (the server's are the native Server_Fire's since W1: C++,
-verify/shot.py), the reload's one stored take under ReloadNow,
-a client's picture under ViewRow, and the click and the clack.
+verify/shot.py), that the reload's arithmetic is nowhere in it (the native
+ReloadNow's since W2), a client's picture under ViewRow, and the click and
+the clack.
 
 The numbers themselves (magazines, reserves, intervals) are the weapons' own
 defaults: verify/weapon_inputs.py. Every check here starts from a named event
@@ -11,18 +12,12 @@ or variable (verify/anchor.py), none from a count of the graph.
 
 from combat import fx_vars as FX
 from combat.record_vars import VIEW_ROW
-from combat.shot_vars import RELOAD_NOW, SERVER_FIRE, SHOT_FIRED
+from combat.shot_vars import RELOAD_NOW, RELOADED, SERVER_FIRE, SHOT_FIRED
 from combat.verify.anchor import (
-    event, event_nodes, feeders, in_event, pure_feeds, reads, runs, title,
+    event, event_nodes, feeders, pure_feeds, reads, runs, title,
 )
-from combat.verify.common import BEL, PIN, by_pins, check, in_pins, out_pins, past_marks, titled
+from combat.verify.common import by_pins, check, out_pins, past_marks, titled
 from combat.verify.fixtures import wg
-
-
-def _linked(node, pin_name):
-    """The nodes on the far side of one of ``node``'s output pins."""
-    return [PIN.get_owning_node(q)
-            for q in PIN.list_connected_pins(BEL.find_output_pin(node, pin_name))]
 
 
 def _writes(nodes, var):
@@ -43,75 +38,53 @@ def check_ammunition_graph():
     # The server's round and deadline are the native Server_Fire's (C++): the
     # graph it lets a shot through to writes neither.
     spent = _writes(event_nodes(SHOT_FIRED), "Loaded")
-    filled = _writes(event_nodes(RELOAD_NOW), "Loaded")
     seen = _writes(event_nodes(VIEW_ROW), "Loaded")
     predicted = _predicted_round()
     check(f"firing spends a round as the owning client's prediction (the server's is "
-          f"the native {SERVER_FIRE}'s, not {SHOT_FIRED}'s), and reloading puts rounds "
-          "back (and a client's picture takes the record's)",
-          not spent and bool(predicted) and bool(filled) and bool(seen)
+          f"the native {SERVER_FIRE}'s, not {SHOT_FIRED}'s), and a client's picture "
+          "takes the record's",
+          not spent and bool(predicted) and bool(seen)
           and all("int - int" in reads(n) for n in predicted)
-          and all("int + int" in reads(n) for n in filled)
           and all(f == event(VIEW_ROW) for n in seen for f in feeders(n, "Loaded")),
-          f"{SHOT_FIRED} {len(spent)}, predicted {len(predicted)}, "
-          f"{RELOAD_NOW} {len(filled)}, {VIEW_ROW} {len(seen)}")
+          f"{SHOT_FIRED} {len(spent)}, predicted {len(predicted)}, {VIEW_ROW} {len(seen)}")
     # The predicted deadline is the one written after the predicted round.
     next_predicted = [n for p in predicted for n in past_marks(runs(p, "then"))
                       if title(n) == "Set NextFireTime"]
-    deadlines = {"predicted": next_predicted,
-                 RELOAD_NOW: _writes(event_nodes(RELOAD_NOW), "NextFireTime")}
-    check("the interval (the owning client's predicted one; the server's is the native "
-          f"{SERVER_FIRE}'s) and the reload push the same NextFireTime deadline",
-          all(deadlines.values()) and not _writes(event_nodes(SHOT_FIRED), "NextFireTime")
-          and all({"float + float", "GetTimeSeconds"} <= reads(n)
-                  for v in deadlines.values() for n in v),
-          ", ".join(f"{k} {len(v)}" for k, v in deadlines.items()))
+    check("the interval pushes NextFireTime as the owning client's predicted deadline "
+          f"(the server's is the native {SERVER_FIRE}'s, a reload's the native "
+          f"{RELOAD_NOW}'s on the same field)",
+          bool(next_predicted) and not _writes(event_nodes(SHOT_FIRED), "NextFireTime")
+          and all({"float + float", "GetTimeSeconds"} <= reads(n) for n in next_predicted),
+          f"predicted {len(next_predicted)}")
     check("the deadline is compared against the clock, not a frame count",
           bool(titled(wg, "GetTimeSeconds")),
           f"{len(titled(wg, 'GetTimeSeconds'))} GetTimeSeconds")
-    # The reserve is only ever *spent* here; it is topped up by BP_AmmoPickup.
-    charged = _writes(event_nodes(RELOAD_NOW), "Reserve")
+    # The reserve is only ever *spent*, by the native reload; it is topped up
+    # by BP_AmmoPickup. The graph's one write is a client's picture.
     pictured = _writes(event_nodes(VIEW_ROW), "Reserve")
-    check("the weapon component spends the reserve and never grants it (its other "
-          "write is a client's picture of the record)",
-          bool(charged) and bool(pictured)
-          and all("int - int" in reads(n) and "int + int" not in reads(n)
-                  for n in charged)
+    stray = [n for n in _writes(wg, "Reserve") if n not in pictured]
+    check("the weapon component's graph neither spends nor grants the reserve: its "
+          "only write is a client's picture of the record",
+          bool(pictured) and not stray
           and all(f == event(VIEW_ROW) for n in pictured for f in feeders(n, "Reserve")),
-          f"{RELOAD_NOW}: {[sorted(reads(n)) for n in charged]}")
-    # The pure-node trap, in the one place where getting it wrong is free ammo.
-    takes = in_event(RELOAD_NOW, "Set ReloadTake")
-    check("the reload works out how many rounds move ONCE and stores it",
-          bool(takes) and all("Min (Integer)" in reads(n) for n in takes),
-          str([sorted(reads(n)) for n in takes]))
-    gates = [g for n in takes for g in runs(n, "then") if title(g) == "Branch"]
-    back = filled + charged + gates
-    check("...and reads it back three times rather than recomputing it",
-          bool(filled) and bool(charged) and bool(gates)
-          and all("Get ReloadTake" in reads(n) and "Min (Integer)" not in reads(n)
-                  for n in back),
-          str([(title(n), "Get ReloadTake" in reads(n)) for n in back]))
-    check("the reload can never take more than the reserve holds",
-          bool(takes) and all({"Min (Integer)", "Get Reserve"} <= reads(n) for n in takes),
-          str([sorted(reads(n)) for n in takes]))
-    # The pistol's reload: the gap stands in for its reserve (so the magazine
-    # fills even from a negative count), and the reserve is written back as is.
-    endless = {n.get_path_name(): n for w_ in takes + charged for n in pure_feeds(w_)
-               if "InfiniteReserve" in out_pins(n)}
-    check("the reload asks InfiniteReserve twice: what it may take, what it is charged",
-          bool(takes) and bool(charged)
-          and all("Get InfiniteReserve" in reads(n) for n in takes + charged),
-          f"{len(endless)} InfiniteReserve read(s) behind ReloadTake and Reserve")
-    picks = [c for n in endless.values() for c in _linked(n, "InfiniteReserve")]
-    check("...each through a Select, not a branch around the reload",
-          bool(picks) and all({"A", "B", "bPickA"} <= in_pins(c) for c in picks),
-          str([title(c) for c in picks]))
+          f"{VIEW_ROW} {len(pictured)}, elsewhere {len(stray)}")
+    # The pure-node trap, in the one place where getting it wrong was free
+    # ammo: the arithmetic is gone from the graph, not stored in it.
+    under = event_nodes(RELOADED)
+    wrote = [title(n) for n in under if title(n).startswith("Set")]
+    takes = [title(n) for n in wg if "ReloadTake" in title(n).replace(" ", "")]
+    check(f"the reload's arithmetic is the native {RELOAD_NOW}'s: the graph has no "
+          f"ReloadTake node, and nothing under {RELOADED} writes Loaded, Reserve or "
+          "NextFireTime", bool(under) and not wrote and not takes,
+          f"{RELOADED}: {len(under)} node(s), writes {wrote}; ReloadTake {takes}")
+    endless = [n for n in wg if "InfiniteReserve" in out_pins(n)]
+    check("...and the pistol's endless reserve with it: the graph does not read "
+          "InfiniteReserve", not endless, f"{len(endless)} read(s)")
     # The gate is nested, not folded: every one of these reads a property off Held,
     # and the outer condition is pulled on frames where nothing is equipped.
-    asks = {"the fire gate": [g for d in _dry_plays() for g in feeders(d, "execute")],
-            RELOAD_NOW: gates}
-    check("the fire gate and the reload each ask the weapon whether it uses ammo (the "
-          "server's own test of the shot is the native base's: verify/shot.py)",
+    asks = {"the fire gate": [g for d in _dry_plays() for g in feeders(d, "execute")]}
+    check("the fire gate asks the weapon whether it uses ammo (the server's own test of "
+          "the shot, and the reload's, are the native base's: verify/shot.py)",
           all(any("Get UsesAmmo" in reads(g) for g in v) for v in asks.values()),
           str({k: any("Get UsesAmmo" in reads(g) for g in v) for k, v in asks.items()}))
     fire_gate = asks["the fire gate"]

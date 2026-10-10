@@ -71,9 +71,12 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - `Scripts/probes/probe_knife.py` equips the knife, writes `KnifeQueued` and sees the clip, the
     35 HP and the ready pose come back. `verify/knife.py`'s `is_melee_*` set both attacks' nodes
     aside in the older counts.
-- **Reload stores `Min(MagazineSize − Loaded, Reserve)` into `ReloadTake` once.** Recomputing it
-  after `Loaded` rises means free ammo. The reload is the `ReloadNow` event: R calls
-  `Server_Reload`, which runs it, and a client of a server runs it on its own copy first.
+- **Reload works out `Min(MagazineSize − Loaded, Reserve)` once, in C++** (W2:
+  `UOtherworldWeaponComponentBase::ReloadTake`, a local of its `ReloadNow`). In the graph it was
+  a pure node stored into a `ReloadTake` variable, because recomputing it after `Loaded` rose
+  meant free ammo; the graph has neither now. R calls the native `Server_Reload`, which runs
+  `ReloadNow`, and a client of a server runs it on its own copy first. A reload that moved
+  rounds raises `Reloaded`, where the graph tells or predicts the clack.
 - **Debug mode:**
   - `DebugMode` lives on the GameMode, because a component can't reach the HUD. It is on by
     default and persisted as `BP_Settings.DebugMode`. The HUD copies it at BeginPlay, and D writes

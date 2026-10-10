@@ -5,7 +5,7 @@ TABLE. A name a constants module owns (``*_tuning.py``) is imported from it.
 
 from uebp.vars import (
     REPLICATED,
-    BOOL, FLOAT, INT, ROTATOR, STRING, VECTOR, ZERO_ROTATOR, ZERO_VECTOR, Var, array, obj,
+    BOOL, FLOAT, INT, NAME, ROTATOR, STRING, VECTOR, ZERO_ROTATOR, ZERO_VECTOR, Var, array, obj,
     struct,
 )
 from combat.chop_tuning import CHOPS_VAR
@@ -20,7 +20,9 @@ from combat.throw_tuning import (
     THROW_PITCH_VAR, THROW_SPEED, THROW_SPEED_VAR, THROW_SPIN_DEG_S, THROW_SPIN_VAR,
 )
 from combat.torch_tuning import BURN_OUT_VAR, BURNS_VAR, LIT_VAR, USE_POSE_VAR
-from combat.wear_tuning import CLOTHING_SLOT_VAR, NOT_CLOTHING
+from combat.wear_tuning import (
+    CLOTHING_SLOT_VAR, NOT_CLOTHING, WORN_MESH_VAR, WORN_PART_VAR,
+)
 
 Damage = Var("Damage", FLOAT)
 SpreadDegrees = Var("SpreadDegrees", FLOAT)
@@ -136,6 +138,12 @@ Hot = Var(HOT_VAR, BOOL, rep=REPLICATED)
 # NOT_CLOTHING: the weapon component wears an item whose slot is >= 0
 # (weapon_component/wear.py). Scripts/clothing sets it on each garment.
 ClothingSlot = Var(CLOTHING_SLOT_VAR, INT, NOT_CLOTHING)
+# What a garment is drawn as, worn: the body component it fills and the
+# skeletal mesh that goes there (clothing/specs.py Garment.worn). No name and
+# no mesh on every other item, and on a garment nothing is drawn for. Data
+# only: nothing reads them yet.
+WornPart = Var(WORN_PART_VAR, NAME)
+WornMesh = Var(WORN_MESH_VAR, obj("/Script/Engine.SkeletalMesh"))
 # Where it is carried (slot_tuning: the hand, a weapon slot, a bag slot, or
 # UNPLACED), and which weapon slot it belongs in (NOT_A_WEAPON on everything
 # but the guns and the blades). weapon_component/slot_*.py.
@@ -200,7 +208,7 @@ TABLE = (
     Lodged, InWorld, Dormant,
     DisplayName, PelletCount, Dropped, UsesAmmo, MagazineSize, Loaded, Reserve,
     InfiniteReserve, Automatic, Consumable, Melee, Chops, Lights, HasSights, Burns, Lit,
-    Heats, Hot, ClothingSlot, Slot, WeaponKind, BurnOutTime, CoolTime, HeatMaterial, UsePose,
+    Heats, Hot, ClothingSlot, WornPart, WornMesh, Slot, WeaponKind, BurnOutTime, CoolTime, HeatMaterial, UsePose,
     SupportPoint, SpreadShoulderScale, SpreadCrouchScale, SpreadProneScale,
     PelletSpreadDegrees, RecoilPitch, RecoilYaw, RecoilShoulderScale, RecoilSightsScale,
     RecoilCrouchScale, RecoilProneScale, SwayRate, ThrowArcDegrees, ThrowSpeed, ThrowSpinDegS,

@@ -17,6 +17,7 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 |---|---|
 | the garments (`/Game/Clothing/BP_<Garment>`), their stand-in models and materials | this package (`specs.py`, `items.py`) |
 | the test garments on `Lvl_Forest_200m` | this package (`placement.py`) |
+| the mesh a garment is drawn as, worn: `Garment.worn` (the body component it fills, the skeletal mesh, from `metahuman_paths.CLOTHING`), written onto the item as `WornPart` and `WornMesh`. Jacket, Pants and Boots have one; data only, nothing reads it yet | `specs.py`, `items.py`; the variables `combat/item_vars.py` |
 | the slots, `ClothingSlot` on the item, `Worn`/`TakeOffSlot` on the weapon component | `combat/wear_tuning.py` |
 | putting one on, taking one off (the server's: `Scripts/net/CLAUDE.md`, "Clothing") | `combat/weapon_component/wear.py`, `wear_drag.py` (checks: `combat/verify/wear.py`) |
 | what is worn, as the owning client is told it and pictures it | the record's `Worn` (`combat/record_vars.py`; C++, read with `WornRow`: `uebp/nodes/inventory.py`), `view_worn.py` |

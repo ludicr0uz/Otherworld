@@ -1253,7 +1253,7 @@ build_ui_art.py:347: BARS
 clothing/items.py:32: EMISSIVE_SHARE
 clothing/items.py:35: parts_of
 clothing/items.py:41: build_garment
-clothing/items.py:83: build_garments
+clothing/items.py:87: build_garments
 clothing/placement.py:20: TEST_LEVEL
 clothing/placement.py:21: TEST_TAG
 clothing/placement.py:22: AHEAD_CM
@@ -1263,16 +1263,19 @@ clothing/placement.py:27: row_spots
 clothing/placement.py:38: _sub
 clothing/placement.py:42: place_test_clothing
 clothing/placement.py:77: test_clothing_in_level
-clothing/specs.py:18: CLOTHING_DIR
-clothing/specs.py:19: MAT_DIR
-clothing/specs.py:23: class Garment
-clothing/specs.py:51: _pair
-clothing/specs.py:57: GARMENTS
-clothing/specs.py:93: BASE_BODY_NAME
-clothing/specs.py:94: BASE_BODY_MESH
-clothing/specs.py:95: BASE_BODY_SKELETON
-clothing/specs.py:96: BASE_BODY_ABP
+clothing/specs.py:21: CLOTHING_DIR
+clothing/specs.py:22: MAT_DIR
+clothing/specs.py:26: class Garment
+clothing/specs.py:51: _worn
+clothing/specs.py:60: _pair
+clothing/specs.py:66: GARMENTS
+clothing/specs.py:105: BASE_BODY_NAME
+clothing/specs.py:106: BASE_BODY_MESH
+clothing/specs.py:107: BASE_BODY_SKELETON
+clothing/specs.py:108: BASE_BODY_ABP
 clothing/verify/__init__.py:11: SECTIONS
+clothing/verify/garments.py:14: WORN_PARTS
+clothing/verify/garments.py:17: _path
 combat/aim_pitch.py:53: AIM_PITCH_VAR
 combat/aim_pitch.py:55: ROLL_PER_DEGREE
 combat/aim_pitch.py:57: MODIFY_BONE_CLASS
@@ -1926,7 +1929,7 @@ combat/install.py:94: install_foley
 combat/install.py:116: install_on_character
 combat/install.py:171: install_on_npc
 combat/install.py:233: retire_old_assets
-combat/item_vars.py:196: TABLE
+combat/item_vars.py:204: TABLE
 combat/item_world.py:80: REPLICATED
 combat/item_world.py:83: replicate_item
 combat/item_world.py:91: relevance_item
@@ -3596,12 +3599,14 @@ combat/weapon_specs.py:282: DROP_TICKETS
 combat/wear_tuning.py:16: WEAR_SLOTS
 combat/wear_tuning.py:18: NOT_CLOTHING
 combat/wear_tuning.py:20: CLOTHING_SLOT_VAR
-combat/wear_tuning.py:21: WORN_VAR
-combat/wear_tuning.py:23: TAKE_OFF_VAR
-combat/wear_tuning.py:25: WEAR_ITEM_VAR
-combat/wear_tuning.py:27: TAKE_OFF_TO_VAR
-combat/wear_tuning.py:29: SERVER_WEAR
-combat/wear_tuning.py:31: WEAR_REQUEST_VAR
+combat/wear_tuning.py:21: WORN_PART_VAR
+combat/wear_tuning.py:23: WORN_MESH_VAR
+combat/wear_tuning.py:25: WORN_VAR
+combat/wear_tuning.py:27: TAKE_OFF_VAR
+combat/wear_tuning.py:29: WEAR_ITEM_VAR
+combat/wear_tuning.py:31: TAKE_OFF_TO_VAR
+combat/wear_tuning.py:33: SERVER_WEAR
+combat/wear_tuning.py:35: WEAR_REQUEST_VAR
 combat/wood.py:44: WOOD_MESH
 combat/wood.py:45: WOOD_DISPLAY
 combat/wood.py:47: WOOD_SCALE

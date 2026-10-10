@@ -18,6 +18,10 @@ WEAR_SLOTS = ("hat", "glasses", "shirt", "jacket", "gloves", "pants", "boots",
 NOT_CLOTHING = -1
 
 CLOTHING_SLOT_VAR = "ClothingSlot"    # on the item: its slot, or NOT_CLOTHING
+WORN_PART_VAR = "WornPart"            # on the item: the body component it fills
+                                      # worn (a name; none on what fills none)
+WORN_MESH_VAR = "WornMesh"            # on the item: the skeletal mesh it is drawn
+                                      # as there (None on what is drawn as none)
 WORN_VAR = "Worn"                     # on the component: Worn[slot], the garment
                                       # worn there or None (grown by the wear)
 TAKE_OFF_VAR = "TakeOffSlot"          # on the component: a slot to take off

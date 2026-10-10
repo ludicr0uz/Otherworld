@@ -26,6 +26,11 @@ pause is resumed by its name instead of a branch.
 
 ``pause`` is read only while a session or a verifier sweep is running, never
 while dev-team itself is asking something at the terminal (a Fab asset).
+
+Typing ``stop`` instead lets the task in hand finish (session, gate and
+write-up as usual) and ends the run after it, with the rest of the queue not
+run: no session is interrupted and nothing is parked. ``pause`` typed after
+``stop`` still pauses at once.
 """
 
 import contextlib
@@ -42,6 +47,7 @@ import time
 from devteam.accounting import git
 
 WORD = "pause"
+STOP_WORD = "stop"                  # the run ends once the task in hand is done
 MARK = "Dev-Team-Pause"             # the WIP commit's trailer: the pause's name
 MANIFEST = "pause.json"
 INTERRUPT_WAITS = ((signal.SIGINT, 20.0), (signal.SIGTERM, 10.0), (signal.SIGKILL, 5.0))
@@ -63,12 +69,15 @@ class Pauser(object):
 
     ``with pauser.watching(on_pause):`` reads lines from the stream for as
     long as the block runs; the pause word sets ``requested`` and calls
-    on_pause once, from the listening thread. Outside a block nothing is read,
-    so a prompt dev-team itself puts to the user gets its answer."""
+    on_pause once, from the listening thread. The stop word sets
+    ``stop_requested`` and interrupts nothing: the run's loop reads it once
+    the task in hand is done. Outside a block nothing is read, so a prompt
+    dev-team itself puts to the user gets its answer."""
 
     def __init__(self, stream, enabled=True, say=print):
         self.stream, self.enabled, self.say = stream, enabled, say
         self.requested = False
+        self.stop_requested = False
 
     def _listen(self, done, on_pause):
         while not done.is_set() and not self.requested:
@@ -88,8 +97,14 @@ class Pauser(object):
                 self.say("\ndev-team: pausing -- stopping the work in hand")
                 if on_pause:
                     on_pause()
+            elif word == STOP_WORD:
+                if not self.stop_requested:
+                    self.stop_requested = True
+                    self.say("\ndev-team: stopping after this task -- the rest of the "
+                             f"queue will not run (type '{WORD}' to stop it now)")
             elif word:
-                self.say(f"    (type '{WORD}' and Enter to pause this task)")
+                self.say(f"    (type '{WORD}' and Enter to pause this task, "
+                         f"'{STOP_WORD}' to stop after it)")
 
     @contextlib.contextmanager
     def watching(self, on_pause=None):

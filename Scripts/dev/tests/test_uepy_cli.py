@@ -37,6 +37,23 @@ class VerdictTableTest(unittest.TestCase):
     def test_nothing_ran(self):
         self.assertEqual(uepy.verdict_table([], True), ["[probes-for] nothing ran"])
 
+    def test_the_record_stands_beside_each_verdict(self):
+        record = {"probe_a": {"ok": True, "when": "2026-10-10 14:27:07", "head": "249150f"},
+                  "probe_c": {"ok": False, "when": "2026-10-10 14:27:07", "head": "abc1234"},
+                  "probe_d": {"ok": False, "when": "2026-10-09 09:00:00", "head": "249150f"}}
+        rows = [("--game", "probe_a", True), ("--game", "probe_b", False),
+                ("--game", "probe_c", False), ("--game", "probe_d", False)]
+        lines = uepy.verdict_table(rows, True, record, "abc1234")
+        self.assertIn("last on record", lines[1])
+        by = {l.split()[1]: l for l in lines if l.startswith("[probes-for] probe_")}
+        self.assertTrue(by["probe_a"].endswith("ok 2026-10-10 14:27 @249150f"))
+        self.assertTrue(by["probe_b"].endswith("no record"))
+        self.assertTrue(by["probe_c"].endswith("FAIL 2026-10-10 14:27 @abc1234 (this commit)"))
+        self.assertTrue(by["probe_d"].endswith("FAIL 2026-10-09 09:00 @249150f"))
+        self.assertIn("failed: probe_b probe_c probe_d; failing at this commit before your "
+                      "change, not yours: probe_c", lines[-1])
+        self.assertEqual(uepy.last_seen(None, "x"), "no record")
+
 
 class ReporterTest(unittest.TestCase):
 

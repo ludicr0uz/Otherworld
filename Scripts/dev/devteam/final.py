@@ -3,18 +3,23 @@
 The gate's probe half cost a run 41% of its time (a SMOKE sweep is about twenty
 minutes once the probes that fail in their batch are re-run alone) and failed
 tasks that changed only Markdown. So a task's gate is the verifiers alone
-(``--gate-probes none``), and the probes are swept twice a run: in the run's
-first baseline, before the first task, and once after the last
-(``--final-probes``, SMOKE). What newly fails there is written to progress.md
-as its own section, with the commits it covers, and counts against the run's
-exit code; it fails no task, because it cannot say which one.
+(``--gate-probes none``), and the probes are swept once a run, after the last
+task (``--final-probes``, SMOKE). What newly fails there is written to
+progress.md as its own section, with the commits it covers, and counts against
+the run's exit code; it fails no task, because it cannot say which one.
+
+What "newly" is measured against: the run's own baseline sweep, before the
+first task, when ``--check-baseline`` asks for one (or the cache holds one
+for this tree); otherwise the latest recorded result of each probe
+(devteam/probe_record.py), from whichever earlier run or gate last ran it.
 """
 
 import os
 import time
 
-from devteam import baseline_cache, gate, probe_gate, work
+from devteam import baseline_cache, gate, probe_gate, probe_record, work
 from devteam.accounting import git_head
+from devteam.trace import shown, step
 
 HEADING = "## Final probes"
 
@@ -35,9 +40,9 @@ def for_task(rows, probe_set):
     return {l: r for l, r in rows.items() if not l.startswith(probe_gate.PREFIX) or l in keep}
 
 
-def section(status, name, commits, body, problems=()):
+def section(status, name, commits, body, problems=(), against="the run's first baseline"):
     """The final sweep's part of progress.md."""
-    text = f"\n{HEADING}: {status}\n\nSet: {name}, against the run's first baseline.\n" \
+    text = f"\n{HEADING}: {status}\n\nSet: {name}, against {against}.\n" \
            f"Commits: {commits}\n\n{body}\n"
     if problems:
         text += "\n### Regressions\n\n" + "\n".join(f"- {p}" for p in problems) + "\n"
@@ -49,14 +54,18 @@ class Finale:
 
     def __init__(self, args, run_dir, progress):
         self.name, self.final_set, self.task_set = args.final_probes, args.final_set, args.probe_set
+        self.check = getattr(args, "check_baseline", False)
         self.log = os.path.join(run_dir, "final-sweeps.txt")
         self.progress = progress
         self.begun, self.first, self.head, self.state, self.last = False, None, None, None, None
+        self.against = "the run's first baseline"
 
     def begin(self, cache, pauser=None):
-        """Sweep the run's first baseline (the verifiers, and the task set's
-        and the final set's probes), once, and leave the task's share of it
-        in ``cache`` for the first task's gate."""
+        """Settle the run's "before" once, before the first task: the cached
+        baseline of this tree if there is one; else a baseline sweep (the
+        verifiers, and the task set's and the final set's probes) when
+        --check-baseline asked for one, whose verifier share goes into
+        ``cache`` for the first task's gate; else the probes' recorded results."""
         if self.begun:
             return
         self.begun = True
@@ -65,10 +74,22 @@ class Finale:
         self.head, self.state = git_head(work.ROOT), work.tree_state()
         rows = baseline_cache.load(work.ROOT, self.state, ran)
         if rows:
-            print("    gate: the run's baseline from the cache (tree unchanged)")
-        else:
+            step("gate: the run's baseline from the cache (tree unchanged)")
+        elif self.check:
+            step(f"gate: sweeping the run's baseline -- the verifiers and {len(ran)} probe(s) "
+                 f"({self.name}); the final probes are compared with it")
             rows = work.sweep("run baseline", self.log, pauser, both, warm=True)
             baseline_cache.save(work.ROOT, self.state, rows, ran)
+        else:
+            labels = probe_gate.labels(self.final_set)
+            record = probe_record.load(work.ROOT)
+            self.first = probe_record.as_rows(record, labels)
+            held = probe_record.describe(record, labels)
+            self.against = (f"the {held} "
+                            f"({os.path.relpath(probe_record.path(work.ROOT), work.ROOT)})")
+            step(f"gate: no baseline sweep (--check-baseline runs one); the final probes "
+                 f"({self.name}) are compared with the {held}")
+            return
         if rows:
             self.first = rows
             cache[self.state] = for_task(rows, self.task_set)
@@ -81,7 +102,7 @@ class Finale:
         print(f"\ndev-team: final probes ({self.name}) {status}"
               + "".join(f"\n  - {p[:200]}" for p in problems))
         with open(self.progress, "a") as f:
-            f.write(section(status, self.name, commits, body, problems))
+            f.write(section(status, self.name, commits, body, problems, self.against))
 
     def finish(self):
         """The one sweep. False when a probe regressed, or it could not run."""
@@ -95,7 +116,7 @@ class Finale:
                         "so there is nothing to compare with.")
             return True
         if state == self.state:
-            self._write("not run", commits, "The tree is as the first baseline found it.")
+            self._write("not run", commits, "The tree is as the run found it.")
             return True
         last = self.last[1] if self.last and self.last[0] == state else None
         started = time.time()
@@ -105,7 +126,9 @@ class Finale:
             if not work.close_editors():
                 self._write("FAILED", commits, "An editor of this project is still running.")
                 return False
-            rows = probe_gate.run_probes(work.ROOT, self.final_set, self.log)
+            step(f"gate: final probes ({self.name}) starting, {len(labels)} probe(s)  "
+                 f"(log: {shown(self.log, work.ROOT)})")
+            rows = work.probes(self.final_set, self.log)
             took = f"{time.time() - started:.0f}s"
         before = {l: self.first[l] for l in labels if l in self.first}
         problems = gate.regressions(before, rows, gate.load_known(), labels)

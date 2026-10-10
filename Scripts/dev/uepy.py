@@ -50,13 +50,16 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 
+from devteam import probe_record
 from uepylib import cold, detach, editors, game, inbox, net, net_plan, probe_level, probe_map, remote, server, warm
 from uepylib import compile as compile_cpp
 from uepylib.paths import (
-    editor_inbox, engine_dir, game_inbox, log, saved_uepy, serve_inbox, set_project,
+    PROJECT_ROOT, editor_inbox, engine_dir, game_inbox, log, saved_uepy, serve_inbox,
+    set_project,
 )
 from uepylib.summary import format_target, summarize, verdict
 
@@ -154,6 +157,10 @@ def parse_args():
                          "--name-only): one --game launch and one --net launch "
                          "(uepylib/probe_map.py). Detaches itself: prints a run "
                          "directory at once; --wait it for every probe's verdict")
+    ap.add_argument("--all-probes", action="store_true",
+                    help="with --probes-for: run a probe even when it is failing on record "
+                         "at this very commit (Saved/DevTeam/probe_status.json), which is "
+                         "otherwise skipped as not the change's")
     ap.add_argument("--verify-for", nargs="*", metavar="PATH",
                     help="run only the verifiers the changed PATHS map to (default: git "
                          "diff --name-only), warm; says so when none does")
@@ -251,6 +258,20 @@ def probes_for(engine, args):
         log(f"no probe rule for {p}")
     if plan["load"]:
         log(f"skipped (need --bots): {names(plan['load'])}")
+    record, head = probe_record.load(PROJECT_ROOT), git_head()
+    skipped = []        # failing on record at this very commit: not yours, not run
+    for kind in ("game", "title", "net", "net-title"):
+        keep = []
+        for path in plan[kind]:
+            entry = record.get(os.path.basename(path)[:-3])
+            if entry and not entry.get("ok") and entry.get("head") == head and not args.all_probes:
+                skipped.append((os.path.basename(path)[:-3], entry))
+            else:
+                keep.append(path)
+        plan[kind] = keep
+    for name, entry in skipped:
+        log(f"skipped {name}: failing on record at this commit since {entry.get('when')} "
+            f"(--all-probes runs it)")
     launches = [("game", "--game", plan["game"]), ("title", "--game --title", plan["title"]),
                 ("net", f"--net --clients {plan['clients']}", plan["net"]),
                 ("net-title", "--net --title", plan["net-title"])]
@@ -276,23 +297,50 @@ def probes_for(engine, args):
                                   kind == "net-title", args.lag, 0, False, collect=got)
         rows += [(flags, name, passed) for name, passed in got]
     if not args.dry_run:
-        for line in verdict_table(rows, ok):
+        for line in verdict_table(rows, ok, record, head):
             print(line, flush=True)
+        probe_record.update(PROJECT_ROOT, {probe_record.PREFIX + name: {"ok": passed}
+                                   for _f, name, passed in rows}, head, dirty=True)
     return 0 if ok else 1
 
 
-def verdict_table(rows, clean):
+def git_head(root=None):
+    r = subprocess.run(["git", "rev-parse", "--short=9", "HEAD"], cwd=root or PROJECT_ROOT,
+                       capture_output=True, text=True)
+    return r.stdout.strip() or "?"
+
+
+def last_seen(entry, head):
+    """A probe's recorded result as the verdict table shows it beside the new one."""
+    if not entry:
+        return "no record"
+    when = (entry.get("when") or "?")[:16]
+    same = entry.get("head") == head
+    return (f"{'ok' if entry.get('ok') else 'FAIL'} {when} @{entry.get('head', '?')}"
+            + (" (this commit)" if same else ""))
+
+
+def verdict_table(rows, clean, record=None, head=None):
     """One line per probe over every launch, the failures first, then the
-    count: what a session reads instead of each launch's report."""
+    count: what a session reads instead of each launch's report. Beside each
+    verdict, the probe's last recorded one (Saved/DevTeam/probe_status.json):
+    a failure that was failing at this commit before the change is not the
+    change's, and the count line says which those are."""
     if not rows:
         return ["[probes-for] nothing ran"]
+    record = record or {}
     width = max(len(name) for _f, name, _p in rows)
-    lines = ["", f"[probes-for] {'probe':<{width}}  verdict  launch"]
+    lines = ["", f"[probes-for] {'probe':<{width}}  verdict  launch              last on record"]
     for flags, name, passed in sorted(rows, key=lambda r: (r[2], r[0], r[1])):
-        lines.append(f"[probes-for] {name:<{width}}  {'ok   ' if passed else 'FAIL '}   {flags}")
+        lines.append(f"[probes-for] {name:<{width}}  {'ok   ' if passed else 'FAIL '}   "
+                     f"{flags:<18}  {last_seen(record.get(name), head)}")
     failed = [name for _f, name, passed in rows if not passed]
+    before = [n for n in failed if record.get(n) and not record[n].get("ok")
+              and record[n].get("head") == head]
     lines.append(f"[probes-for] {len(rows) - len(failed)} of {len(rows)} probes passed"
                  + (f"; failed: {' '.join(failed)}" if failed else "")
+                 + (f"; failing at this commit before your change, not yours: {' '.join(before)}"
+                    if before else "")
                  + ("" if clean or failed else "; a launch's log failed it (errors above)"))
     return lines
 

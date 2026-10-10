@@ -12,7 +12,8 @@ import hashlib
 import os
 import time
 
-from devteam import baseline_cache, fab, gate, limits, pause, probe_gate
+from devteam import baseline_cache, fab, gate, limits, pause, probe_gate, probe_record
+from devteam.trace import shown, step
 from devteam.accounting import (
     describe_time, describe_tokens, git, git_head, merge_results, tag_commit,
     token_usage,
@@ -63,9 +64,19 @@ def tree_fingerprint():
 
 
 def _sweep_and_probes(log_path, probe_set, serve_dir=None):
+    step(f"verifiers: {len(gate.sweep_targets(ROOT))} suite(s), "
+         f"{'the warm editor' if serve_dir else 'one cold boot'}")
     rows = gate.run_sweep(ROOT, log_path, serve_dir)
     if rows is not None and probe_set:
-        rows.update(probe_gate.run_probes(ROOT, probe_set, log_path))
+        rows.update(probes(probe_set, log_path))
+    return rows
+
+
+def probes(probe_set, log_path):
+    """Run a probe set and record every probe's result (devteam/probe_record)."""
+    head, dirty = tree_state()
+    rows = probe_gate.run_probes(ROOT, probe_set, log_path)
+    probe_record.update(ROOT, rows, head[:9], bool(dirty.strip()))
     return rows
 
 
@@ -74,6 +85,9 @@ def sweep(label, log_path, pauser=None, probe_set=None, warm=False, timings=None
     meanwhile is heard, and acted on by the caller once the sweep is back."""
     started = time.time()
     serve = SERVE_DIR if warm else None
+    step(f"gate: {label} sweep starting"
+         + (f", with {len(probe_gate.labels(probe_set))} probe(s)" if probe_set else "")
+         + f"  (log: {shown(log_path, ROOT)})")
     if pauser:
         with pauser.watching():
             rows = _sweep_and_probes(log_path, probe_set, serve)
@@ -118,6 +132,8 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         limits.wait(meter, pauser)
         if pauser and pauser.requested:        # paused while waiting: nothing ran
             return False, "", {"session_id": how.get("resume"), "interrupted": True}
+        step("session " + ("resuming" if how.get("resume") else "starting")
+             + f"  (transcript: {shown(log_path, ROOT)})")
         ok, report, result = run_session(build_cmd(prompt, args.permission_mode, **how, **opts),
                                          ROOT, log_path, env, meter.see, pauser)
         while limits.limited(result):
@@ -161,7 +177,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
             if baseline is None:
                 baseline = baseline_cache.load(ROOT, state, ran)
                 if baseline:
-                    print("    gate: baseline from the cache (tree unchanged)")
+                    step("gate: baseline from the cache (tree unchanged)")
                     timings["baseline"] = "cached"
             if baseline is None:
                 baseline = sweep("baseline", sweep_log, pauser, probes, warm=True,

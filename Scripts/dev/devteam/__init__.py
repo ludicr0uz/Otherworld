@@ -7,7 +7,8 @@ dev-team itself is the thin CLI (argument parsing and the per-task loop):
   work        one task from start to finish: session, gate, write-up; pausing it
               and resuming it
   pause       the typed ``pause``: listening for it, the WIP branch, the session
-              backup, the record ``dev-team resume`` reads
+              backup, the record ``dev-team resume`` reads; and the typed
+              ``stop``, which ends the run once the task in hand is done
   session     one headless ``claude -p`` session: prompt, command, env, live output
   triage      one Haiku call before the run marks the small, obvious tasks low effort
   fast        fast mode for a task while the five-hour session limit is under half used
@@ -22,4 +23,9 @@ Unit-tested in Scripts/dev/tests (everything but the process launching).
   probe_gate      The probe half of the gate: a named probe set (Scripts/probes/sets.py), run beside the verifier sweep
 
   final  The run's one probe sweep: a probe set run after the last task, not after each
+  probe_record  The latest result of every probe (time, commit, pass/fail), kept
+                across runs: the final sweep's "before" when the run has no
+                baseline sweep of its own; ``dev-team probes`` lists it
+  trace  Timestamped progress lines for the slow steps, and the run.log that
+         keeps everything the terminal showed
 """

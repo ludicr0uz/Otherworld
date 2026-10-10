@@ -34,15 +34,40 @@ class Plan(unittest.TestCase):
         plan = probe_map.plan(["Scripts/combat/weapon_component/fire.py"])
         self.assertEqual(plan["systems"], {"weapons"})
         self.assertTrue({"probe_headshot", "probe_ads_hit"} <= names(plan["game"]))
-        self.assertEqual(plan["net"], [])
-        for p in plan["game"]:
+        # The one weapons probe that is a net probe (probe_server/probe_client,
+        # no RUNS_ON) goes to the net launch, not a --game one it cannot run in.
+        self.assertEqual(names(plan["net"]), {"probe_net_fire_action"})
+        for p in plan["game"] + plan["net"]:
             self.assertIn("weapons", probe_map.declared(p)[0])
 
     def test_net_probes_go_to_the_net_launch(self):
         plan = probe_map.plan(["Scripts/net/guard.py"])
         self.assertIn("probe_net_join", names(plan["net"]))
         self.assertNotIn("probe_net_join", names(plan["game"]))
-        self.assertGreaterEqual(plan["clients"], 1)
+        self.assertGreaterEqual(plan["clients"], 2)
+
+    def test_a_helper_module_beside_the_probes_is_not_launched(self):
+        # probe_clothing_drag.py and probe_clothing_draw.py hold checks other
+        # probes import; they define no probe function and failed every
+        # --game launch that picked them up by their SYSTEMS.
+        plan = probe_map.plan(["Scripts/clothing/items.py"])
+        launched = names(plan["game"] + plan["net"] + plan["title"])
+        self.assertIn("probe_clothing", launched)
+        self.assertNotIn("probe_clothing_drag", launched)
+        self.assertNotIn("probe_clothing_draw", launched)
+        self.assertEqual(probe_map.declared(os.path.join(
+            probe_map.PROBES_DIR, "probe_clothing_drag.py"))[2], ())
+        self.assertEqual(probe_map.declared(os.path.join(
+            probe_map.PROBES_DIR, "probe_net_fire_action.py"))[1:],
+            (None, ("probe_server", "probe_client")))
+
+    def test_a_net_launch_has_two_clients_unless_a_probe_wants_more(self):
+        # probe_net_campfire and probe_net_throw stand client 2 behind client 1
+        # but say only ("server", "client"): a one-client launch failed them.
+        self.assertEqual(probe_map.NET_CLIENTS, 2)
+        self.assertEqual(probe_map.clients_needed(("server", "client")), 2)
+        self.assertEqual(probe_map.clients_needed(("server", "client 3")), 3)
+        self.assertEqual(probe_map.plan(["Scripts/survival/hunger.py"])["clients"], 2)
 
     def test_unmapped_is_reported_and_probe_edits_are_not(self):
         plan = probe_map.plan(["foo/bar.txt", "Scripts/probes/probe_axe.py"])
@@ -54,6 +79,8 @@ class Plan(unittest.TestCase):
         self.assertEqual(k(("net",), ("server", "client")), "net")
         self.assertEqual(k(("net",), ("server", "client", "standalone")), "game")
         self.assertEqual(k(("weapons",), None), "game")
+        self.assertEqual(k(("weapons",), None, ("probe_server", "probe_client")), "net")
+        self.assertEqual(k(("weapons",), None, ("probe", "probe_client")), "game")
         self.assertEqual(k(("load",), ("server",)), "load")
         self.assertEqual(probe_map.clients_needed(("server", "client 2")), 2)
 
@@ -103,7 +130,8 @@ class Command(unittest.TestCase):
         text = out.stdout + out.stderr
         self.assertEqual(out.returncode, 0, text)
         self.assertIn("probe_headshot", text)
-        self.assertNotIn("--net", text)
+        self.assertIn("--net --clients 2: probe_net_fire_action", text)
+        self.assertNotIn("probe_net_join", text)
 
     def test_verify_for_dry_run_names_the_verifier_or_none(self):
         out = subprocess.run([sys.executable, UEPY, "--verify-for",

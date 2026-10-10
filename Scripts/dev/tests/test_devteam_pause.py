@@ -53,6 +53,29 @@ class PauserTest(unittest.TestCase):
             self.assertTrue(self.wait(lambda: self.pauser.requested))
         self.assertIn("pause", self.said[0])
 
+    def test_the_stop_word_asks_for_a_stop_and_interrupts_nothing(self):
+        calls = []
+        with self.pauser.watching(lambda: calls.append(1)):
+            self.type("stop\n")
+            self.assertTrue(self.wait(lambda: self.pauser.stop_requested))
+            self.type("STOP\n")                             # a second one says nothing new
+            time.sleep(0.3)
+            self.type("hello\n")
+            self.assertTrue(self.wait(lambda: len(self.said) == 2))
+        self.assertFalse(self.pauser.requested)
+        self.assertEqual(calls, [])
+        self.assertIn("stopping after this task", self.said[0])
+        self.assertIn("'stop'", self.said[1])
+
+    def test_pause_after_stop_still_pauses_at_once(self):
+        calls = []
+        with self.pauser.watching(lambda: calls.append(1)):
+            self.type("stop\n")
+            self.assertTrue(self.wait(lambda: self.pauser.stop_requested))
+            self.type("pause\n")
+            self.assertTrue(self.wait(lambda: calls))
+        self.assertTrue(self.pauser.requested)
+
     def test_nothing_is_read_outside_a_watch(self):
         # A prompt dev-team itself puts to the user must get its own answer.
         with self.pauser.watching():
@@ -378,6 +401,8 @@ class RunOneTest(unittest.TestCase):
                                    (work.gate, "run_sweep", run_sweep),
                                    (work, "close_editors", lambda: True),
                                    (work, "tree_state", lambda: ("h", "")),
+                                   (work, "tree_fingerprint", lambda: "f"),
+                                   (work, "step", lambda *a, **k: None),
                                    (work.baseline_cache, "load", lambda root, state, probes=(): None),
                                    (work.baseline_cache, "save", lambda root, state, rows, probes=(): None),
                                    (work, "print", lambda *a, **k: None)):

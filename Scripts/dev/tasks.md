@@ -1216,7 +1216,46 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 
 - [x] I1. Enhanced Input, one action: the fire key. `DefaultInput.ini` already names the Enhanced Input classes and nothing uses them; ten modules poll `WasInputKeyJustPressed` on a post-physics Tick with bindings pushed from the SaveGame each frame. Add `combat/input_assets.py` authoring `IA_Fire` and `IMC_Default` (the key from `player_tuning`'s binding table), add the context in `AOtherworldCharacter::SetupPlayerInputComponent` and bind `IA_Fire` to a `BlueprintImplementableEvent OnFirePressed` the weapon component's existing fire fragment connects to in place of its poll. The other keys stay polled. The settings page's rebinding writes the mapping context's key for `IA_Fire` (one row) instead of the SaveGame key. Proof: `probe_net_fire.py`, `probe_asks.py`, `probe_look_sensitivity.py`, the menu's rebinding probe if one exists. Done when `grep` finds no poll of the fire key in `Scripts/combat` and the fingerprint of untouched Blueprints is unchanged. effort: medium
 
-- [ ] In the main menu, consolidate exit game and save and exit buttons. When in game, the option shoudl be save and exit. When in the menu it should be exit game. Bottom option in both cases. In multiplayer instead of leave server should trigger the 15 minute delay same as in single player. 
+- [x] In the main menu, consolidate exit game and save and exit buttons. When in game, the option shoudl be save and exit. When in the menu it should be exit game. Bottom option in both cases. In multiplayer instead of leave server should trigger the 15 minute delay same as in single player. 
+
+- [x] H1. Make an item's place in the hand editable in the editor. Today a held item's grip
+      is solved in code and baked at build, so every correction is edit, build, launch, look.
+      Give each held item (the guns, axe, knife, stick, wood, matches, consumables) a grip
+      the editor can move by eye, which the game then uses to seat the item in the hand.
+      Because content is generated from Python, a hand-placed grip must survive a rebuild:
+      the build seeds it from today's solved values only when it is missing, and never
+      overwrites one that exists. A fresh checkout must look the same as it does now. Done
+      when moving an item's grip in the editor changes how it sits in the hand with no build,
+      a rebuild of the weapons step leaves a moved grip alone, and the existing grip-fit
+      verifier still passes. Document the "place a grip by eye" steps beside the grip docs.
+      Design goal: a handle that sits 2 cm off is fixed by whoever sees it, with no engineer.
+      Big picture: item H1 of 3 (H1-H3), hand placement and clip swaps. effort: medium
+
+- [ ] H2. Grip nudges as a tuning table, so a number is a restart and not a build. From H1
+      and D1 (follow D1's table pattern). Add a table of per-item position and rotation
+      nudges, all zero by default, applied on top of whatever H1 gives, so a rebuild or a
+      new ready pose keeps the nudge. Every machine reads the same rows so the server,
+      client and menu agree. The dev GUN SETTINGS tab gets a grip section for the held item:
+      changing a value moves the item that frame and writes the table, as the tab already
+      does for gun tuning. Done when editing a row and relaunching with no build moves the
+      item, a slider in play moves it at once and persists, and all-zero rows change
+      nothing. Cover the table's parse and write-back with tests and add a probe that a row
+      changes the attach offset by exactly that row. Design goal: tune the last centimetre
+      of a handle from inside the game. Big picture: item H2 of 3. effort: medium
+
+- [ ] H3. One command to swap a player clip. A new Mixamo clip today means dropping the FBX
+      in the cache, adding a row, running the whole player import, then the weapons build.
+      Provide a single dev command that takes the role being replaced (knife or axe ready or
+      swing, prone crawl) and an FBX, and does the rest: registers it, imports and retargets
+      only that clip, and rebuilds only the steps that bake it. It rejects an unknown role
+      and says which exist, supports a dry run, and prints the strike moment it detected for
+      a swing so a bad one is noticed. Done when swapping the axe swing takes about two
+      minutes, the diff shows one changed row and no unrelated regenerated content, and
+      swapping back restores it. Cover the row edit and role list with tests and use the
+      existing melee verifier and look probe as proof. Document the flow beside the clips.
+      Design goal: choosing between three candidate swings takes minutes, not an afternoon.
+      Big picture: item H3 of 3, closing the "which clip" loop the animation library opens.
+      effort: medium
 
 - [ ] I2. Enhanced Input, every remaining key. From I1: one `IA_*` per action in `combat/input_assets.py` (aim, sights, reload, interact, throw, block, slots 1-9, sprint, crouch, prone, slide, jump, menu, inventory, loot, hold breath, use), each bound to a Blueprint-implementable event on the character or the weapon component base, each fragment's poll replaced by its event. Then delete: the SaveGame key push, `_post_physics_tick` and the TG_PostPhysics hack in `uebp/graph.py`, and the `WasInputKeyJustPressed` path from `uebp/nodes` (so `check_node_catalog.py` fails on a new poll). Rebinding on the settings page edits the mapping context. Proof: `probes/sets.py` `FULL`. Done when no builder names `WasInputKeyJustPressed`. effort: high
 

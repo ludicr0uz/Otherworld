@@ -136,27 +136,43 @@ def _literal(tree, name):
     return None
 
 
+ENTRY_POINTS = ("probe", "probe_server", "probe_client")
+# A net launch's clients unless a probe names more: what the smoke set and the
+# measured costs in CLAUDE.md use, and what a probe that says "client 2" in
+# its RUNS_ON-less prose expects.
+NET_CLIENTS = 2
+
+
 def declared(path):
-    """(SYSTEMS, RUNS_ON) of a probe file, read from source."""
+    """(SYSTEMS, RUNS_ON, entry points) of a probe file, read from source: the
+    entry points are the names among ENTRY_POINTS it defines, so a helper
+    module beside the probes (probe_*.py with no probe function) is told apart."""
     with open(path, encoding="utf-8") as fh:
         tree = ast.parse(fh.read())
-    return tuple(_literal(tree, "SYSTEMS") or ()), _literal(tree, "RUNS_ON")
+    entries = tuple(n.name for n in tree.body
+                    if isinstance(n, ast.FunctionDef) and n.name in ENTRY_POINTS)
+    return tuple(_literal(tree, "SYSTEMS") or ()), _literal(tree, "RUNS_ON"), entries
 
 
-def probe_kind(systems, runs_on):
-    """'net', 'title' (game with the title kept), 'load' (needs bots) or 'game'."""
+def probe_kind(systems, runs_on, entries=("probe",)):
+    """'net', 'title' (game with the title kept), 'load' (needs bots) or 'game'.
+    A file with probe_server/probe_client and no probe(p) is a net probe
+    whatever its RUNS_ON says (in a --game run it would define no probe)."""
     if "title" in systems and runs_on is not None and "client" in str(runs_on):
         return "net-title"
     if "load" in systems:
         return "load"
     if runs_on and "standalone" not in runs_on and any(r.startswith(("server", "client")) for r in runs_on):
         return "net"
+    if entries and "probe" not in entries:
+        return "net"
     return "title" if "title" in systems else "game"
 
 
 def clients_needed(runs_on):
-    """Clients a net probe wants: the highest 'client N' it names, at least 1."""
-    n = 1
+    """Clients a net probe wants: the highest 'client N' it names, at least
+    NET_CLIENTS."""
+    n = NET_CLIENTS
     for r in runs_on or ():
         if r.startswith("client "):
             n = max(n, int(r.split()[1]))
@@ -174,12 +190,12 @@ def plan(paths, probes_dir=PROBES_DIR):
         elif not p.startswith(("Scripts/probes/", "Scripts/dev/", "Content/")):
             unmapped.append(p)
     out = {"systems": systems, "unmapped": unmapped, "game": [], "title": [],
-           "net": [], "net-title": [], "load": [], "clients": 1}
+           "net": [], "net-title": [], "load": [], "clients": NET_CLIENTS}
     for path in sorted(glob.glob(os.path.join(probes_dir, "probe_*.py"))):
-        tags, runs_on = declared(path)
-        if not systems.intersection(tags):
-            continue
-        kind = probe_kind(tags, runs_on)
+        tags, runs_on, entries = declared(path)
+        if not systems.intersection(tags) or not entries:
+            continue                        # another system's, or a helper module
+        kind = probe_kind(tags, runs_on, entries)
         out[kind].append(path)
         if kind in ("net", "net-title"):
             out["clients"] = max(out["clients"], clients_needed(runs_on))

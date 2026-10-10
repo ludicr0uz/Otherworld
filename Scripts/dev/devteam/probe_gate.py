@@ -15,6 +15,8 @@ import re
 import subprocess
 import sys
 
+from devteam.trace import step
+
 PREFIX = "probe:"
 PER_PROBE_SECONDS = 30
 # Probes that share a boot share its world: one that leaves the player dead or
@@ -84,6 +86,8 @@ def run_launch(root, flags, names, log_path):
         cmd += ["--probe", os.path.join(probes_dir, n + ".py")]
     budget = PER_PROBE_SECONDS * len(names) + 120
     cmd += ["--seconds", str(budget)]
+    step(f"probes: {' '.join(flags)}, {len(names)} probe(s), up to {budget}s"
+         + (f": {', '.join(names)}" if len(names) <= 3 else ""))
     try:
         proc = subprocess.run(cmd, cwd=root, capture_output=True, text=True,
                               stdin=subprocess.DEVNULL, timeout=budget + 300)
@@ -109,6 +113,13 @@ def run_probes(root, probe_set, log_path):
     rows = {}
     for _label, flags, names in launches(probe_set):
         batch = parse_output(run_launch(root, flags, names, log_path), names)
+        failed = [n for n in names if not batch[PREFIX + n]["ok"]]
+        if failed:
+            step(f"probes: {len(failed)} failed in the batch, re-running "
+                 f"{min(len(failed), MAX_RERUNS)} alone: {', '.join(failed[:MAX_RERUNS])}")
         rerun_alone(root, flags, batch, names, log_path)
+        bad = [n for n in names if not batch[PREFIX + n]["ok"]]
+        step(f"probes: {' '.join(flags)} done -- "
+             + (f"failing: {', '.join(bad)}" if bad else f"all {len(names)} passing"))
         rows.update(batch)
     return rows

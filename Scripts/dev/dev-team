@@ -13,6 +13,7 @@ sessions are pointed at in case an earlier task matters to them.
     Scripts/dev/dev-team --no-commit               # leave changes uncommitted
     Scripts/dev/dev-team --dry-run                 # show what would run
     Scripts/dev/dev-team resume paused/<name>      # carry on a paused task
+    Scripts/dev/dev-team probes [NAME]             # the latest result of each probe
 
 A task file is a Markdown list. Every top-level item is one task; indented or
 following lines up to the next item belong to it, so a task can run to several
@@ -58,10 +59,22 @@ FULL (--gate-probes); each probe is a ``probe:<name>`` row in the table and a
 probe that newly fails fails the task like a verifier.
 
 **The final probes.** The probes are swept once a run instead (--final-probes,
-SMOKE by default; devteam/final.py): in the run's first baseline, and again
-after the last task. A probe that newly fails is written to progress.md under
-"Final probes" with the run's commit range and makes the run exit non-zero,
-but fails no task. A run that was paused, interrupted or stopped skips it.
+SMOKE by default; devteam/final.py), after the last task. A probe that newly
+fails is written to progress.md under "Final probes" with the run's commit
+range and makes the run exit non-zero, but fails no task. A run that was
+paused, interrupted or stopped skips it.
+
+**The probe record.** "Newly" is judged against Saved/DevTeam/probe_status.json:
+the latest result of every probe dev-team has run, with the time and the
+commit (``dev-team probes`` lists it; ``dev-team probes net`` the names
+holding "net"). Every probe launch updates it. --check-baseline sweeps the
+verifiers and the probes before the first task instead, about twenty minutes,
+and judges the final probes against that; a baseline the cache holds for an
+unchanged tree is used either way.
+
+**What is happening.** Each slow step -- a sweep, a probe launch, a session
+starting -- is printed with the clock time it began. Everything printed goes
+to the run's run.log as well.
 
 Sessions run unattended, so they cannot ask questions. The default permission
 mode is ``auto`` (a classifier approves or blocks each action); pass
@@ -94,6 +107,12 @@ again and resumes the same session; when the task then finishes, the branch it
 was paused from is fast-forwarded if it has not moved. It runs that one task,
 not the rest of the queue. See devteam/pause.py.
 
+**Stop.** Type ``stop`` and Enter instead to let the task in hand finish and
+end the run after it: its session is not interrupted, its gate and write-up
+run as usual and it is ticked if it passed, and the tasks still waiting are
+listed as not run. Like a pause, a stop skips the final probes. ``pause``
+typed after ``stop`` still pauses at once.
+
 **Fab assets need you.** Sessions cannot sign in to Fab, so an asset a task
 needs is asked of you at this terminal: a task's ``fab:`` hints before its
 session starts, and a session whose report opens with FAB-REQUIRED after it
@@ -109,8 +128,9 @@ trailers to the task's last commit (a gate fix included), amending only the
 message, and never a commit that is already on a remote branch.
 
 Logs go to Saved/DevTeam/<timestamp>/: the raw stream-json transcript of every
-task, each task's sweep output, and progress.md with each task's report and
-gate table. ``claude --resume <session id>`` opens any task to inspect it.
+task, each task's sweep output, run.log (what the terminal showed) and
+progress.md with each task's report and gate table. ``claude --resume
+<session id>`` opens any task to inspect it.
 
 The pieces live in Scripts/dev/devteam (see its __init__ for the map).
 """
@@ -124,9 +144,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(1, os.path.dirname(HERE))        # Scripts/: asset_pipeline
 
-from devteam import baseline_cache, fab, fast, final, limits, pause, probe_gate  # noqa: E402
+from devteam import (                                               # noqa: E402
+    baseline_cache, fab, fast, final, limits, pause, probe_gate, probe_record,
+)
 from devteam.accounting import git_head                             # noqa: E402
 from devteam.tasks import Task, parse_tasks, requeue, tick          # noqa: E402
+from devteam.trace import Tee, clock                                # noqa: E402
 from devteam.triage import triage                                   # noqa: E402
 from devteam.work import (                                          # noqa: E402
     LOG_ROOT, ROOT, SERVE_DIR, close_editors, park_task, resume, run_one,
@@ -169,8 +192,12 @@ def parse_args():
                    help="probe set the gate runs beside the verifiers, after every task: "
                         "none (default), SMOKE or FULL (Scripts/probes/sets.py)")
     p.add_argument("--final-probes", default="SMOKE", metavar="SET",
-                   help="probe set swept once, after the run's last task, against the "
-                        "run's first baseline: SMOKE (default), FULL or none")
+                   help="probe set swept once, after the run's last task, against each "
+                        "probe's recorded result: SMOKE (default), FULL or none")
+    p.add_argument("--check-baseline", action="store_true",
+                   help="sweep the verifiers and the probes before the first task too "
+                        "(about twenty minutes) and judge the final probes against that "
+                        "sweep, not the record")
     p.add_argument("--fix-attempts", type=int, default=1, metavar="N",
                    help="times a session is sent back to fix a gate regression (default 1)")
     p.add_argument("--dry-run", action="store_true",
@@ -251,11 +278,30 @@ def probe_sets(args):
     if not args.gate:
         return "  gate: off"
     return (f"  gate: the verifiers round each task; probes per task: {args.gate_probes}; "
-            f"final probes: {args.final_probes}")
+            f"final probes: {args.final_probes}, against "
+            + ("a baseline sweep before the first task" if args.check_baseline
+               else "each probe's recorded result (--check-baseline sweeps one instead)"))
+
+
+def list_probes(pattern=None):
+    """``dev-team probes [NAME]``: the record, one line per probe."""
+    record = probe_record.load(ROOT)
+    path = os.path.relpath(probe_record.path(ROOT), ROOT)
+    lines = probe_record.listing(record, pattern)
+    if not lines:
+        print(f"dev-team: no probe result on record" + (f" for '{pattern}'" if pattern else "")
+              + f" ({path})")
+        return 1
+    print(f"dev-team: {len(lines)} probe(s) on record in {path} "
+          "(time it last ran, commit, + if the tree had uncommitted changes, result)")
+    print("\n".join(lines))
+    return 0
 
 
 def main():
     args = parse_args()
+    if args.tasks and args.tasks[0] == "probes" and len(args.tasks) <= 2:
+        sys.exit(list_probes(args.tasks[1] if len(args.tasks) == 2 else None))
     gate_line = probe_sets(args)
     # Fab assets are asked for at the terminal; '-' has used stdin up.
     args.interactive = sys.stdin.isatty() and args.tasks != ["-"]
@@ -286,17 +332,26 @@ def main():
     progress = os.path.join(run_dir, "progress.md")
     with open(progress, "w") as f:
         f.write(f"# dev-team run {stamp}\n")
+    print(f"dev-team: run {stamp} -- logs in {os.path.relpath(run_dir, ROOT)}")
+    with Tee(os.path.join(run_dir, "run.log")):
+        code = run(args, task_file, todo, triage_cost, run_dir, progress, meter, pauser)
+    sys.exit(code)
 
+
+def run(args, task_file, todo, triage_cost, run_dir, progress, meter, pauser):
+    """The loop: one task after another until the queue is empty or the run
+    is halted. Returns the exit code."""
     outcomes, total_cost, cache = [], triage_cost, {}
     finale = final.Finale(args, run_dir, progress) if args.final_set else None
     halted = False      # paused, interrupted or stopped: no final sweep
     attempted = []      # run already and still unticked: not to be queued again
     if pauser.enabled:
-        print(f"dev-team: type '{pause.WORD}' and Enter to pause the task in hand")
+        print(f"dev-team: type '{pause.WORD}' and Enter to pause the task in hand, "
+              f"'{pause.STOP_WORD}' to stop the run after it")
     while todo:
         # The total moves when the task file is edited mid-run (reread, below).
         task, n, total = todo[0], len(outcomes) + 1, len(outcomes) + len(todo)
-        print(f"\n[{n}/{total}] {task.title}")
+        print(f"\n[{n}/{total}] {clock()}  {task.title}")
         if not close_editors():
             print("dev-team: stopping -- an editor of this project is still running")
             halted = True
@@ -340,6 +395,11 @@ def main():
         if not ok and not args.keep_going:
             print("dev-team: stopping (use --keep-going to continue past failures)")
             break
+        if pauser.stop_requested:
+            print("dev-team: stopped after this task, as asked"
+                  + (f" -- {len(todo)} task(s) not run" if todo else ""))
+            halted = True
+            break
         if task_file:
             todo, cost = reread(task_file, todo, attempted, args, n)
             total_cost += cost
@@ -352,12 +412,12 @@ def main():
             probes_ok = finale.finish()
         except KeyboardInterrupt:
             print("\ndev-team: interrupted -- the final probes were not swept")
-    print(f"\ndev-team: finished -- ${total_cost:.2f} total, progress in {progress}")
+    print(f"\ndev-team: finished {clock()} -- ${total_cost:.2f} total, progress in {progress}")
     for task, status in outcomes:
         print(f"  {status:>11}  {task.title}")
     for task in todo:
         print(f"  {'not run':>11}  {task.title}")
-    sys.exit(0 if all(s == "done" for _t, s in outcomes) and not todo and probes_ok else 1)
+    return 0 if all(s == "done" for _t, s in outcomes) and not todo and probes_ok else 1
 
 
 if __name__ == "__main__":

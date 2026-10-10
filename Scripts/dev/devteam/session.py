@@ -59,13 +59,23 @@ meanwhile, then `uepy.py --wait <run dir> --timeout 900` prints the usual \
 report (and fails on timeout); `--status` lists runs. One detached run at a \
 time.
 
-Probes: run `uepy.py --probes-for` (no paths: the probes your `git diff` can \
-affect, one --game and one --net launch; `--dry-run` lists them), never a \
-hand-picked set unless it lists nothing. It detaches itself and prints a run \
-directory at once; its launches take 5-14 minutes (measured), so write the \
-docs and the commit message meanwhile, then `uepy.py --wait <run dir> \
---timeout 900` prints every probe's verdict in one table. Read that table, \
-not the launches' reports, and rerun only a probe that failed on your change.
+Probes: run `uepy.py --probes-for` once, and only when the change is complete: \
+the code written and the content it needs rebuilt, as you mean to commit it. \
+A rebuild or an edit after the run voids its verdicts, so do not start it \
+early to overlap with the work. It runs the probes your `git diff` can \
+affect (one --game and one --net launch; `--dry-run` lists them; pass paths \
+when your diff is wider than your change, say a file you regenerated), never \
+a hand-picked set unless it lists nothing. It detaches itself and prints a \
+run directory at once; its launches take 5-14 minutes (measured), so write \
+the docs and the commit message meanwhile, then `uepy.py --wait <run dir> \
+--timeout 900` prints every probe's verdict in one table, with the probe's \
+last recorded verdict, time and commit beside it (Saved/DevTeam/probe_status.json, \
+kept by dev-team and by every --probes-for; `Scripts/dev/dev-team probes \
+[NAME]` lists it). Read that table, not the launches' reports. A probe that \
+was failing on record at this commit before your change is skipped as not \
+yours (--all-probes runs it anyway); a failure the table does not mark that \
+way is yours to fix, and a probe never recorded is new ground. Rerun only a \
+probe that failed on your change.
 
 Verifiers: never run a `verify_*.py` by hand or the full suite (a verifier is \
 85 s cold; the gate runs all nine around your session, and sessions that ran \

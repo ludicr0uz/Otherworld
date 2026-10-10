@@ -137,8 +137,9 @@ class LoopTest(unittest.TestCase):
     def run_cli(self, during, *flags, fail=()):
         """Run the queue; ``during`` maps a task's text to what its session
         does to the task file while it works. Returns (exit code, output)."""
-        def run_one(task, n, total, *_rest):
+        def run_one(task, n, total, *rest):
             self.ran.append((n, total, task.text))
+            self.pauser = rest[-1]          # what a typed 'stop' would set
             if task.text in during:
                 during[task.text]()
             ok = task.text not in fail
@@ -190,6 +191,21 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(len(self.ran), 1)
         self.assertEqual(code, 1)
         self.assertNotIn("new task(s)", out)
+
+    def test_a_stop_typed_during_a_task_ends_the_run_after_it(self):
+        self.write("- [ ] a\n- [ ] b\n")
+
+        def stop():
+            self.pauser.stop_requested = True
+            self.write("- [ ] a\n- [ ] b\n- [ ] c\n")      # not read again after a stop
+        code, out = self.run_cli({"a": stop})
+        self.assertEqual(self.ran, [(1, 2, "a")])
+        self.assertEqual(code, 1)
+        self.assertIn("stopped after this task, as asked -- 1 task(s) not run", out)
+        self.assertNotIn("new task(s)", out)
+        self.assertIn("not run  b", out)
+        with open(self.path) as fh:                         # a finished task is still ticked
+            self.assertEqual(fh.read(), "- [x] a\n- [ ] b\n- [ ] c\n")
 
     def test_a_task_file_that_goes_away_keeps_the_queue(self):
         self.write("- [ ] a\n- [ ] b\n")
@@ -612,7 +628,11 @@ class KnownFailuresTest(unittest.TestCase):
         # The probes and the verifiers a change needs, by tool rather than by
         # hand: each rule travels with the minutes it is meant to save.
         prompt = build_prompt(mock.Mock(text="t"), 1, 1, "/p", "| t |", False)
-        self.assertIn("uepy.py --probes-for", prompt)
+        self.assertIn("uepy.py --probes-for` once, and only when the change is complete", prompt)
+        self.assertIn("A rebuild or an edit after the run voids its verdicts", prompt)
+        self.assertIn("last recorded verdict, time and commit beside it", prompt)
+        self.assertIn("dev-team probes", prompt)
+        self.assertIn("--all-probes", prompt)
         self.assertIn("--wait <run dir>", prompt)
         self.assertIn("5-14 minutes", prompt)
         self.assertIn("uepy.py --verify-for", prompt)

@@ -15,15 +15,18 @@ from combat.tuning import DROP_FORWARD
 from combat.carry_tuning import LOWERED_VAR
 from combat.light_tuning import MATCHES_CLASS_VAR
 from combat.torch_tuning import STICK_CLASS_VAR
-from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
+from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS
 from combat.weapon_component.sights import _author_camera_after_boom
 from uebp.nodes.actor import (
     FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_ATTACH, FN_DETACH, FN_GET_COMP, FN_GET_OWNER,
     FN_GET_TRANSFORM, FN_PLAY_SLOT, FN_SET_ACTOR_LOC,
-    FN_IS_PLAYING_SLOT, FN_SET_HIDDEN, FN_SET_REL_LOC, FN_SET_REL_ROT, FN_STOP_SLOT)
+    FN_COMP_REL_XFORM, FN_FIND_BY_TAG, FN_IS_PLAYING_SLOT, FN_SET_HIDDEN, FN_SET_REL_XFORM,
+    FN_STOP_SLOT, SCENE_COMPONENT_CLASS)
+from combat.grip_handle import GRIP
 from combat.weapon_component.throw_windup import THROW_ANIM_VAR
 from uebp.nodes.array import FN_ARR_ADD
-from uebp.nodes.math import FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_MUL_VF, FN_NOT
+from uebp.nodes.math import (
+    FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_INVERT_TRANSFORM, FN_MUL_VF, FN_NOT)
 from uebp.nodes.palette import (
     MACRO_FOR_EACH, MACRO_SWITCH_AUTHORITY_COMP, NODE_BREAK_HIT, NODE_CAST_CHAR, NODE_SPAWN)
 from uebp.nodes.system import FN_IS_VALID, FN_TRACE
@@ -193,22 +196,24 @@ def _author_equip(ed, exec_in):
         _set(attach, rule, "SnapToTarget")
     _connect(then(show), _pin(attach, "execute"))
 
-    gl_pin, gl_n = _prop(ed, IV.GripLocation, item)
-    keep(gl_n)
-    put = keep(_node(ed, FN_SET_REL_LOC))
-    _connect(item, _pin(put, "self"))
-    _connect(gl_pin, _pin(put, "NewRelativeLocation"))
-    _connect(then(attach), _pin(put, "execute"))
-
-    # The resting orientation only. From the next frame on, Tick points the
-    # held weapon at the aim point; this just stops it being visibly wrong for
-    # the one frame in between.
-    gr_pin, gr_n = _prop(ed, IV.GripRotation, item)
-    keep(gr_n)
-    turn = keep(_node(ed, FN_SET_REL_ROT))
+    # Seated by its Grip (grip_handle.py): the component marks where the
+    # socket is in the item's frame, so the item's place under the socket is
+    # the inverse of it. Read off the live item, not off a variable baked at
+    # build: a grip moved in the editor is the grip the next game uses.
+    # The resting orientation only for a gun: from the next frame on, Tick
+    # points the held weapon at the aim point.
+    grip = keep(_node(ed, FN_FIND_BY_TAG))
+    _connect(item, _pin(grip, "self"))
+    _pin(grip, "ComponentClass").set_pin_value(SCENE_COMPONENT_CLASS)
+    _set(grip, "Tag", GRIP)
+    at = keep(_node(ed, FN_COMP_REL_XFORM))
+    _connect(out(grip), _pin(at, "self"))
+    seat = keep(_node(ed, FN_INVERT_TRANSFORM))
+    _connect(out(at), _pin(seat, "T"))
+    turn = keep(_node(ed, FN_SET_REL_XFORM))
     _connect(item, _pin(turn, "self"))
-    _connect(gr_pin, _pin(turn, "NewRelativeRotation"))
-    _connect(then(put), _pin(turn, "execute"))
+    _connect(out(seat), _pin(turn, "NewRelativeTransform"))
+    _connect(then(attach), _pin(turn, "execute"))
 
     hold = keep(ed.add_set_member_variable_node(WV.Held))
     _connect(item, _pin(hold, WV.Held))

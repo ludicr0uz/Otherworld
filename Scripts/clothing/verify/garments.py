@@ -11,6 +11,7 @@ from asset_pipeline.metahuman_paths import CLOTHING
 from clothing.ground_model import MODEL, lying_box
 from clothing.items import parts_of
 from combat.grip import _grip_location, _grip_rotation
+from combat.verify.grip_fit import check_has_grip
 from clothing.specs import GARMENTS
 
 # The three garments drawn worn, and the MetaHuman component each fills.
@@ -51,6 +52,9 @@ def _check_ground_model(bp, g, stand_ins):
     got = cdo(bp).get_editor_property("GripLocation").to_tuple()
     check(f"{name} is held at its stand-in's grip point",
           all(abs(a - b) < 0.01 for a, b in zip(got, want)), f"{got} against {want}")
+    # ...by a Grip the editor can move (combat/grip_handle.py); the line
+    # above is the seed the build gives it.
+    check_has_grip(name, bp)
     scale = model.get_editor_property("relative_scale3d")
     check(f"{name}'s ground model is the size it is worn at",
           all(abs(c - 1.0) < 1e-4 for c in scale.to_tuple()), str(scale.to_tuple()))

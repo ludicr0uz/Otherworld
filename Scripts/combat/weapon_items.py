@@ -23,6 +23,7 @@ from Sound.sound_items import BINDINGS as ITEM_SOUNDS
 from Sound.sound_weapons import DRY_FIRE
 from combat.glimmer import add_glimmer, author_glimmer
 from combat.glimmer_tuning import GLIMMER
+from combat.grip_handle import GRIP, seed_grip
 from combat.item_world import relevance_item, replicate_item
 from combat.log import _log
 from uebp.graph import (
@@ -118,9 +119,9 @@ def build_parts(bp, parts):
             _log(f"  note: could not set NoCollision on {name}: {exc}")
 
 
-# The components every weapon keeps: its own root, and BP_WeaponItem's Body
-# and Glimmer.
-KEEP = {"None", "DefaultSceneRoot", "Body", GLIMMER}
+# The components every weapon keeps: its own root, BP_WeaponItem's Body and
+# Glimmer, and its Grip, which somebody may have placed (grip_handle.py).
+KEEP = {"None", "DefaultSceneRoot", "Body", GLIMMER, GRIP}
 
 
 def build_model(bp, model):
@@ -177,6 +178,8 @@ def build_weapon(spec, item_bp):
         raise RuntimeError(f"{spec['display']} is scoped but does not zoom past "
                            f"the shoulder aim")
 
+    grip_loc = unreal.Vector(*spec["grip_loc"])
+    seed_grip(bp, grip_loc, spec["grip_rot"])
     _apply_defaults(bp, {
         IV.DisplayName: spec["display"],
         IV.Damage: float(spec["damage"]),
@@ -202,7 +205,7 @@ def build_weapon(spec, item_bp):
         IV.MuzzleOffset: unreal.Vector(*spec["muzzle"]),
         IV.SightOffset: unreal.Vector(*spec["sight"]),
         IV.SightAim: unreal.Vector(*spec["sight_front"]),
-        IV.GripLocation: unreal.Vector(*spec["grip_loc"]),
+        IV.GripLocation: grip_loc,
         IV.GripRotation: spec["grip_rot"],
         IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         IV.AdsZoom: float(spec.get("ads_zoom", COMBAT.ads_zoom_irons)),

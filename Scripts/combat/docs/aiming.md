@@ -310,6 +310,46 @@ in game `probes/probe_carry.py`.
   - On the mannequin, `HandGrip_R` carries forward on its **+Y** axis.
   - On the adventurer, the hand bone's +Y runs down the aim too, since the retarget's palm
     calibration turns the whole hand onto the mannequin's. Nothing depends on that.
+- **The game seats an item by its `Grip` component** (`grip_handle.py`), not by the two
+  variables. Every held item's Blueprint (the guns, the axe, the knife, the stick, the wood,
+  the matches, the consumables, the garments) has a SceneComponent named and tagged `Grip`
+  under its root. It marks where the hand's grip socket is in the item's own frame: the equip
+  attaches the item to the socket and sets its relative transform to the inverse of `Grip`'s
+  (`weapon_component/inventory.py`, found by the tag).
+  - **`GripLocation` and `GripRotation` are the seed:** what the solve below says, written by
+    every build as before. Nothing in the game reads them.
+  - **A build makes `Grip` from the seed when it is missing.** One that exists and still sits
+    on the last build's seed was moved by nobody, so it follows the solve (a ready pose that
+    changes moves the fist). One that sits anywhere else was placed by a person, and no build
+    touches it again: the build logs `Grip was placed by hand (… off the solve), left alone`.
+  - **`verify/grip_fit.py` measures the `Grip`, and leaves a placed one to its placer:** it
+    prints that grip's measurements and holds it only to 8 cm of the fist (`PLACED_MISS_CM`).
+  - **What a placed grip does not move:** the shotgun's left hand (`shotgun_hold.py` bakes
+    it against the solved grip), and the knife's blade grip for the throw
+    (`ThrowGripLocation`, still solved and baked).
+
+### Placing a grip by eye
+
+For a handle that sits a couple of centimetres off in the hand. No build, no script.
+
+1. In the Content Browser open the item's Blueprint (`/Game/Weapons/BP_Pistol`,
+   `BP_Axe`, …; the consumables are under `/Game/Survival`, the garments under
+   `/Game/Clothing`) and go to its **Viewport** tab.
+2. In the **Components** panel select **Grip**. The move gizmo appears where the hand's
+   grip socket will be: on the player that is the right wrist, some 8 to 14 cm from the
+   handle, not the palm.
+3. Drag `Grip` (or type into Location and Rotation in Details). **The item moves the
+   opposite way in the hand:** `Grip` 2 cm towards the muzzle puts the gun 2 cm further
+   back in the fist; `Grip` 1 cm up sinks the item 1 cm into the hand. Leave its Scale at 1.
+4. **Compile** and **Save**, then press Play: the next item of that kind that is equipped
+   sits by the new grip.
+5. Commit the `.uasset`. A rebuild keeps it.
+
+To give a grip back to the solve, delete the `Grip` component, Compile, Save, and run the
+item's build step (`UEPY_BUILD_ONLY=weapons` for a gun, `knife`, `axe`, `wood`, `matches`,
+`stick`; `build_survival.py`; `build_clothing.py`): it is seeded again. Until that build,
+an item with no `Grip` hangs from the wrist and logs an `Accessed None` at each equip.
+
 - **`GripLocation` is solved too** (`grip._grip_location`): it puts the weapon's `Grip` part in
   the middle of the fist in the ready pose.
   - Each closing finger's three joints lie on a circle. The centre of that circle is what the

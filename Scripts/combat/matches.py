@@ -22,6 +22,7 @@ import unreal
 from combat.chop_tuning import CHOPS_VAR
 from combat.log import _log
 from uebp.graph import BEL, _apply_defaults, _create_blueprint, _must_load, _rot
+from combat.grip_handle import seed_grip
 from combat.grip import _grip_location, _grip_rotation
 from combat.light_tuning import LIGHTS_VAR
 from combat.paths import CUBE, HOLD_ITEM_ANIM_PATH, MAT_METAL, MATCHES_BP_PATH
@@ -62,6 +63,8 @@ def build_matches(item_bp):
         raise RuntimeError(f"{MATCHES_BP_PATH} failed to compile")
     aim = HOLD_ITEM_ANIM_PATH
     grip_rot = _grip_rotation(aim)
+    grip_loc = unreal.Vector(*_grip_location(aim, grip_rot, matches_outline()))
+    seed_grip(bp, grip_loc, grip_rot)
     _apply_defaults(bp, {
         IV.DisplayName: MATCHES_DISPLAY,
         LIGHTS_VAR: True,
@@ -81,7 +84,7 @@ def build_matches(item_bp):
         IV.InfiniteReserve: False,
         IV.NextFireTime: 0.0,
         IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
-        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, matches_outline())),
+        IV.GripLocation: grip_loc,
         IV.GripRotation: grip_rot,
         IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the knife's reason: right-click still aims.

@@ -36,6 +36,7 @@ from combat.slot_tuning import MELEE_KIND, WEAPON_KIND_VAR
 from combat.chop_tuning import CHOPS_VAR
 from combat.log import _log
 from uebp.graph import BEL, _apply_defaults, _create_blueprint, _must_load, _rot
+from combat.grip_handle import seed_grip
 from combat.grip import _grip_location, _grip_rotation, _rotate_vector
 from combat.heat import build_heated_model, build_hot_instance
 from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
@@ -128,6 +129,8 @@ def build_axe(item_bp):
     # that faces ahead.
     grip_rot = _grip_rotation(player_skin().aim_pistol)
     lodge = axe_lodge()
+    grip_loc = unreal.Vector(*_grip_location(aim, grip_rot, axe_outline()))
+    seed_grip(bp, grip_loc, grip_rot)
     _apply_defaults(bp, {
         **defaults_for(AXE_BP_PATH, ITEM_SOUNDS),
         IV.DisplayName: AXE_DISPLAY,
@@ -161,7 +164,7 @@ def build_axe(item_bp):
         IV.InfiniteReserve: False,
         IV.NextFireTime: 0.0,
         IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
-        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, axe_outline())),
+        IV.GripLocation: grip_loc,
         IV.GripRotation: grip_rot,
         IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the knife's reason: right-click still aims.

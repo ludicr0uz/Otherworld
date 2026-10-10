@@ -30,7 +30,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - `fix_retargeted_abp()` re-points `spine_01` to `Spine02`.
 - **The grip is a bone (`RightHand`), not a socket**, because Python can't create a socket.
   `_BoneGrip` stands in for one.
-  - The weapon is attached at the wrist, then moved into the fist by `GripLocation`.
+  - The weapon is attached at the wrist, then moved into the fist by its `Grip`
+    component (seeded from `GripLocation`: `docs/aiming.md`).
   - The fingers close the way the mannequin's do in the retargeted ready pose.
     `finger_verify.py` checks each finger's curl against the mannequin's.
 - **The two ready poses and the six hit reactions are retargeted onto every creature**

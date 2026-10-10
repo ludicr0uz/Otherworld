@@ -9,6 +9,7 @@ SYSTEMS = ('throw',)
 
 import unreal
 
+from combat.grip_handle import GRIP
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.throw_tuning import THROW_GRIP_LOC_VAR, THROW_GRIP_VAR
 from combat.weapon_component.throw import THROW_AIMING_VAR, THROW_FORCED_VAR
@@ -25,6 +26,12 @@ def _rel(item):
     """A copy: the struct read back is a view that later reads overwrite."""
     v = item.root_component.get_editor_property("relative_location")
     return unreal.Vector(v.x, v.y, v.z)
+
+
+def _hammer_grip(item):
+    """Where the item's Grip component seats it (combat/grip_handle.py)."""
+    grip = item.find_component_by_tag(unreal.SceneComponent, GRIP)
+    return grip.get_relative_transform().inverse().translation
 
 
 def _cocked(p, wc, item):
@@ -60,7 +67,7 @@ def probe(p):
     if not (knife and axe):
         return
 
-    grip = knife.get_editor_property("GripLocation")
+    grip = _hammer_grip(knife)
     blade = knife.get_editor_property(THROW_GRIP_LOC_VAR)
     p.check("the knife has a blade grip apart from its hammer grip",
             knife.get_editor_property(THROW_GRIP_VAR)
@@ -74,7 +81,7 @@ def probe(p):
     p.check("...and by the handle again once the key is let go",
             (after - grip).length() < NEAR_CM, str(after))
 
-    a_grip = axe.get_editor_property("GripLocation")
+    a_grip = _hammer_grip(axe)
     _b, a_during, _a = yield from _cocked(p, wc, axe)
     p.check("the axe, with no blade grip, stays in its own while cocked",
             not axe.get_editor_property(THROW_GRIP_VAR)

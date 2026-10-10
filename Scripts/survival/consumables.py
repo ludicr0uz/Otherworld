@@ -23,6 +23,7 @@ from uebp.graph import BEL, BGE, _apply_defaults, _assets, _create_blueprint, _m
 from uebp.layout import arrange
 from combat.materials import build_flat_material
 from combat.paths import HOLD_ITEM_ANIM_PATH, ITEM_BP_PATH
+from combat.grip_handle import seed_grip
 from combat.grip import _grip_location, _grip_rotation
 from combat.tuning import COMBAT
 from combat.weapon_items import build_parts
@@ -68,6 +69,8 @@ def build_consumable(spec, base_bp):
         raise RuntimeError(f"{spec['path']} failed to compile")
     aim = HOLD_ITEM_ANIM_PATH
     grip_rot = _grip_rotation(aim)
+    grip_loc = unreal.Vector(*_grip_location(aim, grip_rot, spec["parts"], spec["grip_part"]))
+    seed_grip(bp, grip_loc, grip_rot)
     _apply_defaults(bp, {
         **defaults_for(spec["path"], ITEM_SOUNDS),
         IV.DisplayName: spec["display"],
@@ -90,8 +93,7 @@ def build_consumable(spec, base_bp):
         IV.Reserve: 0,
         IV.NextFireTime: 0.0,
         IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
-        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, spec["parts"],
-                                                       spec["grip_part"])),
+        IV.GripLocation: grip_loc,
         IV.GripRotation: grip_rot,
         IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0: the ADS speed and scope fade divide by (AdsZoom - 1), and

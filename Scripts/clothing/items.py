@@ -16,6 +16,7 @@ import unreal
 
 from combat.log import _log
 from uebp.graph import BEL, _apply_defaults, _create_blueprint, _must_load, _rot
+from combat.grip_handle import seed_grip
 from combat.grip import _grip_location, _grip_rotation
 from combat.materials import build_flat_material
 from combat.paths import HOLD_ITEM_ANIM_PATH, ITEM_BP_PATH
@@ -57,6 +58,8 @@ def build_garment(garment, item_bp):
     grip_rot = _grip_rotation(aim)
     # The fist holds every garment where its stand-in's first part is, the
     # three that lie as their mesh too.
+    grip_loc = unreal.Vector(*_grip_location(aim, grip_rot, parts, parts[0][0]))
+    seed_grip(bp, grip_loc, grip_rot)
     _apply_defaults(bp, {
         **defaults_for(garment.path, ITEM_SOUNDS),
         IV.DisplayName: garment.display,
@@ -75,8 +78,7 @@ def build_garment(garment, item_bp):
         IV.Reserve: 0,
         IV.NextFireTime: 0.0,
         IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
-        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, parts,
-                                                       parts[0][0])),
+        IV.GripLocation: grip_loc,
         IV.GripRotation: grip_rot,
         IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the consumables' reason: the aim divides by AdsZoom - 1.

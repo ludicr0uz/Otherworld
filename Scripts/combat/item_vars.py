@@ -41,6 +41,8 @@ SightOffset = Var("SightOffset", VECTOR)
 # scope's objective). The camera is turned onto it, so the view runs down
 # the sight line itself and the tip is the middle of the screen.
 SightAim = Var("SightAim", VECTOR)
+# The solved grip, the seed of the item's Grip component (grip_handle.py).
+# The game seats the item by the component and reads neither of these.
 GripLocation = Var("GripLocation", VECTOR)
 GripRotation = Var("GripRotation", struct("/Script/CoreUObject.Rotator"))
 SlotColor = Var("SlotColor", struct("/Script/CoreUObject.LinearColor"))

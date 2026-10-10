@@ -43,6 +43,7 @@ from uebp.graph import (
     _create_blueprint, _drop_components, _events, _find_handle, _must_load, _node, _pin,
     _rot, _set, else_, then)
 from uebp.layout import arrange
+from combat.grip_handle import seed_grip
 from combat.grip import _grip_location, _grip_rotation
 from combat.light_tuning import LIGHTS_VAR
 from combat.paths import (
@@ -193,6 +194,8 @@ def build_stick(item_bp, rebuild=True):
         raise RuntimeError(f"{STICK_BP_PATH} failed to compile")
     aim = HOLD_TORCH_ANIM_PATH
     grip_rot = _grip_rotation(aim)
+    grip_loc = unreal.Vector(*_grip_location(aim, grip_rot, stick_outline()))
+    seed_grip(bp, grip_loc, grip_rot)
     _apply_defaults(bp, {
         IV.DisplayName: STICK_DISPLAY,
         BURNS_VAR: True,
@@ -215,7 +218,7 @@ def build_stick(item_bp, rebuild=True):
         IV.InfiniteReserve: False,
         IV.NextFireTime: 0.0,
         IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
-        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, stick_outline())),
+        IV.GripLocation: grip_loc,
         IV.GripRotation: grip_rot,
         IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the knife's reason: right-click still aims.

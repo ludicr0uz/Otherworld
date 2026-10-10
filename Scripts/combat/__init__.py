@@ -211,6 +211,9 @@ ASSETS AND PATCHES
   weapon_layers_consts  its path, its tag, the link's place in the base
   grip              hand-grip socket maths for holding a weapon: GripRotation
                     and GripLocation (the handle seated in the fist)
+  grip_handle       the Grip component the game seats an item by and the
+                    editor can move: seeded from the solve, never written
+                    over once somebody placed it
   lodge             how a thrown blade sits in the tree it lodged in, out of
                     its model: lodge_pose -> LodgeTurn, LodgePoint
   settings_savegame BP_Settings

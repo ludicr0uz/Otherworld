@@ -16,14 +16,15 @@ from combat.hit_reaction import (
 )
 from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH
 from combat.tuning import COMBAT, CombatConfig
+from combat.damage import ON_HEALTH_CHANGED
 from combat.verify.fixtures import (
-    _montages, drain_subtracts, drain_writes, h, hg, wg,
+    _montages, drain_subtracts, drain_writes, exec_reach, h, health_bp, hg, wg,
 )
 from combat.verify.knife import is_melee_write
 from combat.verify.throw_strike import is_strike_node
 from combat.verify.common import (
     pellet_calls, take_hits,
-    BEL, PIN, _mesh_asset, by_pins, check, component_template, has_in_pin,
+    BEL, PIN, _mesh_asset, by_pins, check, component_template, graph, has_in_pin,
     load, num_pin, pin_value, titled,
 )
 from asset_pipeline.retarget_paths import HIT_SOURCES as RETARGET_HIT_SOURCES
@@ -191,8 +192,12 @@ def check_flinching():
                     for q in PIN.list_connected_pins(BEL.find_input_pin(n, "A"))]
     _prev_reads = [n for n in hg if str(BEL.get_node_title(n)).replace("\n", " ")
                    == f"Get {PREV_HEALTH_VAR}" and n not in _drain_reads]
+    # ...and a client's, in OnHealthChanged (combat/damage.py), which follows
+    # a Health that was no blow for the same reason.
+    _told = graph(health_bp).find_event_node(ON_HEALTH_CHANGED)
+    _clients = exec_reach([BEL.find_then_pin(_told)]) if _told else []
     _prev_writes = [n for n in hg if has_in_pin(n, PREV_HEALTH_VAR)
-                    and n not in drain_writes]
+                    and n not in drain_writes and n not in _clients]
     check(f"{PREV_HEALTH_VAR} is read once and written once -- the whole trigger",
           len(_prev_reads) == 1 and len(_prev_writes) == 1,
           f"{len(_prev_reads)} reads, {len(_prev_writes)} writes")

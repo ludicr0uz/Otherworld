@@ -6,7 +6,9 @@ The base holds the shot's server half: Server_Fire's guard, refusals, round
 and deadline, the pellets' traces and the damage they hand over; and the
 reload (task W2): Server_Reload, ReloadNow, and how many rounds move. Held is
 still this Blueprint's variable, the round and the deadline the item's, and
-the health component a Blueprint, so C++ reads and writes them by name
+a body's zone tables its health Blueprint's (its Health, Dead and TakeHit are
+that component's own native parent's since W3), so C++ reads and writes them
+by name
 (Source/CLAUDE.md, "A Blueprint variable read or written from C++ is found
 by name"). The names are properties of the class defaults, written here from
 the builders' own constants and held to them by combat/verify/shot.py.
@@ -16,10 +18,8 @@ import unreal
 
 from combat import health_vars as HV
 from combat import item_vars as IV
-from combat.damage import TAKE_HIT
 from combat.light_tuning import LIGHTS_VAR
 from combat.log import _log
-from combat.paths import HEALTH_CLASS_PATH
 from combat.shot_vars import (
     FIRE_GRACE_S, NATIVE_FUNCTIONS, SERVER_FIRE, SERVER_RELOAD, AsksServed)
 from combat.weapon_component import vars as WV
@@ -43,9 +43,6 @@ NAMES = {
     "item_reserve_var": str(IV.Reserve),
     "item_infinite_reserve_var": str(IV.InfiniteReserve),
     "item_reload_seconds_var": str(IV.ReloadSeconds),
-    "take_hit_event": TAKE_HIT,
-    "health_var": str(HV.Health),
-    "health_dead_var": str(HV.Dead),
     "head_bones_var": str(HV.HeadBones),
     "limb_bones_var": str(HV.LimbBones),
     "head_multiplier_var": str(HV.HeadMultiplier),
@@ -53,9 +50,9 @@ NAMES = {
 }
 # ...and its numbers.
 NUMBERS = {"fire_grace_seconds": FIRE_GRACE_S}
-# The class a body is asked for its health by, as the graphs ask
-# (GetComponentByClass): {property: class path}.
-CLASSES = {"health_class": HEALTH_CLASS_PATH}
+# Classes the base is told: {property: class path}. None since W3 (the
+# health component is asked for by its native class).
+CLASSES = {}
 
 
 # The graph's stored take, until the reload was the base's (W2): taken off a

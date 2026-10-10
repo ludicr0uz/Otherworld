@@ -1,15 +1,20 @@
-"""verify.damage -- health is the server's (combat/damage.py): the TakeHit
-event every blow calls and what it writes, behind the authority switch; what
-of the component replicates and what does not; OnRep_Health, a client's side
-of a change; the Tick's server-only parts (the world-floor net, the drain,
-Dead, the replacement) and its own death latch; the kill credited to the
+"""verify.damage -- health is the server's (combat/damage.py): TakeHit, which
+every blow calls, is the native parent's (task W3), and the graph writes none
+of what it writes; what of the component replicates and what does not;
+OnHealthChanged, a client's side of a change; the Tick's server-only parts
+(the world-floor net, the drain, Die, the replacement) and the death path's
+own latch behind OnDied; the kill credited to the
 blow's instigator; and that no blow writes a target's health itself.
 
 That a client's bar falls is two processes' to prove: probes/probe_net_health.py.
 """
 
+import unreal
+
 from combat import health_vars as HV
-from combat.damage import REPLICATED, TAKE_HIT, TAKE_HIT_PARAMS
+from combat import health_native
+from combat.damage import (
+    DIE, NATIVE_REPLICATED, ON_DIED, ON_HEALTH_CHANGED, REPLICATED, TAKE_HIT)
 from combat.game_state import DAMAGED_BY_PLAYER_VAR, KILL_COUNT_VAR, LAST_DAMAGE_VAR
 from combat.hit_reaction import LAST_HIT_FROM_VAR, PREV_HEALTH_VAR
 from combat.verify.common import (
@@ -18,7 +23,7 @@ from combat.verify.fixtures import _wg_all, char, drain_writes, health_bp, hg, n
 from combat.verify.sights import _feeds, _title
 from net.state_consts import PLAYER_KILL_COUNT_VAR
 from uebp import net
-from uebp.graph import BGE
+from uebp.nodes.health import HEALTH_BASE_CLASS
 
 # Stamps only TakeHit may write, wherever the blow is struck from.
 STAMPS = (LAST_DAMAGE_VAR, DAMAGED_BY_PLAYER_VAR, LAST_HIT_FROM_VAR)
@@ -77,69 +82,57 @@ def _sets(nodes, var):
     return [n for n in nodes if _title(n) in (f"Set {var}", f"Set with Notify {var}")]
 
 
+def _event(name):
+    return graph(health_bp).find_event_node(name)
+
+
+def _below(event):
+    """Every node of the component's graph an exec path from ``event`` reaches."""
+    return [n for n in hg if event in _upstream(n)]
+
+
 def check_take_hit():
-    ed = graph(health_bp)
-    event = ed.find_event_node(TAKE_HIT)
-    check(f"BP_HealthComponent has a {TAKE_HIT} event", bool(event))
-    if not event:
-        return
-    outs = {str(PIN.get_pin_name(p)) for p in BEL.list_output_pins(event)}
-    check("...told how much, which way it came, who struck it and with what",
-          {name for name, _ in TAKE_HIT_PARAMS} <= outs, str(sorted(outs)))
-    check("...a plain event, not an RPC: only the server's call does anything, and "
-          "nothing a client sends reaches it",
-          net.compiled_rpc(health_bp, TAKE_HIT) == (net.LOCAL, False),
-          str(net.compiled_rpc(health_bp, TAKE_HIT)))
-    first = [PIN.get_owning_node(q) for q in
-             PIN.list_connected_pins(BEL.find_then_pin(event))]
-    check("...whose first step is Switch Has Authority",
-          len(first) == 1 and "Switch Has Authority" in _title(first[0]),
-          str([_title(n) for n in first]))
-    mine = [n for n in hg if event in _upstream(n)]
-    writes = [n for n in mine if _title(n) in HEALTH_SETS]
-    fed = {_title(f) for w in writes for f in _feeds(BEL.find_input_pin(w, "Health"))}
-    check("it takes Amount off Health, floored at zero, once",
-          len(writes) == 1 and "Get Health" in fed and any("Clamp" in t for t in fed)
-          and TAKE_HIT in {_title(f).replace(" ", "") for f in
-                           _feeds(BEL.find_input_pin(writes[0], "Health"))},
-          f"{len(writes)} write(s), fed by {sorted(fed)}")
-    for var, source in ((LAST_HIT_FROM_VAR, "From"), (HV.LastInstigator, "InstigatedBy"),
-                        (HV.LastCause, "Cause")):
-        sets = _sets(mine, var)
-        links = [str(PIN.get_pin_name(q)) for s in sets
-                 for q in PIN.list_connected_pins(BEL.find_input_pin(s, str(var)))]
-        check(f"...and keeps {source} as {var}", len(sets) == 1 and links == [source],
-              f"{len(sets)} write(s), off {links}")
-    stamps = _sets(mine, LAST_DAMAGE_VAR)
-    check(f"...and stamps {LAST_DAMAGE_VAR} with the game time",
-          len(stamps) == 1 and any("Time" in _title(f) for f in
-                                   _feeds(BEL.find_input_pin(stamps[0], LAST_DAMAGE_VAR))))
-    blames = _sets(mine, DAMAGED_BY_PLAYER_VAR)
-    check(f"{DAMAGED_BY_PLAYER_VAR} is set only where the instigator is a "
-          "PlayerController (a wanderer's blow blames no player)",
-          len(blames) == 1
-          and ["CastToPlayerController"] == [_title(n).replace(" ", "") for n in
-                                             _ran_by(blames[0])]
-          and _arm_into(blames[0]) == ["then"], str([_title(n) for b in blames
-                                                     for n in _ran_by(b)]))
-    counts = _sets(mine, HV.HitCount)
-    gate = [g for c in counts for g in _ran_by(c)]
-    asked = {_title(f) for g in gate for f in _feeds(BEL.find_input_pin(g, "Condition"))}
-    check(f"{HV.HitCount} rises once, before the write, and only where the blow takes "
-          "health (Health and Amount above 0): what a client tells a blow by",
-          len(counts) == 1 and len(gate) == 1 and _title(gate[0]) == "Branch"
-          and "Get Health" in asked and writes and counts[0] in _ran_by(writes[0]),
-          f"{len(counts)} write(s), behind {sorted(asked)}")
-    check("every write of the event is behind its authority switch",
-          all(_behind_authority(n) for n in mine if _title(n).startswith("Set")),
-          str([_title(n) for n in mine if _title(n).startswith("Set")
-               and not _behind_authority(n)]))
+    check(f"BP_HealthComponent is a child of the native base ({HEALTH_BASE_CLASS})",
+          health_native.is_native(health_bp), str(BEL.get_blueprint_parent_class(health_bp)))
+    got = {name: net.compiled_rpc(health_bp, name) for name in (TAKE_HIT, DIE)}
+    check(f"...which has {TAKE_HIT} and {DIE}, plain functions, not RPCs (only the "
+          "server's call does anything, and nothing a client sends reaches either), and "
+          "the graph has no event named as either",
+          got == {TAKE_HIT: (net.LOCAL, False), DIE: (net.LOCAL, False)}
+          and not [n for n in health_native.NATIVE_FUNCTIONS if _event(n)], str(got))
+    own = {str(v) for v in BEL.list_member_variable_names(health_bp)}
+    cdo = unreal.get_default_object(BEL.generated_class(health_bp))
+    missing = []
+    for var in HV.NATIVE:
+        try:
+            cdo.get_editor_property(str(var))
+        except Exception:                                         # noqa: BLE001
+            missing.append(str(var))
+    check(f"...and holds what a blow writes ({', '.join(str(v) for v in HV.NATIVE)}): "
+          "each a property of the class and none a variable of the Blueprint",
+          not missing and not own & {str(v) for v in HV.NATIVE},
+          f"missing {missing}, the Blueprint's own {sorted(own & {str(v) for v in HV.NATIVE})}")
+    check("...and no graph of an earlier build's notify beside the base's",
+          not [g for g in health_native.RETIRED_GRAPHS if BEL.find_graph(health_bp, g)])
+    # What only TakeHit may write, the graph does not: the count a client
+    # tells a blow by, who struck it and with what, which way it came.
+    loose = [_title(n) for var in (HV.HitCount, HV.LastInstigator, HV.LastCause,
+                                   LAST_HIT_FROM_VAR, DAMAGED_BY_PLAYER_VAR)
+             for n in _sets(hg, var)]
+    check("the graph writes none of a blow's stamps itself (the count, who, with what, "
+          "which way, DamagedByPlayer)", not loose, str(loose))
+    stamps = _sets(hg, LAST_DAMAGE_VAR)
+    event = _event(ON_HEALTH_CHANGED)
+    check(f"...and {LAST_DAMAGE_VAR} once, a client's own clock in {ON_HEALTH_CHANGED}",
+          len(stamps) == 1 and event and event in _upstream(stamps[0]), str(len(stamps)))
 
 
 def check_replication():
-    got = net.variable_replication(health_bp, HV.Health)
-    check("Health is a RepNotify, to everyone", got == (net.REP_NOTIFY, "OnRep_Health",
-                                                        "COND_NONE"), str(got))
+    for var, notify in NATIVE_REPLICATED.items():
+        got = net.compiled_replication(health_bp, str(var))
+        want = (net.REP_NOTIFY if notify != "None" else net.REPLICATED, notify)
+        check(f"{var} is the base's, {'a RepNotify' if notify != 'None' else 'Replicated'}",
+              got == want, str(got))
     for var in REPLICATED:
         got = net.variable_replication(health_bp, var)
         check(f"{var} is Replicated", got == (net.REPLICATED, "None", "COND_NONE")
@@ -151,11 +144,12 @@ def check_replication():
 
 
 def check_on_rep():
-    ed = BGE.get_graph_editor_by_name(health_bp, "OnRep_Health")
-    check("OnRep_Health has a graph", bool(ed))
-    if not ed:
+    event = _event(ON_HEALTH_CHANGED)
+    check(f"the graph has the base's {ON_HEALTH_CHANGED} event (a client's, told when "
+          "a Health arrives)", bool(event))
+    if not event:
         return
-    nodes = ed.list_all_nodes()
+    nodes = _below(event)
     sets = [n for n in nodes if _title(n).startswith("Set")]
     check("it runs on a client only: every write is down a switch's Remote arm (the "
           "machine that set Health has done all of it)",
@@ -188,23 +182,35 @@ def check_tick_authority():
           str([_title(n) for n in first]))
     own = [n for n in hg if _title(n) in HEALTH_SETS]
     check("every write of Health in the component is the server's: the world-floor "
-          "net's, the drain's and TakeHit's are each behind an authority switch",
-          len(own) == 3 and all(_behind_authority(n) for n in own),
+          "net's and the drain's are each behind an authority switch (a blow's is "
+          "TakeHit's, C++)",
+          len(own) == 2 and all(_behind_authority(n) for n in own),
           str([_behind_authority(n) for n in own]))
     check("...and the drain's own PrevHealth with it",
           all(_behind_authority(n) for n in drain_writes), str(len(drain_writes)))
-    dead = _sets(hg, HV.Dead)
-    check("Dead is set once, by the server (it replicates)",
-          len(dead) == 1 and _arm_into(dead[0]) == ["Authority"],
-          str([_arm_into(d) for d in dead]))
+    tick_all = _below(tick[0]) if tick else []
+    dies = [n for n in hg if _title(n) == DIE]
+    gate = [g for d in dies for g in _ran_by(d)]
+    check(f"Dead is the base's to set: the graph has no Set of it, and calls {DIE} once, "
+          "from the Tick, where Health is at 0 and Dead not yet said",
+          not _sets(hg, HV.Dead) and len(dies) == 1 and dies[0] in tick_all
+          and len(gate) == 1 and _arm_into(dies[0]) == ["else"]
+          and {_title(f) for f in _feeds(BEL.find_input_pin(gate[0], "Condition"))}
+          == {f"Get {HV.Dead}"},
+          f"{len(dies)} call(s), {len(_sets(hg, HV.Dead))} Set(s)")
+    died = _event(ON_DIED)
     played = _sets(hg, HV.DeathPlayed)
     gate = [g for p in played for g in _ran_by(p)]
-    check(f"the death path runs once on each machine, on its own {HV.DeathPlayed}: "
-          "Dead can arrive before a client's Tick has seen Health at 0",
-          len(played) == 1 and len(gate) == 1 and _arm_into(played[0]) == ["else"]
+    check(f"the death path hangs on the base's {ON_DIED} (the server's from {DIE}, a "
+          f"client's when Dead arrives) and runs once on each machine, on its own "
+          f"{HV.DeathPlayed}",
+          bool(died) and len(played) == 1 and len(gate) == 1
+          and _arm_into(played[0]) == ["else"] and _ran_by(gate[0]) == [died]
           and {_title(f) for f in _feeds(BEL.find_input_pin(gate[0], "Condition"))}
-          == {f"Get {HV.DeathPlayed}"} and dead and _ran_by(_ran_by(dead[0])[0]) == played,
-          str([_title(g) for g in gate]))
+          == {f"Get {HV.DeathPlayed}"}, str([_title(g) for g in gate]))
+    check("...and nothing of it off the Tick: the corpse, the kill and the replacement "
+          "are reached from the event alone", bool(died) and played
+          and played[0] not in tick_all, str(len(tick_all)))
     spawns = [n for n in hg if "SpawnActor" in _title(n).replace(" ", "")
               and "Class" in in_pins(n)
               and any(_title(f) == f"Get {HV.RespawnClass}"
@@ -260,8 +266,8 @@ def check_player_kill_credit():
 def check_blows():
     calls = take_hits(_wg_all)
     check("the weapon component's blows each call the target's TakeHit: the fist, the "
-          "blade and the thrown blade (the pellet's is the native base's FirePellets, "
-          "by name: verify/shot.py)", len(calls) == 3, str(len(calls)))
+          "blade and the thrown blade (the pellet's is the native base's FirePellets: "
+          "verify/shot.py)", len(calls) == 3, str(len(calls)))
     fed = [{pin: bool(PIN.list_connected_pins(BEL.find_input_pin(c, pin)))
             for pin in ("self", "From", "InstigatedBy", "Cause")} for c in calls]
     check("...each on the target's health component, with a direction, an instigator "

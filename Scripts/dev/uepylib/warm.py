@@ -11,8 +11,9 @@ So a target whose editor goes away under it is run once more, in a fresh
 editor, without the caller having to notice:
 
   died      the process is gone (the inbox sees no live heartbeat)
-  crashed   the editor's log says ``=== Critical error: ===``; the process may
-            sit in the crash handler for a long time, or for good
+  crashed   the editor's log says ``=== Critical error: ===`` or ``appError
+            called: Fatal error``; the process may sit in the crash handler
+            for a long time, or for good
   stalled   the job is in flight and for STALL_SECONDS the process has used no
             CPU and logged nothing: hung without a word
 
@@ -31,6 +32,11 @@ from uepylib.paths import log
 from uepylib.targets import TargetResult, label_for
 
 CRASH_MARK = b"=== Critical error: ==="
+# A fatal error on the game thread (a failed cast inside DeleteAsset, seen
+# 2026-10-09) logs this and then sits in appError using a little CPU: neither
+# the mark above nor the stall is ever seen, and the job waits out its timeout.
+FATAL_MARK = b"appError called: Fatal error"
+CRASH_MARKS = (CRASH_MARK, FATAL_MARK)
 STALL_SECONDS = 180.0
 STALL_CPU = 0.5                 # CPU seconds below which a window counts as idle
 WATCH_EVERY = 1.0               # seconds between looks at the log
@@ -98,8 +104,8 @@ class Watch(object):
             self.moved = now
             # The mark may straddle two reads.
             seen = self.tail + new
-            self.tail = seen[-len(CRASH_MARK):]
-            if CRASH_MARK in seen:
+            self.tail = seen[-max(len(m) for m in CRASH_MARKS):]
+            if any(m in seen for m in CRASH_MARKS):
                 return "the warm editor crashed (a critical error in its log)"
         if now - self.sampled >= SAMPLE_EVERY:
             self.sampled = now

@@ -20,6 +20,9 @@ Scripts/dev/check_node_catalog.py.
   weapon.py   the weapon component's native parent (C++, Source/Otherworld):
               the shot's request, its pellets, and the two events the graph
               hangs its cosmetics on (W1)
+  health.py   the health component's native parent (C++, Source/Otherworld):
+              the blow, the death, and the two events the graph hangs a
+              client's side and the death path on (W3)
   guard.py    the game's own RPC guard (C++, Source/Otherworld): what every
               Server event asks first, and the shot of its AimPoint (A5)
   level.py    the game's own net library (C++, Source/Otherworld): whether an

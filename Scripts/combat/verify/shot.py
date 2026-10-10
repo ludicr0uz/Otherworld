@@ -93,8 +93,7 @@ def check_native():
           f"variables {stored}, nodes {nodes}")
     wrong = native.wrong_names(wc)
     check(f"...told the names it reads the Blueprints by ({len(native.NAMES)}: Held, "
-          "AsksServed, the item's and the health component's, TakeHit), the health "
-          "component's class, and the cooldown's "
+          "AsksServed, the item's and the struck body's zone tables), and the cooldown's "
           f"grace ({FIRE_GRACE_S:g} s for uneven packets), and the guard's two names "
           f"for its requests ({SERVER_FIRE}, {SERVER_RELOAD})", not wrong
           and native.NAMES["fire_event_name"] == SERVER_FIRE
@@ -113,9 +112,10 @@ def check_native():
             owner.get_editor_property(native.NAMES[prop])
         except Exception:                                         # noqa: BLE001
             missing.append(native.NAMES[prop])
-    takes = net.compiled_rpc(unreal.load_asset(HEALTH_BP_PATH), native.NAMES["take_hit_event"])
-    check("...each a variable of the Blueprint it is read off, and TakeHit an event of "
-          "the health component's", not missing and takes == (net.LOCAL, False), str(missing))
+    check("...each a variable of the Blueprint it is read off (the health component's "
+          "Health, Dead and TakeHit are its own native parent's since W3, and read by no "
+          "name)", not missing and not [p for p in native.NAMES if "health" in p
+                                        or "take_hit" in p], str(missing))
 
 
 def check_events():

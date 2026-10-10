@@ -1519,14 +1519,13 @@ combat/chop_tuning.py:30: WOOD_SPOT_VAR
 combat/chop_tuning.py:31: WOOD_CLASS_VAR
 combat/combat_trace.py:29: _author_switch
 combat/combat_trace.py:45: build_combat_trace_switch
-combat/damage.py:57: TAKE_HIT
-combat/damage.py:59: TAKE_HIT_PARAMS
-combat/damage.py:65: REPLICATED
-combat/damage.py:68: hit
-combat/damage.py:86: owner_instigator
-combat/damage.py:96: _author_take_hit
-combat/damage.py:141: _author_on_rep_health
-combat/damage.py:166: replicate_health
+combat/damage.py:60: TAKE_HIT_PARAMS
+combat/damage.py:63: REPLICATED
+combat/damage.py:65: NATIVE_REPLICATED
+combat/damage.py:69: hit
+combat/damage.py:87: owner_instigator
+combat/damage.py:97: author_health_changed
+combat/damage.py:117: replicate_health
 combat/death.py:35: CORPSE_SECONDS
 combat/death.py:39: CONTROLLER_RETIRE_SECONDS
 combat/death.py:44: DEATH_PAUSE_SECONDS
@@ -1820,9 +1819,14 @@ combat/headshot_tuning.py:7: HEADSHOT_TIME_VAR
 combat/headshot_tuning.py:10: HEADSHOT_NEVER
 combat/headshot_tuning.py:11: HEADSHOT_MARK_SECONDS
 combat/health_component.py:46: build_health_component
-combat/health_vars.py:61: TABLE
-combat/health_vars.py:71: DAMAGE
-combat/health_vars.py:101: STATE
+combat/health_native.py:22: NATIVE_FUNCTIONS
+combat/health_native.py:25: RETIRED_GRAPHS
+combat/health_native.py:28: base_class
+combat/health_native.py:36: is_native
+combat/health_native.py:40: reparent
+combat/health_vars.py:66: TABLE
+combat/health_vars.py:105: STATE
+combat/health_vars.py:110: NATIVE
 combat/heat.py:49: build_hot_material
 combat/heat.py:120: build_hot_instance
 combat/heat.py:143: _author_cooling
@@ -2600,20 +2604,22 @@ combat/verify/consume.py:25: _exec_after
 combat/verify/consume.py:37: _reached
 combat/verify/consume.py:50: _upstream
 combat/verify/consume.py:64: check_eating_spends_the_press
-combat/verify/damage.py:24: STAMPS
-combat/verify/damage.py:27: _ran_by
-combat/verify/damage.py:32: _upstream
-combat/verify/damage.py:43: _arm_into
-combat/verify/damage.py:49: _switches
-combat/verify/damage.py:53: _behind_authority
-combat/verify/damage.py:76: _sets
-combat/verify/damage.py:80: check_take_hit
-combat/verify/damage.py:139: check_replication
-combat/verify/damage.py:153: check_on_rep
-combat/verify/damage.py:182: check_tick_authority
-combat/verify/damage.py:216: check_kill_credit
-combat/verify/damage.py:230: check_player_kill_credit
-combat/verify/damage.py:260: check_blows
+combat/verify/damage.py:29: STAMPS
+combat/verify/damage.py:32: _ran_by
+combat/verify/damage.py:37: _upstream
+combat/verify/damage.py:48: _arm_into
+combat/verify/damage.py:54: _switches
+combat/verify/damage.py:58: _behind_authority
+combat/verify/damage.py:81: _sets
+combat/verify/damage.py:85: _event
+combat/verify/damage.py:89: _below
+combat/verify/damage.py:94: check_take_hit
+combat/verify/damage.py:130: check_replication
+combat/verify/damage.py:146: check_on_rep
+combat/verify/damage.py:176: check_tick_authority
+combat/verify/damage.py:222: check_kill_credit
+combat/verify/damage.py:236: check_player_kill_credit
+combat/verify/damage.py:266: check_blows
 combat/verify/dead.py:17: _title
 combat/verify/dead.py:21: _execs
 combat/verify/dead.py:26: _next
@@ -2723,16 +2729,17 @@ combat/verify/head_hide.py:60: check_head_hide
 combat/verify/head_hide.py:110: check_dead_shows_head
 combat/verify/headshot.py:18: _one
 combat/verify/headshot.py:24: check_headshot_stamp
-combat/verify/health.py:32: check_health_death_respawn
-combat/verify/health.py:89: _fed_by
-combat/verify/health.py:95: check_respawn_delay
-combat/verify/health.py:126: RESPAWN_POINT_SETTER
-combat/verify/health.py:131: check_spawn_numbering
-combat/verify/health.py:164: check_damage_stamp
-combat/verify/health.py:183: check_kill_counter
-combat/verify/health.py:206: check_dying
-combat/verify/health.py:296: check_corpse
-combat/verify/health.py:367: check_world_edge
+combat/verify/health.py:37: check_native
+combat/verify/health.py:59: check_health_death_respawn
+combat/verify/health.py:116: _fed_by
+combat/verify/health.py:122: check_respawn_delay
+combat/verify/health.py:153: RESPAWN_POINT_SETTER
+combat/verify/health.py:158: check_spawn_numbering
+combat/verify/health.py:191: check_damage_stamp
+combat/verify/health.py:211: check_kill_counter
+combat/verify/health.py:234: check_dying
+combat/verify/health.py:324: check_corpse
+combat/verify/health.py:395: check_world_edge
 combat/verify/heat.py:46: MEL
 combat/verify/heat.py:50: HEATED
 combat/verify/heat.py:56: OTHERS
@@ -2755,7 +2762,7 @@ combat/verify/hit_bodies.py:82: _fed_by
 combat/verify/hit_bodies.py:87: _fed_pins
 combat/verify/hit_bodies.py:93: check_body_miss_is_a_miss
 combat/verify/hit_bodies.py:133: check_one
-combat/verify/hit_reactions.py:36: check_flinching
+combat/verify/hit_reactions.py:37: check_flinching
 combat/verify/hold_pose.py:22: CARRY_REACH_CM
 combat/verify/hold_pose.py:23: CARRY_HEIGHT_CM
 combat/verify/hold_pose.py:24: ARM_DIR_DOT
@@ -3293,15 +3300,15 @@ combat/weapon_component/look_vars.py:27: LOOK_PARAMS
 combat/weapon_component/loot_take.py:47: ACTOR_CLASS_PATH
 combat/weapon_component/loot_take.py:50: author_loot_take
 combat/weapon_component/native.py:30: NAMES
-combat/weapon_component/native.py:55: NUMBERS
-combat/weapon_component/native.py:58: CLASSES
-combat/weapon_component/native.py:63: RETIRED_VARS
-combat/weapon_component/native.py:66: _must_load_class
-combat/weapon_component/native.py:73: base_class
-combat/weapon_component/native.py:81: retire_events
-combat/weapon_component/native.py:94: reparent
-combat/weapon_component/native.py:112: write_names
-combat/weapon_component/native.py:122: wrong_names
+combat/weapon_component/native.py:52: NUMBERS
+combat/weapon_component/native.py:55: CLASSES
+combat/weapon_component/native.py:60: RETIRED_VARS
+combat/weapon_component/native.py:63: _must_load_class
+combat/weapon_component/native.py:70: base_class
+combat/weapon_component/native.py:78: retire_events
+combat/weapon_component/native.py:91: reparent
+combat/weapon_component/native.py:109: write_names
+combat/weapon_component/native.py:119: wrong_names
 combat/weapon_component/pickup.py:55: ITEM_CAST
 combat/weapon_component/pickup.py:58: _author_item_candidates
 combat/weapon_component/pickup.py:99: _author_take_item
@@ -3624,10 +3631,10 @@ dev/check_node_catalog.py:29: BGE
 dev/check_node_catalog.py:30: SCRATCH
 dev/check_node_catalog.py:31: EXCLUDED
 dev/check_node_catalog.py:34: CONTEXTS
-dev/check_node_catalog.py:46: catalog
-dev/check_node_catalog.py:57: load_project_classes
-dev/check_node_catalog.py:68: scratch_graphs
-dev/check_node_catalog.py:113: resolves
+dev/check_node_catalog.py:47: catalog
+dev/check_node_catalog.py:58: load_project_classes
+dev/check_node_catalog.py:69: scratch_graphs
+dev/check_node_catalog.py:114: resolves
 dev/check_saved_navmesh.py:17: MAPS
 dev/check_saved_navmesh.py:19: MARK
 dev/codemods/drop_unused_imports.py:18: UNUSED
@@ -4111,15 +4118,17 @@ dev/uepylib/summary.py:150: verdict
 dev/uepylib/summary.py:155: format_target
 dev/uepylib/targets.py:10: class TargetResult
 dev/uepylib/targets.py:19: label_for
-dev/uepylib/warm.py:33: CRASH_MARK
-dev/uepylib/warm.py:34: STALL_SECONDS
-dev/uepylib/warm.py:35: STALL_CPU
-dev/uepylib/warm.py:36: WATCH_EVERY
-dev/uepylib/warm.py:37: SAMPLE_EVERY
-dev/uepylib/warm.py:38: LOG
-dev/uepylib/warm.py:41: cpu_seconds
-dev/uepylib/warm.py:48: parse_cpu
-dev/uepylib/warm.py:62: class Watch
+dev/uepylib/warm.py:34: CRASH_MARK
+dev/uepylib/warm.py:38: FATAL_MARK
+dev/uepylib/warm.py:39: CRASH_MARKS
+dev/uepylib/warm.py:40: STALL_SECONDS
+dev/uepylib/warm.py:41: STALL_CPU
+dev/uepylib/warm.py:42: WATCH_EVERY
+dev/uepylib/warm.py:43: SAMPLE_EVERY
+dev/uepylib/warm.py:44: LOG
+dev/uepylib/warm.py:47: cpu_seconds
+dev/uepylib/warm.py:54: parse_cpu
+dev/uepylib/warm.py:68: class Watch
 forest_generator/asset_sources.py:58: ENGINE_VERSION
 forest_generator/asset_sources.py:59: ENGINE_ROOT_GLOB
 forest_generator/asset_sources.py:60: TEMPLATE_RESOURCES
@@ -6463,17 +6472,17 @@ probes/boot.py:67: _world
 probes/boot.py:72: _game_time
 probes/boot.py:79: load_probes
 probes/boot.py:105: make_writable
-probes/boot.py:131: _write_results
-probes/boot.py:148: _save_dir
-probes/boot.py:152: _hermetic
-probes/boot.py:162: _finish
-probes/boot.py:175: _ready
-probes/boot.py:199: _awaited
-probes/boot.py:204: _tick
-probes/boot.py:234: start
-probes/boot.py:272: _ticker
-probes/boot.py:278: _prepare
-probes/boot.py:299: _open
+probes/boot.py:139: _write_results
+probes/boot.py:156: _save_dir
+probes/boot.py:160: _hermetic
+probes/boot.py:170: _finish
+probes/boot.py:183: _ready
+probes/boot.py:207: _awaited
+probes/boot.py:212: _tick
+probes/boot.py:242: start
+probes/boot.py:280: _ticker
+probes/boot.py:286: _prepare
+probes/boot.py:307: _open
 probes/bots.py:37: COUNT_ENV
 probes/bots.py:40: SPAWN_PER_TICK
 probes/bots.py:41: SPAWN_RADIUS_CM
@@ -7043,22 +7052,22 @@ probes/probe_net_guard.py:70: _now
 probes/probe_net_guard.py:74: _guard
 probes/probe_net_guard.py:78: _counts
 probes/probe_net_guard.py:83: _send
-probes/probe_net_health.py:45: WAIT
-probes/probe_net_health.py:46: SWING_WAIT
-probes/probe_net_health.py:47: START_CM
-probes/probe_net_health.py:48: NEAR
-probes/probe_net_health.py:49: LOW
-probes/probe_net_health.py:50: AHEAD
-probes/probe_net_health.py:53: _await
-probes/probe_net_health.py:58: _health
-probes/probe_net_health.py:62: _hp
-probes/probe_net_health.py:66: _bodies
-probes/probe_net_health.py:75: _player_id
-probes/probe_net_health.py:80: _drawn
-probes/probe_net_health.py:87: _bar
-probes/probe_net_health.py:92: _take
-probes/probe_net_health.py:96: _state
-probes/probe_net_health.py:103: _stand_beside
+probes/probe_net_health.py:46: WAIT
+probes/probe_net_health.py:47: SWING_WAIT
+probes/probe_net_health.py:48: START_CM
+probes/probe_net_health.py:49: NEAR
+probes/probe_net_health.py:50: LOW
+probes/probe_net_health.py:51: AHEAD
+probes/probe_net_health.py:54: _await
+probes/probe_net_health.py:59: _health
+probes/probe_net_health.py:63: _hp
+probes/probe_net_health.py:67: _bodies
+probes/probe_net_health.py:76: _player_id
+probes/probe_net_health.py:81: _drawn
+probes/probe_net_health.py:88: _bar
+probes/probe_net_health.py:93: _take
+probes/probe_net_health.py:97: _state
+probes/probe_net_health.py:104: _stand_beside
 probes/probe_net_hud_own_pawn.py:41: WAIT
 probes/probe_net_hud_own_pawn.py:42: OTHERS
 probes/probe_net_hud_own_pawn.py:43: NEAR
@@ -7306,31 +7315,31 @@ probes/probe_net_survival.py:81: _tags
 probes/probe_net_survival.py:86: _mushrooms
 probes/probe_net_survival.py:93: _give_mushroom
 probes/probe_net_survival.py:102: _eat
-probes/probe_net_take.py:55: HUD_BP_PATH
-probes/probe_net_take.py:61: WAIT
-probes/probe_net_take.py:62: HAT
-probes/probe_net_take.py:63: SPARE_HEALTH
-probes/probe_net_take.py:64: SAME_PLACE_CM
-probes/probe_net_take.py:65: STOOD_CM
-probes/probe_net_take.py:67: BESIDE_CM
-probes/probe_net_take.py:70: _await
-probes/probe_net_take.py:75: _vec
-probes/probe_net_take.py:79: _wc
-probes/probe_net_take.py:83: _hats
-probes/probe_net_take.py:88: _lying
-probes/probe_net_take.py:94: _carried
-probes/probe_net_take.py:98: _bodies
-probes/probe_net_take.py:106: _stand
-probes/probe_net_take.py:112: _posts
-probes/probe_net_take.py:116: _both
-probes/probe_net_take.py:145: _wanderers
-probes/probe_net_take.py:153: _kill
-probes/probe_net_take.py:165: _server_loot
-probes/probe_net_take.py:235: _server_items
-probes/probe_net_take.py:314: _reticle_on
-probes/probe_net_take.py:329: _stood
-probes/probe_net_take.py:346: _client_loot
-probes/probe_net_take.py:398: _client_items
+probes/probe_net_take.py:56: HUD_BP_PATH
+probes/probe_net_take.py:62: WAIT
+probes/probe_net_take.py:63: HAT
+probes/probe_net_take.py:64: SPARE_HEALTH
+probes/probe_net_take.py:65: SAME_PLACE_CM
+probes/probe_net_take.py:66: STOOD_CM
+probes/probe_net_take.py:68: BESIDE_CM
+probes/probe_net_take.py:71: _await
+probes/probe_net_take.py:76: _vec
+probes/probe_net_take.py:80: _wc
+probes/probe_net_take.py:84: _hats
+probes/probe_net_take.py:89: _lying
+probes/probe_net_take.py:95: _carried
+probes/probe_net_take.py:99: _bodies
+probes/probe_net_take.py:107: _stand
+probes/probe_net_take.py:113: _posts
+probes/probe_net_take.py:117: _both
+probes/probe_net_take.py:146: _wanderers
+probes/probe_net_take.py:154: _kill
+probes/probe_net_take.py:166: _server_loot
+probes/probe_net_take.py:243: _server_items
+probes/probe_net_take.py:322: _reticle_on
+probes/probe_net_take.py:337: _stood
+probes/probe_net_take.py:354: _client_loot
+probes/probe_net_take.py:406: _client_items
 probes/probe_net_throw.py:54: WAIT
 probes/probe_net_throw.py:55: SPARE_HEALTH
 probes/probe_net_throw.py:56: SAME_PLACE_CM
@@ -8285,6 +8294,11 @@ uebp/nodes/gas.py:24: FN_END_ABILITY
 uebp/nodes/guard.py:7: GUARD_CLASS
 uebp/nodes/guard.py:10: FN_GUARD_ALLOW
 uebp/nodes/guard.py:12: FN_GUARD_AIM_ALLOWED
+uebp/nodes/health.py:8: HEALTH_BASE_CLASS
+uebp/nodes/health.py:12: FN_TAKE_HIT
+uebp/nodes/health.py:15: FN_DIE
+uebp/nodes/health.py:17: NODE_EVENT_HEALTH_CHANGED
+uebp/nodes/health.py:19: NODE_EVENT_DIED
 uebp/nodes/inventory.py:12: INVENTORY_LIBRARY
 uebp/nodes/inventory.py:18: FN_MARK_INVENTORY_DIRTY
 uebp/nodes/inventory.py:22: FN_MARK_CARRIED_ITEM_DIRTY
@@ -8880,6 +8894,13 @@ world/world_tuning.py:63: write_table
 Source/Otherworld/Public/OtherworldCharacter.h:18: UCLASS class OTHERWORLD_API AOtherworldCharacter : public ACharacter
 Source/Otherworld/Public/OtherworldCharacter.h:38: UFUNCTION void OnRep_Prone();
 Source/Otherworld/Public/OtherworldCharacterMovement.h:98: UCLASS class OTHERWORLD_API UOtherworldCharacterMovement : public UCharacterM
+Source/Otherworld/Public/OtherworldHealthComponent.h:32: UCLASS class OTHERWORLD_API UOtherworldHealthComponent : public UActorCompone
+Source/Otherworld/Public/OtherworldHealthComponent.h:51: UFUNCTION void TakeHit(double Amount, FVector From, AController* InstigatedBy, A
+Source/Otherworld/Public/OtherworldHealthComponent.h:59: UFUNCTION void Die();
+Source/Otherworld/Public/OtherworldHealthComponent.h:63: UFUNCTION void OnHealthChanged();
+Source/Otherworld/Public/OtherworldHealthComponent.h:73: UFUNCTION void OnDied();
+Source/Otherworld/Public/OtherworldHealthComponent.h:110: UFUNCTION void OnRep_Health();
+Source/Otherworld/Public/OtherworldHealthComponent.h:113: UFUNCTION void OnRep_Dead();
 Source/Otherworld/Public/OtherworldHitHistory.h:66: UCLASS class OTHERWORLD_API UOtherworldHitHistory : public UWorldSubsystem
 Source/Otherworld/Public/OtherworldInventoryRecord.h:137: UCLASS class OTHERWORLD_API UOtherworldInventoryRecordComponent : public UAct
 Source/Otherworld/Public/OtherworldInventoryRecord.h:154: UFUNCTION void MarkDirty();
@@ -8953,14 +8974,14 @@ Source/Otherworld/Public/OtherworldShotLibrary.h:68: UFUNCTION static float Last
 Source/Otherworld/Public/OtherworldShotLibrary.h:72: UFUNCTION static void LastShotLine(const UObject* WorldContextObject, FVector& S
 Source/Otherworld/Public/OtherworldShotLibrary.h:76: UFUNCTION static int32 RewoundShots(const UObject* WorldContextObject);
 Source/Otherworld/Public/OtherworldShotLibrary.h:79: UFUNCTION static int32 RewoundHits(const UObject* WorldContextObject);
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:52: UCLASS class OTHERWORLD_API UOtherworldWeaponComponentBase : public UActorCom
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:64: UFUNCTION void Server_Fire(FVector AimPoint);
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:72: UFUNCTION void ShotFired(FVector AimPoint);
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:83: UFUNCTION void FirePellets(AActor* Gun, FVector Muzzle, FVector Direction, int32
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:95: UFUNCTION void PelletFlew(FVector Start, FVector Stop, bool bStopped, FVector Po
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:104: UFUNCTION void Server_Reload();
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:115: UFUNCTION void ReloadNow();
-Source/Otherworld/Public/OtherworldWeaponComponentBase.h:119: UFUNCTION void Reloaded();
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:54: UCLASS class OTHERWORLD_API UOtherworldWeaponComponentBase : public UActorCom
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:66: UFUNCTION void Server_Fire(FVector AimPoint);
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:74: UFUNCTION void ShotFired(FVector AimPoint);
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:85: UFUNCTION void FirePellets(AActor* Gun, FVector Muzzle, FVector Direction, int32
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:97: UFUNCTION void PelletFlew(FVector Start, FVector Stop, bool bStopped, FVector Po
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:106: UFUNCTION void Server_Reload();
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:117: UFUNCTION void ReloadNow();
+Source/Otherworld/Public/OtherworldWeaponComponentBase.h:121: UFUNCTION void Reloaded();
 Source/OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h:36: UCLASS class OTHERWORLDEDITOR_API UOtherworldBlueprintNetLibrary : public UBl
 Source/OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h:43: UFUNCTION static bool SetCustomEventRpc(UEdGraphNode* EventNode, EOtherworldRpc 
 Source/OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h:47: UFUNCTION static bool GetCustomEventRpc(const UEdGraphNode* EventNode, EOtherwor

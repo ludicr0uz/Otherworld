@@ -37,8 +37,9 @@
 // variable, and Loaded, Reserve and NextFireTime are the item's (one magazine
 // and one deadline per gun, and the item is a Blueprint actor still). They
 // are read and written here by name, as the inventory's record reads them,
-// and a round spent marks that record. The health component is a Blueprint
-// too (until W3): its tables are read by name and TakeHit called by name.
+// and a round spent marks that record. A struck body's TakeHit is its
+// UOtherworldHealthComponent's (W3); its zone tables are that Blueprint's
+// variables, read by name.
 // The names are properties of the class defaults, written by
 // Scripts/combat/weapon_component/native.py from the builders' constants.
 #pragma once
@@ -48,6 +49,7 @@
 #include "OtherworldWeaponComponentBase.generated.h"
 
 class AController;
+class UOtherworldHealthComponent;
 
 UCLASS(Abstract, Blueprintable, ClassGroup = (Otherworld))
 class OTHERWORLD_API UOtherworldWeaponComponentBase : public UActorComponent
@@ -182,21 +184,8 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
 	FName ItemReloadSecondsVar = TEXT("ReloadSeconds");
 
-	// The health component (the shooter's own, and a struck body's): its
-	// class, which a body is asked for as the graph asked
-	// (GetComponentByClass), and its event and variables.
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
-	TSubclassOf<UActorComponent> HealthClass;
-
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
-	FName TakeHitEvent = TEXT("TakeHit");
-
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
-	FName HealthVar = TEXT("Health");
-
-	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
-	FName HealthDeadVar = TEXT("Dead");
-
+	// The struck body's health component (UOtherworldHealthComponent, W3):
+	// its zone tables are its Blueprint's variables still.
 	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot|Names")
 	FName HeadBonesVar = TEXT("HeadBones");
 
@@ -223,15 +212,12 @@ public:
 	int32 Reloads = 0;
 
 private:
-	/** The actor's component that takes hits (its HealthClass one), or none. */
-	UActorComponent* HealthOf(const AActor* Actor) const;
+	/** The actor's component that takes hits, or none. */
+	UOtherworldHealthComponent* HealthOf(const AActor* Actor) const;
 
 	/** Whether the owner lives: an owner with no health component does. */
 	bool OwnerAlive() const;
 
 	/** Whether the shot may be fired now: a gun in a living hand, a round in it, cooled. */
 	bool MayFire(AActor* Gun) const;
-
-	/** TakeHit(Amount, From, InstigatedBy, Cause) on a health component, by name. */
-	void HandHit(UActorComponent* Health, float Amount, const FVector& From, AController* By, AActor* Cause) const;
 };

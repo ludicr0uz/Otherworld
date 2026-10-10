@@ -235,9 +235,12 @@ ASSETS AND PATCHES
                     console events and CombatTrace's default
 
 BP_HealthComponent (health_component wires the fragments together)
-  health_component  variables, defaults, the Tick's death branch
-  damage            health is the server's: the TakeHit event every blow calls
-                    (hit, owner_instigator), what replicates, OnRep_Health
+  health_component  variables, defaults, the Tick's call of Die, the death
+                    path on OnDied
+  health_native     the reparent onto the C++ parent (W3), and what a
+                    component built before it loses first
+  damage            health is the server's: the native TakeHit every blow calls
+                    (hit, owner_instigator), what replicates, OnHealthChanged
   server_pose       a dedicated server refreshes the bones of every body with
                     health: its hit bodies and muzzles are where clients see them;
                     and hands the body to the C++ that poses it by how near a

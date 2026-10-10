@@ -105,9 +105,13 @@ first by **the mirror** (`combat/weapon_component/look.py`), from the few facts 
 Health is the value a cheater most wants, so only the server changes it, and every blow
 says who struck it. `combat/damage.py` is the whole of it.
 
-- **A blow calls the target's `TakeHit(Amount, From, InstigatedBy, Cause)`,** a custom
-  event on `BP_HealthComponent`, with `damage.hit(ed, as_health, amount, came_from,
-  instigator, cause, execs)`. No graph writes another body's `Health`, `LastDamageTime`,
+- **A blow calls the target's `TakeHit(Amount, From, InstigatedBy, Cause)`,** a function
+  of `BP_HealthComponent`'s C++ parent (W3: `UOtherworldHealthComponent`, `Source/CLAUDE.md`
+  "The health component's native parent"; authority only), with `damage.hit(ed, as_health,
+  amount, came_from, instigator, cause, execs)`. `Health` and `Dead` are its RepNotify
+  properties: a client's side of a change hangs on its `OnHealthChanged` event, and the
+  death path on `OnDied` (the server's from `Die`, which the graph's Tick calls at 0 HP; a
+  client's when `Dead` arrives). No graph writes another body's `Health`, `LastDamageTime`,
   `LastHitFrom` or `DamagedByPlayer` (`combat/verify/damage.py` fails on one in the weapon
   component, `npc/verify.py` in a wanderer's controller).
 - **Players hurt players (M15, done), and nothing was added to make them.** A pellet, a

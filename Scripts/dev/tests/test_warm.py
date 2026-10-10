@@ -47,6 +47,11 @@ class WatchTest(unittest.TestCase):
         self.log("[2026.10.01][151]LogMac: === Critical error: ===\nSIGSEGV\n")
         self.assertIn("crashed", self.after(2))
 
+    def test_a_fatal_error_on_the_game_thread_is_a_crash(self):
+        # It never writes the critical-error mark, and spins in appError.
+        self.log("LogMac: Error: appError called: Fatal error: [File:Casts.cpp] [Line: 10]\n")
+        self.assertIn("crashed", self.after(2, cpu=2))
+
     def test_the_mark_may_arrive_in_two_reads(self):
         self.log("LogMac: === Critical")
         self.assertIsNone(self.after(2))

@@ -1,8 +1,13 @@
 """BP_HealthComponent's member variables, named once: each row is
 the name, the pin type and the default (uebp/vars.py). The builder declares
-TABLE, then DAMAGE, the loot rows (loot/consts.py) and STATE, in the order
-they have always been declared in. The defaults of DAMAGE and STATE are the
+TABLE, then the loot rows (loot/consts.py) and STATE, in the order
+they have always been declared in. The defaults of STATE are the
 builder's and the graph modules' (health_component.py writes them).
+
+NATIVE is not declared: those are properties of the component's C++ parent
+(task W3, Source/Otherworld/Public/OtherworldHealthComponent.h; Health and
+Dead RepNotify, HitCount and LastHitFrom replicated), named here so a graph
+reads and writes them by the same rows as before.
 """
 
 from uebp.vars import BOOL, FLOAT, INT, NAME, REPLICATED, REP_NOTIFY, VECTOR, Var, array, cls, obj
@@ -59,16 +64,15 @@ PlayerRespawnWait = Var("PlayerRespawnWait", FLOAT)
 RespawnFor = Var("RespawnFor", obj("/Script/Engine.Controller"))
 
 TABLE = (
-    Health, MaxHealth, Dead, DespawnOnDeath, RespawnClass, AmmoClass, DropClasses,
+    MaxHealth, DespawnOnDeath, RespawnClass, AmmoClass, DropClasses,
     RespawnPoint, HurtSounds, DeathSounds, HeardDamageTime, HeartbeatSounds, HeartbeatNextTime,
-    LastInstigator, LastCause, HitCount, SeenHits, DeathPlayed, PlayerRespawnWait,
+    SeenHits, DeathPlayed, PlayerRespawnWait,
     RespawnFor,
 )
 
 # Set by whatever hurt this body (game_state.py says what reads them).
 LastDamageTime = Var("LastDamageTime", FLOAT)
 DamagedByPlayer = Var("DamagedByPlayer", BOOL)
-DAMAGE = (LastDamageTime, DamagedByPlayer)
 
 # How long after a death its replacement appears (respawn.py).
 RespawnDelay = Var("RespawnDelay", FLOAT)
@@ -99,5 +103,9 @@ NextReactTime = Var("NextReactTime", FLOAT)
 ReactIndex = Var("ReactIndex", INT)
 Steady = Var("Steady", BOOL)
 STATE = (RespawnDelay, NpcId, SpawnedAt, HeadBones, LimbBones, HeadMultiplier,
-         LimbMultiplier, HitReactions, LastHitFrom, PrevHealth, NextReactTime, ReactIndex,
+         LimbMultiplier, HitReactions, PrevHealth, NextReactTime, ReactIndex,
          Steady)
+
+# The C++ parent's properties (the module docstring).
+NATIVE = (Health, Dead, HitCount, LastHitFrom, LastDamageTime, DamagedByPlayer,
+          LastInstigator, LastCause)

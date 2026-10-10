@@ -5,7 +5,8 @@ needs and a Blueprint cannot do (`serversupportsysdesign.md` 4.3): the player's
 predicted movement states (M12), the lag compensation of shots (M22), the server's
 replication graph (A2), how often a dedicated server poses a body (A4), the record of
 what a player carries (A3a, A3b), what a Server event checks before it runs (A5) and the
-first slice of the weapon component, the shot's server half (W1). The editor-only
+first slices of the weapon component, the shot's server half (W1) and the reload (W2),
+and the health component's blow and death mark (W3). The editor-only
 module, `OtherworldEditor`, holds what the Python builders need and Python cannot reach.
 Everything else stays in the Python builders.
 
@@ -27,6 +28,7 @@ Everything else stays in the Python builders.
 | `Otherworld/Private/OtherworldInventoryLibrary.cpp` | `UOtherworldInventoryLibrary` (Python: `unreal.OtherworldInventoryLibrary`; declared in the record's header): `MarkInventoryDirty` and `MarkCarriedItemDirty` for the graphs (`Scripts/uebp/nodes/inventory.py`, placed by `Scripts/combat/dirty.py`), the view's reads of the record (`InventoryRow`, `WornRow`, `HandRow`, for `Scripts/combat/weapon_component/view.py`), the save's (`InventoryRecordOf`, `InventoryRecordToBytes`, `InventoryRecordFromBytes`), and the probes' reads and the audit's switch |
 | `Otherworld/Public/OtherworldRpcGuard.h`, `Private/….cpp` | `UOtherworldRpcGuard` (A5; `Scripts/net/CLAUDE.md`, "Every Server event asks the guard first"): a component on the player with the two checks a Blueprint Server event has no `_Validate` for. `Allow(Name)`, a token bucket per event name per connection (the state is keyed by the `UNetConnection`, so it outlives a character), which logs `RPC-REFUSED` and past `KickRefusals` in `KickSeconds` closes the connection (`ENetCloseResult::Extended`, `ClosedByRpcGuard`); and `AimAllowed(AimPoint)`, the cone along `GetBaseAimRotation` a shot's point must lie in. Both pass uncounted unless the owner's controller is a remote player's. Its numbers are `EditAnywhere`, written by `combat/install.py` from `Scripts/net/guard_consts.py`; `Counted`, `Refused`, `AimRefused` and `bKicked` (Python: `kicked`) are for the probes |
 | `Otherworld/Public/OtherworldWeaponComponentBase.h`, `Private/….cpp` | `UOtherworldWeaponComponentBase` (W1; "The weapon component's native parent" below): the class `BP_WeaponComponent` is a child of. `Server_Fire(AimPoint)`, a reliable Server RPC with a `_Validate`: the guard's `Allow` and `AimAllowed`, the shot's own refusals, the round and the deadline, the record's mark, then the event `ShotFired`. `FirePellets(...)`: each pellet's `ShotTrace`, the zone off the target's tables, its `TakeHit`, then the event `PelletFlew`. `ShotsFired` and `ShotsRefused` are for the probes. Its nodes are `Scripts/uebp/nodes/weapon.py`; the graph's side is `Scripts/combat/weapon_component/shot.py`, `firing.py`, `impact.py` |
+| `Otherworld/Public/OtherworldHealthComponent.h`, `Private/….cpp` | `UOtherworldHealthComponent` (W3; "The health component's native parent" below): the class `BP_HealthComponent` is a child of. `TakeHit(Amount, From, InstigatedBy, Cause)` and `Die()`, authority only; `Health` and `Dead` (RepNotify), `HitCount` and `LastHitFrom` (replicated), `LastDamageTime`, `DamagedByPlayer`, `LastInstigator`, `LastCause`; the events `OnHealthChanged` (a client's) and `OnDied` (once on each machine). Its nodes are `Scripts/uebp/nodes/health.py`; the graph's side is `Scripts/combat/damage.py`, `health_component.py` |
 | `OtherworldEditor/OtherworldEditor.Build.cs` | the editor module's dependencies (adds `UnrealEd`, `BlueprintGraph`); only the Editor target lists it, so no game or server build carries it |
 | `Otherworld/Public/OtherworldLoadLibrary.h`, `Private/….cpp` | `UOtherworldLoadLibrary` (Python: `unreal.OtherworldLoadLibrary`): what the load test reads off a server or a client (A1, `Scripts/probes/probe_net_load.py`): each connection's bytes and packets in and out, open actor channels and lag (`FOtherworldConnectionStats`, read with `get_editor_property`), the frame and world-tick times sampled between `StartFrameTiming` and `StopFrameTiming`, and the hit history's characters and samples; and `SpawnActorAt`, a spawn for a probe that needs a thing the level lacks (Python has none in a game; `probe_gas_traversal.py`'s block) |
 | `Otherworld/Public/OtherworldReplicationGraph.h`, `Private/….cpp` | `UOtherworldReplicationGraph` (A2, `Scripts/net/CLAUDE.md` "Relevancy, update rates and dormancy"): the server's replication driver, named for the `IpNetDriver` in `Config/DefaultEngine.ini`. A grid-spatialisation node for everything with a place in the world, an always-relevant list for `bAlwaysRelevant` actors, and `UOtherworldReplicationGraphNode_ForConnection` per connection (the engine's viewer and view target, plus the viewer's PlayerState). Each class's cull distance and period are read off its CDO, which the builders write from `Scripts/net/relevancy_consts.py`; `CellSizeCm` is its one config value |
@@ -152,9 +154,10 @@ comment has the picture of the first two, the shot's server half (W1) and the re
   The reparent keeps every variable (checked by name).
 - **What the base does not hold yet.** `Held` and `AsksServed` are still the Blueprint's
   variables, `Loaded`, `Reserve` and `NextFireTime` the item Blueprint's (a magazine and a
-  deadline are a gun's own, and the item has no native parent), and the health component
-  is a Blueprint until W3. The base reads and writes them by name, and calls `TakeHit` by
-  name, its parameters by position and kind. The names are `EditAnywhere` properties of
+  deadline are a gun's own, and the item has no native parent), and a body's zone tables
+  (`HeadBones`, `LimbBones`, the two multipliers) its health Blueprint's. The base reads
+  and writes them by name. `Health`, `Dead` and `TakeHit` it reaches directly since W3
+  (`FindComponentByClass<UOtherworldHealthComponent>`). The names are `EditAnywhere` properties of
   the class defaults, written from the builders' constants (`native.NAMES`) and checked
   by `combat/verify/shot.check_native`, which also checks each names a variable.
 - **A write from C++ of what a player carries marks the record itself**
@@ -185,9 +188,47 @@ comment has the picture of the first two, the shot's server half (W1) and the re
 - **A custom event named as a function a new slice adds** is removed by
   `native.retire_events` (the names are `shot_vars.NATIVE_FUNCTIONS`) before the build:
   add the slice's functions to that tuple.
-- **The next slices** (W3, the health component) take names out of
-  `native.NAMES` as their state becomes native. Moving `Loaded` and `Reserve` to
+- **The next slices** take names out of `native.NAMES` as their state becomes native
+  (W3 took the health component's three and its class). Moving `Loaded` and `Reserve` to
   `UPROPERTY`s needs a native parent for `BP_WeaponItem`, which nothing has yet.
+
+## The health component's native parent (`UOtherworldHealthComponent`, W3)
+
+The blow and the mark of a death are C++; what dying is stays in the graph. The header's
+first comment has the picture.
+
+- **`BP_HealthComponent` is reparented by its own builder** (`combat/health_native.py`,
+  called from `health_component.py` before the graph is authored), not by `install.py`:
+  the graph's `Die` call and its two events are the base's. A component built before W3
+  first loses what the base now names, or the compile fails: the eight Blueprint variables
+  (`health_vars.NATIVE`), the `TakeHit` custom event and the `OnRep_Health` function graph.
+- **The graphs name the properties as they named the variables** (`HV.Health`, with
+  `HEALTH_CLASS_PATH` from another Blueprint): a get or set node finds an inherited
+  `BlueprintReadWrite` property by name. They are rows of `health_vars.NATIVE`, which
+  nothing declares; their defaults are still written onto the class defaults.
+- **A Blueprint Set of a native RepNotify property calls no notify** (the engine's Set
+  node calls only a notify defined in a Blueprint; its title is plain `Set Health`). So
+  `OnHealthChanged` is told on a client alone, from `OnRep_Health`. The graph's fragment
+  on it keeps its authority switch all the same.
+- **`OnDied` is told once on each machine**: on the server by `Die()`, which the graph's
+  Tick calls on the frame it sees `Health` at 0 with `Dead` unsaid (after the drain and
+  the world-floor net, which write `Health` in the graph); on a client at the component's
+  first tick after `Dead` arrived (`TickComponent`, after the graph's Tick). Until W3 a
+  client began the death path when its own Tick saw `Health` at 0; now it waits for `Dead`.
+- **Never run the death path from inside the notify.** `OnRep_Dead` runs mid-bunch, before
+  the actor's replicated place has been applied: a wanderer moved and killed in one
+  server frame ragdolled where it had stood, 82 m from the server's body, and the loot
+  window's take was out of the server's reach (`probe_net_take.py` found it; its note
+  records the server's distances). The notify only marks the death owed.
+- **Both functions are `BlueprintAuthorityOnly`** and check the owner's authority
+  themselves: a client's call, from a graph or a probe's `call_method`, does nothing.
+- **Python sees the properties and both functions** (`health`, `take_hit`); a probe reads
+  and writes `Health` and `Dead` with `p.get`/`p.set` as before. `WRITABLE` rows naming
+  them are skipped by `probes/boot.py`: a native `EditAnywhere` property is writable as
+  it is, and is no variable of the Blueprint to mark.
+- **The parameters are not the task's `(Damage, Instigator, Bone)`**: every caller already
+  hands `(Amount, From, InstigatedBy, Cause)`, the zone is worked out by the caller that
+  knows the bone (`FirePellets`, the swing), and the kill credit needs `Cause`.
 
 ## Traps
 

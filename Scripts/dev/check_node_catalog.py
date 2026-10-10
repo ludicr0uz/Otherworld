@@ -40,6 +40,7 @@ CONTEXTS = (
     ("BTTask", "/Script/AIModule.BTTask_BlueprintBase", "EventGraph"),
     ("Ability", "/Script/GameplayAbilities.GameplayAbility", "EventGraph"),
     ("WeaponComponent", "/Script/Otherworld.OtherworldWeaponComponentBase", "EventGraph"),
+    ("HealthComponent", "/Script/Otherworld.OtherworldHealthComponent", "EventGraph"),
 )
 
 

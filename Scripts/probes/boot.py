@@ -111,6 +111,14 @@ def make_writable(pairs):
         if bp is None:
             problems.append(f"WRITABLE: no Blueprint at {bp_path}")
             continue
+        # A property of the Blueprint's native parent (Health and Dead since
+        # W3) is no variable of the Blueprint, and is writable as it is.
+        if str(var) not in {str(v) for v in bel.list_member_variable_names(bp)}:
+            try:
+                unreal.get_default_object(bel.generated_class(bp)).get_editor_property(str(var))
+                continue
+            except Exception:                                     # noqa: BLE001
+                pass
         try:
             bel.set_blueprint_variable_instance_editable(bp, var, True)
         except Exception as exc:

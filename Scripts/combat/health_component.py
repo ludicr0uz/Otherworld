@@ -4,9 +4,8 @@ The death, replacement and flinch fragments are authored in death.py,
 replacement.py and hit_reaction.py; this module wires them together.
 """
 
-import unreal
-
-from combat.damage import _author_take_hit, replicate_health
+from combat import health_native
+from combat.damage import author_health_changed, replicate_health
 from combat.debuff_drain import _author_debuff_drain
 from combat.death import (
     CORPSE_SECONDS, PLAYER_RESPAWN_WAIT, _author_corpse, _author_death_collapse,
@@ -15,8 +14,8 @@ from combat.death import (
 from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR, NEVER_DAMAGED
 from combat.log import _log
 from uebp.graph import (
-    BEL, BGE, _apply_defaults, _assets, _connect, _create_blueprint, _events, _node, _pin,
-    _post_physics_tick, _set, else_, out, then,
+    BEL, BGE, _apply_defaults, _assets, _connect, _create_blueprint, _events, _node, _palette,
+    _pin, _post_physics_tick, _set, else_, out, then,
 )
 from uebp import net
 from uebp.layout import arrange
@@ -37,6 +36,7 @@ from Sound.sound_world import (
     _author_death_voice, _author_heartbeat, _author_hurt_voice, voice_defaults)
 from loot.consts import BODY_ARRAYS
 from loot.roll import declare_loot_vars
+from uebp.nodes.health import FN_DIE, NODE_EVENT_DIED
 from uebp.nodes.math import FN_LE_FF
 from uebp.nodes.palette import MACRO_SWITCH_AUTHORITY_COMP
 from uebp.vars import declare, defaults
@@ -74,7 +74,8 @@ def build_health_component(rebuild=True):
     Because the replacement carries the same component with the same defaults,
     one death begets one respawn indefinitely with nothing tracking it.
 
-    Damage is this component's own TakeHit event (damage.py), which every
+    Damage is this component's own TakeHit (damage.py; C++, the native parent's
+    since W3), which every
     blow calls and only the server runs, rather than the engine's ApplyDamage /
     Event AnyDamage. AnyDamage is an *Actor* event, so routing through it would
     mean authoring a graph on both characters -- and BP_ThirdPersonCharacter's
@@ -85,20 +86,25 @@ def build_health_component(rebuild=True):
 
         the world-floor net, the drain     the server (and single player)
         the grunt, the heart, the flinch   every copy, off what was replicated
-        the death path, once (DeathPlayed) every copy: the cry and the collapse
-            Dead, the kill, the replacement    the server
+        Health at 0: Die (C++), which marks Dead   the server
+        the death path, off OnDied, once       every copy: the cry and the collapse
+            the kill, the replacement          the server
     """
     # The weapon-drop path casts the spawned actor to BP_WeaponItem, and a cast
     # node only appears in the palette for a class that is already loaded.
     if not _assets().load_asset(ITEM_BP_PATH):
         raise RuntimeError(f"could not load {ITEM_BP_PATH} for its cast node")
 
-    bp = _create_blueprint(HEALTH_BP_PATH, unreal.ActorComponent)
+    # A child of the native base (health_native.py): Health, Dead, the blow
+    # and the death's mark are C++.
+    bp = _create_blueprint(HEALTH_BP_PATH, health_native.base_class())
+    ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
+    health_native.reparent(bp, ed)
+    # The reparent compiled the Blueprint: the graph is asked for again.
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
 
     declare(ed, HV.TABLE)
-    declare(ed, HV.DAMAGE)
     # Corpse loot: the table loot/install.py fills, and what this body carries.
     declare_loot_vars(ed)
     # The respawn's, the hit boxes' and the flinch's (health_vars.py).
@@ -111,7 +117,7 @@ def build_health_component(rebuild=True):
     ed.remove_member_variable("SpawnOrigin")
 
     _author_health_begin_play(ed, begin)
-    _author_take_hit(ed)
+    author_health_changed(ed)
 
     # Health is the server's: only it writes one off or drains one. A
     # client's copy goes straight on to what it shows of the Health it is sent.
@@ -146,28 +152,32 @@ def build_health_component(rebuild=True):
     steady, flinch = _author_steady_gate(ed, else_(at_zero))
     _author_hit_reaction(ed, flinch, skips=(steady,))
 
-    # Branch on DeathPlayed and use its *False* pin -- one node cheaper than a
-    # NOT, and it is what stops the death path running again every frame after
-    # the first. This machine's own latch, not Dead: Dead is the server's word,
-    # replicated, and can reach a client before its Tick has seen Health at 0.
-    dead_get = ed.add_get_member_variable_node(HV.DeathPlayed)
+    # At zero, the server says so, once: Die (C++) marks Dead, which
+    # replicates, and tells OnDied here; a client's call does nothing, and
+    # its OnDied comes when Dead arrives.
+    dead_get = ed.add_get_member_variable_node(HV.Dead)
     already = ed.add_branch_node()
-    _connect(out(dead_get, HV.DeathPlayed), _pin(already, "Condition"))
+    _connect(out(dead_get, HV.Dead), _pin(already, "Condition"))
     _connect(then(at_zero), _pin(already, "execute"))
+    die = _node(ed, FN_DIE)
+    _connect(else_(already), _pin(die, "execute"))
 
+    # --- OnDied: what dying is, once on each machine -------------------------
+    # DeathPlayed is this machine's own latch, beside the base's: nothing
+    # that tells the event twice runs the path twice.
+    died = _palette(ed, NODE_EVENT_DIED)
+    played_get = ed.add_get_member_variable_node(HV.DeathPlayed)
+    once = ed.add_branch_node()
+    _connect(out(played_get, HV.DeathPlayed), _pin(once, "Condition"))
+    _connect(then(died), _pin(once, "execute"))
     played = ed.add_set_member_variable_node(HV.DeathPlayed)
     _set(played, HV.DeathPlayed, True)
-    _connect(else_(already), _pin(played, "execute"))
-    says = ed.add_macro_node(MACRO_SWITCH_AUTHORITY_COMP)
-    _connect(then(played), _pin(says, "execute"))
-    mark = ed.add_set_member_variable_node(HV.Dead)
-    _set(mark, HV.Dead, True)
-    _connect(out(says, "Authority"), _pin(mark, "execute"))
+    _connect(else_(once), _pin(played, "execute"))
 
     despawn_get = ed.add_get_member_variable_node(HV.DespawnOnDeath)
     should = ed.add_branch_node()
     _connect(out(despawn_get, HV.DespawnOnDeath), _pin(should, "Condition"))
-    for e in _author_death_voice(ed, (then(mark), out(says, "Remote"))):
+    for e in _author_death_voice(ed, (then(played),)):
         _connect(e, _pin(should, "execute"))
 
     # --- count it, leave a corpse, and later a replacement -------------------------
@@ -202,14 +212,14 @@ def build_health_component(rebuild=True):
     _author_replacement(ed, out(spawns, "Authority"))
 
     ed.add_comment_to_nodes(
-        f"At 0 HP, once on each machine (DeathPlayed): the server marks Dead, which "
-        f"replicates, then (if DespawnOnDeath) count the kill and "
+        f"At 0 HP the server calls Die, which marks Dead (it replicates). OnDied, once "
+        f"on each machine: (if DespawnOnDeath) count the kill and "
         f"leave this one on the ground for {CORPSE_SECONDS:.0f} s; its "
         f"replacement follows {RESPAWN_DELAY:.0f} s later. The player's copy "
         "has DespawnOnDeath false and no RespawnClass, so none of that runs "
         "on them.",
-        [health, dying, at_zero, dead_get, already, played, says, mark, despawn_get,
-         should, mine_again, is_player, spawns])
+        [health, dying, at_zero, dead_get, already, die, died, played_get, once, played,
+         despawn_get, should, mine_again, is_player, spawns])
 
     # After every declare above: a re-declared variable loses its replication.
     replicate_health(bp)
@@ -221,7 +231,7 @@ def build_health_component(rebuild=True):
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_HealthComponent failed to compile")
-    _apply_defaults(bp, {**defaults(HV.TABLE), **voice_defaults(),
+    _apply_defaults(bp, {**defaults(HV.TABLE), **defaults(HV.NATIVE), **voice_defaults(),
         RESPAWN_DELAY_VAR: RESPAWN_DELAY,
         HV.PlayerRespawnWait: PLAYER_RESPAWN_WAIT,
         # Far enough in the past that nothing counts as recently hurt at level

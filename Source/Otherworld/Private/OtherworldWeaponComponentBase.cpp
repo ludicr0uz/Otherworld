@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
+#include "OtherworldHealthComponent.h"
 #include "OtherworldInventoryRecord.h"
 #include "OtherworldRpcGuard.h"
 #include "OtherworldShotLibrary.h"
@@ -83,17 +84,17 @@ namespace
 	}
 }
 
-UActorComponent* UOtherworldWeaponComponentBase::HealthOf(const AActor* Actor) const
+UOtherworldHealthComponent* UOtherworldWeaponComponentBase::HealthOf(const AActor* Actor) const
 {
-	return Actor && HealthClass ? Actor->FindComponentByClass(HealthClass) : nullptr;
+	return Actor ? Actor->FindComponentByClass<UOtherworldHealthComponent>() : nullptr;
 }
 
 bool UOtherworldWeaponComponentBase::OwnerAlive() const
 {
 	// A request can arrive after the blow that killed: the health itself is
 	// asked. An owner with no health component is alive.
-	const UActorComponent* Health = HealthOf(GetOwner());
-	return !Health || !(ReadBool(Health, HealthDeadVar) || ReadReal(Health, HealthVar) <= 0.0);
+	const UOtherworldHealthComponent* Health = HealthOf(GetOwner());
+	return !Health || Health->IsAlive();
 }
 
 bool UOtherworldWeaponComponentBase::MayFire(AActor* Gun) const
@@ -222,46 +223,6 @@ void UOtherworldWeaponComponentBase::ReloadNow()
 	Reloaded();
 }
 
-void UOtherworldWeaponComponentBase::HandHit(UActorComponent* Health, float Amount, const FVector& From,
-	AController* By, AActor* Cause) const
-{
-	UFunction* Function = Health->FindFunction(TakeHitEvent);
-	if (!Function)
-	{
-		return;
-	}
-	TArray<uint8> Storage;
-	Storage.SetNumZeroed(FMath::Max<int32>(Function->ParmsSize, 1));
-	uint8* Parms = Storage.GetData();
-	// By position and kind: the amount, the way it came, who, with what.
-	int32 Objects = 0;
-	for (TFieldIterator<FProperty> It(Function); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
-	{
-		It->InitializeValue_InContainer(Parms);
-		void* Value = It->ContainerPtrToValuePtr<void>(Parms);
-		if (const FNumericProperty* Number = CastField<FNumericProperty>(*It))
-		{
-			Number->SetFloatingPointPropertyValue(Value, Amount);
-		}
-		else if (const FStructProperty* Struct = CastField<FStructProperty>(*It))
-		{
-			if (Struct->Struct == TBaseStructure<FVector>::Get())
-			{
-				*static_cast<FVector*>(Value) = From;
-			}
-		}
-		else if (const FObjectPropertyBase* Object = CastField<FObjectPropertyBase>(*It))
-		{
-			Object->SetObjectPropertyValue(Value, Objects++ == 0 ? static_cast<UObject*>(By) : static_cast<UObject*>(Cause));
-		}
-	}
-	Health->ProcessEvent(Function, Parms);
-	for (TFieldIterator<FProperty> It(Function); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
-	{
-		It->DestroyValue_InContainer(Parms);
-	}
-}
-
 void UOtherworldWeaponComponentBase::FirePellets(AActor* Gun, FVector Muzzle, FVector Direction, int32 Pellets,
 	float SpreadDegrees, float Range, float Damage, float MaxRewindSeconds, float ExtraRewindSeconds)
 {
@@ -293,7 +254,7 @@ void UOtherworldWeaponComponentBase::FirePellets(AActor* Gun, FVector Muzzle, FV
 		if (bStopped)
 		{
 			AActor* Struck = Hit.GetActor();
-			UActorComponent* Health = HealthOf(Struck);
+			UOtherworldHealthComponent* Health = HealthOf(Struck);
 			if (!Health)
 			{
 				bScenery = true;
@@ -325,7 +286,7 @@ void UOtherworldWeaponComponentBase::FirePellets(AActor* Gun, FVector Muzzle, FV
 				}
 				// Which way it came from is the impact normal: it points
 				// back out of the surface toward the muzzle.
-				HandHit(Health, Damage * Worth, Hit.ImpactNormal, By, Gun);
+				Health->TakeHit(Damage * Worth, Hit.ImpactNormal, By, Gun);
 			}
 		}
 		PelletFlew(Muzzle, bStopped ? Hit.Location : End, bStopped, Point, Hit.ImpactNormal,

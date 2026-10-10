@@ -2,6 +2,9 @@
 dying, the corpse and the world-floor net.
 """
 
+import unreal
+
+from combat.damage import ON_DIED, ON_HEALTH_CHANGED
 from combat.death import (
     CONTROLLER_RETIRE_SECONDS, CORPSE_SECONDS, DEATH_PAUSE_SECONDS,
 )
@@ -20,11 +23,35 @@ from combat.verify.fixtures import (
 )
 from net.pause_checks import check_standalone_pause
 from net.state_checks import check_state
+from uebp import net
+from uebp.nodes.health import HEALTH_BASE_CLASS
 from combat.verify.common import (
     HEALTH_SETS,
     BEL, PIN, by_pins, check, graph, in_pins, num_pin, out_pins, pin_value,
     titled,
 )
+
+
+# ─── The native parent (W3) ──────────────────────────────────────────────────
+
+def check_native():
+    """The component is a child of UOtherworldHealthComponent, and what a
+    client shows and what dying is hang on its two events."""
+    base = unreal.load_class(None, HEALTH_BASE_CLASS)
+    check(f"BP_HealthComponent's class is a child of {HEALTH_BASE_CLASS}",
+          base is not None and BEL.get_blueprint_parent_class(health_bp) == base,
+          str(BEL.get_blueprint_parent_class(health_bp)))
+    ed = graph(health_bp)
+    for name in (ON_HEALTH_CHANGED, ON_DIED):
+        event = ed.find_event_node(name)
+        wired = bool(event) and bool(PIN.list_connected_pins(BEL.find_then_pin(event)))
+        check(f"...and its graph has the base's {name} event, with something on it",
+              wired, f"event {bool(event)}")
+    check("Health and Dead are the base's properties, replicated with a notify each",
+          base is not None
+          and net.compiled_replication(health_bp, "Health") == (net.REP_NOTIFY, "OnRep_Health")
+          and net.compiled_replication(health_bp, "Dead") == (net.REP_NOTIFY, "OnRep_Dead"),
+          str(net.compiled_replication(health_bp, "Health")))
 
 
 # ─── Health, death, respawn ──────────────────────────────────────────────────
@@ -165,14 +192,15 @@ def check_damage_stamp():
     check("nothing starts the game looking recently hurt",
           abs(float(h.get_editor_property(LAST_DAMAGE_VAR)) - NEVER_DAMAGED) < 1e-6,
           str(h.get_editor_property(LAST_DAMAGE_VAR)))
-    # Both are TakeHit's now, in the component's own graph, on the server
-    # (verify/damage.py reads the event); the weapon's graph writes neither.
-    check("a blow stamps the time it landed",
+    # Both are TakeHit's, the native parent's (verify/damage.py); neither
+    # graph stamps a blow, but a client's own clock in OnHealthChanged.
+    check("a blow stamps the time it landed (TakeHit's, C++): no graph writes it but "
+          "a client's OnHealthChanged",
           len(titled(hg, f"Set {LAST_DAMAGE_VAR}")) == 1
           and not titled(wg, f"Set {LAST_DAMAGE_VAR}"),
           "the HUD floats a wanderer's bar off this")
-    check("a blow also records who did it",
-          len(titled(hg, f"Set {DAMAGED_BY_PLAYER_VAR}")) == 1
+    check("a blow also records who did it (TakeHit's, C++): no graph writes it",
+          not titled(hg, f"Set {DAMAGED_BY_PLAYER_VAR}")
           and not titled(wg, f"Set {DAMAGED_BY_PLAYER_VAR}"))
     check("nothing is born blamed on the player",
           h.get_editor_property(DAMAGED_BY_PLAYER_VAR) is False)
@@ -349,16 +377,16 @@ def check_corpse():
           bool(titled(hg, f"SET {PLAYER_DEAD_VAR}"))
           or bool(titled(hg, f"Set {PLAYER_DEAD_VAR}")))
 
-    # Three writers: the safety net's, the debuff drain's (combat/debuff_drain.py)
-    # and TakeHit's (combat/damage.py).
+    # Two writers: the safety net's and the debuff drain's
+    # (combat/debuff_drain.py). A blow's is TakeHit's, C++ (combat/damage.py).
     # Anything else writing Health inside the component's own graph is a probe
     # that was left behind -- which is exactly how the 60 s corpse timer was
     # measured, on a compressed value, with a clock forcing the death.
     writes = [n for n in hg if str(BEL.get_node_title(n)).replace("\n", " ") in HEALTH_SETS]
     drains = [n for n in writes if n in drain_writes]
-    check("only the world-floor net, the debuff drain and TakeHit write Health from "
-          "inside the component",
-          len(writes) == 3 and len(drains) == 1,
+    check("only the world-floor net and the debuff drain write Health from inside the "
+          "component's graph (a blow's write is the native TakeHit's)",
+          len(writes) == 2 and len(drains) == 1,
           f"{len(writes)} Set Health node(s), {len(drains)} of them the drain's")
 
 
@@ -417,6 +445,7 @@ def check_world_edge():
 
 
 def run():
+    check_native()
     check_health_death_respawn()
     check_spawn_numbering()
     check_damage_stamp()

@@ -26,6 +26,7 @@ Join order varies, so a player is known by its player id, never by index.
 """
 
 SYSTEMS = ('net', 'health')
+LEVEL = "/Game/Maps/Lvl_Forest_200m"  # on the 50 m level a wanderer reaches client 2 (10 HP) before the probe stands its zombie beside client 1
 
 import time
 

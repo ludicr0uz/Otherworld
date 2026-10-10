@@ -41,11 +41,12 @@ from combat.game_state import DAMAGED_BY_PLAYER_VAR
 from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH)
 from combat.record_vars import DropForced
-from combat.slot_tuning import SLOT_VAR
+from combat.slot_tuning import HAS_ROOM_VAR, SLOT_VAR
 from combat.strike_vars import SERVER_TAKE
 from loot.consts import LOOT_RADIUS
 from combat.tuning import INTERACT_RADIUS
 from combat.weapon_component import vars as WV
+from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
 from graphics_menu.loot_consts import LOOT_OPEN_VAR, LOOT_TAKE_VAR, LOOT_TARGET_VAR
 from loot.consts import LOOT_CHANCES_VAR, LOOT_TAKE_REACH_CM, LOOT_VAR
@@ -189,6 +190,13 @@ def _server_loot(p, pawns, wcs, wanderers):
     yield from _both(p, "loot-got", 20.0)
     yield 0.3
     gained = [_carried(p, wc) - n for wc, n in zip(wcs, had)]
+    # What the server's own gates read when the takes arrived: on record,
+    # for a run where neither client gets the row.
+    p.note("the server's gates: " + "; ".join(
+        f"{(body.get_owner().get_actor_location() - pawn.get_actor_location()).length():.0f} cm "
+        f"off (reach {LOOT_TAKE_REACH_CM:.0f}), OwnerDead {p.get(wc, OWNER_DEAD_VAR)}, room "
+        f"{p.get(wc, HAS_ROOM_VAR)}"
+        for pawn, wc in zip(pawns, wcs)))
     p.check("both clients take the body's one row at once: on the server one of them "
             "has it and the body carries nothing", sorted(gained) == [0, 1]
             and len(p.get(body, LOOT_VAR)) == 0, f"gained {gained}, the body {rows} -> "

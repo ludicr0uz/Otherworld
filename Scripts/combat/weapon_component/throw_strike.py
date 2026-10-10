@@ -103,7 +103,7 @@ from uebp.nodes.actor import (
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR, FN_ARR_CONTAINS
 from uebp.nodes.math import (
     FN_ADD_VV, FN_AND, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_COMPOSE_ROT, FN_GREATER_FF,
-    FN_LE_FF, FN_MUL_FF, FN_MUL_VF, FN_NE_NAME, FN_NORMAL,
+    FN_LE_FF, FN_MUL_FF, FN_MUL_VF, FN_NEGATE_V, FN_NE_NAME, FN_NORMAL,
     FN_NOT, FN_ROTATE_VECTOR, FN_ROT_FROM_X, FN_SELECT_FF, FN_SUB_FF, FN_SUB_VV)
 from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_CAST_INSTANCED
 from uebp import props as EP
@@ -153,11 +153,24 @@ def _head_worth(ed, as_health, damage):
 def _author_wound(ed, as_health, damage, thrown, brk, execs):
     """Take ``damage`` off the body: its TakeHit (damage.py), stamped as a
     pellet's is (impact.py), the thrower's controller struck it and ``thrown``
-    is what with. Returns the exec pin after it, and the nodes."""
+    is what with. Returns the exec pin after it, and the nodes.
+
+    Which way it came, the flinch's (hit_reaction.py: from the body toward
+    the source), is the segment the blade flew, reversed: back toward the
+    thrower. Not the impact normal a pellet uses: a pellet's is the body's
+    at the wound, but the blade's hit is the capsule's, and at the side of
+    the chest that normal points sideways, where no thrower stood, and the
+    body flinched to the side of a blade thrown straight at it."""
     who, who_n = owner_instigator(ed)
-    took, take = take_hit(ed, as_health, damage, _hit(brk, "ImpactNormal"), who, thrown,
-                          execs)
-    return took, [*who_n, take]
+    flew = _node(ed, FN_SUB_VV)
+    _connect(_hit(brk, "TraceEnd"), _pin(flew, "A"))
+    _connect(_hit(brk, "TraceStart"), _pin(flew, "B"))
+    along = _node(ed, FN_NORMAL)
+    _connect(out(flew), _pin(along, "A"))
+    came = _node(ed, FN_NEGATE_V)
+    _connect(out(along), _pin(came, "A"))
+    took, take = take_hit(ed, as_health, damage, out(came), who, thrown, execs)
+    return took, [*who_n, flew, along, came, take]
 
 
 def _author_lodge(ed, thrown, brk, on, exec_in):

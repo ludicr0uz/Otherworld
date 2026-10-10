@@ -601,7 +601,16 @@ class KnownFailuresTest(unittest.TestCase):
                                  "since": "2026-01-02", "why": "why | more"}])
 
     def test_shipped_file_parses(self):
-        self.assertEqual(len(gate.load_known()), 0)
+        # Every row names its sweep row (a verifier, or probe:<name>) and a
+        # check label, and nothing a comment or blank line is parsed as one.
+        rows = gate.load_known()
+        with open(gate.KNOWN_PATH) as fh:
+            lines = [l for l in fh.read().splitlines() if l.strip() and not l.startswith("#")]
+        self.assertEqual(len(rows), len(lines))
+        for row in rows:
+            self.assertTrue(row["target"].endswith(".py") or row["target"].startswith("probe:"),
+                            row)
+            self.assertTrue(row["check"] and row["since"] and row["why"], row)
 
     def test_listed_check_is_not_a_regression(self):
         known = gate.parse_known("a | pose x | since d | w")

@@ -31,8 +31,9 @@ PROBE_SECONDS = 420
 JOIN_SECONDS = 300
 KEEP_RUNS = 10
 POLL = 0.25
-# Scripts/probes/kept_slots.py's suffix: what the server set aside for the run.
-KEPT_BACKUP = ".probe-backup"
+# Scripts/probes/kept_slots.py's suffixes: what the server set aside for the
+# run (the tuning tabs' slots, and the profile under the second).
+KEPT_BACKUPS = (".probe-backup", ".probe-run")
 
 
 def pie_editor():
@@ -56,13 +57,14 @@ def run_dir():
 
 
 def put_back_kept(save_dir):
-    """The tuning tabs' save slots the server set aside (probes/kept_slots.py),
-    put back once every process is gone."""
-    for backup in glob.glob(os.path.join(save_dir, "*" + KEPT_BACKUP)):
-        live = backup[:-len(KEPT_BACKUP)]
-        if os.path.exists(live):
-            os.remove(live)
-        shutil.move(backup, live)
+    """The save slots the server set aside (probes/kept_slots.py: the tuning
+    tabs' and the profile), put back once every process is gone."""
+    for suffix in KEPT_BACKUPS:
+        for backup in glob.glob(os.path.join(save_dir, "*" + suffix)):
+            live = backup[:-len(suffix)]
+            if os.path.exists(live):
+                os.remove(live)
+            shutil.move(backup, live)
 
 
 def _read(path):

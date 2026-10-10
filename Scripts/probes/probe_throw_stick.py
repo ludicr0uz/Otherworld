@@ -13,8 +13,9 @@ the gun, which takes nothing, plays none, and the blade that kills plays none
 either (the body ragdolls instead).
 
 The bodies are two zombies with no mind of their own, stood in turn in front
-of the player in the open; the other wanderers are gone. The keys are held
-and clicked as probe_throw_strike.py, the tree's half, does it.
+of the player in the open; the other wanderers are gone, and so are the
+level's own pick-ups, which would be E's instead of the blade. The keys are
+held and clicked as probe_throw_strike.py, the tree's half, does it.
 
 Run with --windowed and OW_THROW_SHOTS=1 to save a picture of each blade in
 the body to Saved/Screenshots/MacEditor, seen through the second body's eyes.
@@ -34,8 +35,8 @@ from combat.anim_blueprint import HIT_SLOT
 from combat.game_state import DAMAGED_BY_PLAYER_VAR
 from combat.hit_reaction import LAST_HIT_FROM_VAR
 from combat.paths import (
-    BLOOD_CLASS_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH,
-    WEAPON_COMP_CLASS_PATH,
+    BLOOD_CLASS_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH, ITEM_CLASS_PATH,
+    WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
 from combat.melee_tuning import throw_damage
 from combat.throw_tuning import (
@@ -103,8 +104,11 @@ def _wound(p, wc, player, item, body, health, at, yaw, pitch, hp=BODY_HP,
     from the body). With ``reticle`` the view is turned to put the reticle on
     the body first, and the throw goes to its point."""
     def place():
-        body.set_actor_location(player.get_actor_location() + _dir(0.0, yaw) * BODY_AT_CM,
-                                False, True)
+        # Facing the thrower, chest on: side on, a throw down the view finds
+        # an arm as often as the chest.
+        body.set_actor_location_and_rotation(
+            player.get_actor_location() + _dir(0.0, yaw) * BODY_AT_CM,
+            unreal.Rotator(pitch=0.0, yaw=yaw + 180.0, roll=0.0), False, True)
 
     yield from _stand(p, player, at, yaw, pitch)
     p.set(health, "Health", hp)
@@ -171,9 +175,22 @@ def _in_body(p, wc, item, name, body, over, off, yaw):
     return onto == body
 
 
-def _take_from(p, wc, player, item, about, yaw):
+def _clear_ground(p, player):
+    """The level's own pick-ups (the clothing scattered by the start, for the
+    clothing probes) are gone: E takes the thing in reach nearest the
+    reticle's point, and a level view rests that point twenty metres off,
+    where a garment two metres from the player is as near to it as the blade
+    in the body is."""
+    for item in unreal.GameplayStatics.get_all_actors_of_class(
+            p.world(), p.load_class(ITEM_CLASS_PATH)):
+        if p.get(item, "Dropped") is True and item.get_attach_parent_actor() is None:
+            item.destroy_actor()
+
+
+def _take_from(p, wc, player, item, about, yaw, expected=True):
     """Stand beside ``about`` (a point), facing it, and press E. Returns
-    (whether ``item`` was taken, how far away it was)."""
+    (whether ``item`` was taken, how far away it was). A take that was
+    ``expected`` and did not happen is explained in a note."""
     half = player.get_editor_property("capsule_component").get_scaled_capsule_half_height()
     at = about - _dir(0.0, yaw) * TAKE_FROM_CM
     floor = _trace(p, at + unreal.Vector(0, 0, 200.0), at - unreal.Vector(0, 0, 500.0),
@@ -188,7 +205,29 @@ def _take_from(p, wc, player, item, about, yaw):
         taken = yield from _take(p, wc, item)
         if taken:
             break
+    if expected and not taken:
+        p.note(_offered(p, wc, player, item))
     return taken, gap
+
+
+def _offered(p, wc, player, item):
+    """What E had to choose from, for a take that failed: the items flagged
+    Dropped about the player, nearest the reticle first, and what the key
+    settled on (interact.py keeps the one in reach nearest AimPoint)."""
+    here, aim = player.get_actor_location(), p.get(wc, "AimPoint")
+    about = []
+    for other in unreal.GameplayStatics.get_all_actors_of_class(
+            p.world(), p.load_class(ITEM_CLASS_PATH)):
+        gap = (other.get_actor_location() - here).length()
+        if p.get(other, "Dropped") is True and gap < INTERACT_RADIUS + 100.0:
+            about.append(((other.get_actor_location() - aim).length(), gap,
+                          other.get_name() + (" (the item)" if other == item else "")))
+    target, held = p.get(wc, "InteractTarget"), p.get(wc, "Held")
+    return (f"E settled on {target.get_name() if target else None}; HasRoom "
+            f"{p.get(wc, 'HasRoom')}, Held {held.get_name() if held else None}, "
+            f"AimPoint {aim}; Dropped about the player (cm from the reticle's point / "
+            f"from the player): " + ", ".join(
+                f"{name} {a:.0f}/{g:.0f}" for a, g, name in sorted(about)))
 
 
 def _zombies(p):
@@ -232,7 +271,7 @@ def _bodies(p, wc, player, knife, axe, gun, body, second, at, yaw):
             went.length() < SWAY_CM and (knife.get_actor_location() - was).length() > 250.0,
             f"{went.length():.1f} cm off the body's own move")
     far = body.get_actor_location() - out * (TOO_FAR_CM - TAKE_FROM_CM)
-    taken, gap = yield from _take_from(p, wc, player, knife, far, yaw)
+    taken, gap = yield from _take_from(p, wc, player, knife, far, yaw, expected=False)
     p.check("E from beyond reach of the body does not take it",
             not taken and gap > INTERACT_RADIUS and _held_by(knife)[0] == body,
             f"{gap:.0f} cm away")
@@ -288,9 +327,15 @@ def _bodies(p, wc, player, knife, axe, gun, body, second, at, yaw):
             f"{gap:.0f} cm away")
 
     # --- the body gone: the blade is left where it lay -------------------------
+    # The first body, dead, is done with: the second stands where it fell,
+    # and a blade thrown at it must not find the corpse. With the reticle on
+    # its middle: a throw down the view alone finds an arm as often as the
+    # chest, as the idle sways the body, and a blade into an arm is set
+    # toward the nearest bone, not down the throw.
+    body.destroy_actor()
     health = p.component(second, HEALTH_CLASS_PATH)
     lost, over, off = yield from _wound(p, wc, player, knife, second, health, at, yaw,
-                                        BODY_VIEW_DEG)
+                                        BODY_VIEW_DEG, reticle=True)
     if not _in_body(p, wc, knife, "knife, thrown at a second body,", second, over, off, yaw):
         return
     was = knife.get_actor_location()
@@ -322,6 +367,7 @@ def _run(p):
         ctrl.un_possess()
     for other in _wanderers(p):
         other.get_controlled_pawn().destroy_actor()
+    _clear_ground(p, player)
 
     bag = {i.get_class().get_name(): i for i in p.get(wc, "Inventory")}
     guns = [i for i in bag.values() if i.get_editor_property("UsesAmmo")]

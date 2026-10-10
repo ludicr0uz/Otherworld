@@ -8,7 +8,8 @@ the bone the damage was counted on (weapon_component/throw_strike.py), so the
 two are checked against each other, both ways.
 
 The body is a zombie with no mind of its own, stood in front of the player
-in the open, as in probe_throw_stick.py; the other wanderers are gone.
+in the open, as in probe_throw_stick.py; the other wanderers are gone, and
+the level's own pick-ups with them.
 
 Any profile on disk is set aside first, so the game starts on the issued
 loadout, and put back at the end.
@@ -39,7 +40,7 @@ from probes.probe_chop_tree import _flat
 from probes.probe_hot_blade import _wanderers
 from probes.probe_knife import _file
 from probes.probe_throw_stick import (
-    BODY_AT_CM, BODY_VIEW_DEG, _held_by, _open, _take_from, _zombies,
+    BODY_AT_CM, BODY_VIEW_DEG, _clear_ground, _held_by, _open, _take_from, _zombies,
 )
 from probes.probe_throw_strike import AXE, KNIFE, _dir, _stand, _throw
 from combat import health_vars as HV
@@ -52,7 +53,11 @@ WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
             + [(HEALTH_BP_PATH, HV.Health), (HEALTH_BP_PATH, DAMAGED_BY_PLAYER_VAR)])
 
 BODY_HP = 400.0           # room for every blade, and the head's worth
-ON_HEAD_CM = 40.0         # the reticle's point (on the capsule), from the head's middle
+ON_HEAD_CM = 50.0         # the reticle's point (on the capsule, 34 cm out), from the head's middle
+# The zombie's idle sways its head: a throw at the head lands in the neck or
+# the spine one time in three. The head is what is under test, not the aim:
+# a blade that missed it is taken back and thrown again, this many times.
+HEAD_TRIES = 3
 
 
 def probe(p):
@@ -94,8 +99,12 @@ def _strike(p, wc, player, item, body, health, at, yaw, head):
     or, with ``head`` False, at its middle. Returns (the health it lost, the
     bone it was left in, the bone the wound was counted on)."""
     def place():
-        body.set_actor_location(player.get_actor_location() + _dir(0.0, yaw) * BODY_AT_CM,
-                                False, True)
+        # Facing the thrower: the zombie's idle hunches its head forward,
+        # and with its back turned the head is beyond the capsule the
+        # reticle rests on, where a throw at it finds the spine or an arm.
+        body.set_actor_location_and_rotation(
+            player.get_actor_location() + _dir(0.0, yaw) * BODY_AT_CM,
+            unreal.Rotator(pitch=0.0, yaw=yaw + 180.0, roll=0.0), False, True)
 
     yield from _stand(p, player, at, yaw, BODY_VIEW_DEG)
     p.set(health, "Health", BODY_HP)
@@ -130,6 +139,7 @@ def _run(p):
     for other in _wanderers(p):
         if other.get_controlled_pawn() is not None:
             other.get_controlled_pawn().destroy_actor()
+    _clear_ground(p, player)
 
     health = p.component(body, HEALTH_CLASS_PATH)
     heads = [str(b) for b in p.get(health, HEAD_BONES_VAR)]
@@ -155,9 +165,17 @@ def _run(p):
         return
 
     for name, item, damage in blades:
-        marked = p.get(wc, HEADSHOT_TIME_VAR)
-        lost, bone, counted = yield from _strike(p, wc, player, item, body, health,
-                                                 at, yaw, head=True)
+        for attempt in range(HEAD_TRIES):
+            marked = p.get(wc, HEADSHOT_TIME_VAR)
+            lost, bone, counted = yield from _strike(p, wc, player, item, body, health,
+                                                     at, yaw, head=True)
+            if bone in heads or attempt == HEAD_TRIES - 1:
+                break
+            p.note(f"the {name} landed in {bone}, not the head: taken back, thrown again")
+            taken, _gap = yield from _take_from(p, wc, player, item,
+                                                body.get_actor_location(), yaw)
+            if not taken:
+                break
         p.check(f"a {name} thrown at the head is left in a bone of the head",
                 bone in heads and counted == bone, f"in {bone}, counted on {counted}")
         p.check(f"...and takes its {damage:g} HP times the head's {worth:g}",

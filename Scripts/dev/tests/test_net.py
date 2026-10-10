@@ -397,13 +397,15 @@ class RunTest(unittest.TestCase):
 
     def test_kept_slots_are_put_back(self):
         for name, text in (("A.sav.probe-backup", "mine"), ("A.sav", "the run's"),
-                           ("B.sav", "untouched")):
+                           ("B.sav", "untouched"), ("Profile.sav.probe-run", "my game"),
+                           ("Profile.sav", "a probe's")):
             with open(os.path.join(self.tmp, name), "w") as fh:
                 fh.write(text)
         net.put_back_kept(self.tmp)
-        self.assertEqual(sorted(os.listdir(self.tmp)), ["A.sav", "B.sav"])
-        with open(os.path.join(self.tmp, "A.sav")) as fh:
-            self.assertEqual(fh.read(), "mine")
+        self.assertEqual(sorted(os.listdir(self.tmp)), ["A.sav", "B.sav", "Profile.sav"])
+        for name, text in (("A.sav", "mine"), ("Profile.sav", "my game")):
+            with open(os.path.join(self.tmp, name)) as fh:
+                self.assertEqual(fh.read(), text)
 
     def test_old_runs_are_dropped(self):
         with mock.patch.object(net, "saved_uepy", lambda *p: os.path.join(self.tmp, *p)):

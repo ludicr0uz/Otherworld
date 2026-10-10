@@ -53,9 +53,15 @@ import traceback
 import unreal
 
 from combat.record_vars import SlotForced
+from graphics_menu.profile_consts import PROFILE_SLOT
 from graphics_menu.tune_keep_consts import TUNE_SAVE_SLOTS
 
 from probes import bots, kept_slots
+
+# The developer's saves a run is kept clear of (kept_slots.py): the tuning
+# tabs' slots, and the profile, which the level reads back onto the player as
+# it starts -- before any probe runs, so no probe can set it aside for itself.
+KEPT = ((TUNE_SAVE_SLOTS, kept_slots.BACKUP), ((PROFILE_SLOT,), kept_slots.RUN_BACKUP))
 from probes.context import Probe
 from probes.net import LISTENING, SERVER, STANDALONE, Where, pick_probe
 from probes.runner import DEFAULT_TIMEOUT, Ledger, ProbeRun, Queue
@@ -171,13 +177,15 @@ def _save_dir():
 
 
 def _hermetic(fn, probe):
-    """The probe, and then nothing of its nudges left in the tabs' slots."""
+    """The probe, and then nothing of its nudges left in the tabs' slots, nor
+    a profile it saved for the next probe's level to read."""
     try:
         result = fn(probe)
         if hasattr(result, "send"):      # a plain function ran already
             yield from result
     finally:
-        kept_slots.clear(_save_dir(), TUNE_SAVE_SLOTS)
+        for slots, _suffix in KEPT:
+            kept_slots.clear(_save_dir(), slots)
 
 
 def _finish(setup_errors):
@@ -185,7 +193,8 @@ def _finish(setup_errors):
     # Before the results: uepy.py kills the game as soon as they appear. In a
     # network run the others may still be playing: uepy.py puts them back.
     if not _state["where"].networked:
-        kept_slots.put_back(_save_dir(), TUNE_SAVE_SLOTS)
+        for slots, suffix in KEPT:
+            kept_slots.put_back(_save_dir(), slots, suffix)
     _write_results(queue.results() if queue else [], setup_errors)
     _state["phase"] = "done"
     if _state["handle"] is not None:
@@ -276,12 +285,14 @@ def start():
     timeout = float(os.environ.get("UEPY_PROBE_TIMEOUT") or DEFAULT_TIMEOUT)
     game_time = _game_time(map_path)
 
-    # The developer's own tuning (graphics_menu/tune_keep.py) is not the
-    # build's: every probe starts from the built tables.
+    # The developer's own tuning (graphics_menu/tune_keep.py) and saved game
+    # (graphics_menu/profile_read.py) are not the build's: every probe starts
+    # from the built tables and the issued loadout.
     # In a network run the processes share the save folder: the server, which
     # is up before any client is in the level, sets them aside for all.
     if where.role in (STANDALONE, SERVER):
-        kept_slots.set_aside(_save_dir(), TUNE_SAVE_SLOTS)
+        for slots, suffix in KEPT:
+            kept_slots.set_aside(_save_dir(), slots, suffix)
     loaded = load_probes(paths, where)
     runs = []
     for ledger, fn, _writable, own_timeout in loaded:

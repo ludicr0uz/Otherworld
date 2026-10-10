@@ -28,15 +28,16 @@ from combat.paths import (
     WEAPON_COMP_CLASS_PATH,
 )
 from combat.weapon_component.tick import FIRE_FORCED_VAR
-from probes.probe_bullet_impact import _all, _file, _fire, _look, _until, _wanderer
+from probes.probe_bullet_impact import (
+    _aim_at_chest, _all, _file, _fire, _look, _wanderer,
+)
 from combat import health_vars as HV
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, FIRE_FORCED_VAR), (HEALTH_BP_PATH, HV.Health)]
 
-IN_FRONT_CM = 150.0      # past the muzzle, inside every pellet's pattern
+IN_FRONT_CM = 300.0      # well past the muzzle (probe_bullet_impact.py), inside the pattern
 SWEEP_CM = 40            # either side of the head, a line per centimetre
 HEAD_MAX_CM = 22         # the fitted head's capsule is 20 across
-AIM_NEAR_CM = 40.0       # the reticle is on the capsule in front of the chest
 ON_BODY_CM = 5.0         # a splash is traced from this far in front of itself
 
 
@@ -58,26 +59,6 @@ def _through(comp, at, along):
     return str(hit[2]) if hit else None
 
 
-def _aim_at_chest(p, wc, npc, stand):
-    """Rest the reticle on the wanderer's chest. The camera sits over the
-    shoulder, so looking level puts it beside a wanderer stood dead ahead."""
-    cam = unreal.GameplayStatics.get_player_camera_manager(p.world(), 0)
-    chest = lambda: npc.mesh.get_socket_location("Spine02")
-    for _ in range(4):     # the boom swings as the view turns: close in on it
-        stand()
-        p.controller().set_control_rotation(unreal.MathLibrary.find_look_at_rotation(
-            cam.get_camera_location(), chest()))
-        yield 0.1
-    stand()
-    yield _until(lambda: p.get(wc, "AimValid")
-                 and (p.get(wc, "AimPoint") - chest()).length() < AIM_NEAR_CM)
-    p.check("the reticle rests on the wanderer's chest",
-            (p.get(wc, "AimPoint") - chest()).length() < AIM_NEAR_CM,
-            f"{(p.get(wc, 'AimPoint') - chest()).length():.0f} cm off; camera "
-            f"{(cam.get_camera_location() - chest()).length():.0f} cm from the chest, "
-            f"view {p.controller().get_control_rotation()}")
-
-
 def _run(p):
     yield lambda: _wanderer(p) is not None
     yield 0.5
@@ -88,6 +69,9 @@ def _run(p):
             held is not None and p.get(held, "Loaded") > 0, str(held))
     health = p.component(npc, HEALTH_CLASS_PATH)
     p.set(health, "Health", 1000.0)    # it must outlive the rounds
+    # Its tree would have it walk off, or swing at the player, between the
+    # aim and the round (probe_headshot.py): a body with no mind of its own.
+    npc.get_controller().un_possess()
     _look(p, 0.0)
 
     # One spot, fixed now: the player turns with the view, and a wanderer

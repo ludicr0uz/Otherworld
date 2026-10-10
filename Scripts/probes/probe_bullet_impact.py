@@ -32,7 +32,13 @@ from combat import health_vars as HV
 WRITABLE = [(WEAPON_COMP_BP_PATH, FIRE_FORCED_VAR), (HEALTH_BP_PATH, HV.Health)]
 
 LOOK_DOWN_DEG = -55.0   # the reticle on the ground a few metres ahead
-IN_FRONT_CM = 150.0     # past the muzzle, inside every pellet's pattern
+# The body, in front of the player: inside every pellet's pattern, and well
+# past the muzzle. The pellets fly from the muzzle at the reticle's point, and
+# a shotgun's muzzle is a metre out: a body at 150 cm put that point on its
+# capsule a hand's width from the muzzle, and the round went sideways through
+# the capsule's edge, past the model, into the ground at its feet.
+IN_FRONT_CM = 300.0
+AIM_NEAR_CM = 40.0      # the reticle is on the capsule in front of the chest
 WALL_WAIT_S = 20.0      # a headless game's clock is slow: bound waits by the wall
 
 
@@ -91,6 +97,27 @@ def _fire(p, wc, held):
     p.set(wc, FIRE_FORCED_VAR, False)
     p.check("the forced trigger fires a round", p.get(held, "Loaded") < loaded,
             f"{loaded} -> {p.get(held, 'Loaded')}")
+
+
+def _aim_at_chest(p, wc, npc, stand):
+    """Rest the reticle on the wanderer's chest. The camera sits over the
+    shoulder, so looking level puts it beside a wanderer stood dead ahead,
+    and its boom swings as the view turns: close in on it."""
+    cam = unreal.GameplayStatics.get_player_camera_manager(p.world(), 0)
+    chest = lambda: npc.mesh.get_socket_location("Spine02")
+    for _ in range(4):
+        stand()
+        p.controller().set_control_rotation(unreal.MathLibrary.find_look_at_rotation(
+            cam.get_camera_location(), chest()))
+        yield 0.1
+    stand()
+    yield _until(lambda: p.get(wc, "AimValid")
+                 and (p.get(wc, "AimPoint") - chest()).length() < AIM_NEAR_CM)
+    p.check("the reticle rests on the wanderer's chest",
+            (p.get(wc, "AimPoint") - chest()).length() < AIM_NEAR_CM,
+            f"{(p.get(wc, 'AimPoint') - chest()).length():.0f} cm off; camera "
+            f"{(cam.get_camera_location() - chest()).length():.0f} cm from the chest, "
+            f"view {p.controller().get_control_rotation()}")
 
 
 def probe(p):
@@ -182,18 +209,23 @@ def _run(p):
     npc = _wanderer(p)
     health = p.component(npc, HEALTH_CLASS_PATH)
     p.set(health, "Health", 1000.0)    # it must outlive the round
+    # Its tree would have it walk off, or swing at the player, between the
+    # stand and the round (probe_headshot.py): a body with no mind of its own.
+    npc.get_controller().un_possess()
     _look(p, 0.0)
+    # One spot, fixed now: the player turns with the view, and a wanderer
+    # re-stood "ahead" each time would circle away from the reticle.
+    spot = player.get_actor_location() + player.get_actor_forward_vector() * IN_FRONT_CM
 
     def stand():
-        npc.set_actor_location(
-            player.get_actor_location() + player.get_actor_forward_vector() * IN_FRONT_CM,
-            False, True)
+        npc.set_actor_location(spot, False, True)
 
     stand()
     yield 0.1
     stand()
-    yield 0.05
-    stand()
+    # The view was on the ground: the reticle has to be on the body before
+    # the round, or the pellets go where it still rests.
+    yield from _aim_at_chest(p, wc, npc, stand)
     yield from _fire(p, wc, held)
     blood, chips = _all(p, BLOOD_CLASS_PATH), _all(p, BULLET_IMPACT_CLASS_PATH)
     p.check("a round into a wanderer bleeds", len(blood) >= 1,

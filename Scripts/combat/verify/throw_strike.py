@@ -305,16 +305,25 @@ def check_wound():
           str(before))
     told = {pin: [_title(f).replace(" ", "") for f in _feeders(wound, pin)]
             for pin in ("InstigatedBy", "Cause")}
-    normal = [str(PIN.get_pin_name(q)).replace(" ", "") for q in
-              PIN.list_connected_pins(BEL.find_input_pin(wound, "From"))]
+    # From: back down the segment the blade flew (TraceEnd - TraceStart,
+    # normalised, negated), toward the thrower -- not the capsule's normal
+    # where the blade met it, which at the side of the chest points sideways.
+    came = _feeders(wound, "From")
+    along = [f for c in came for f in _feeders(c, "A")]
+    flew = [f for a in along for f in _feeders(a, "A")]
+    ends = [str(PIN.get_pin_name(q)).replace(" ", "") for f in flew for pin in ("A", "B")
+            for q in PIN.list_connected_pins(BEL.find_input_pin(f, pin))]
+    way = [_title(n).replace(" ", "") for n in came + along + flew]
     check("...stamped as a pellet's hit is: who struck it (the thrower's controller: "
-          "the kill's credit, and the wendigo's rage), which way it came (the flinch) "
-          "and with what (the thrown item)",
-          told["InstigatedBy"] == ["GetInstigatorController"] and normal == ["ImpactNormal"]
+          "the kill's credit, and the wendigo's rage), which way it came (the flinch: "
+          "back down the throw, toward the thrower) and with what (the thrown item)",
+          told["InstigatedBy"] == ["GetInstigatorController"]
+          and way == ["NegateVector", "Normalize", "vector-vector"]
+          and ends == ["TraceEnd", "TraceStart"]
           and told["Cause"] == [f"Get{THROWN_VAR}"]
           and not [n for v in (LAST_DAMAGE_VAR, DAMAGED_BY_PLAYER_VAR, LAST_HIT_FROM_VAR)
                    for n in wg if _title(n) == f"Set {v}"],
-          f"{told}, From off {normal}")
+          f"{told}, From off {way} of {ends}")
     # Between the two, the headshot stamp (verify/headshot.py); the blood is
     # Fx_Stab's, told after it.
     blood = fxv.in_fx(FX.STAB, _spawns("BloodClass"))

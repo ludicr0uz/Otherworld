@@ -53,6 +53,21 @@ class KeptSlotsTest(unittest.TestCase):
         kept_slots.put_back(self.dir, SLOTS)
         self.assertEqual(self._read("A.sav"), "mine")
 
+    def test_the_profile_is_kept_under_a_name_a_probes_own_wrapper_does_not_know(self):
+        # A probe's probe() moves Profile.sav to Profile.sav.probe-backup for
+        # itself and moves whatever is at that name back when it ends. The
+        # run's copy must not be what it finds there.
+        self._write("Profile.sav", "mine")
+        kept_slots.set_aside(self.dir, ("Profile",), kept_slots.RUN_BACKUP)
+        self.assertEqual(os.listdir(self.dir), ["Profile.sav.probe-run"])
+        self.assertNotIn(kept_slots.RUN_BACKUP, (kept_slots.BACKUP,))
+        self._write("Profile.sav", "a probe's save-and-exit")
+        kept_slots.clear(self.dir, ("Profile",))
+        self.assertIsNone(self._read("Profile.sav"))
+        kept_slots.put_back(self.dir, ("Profile",), kept_slots.RUN_BACKUP)
+        self.assertEqual(self._read("Profile.sav"), "mine")
+        self.assertEqual(os.listdir(self.dir), ["Profile.sav"])
+
     def test_other_files_are_left_alone(self):
         self._write("Settings.sav", "binds")
         kept_slots.set_aside(self.dir, SLOTS)

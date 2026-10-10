@@ -20,4 +20,6 @@ Unit-tested in Scripts/dev/tests (everything but the process launching).
 
   baseline_cache  The before-sweep's result kept on disk, so it survives across dev-team runs
   probe_gate      The probe half of the gate: a named probe set (Scripts/probes/sets.py), run beside the verifier sweep
+
+  final  The run's one probe sweep: a probe set run after the last task, not after each
 """

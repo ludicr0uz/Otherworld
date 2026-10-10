@@ -108,14 +108,30 @@ def known_report(known, after):
     return standing, fixed
 
 
-def regressions(before, after, known=()):
+PROBE = "probe:"                    # probe_gate.PREFIX: a probe's row, not a verifier's
+
+
+def not_rerun(before, after, probes=None):
+    """The baseline's probe rows the after-sweep was never asked for, sorted.
+    ``probes`` is the labels of the set the after-sweep ran; None says the two
+    sweeps ran the same set, so a row that is missing went missing."""
+    if probes is None:
+        return []
+    return sorted(l for l in (before or {}) if l.startswith(PROBE)
+                  and l not in probes and l not in (after or {}))
+
+
+def regressions(before, after, known=(), probes=None):
     """What got worse between two sweeps, one line each (empty: nothing).
-    A failure listed in ``known`` is never a regression."""
+    A failure listed in ``known`` is never a regression, and neither is a
+    probe row the after-sweep's set (``probes``, see not_rerun) did not hold:
+    only the labels both sweeps ran are compared."""
     if after is None:
         return ["the verifier sweep itself failed to run (see the sweep log)"]
     before = before or {}
+    skipped = set(not_rerun(before, after, probes))
     problems = []
-    for label in sorted(set(before) | set(after)):
+    for label in sorted((set(before) | set(after)) - skipped):
         b, a = before.get(label), after.get(label)
         if a is None:
             problems.append(f"{label}: did not report (it ran before the task)")
@@ -136,17 +152,23 @@ def regressions(before, after, known=()):
     return problems
 
 
-def table(before, after=None, times=None):
+def table(before, after=None, times=None, probes=None):
     """A Markdown table of one sweep, or of before -> after; ``times`` ({label:
-    text}) adds a line of how long each sweep took."""
+    text}) adds a line of how long each sweep took. A probe row the after-sweep's
+    set (``probes``, see not_rerun) did not hold reads ``not re-run``."""
     labels = sorted(set(before or {}) | set(after or {}))
+    skipped = not_rerun(before, after, probes) if after is not None else []
     if after is None:
         rows = ["| verifier | result |", "|---|---|"]
         rows += [f"| {l} | {describe((before or {}).get(l))} |" for l in labels]
     else:
         rows = ["| verifier | before | after |", "|---|---|---|"]
-        rows += [f"| {l} | {describe((before or {}).get(l))} | {describe(after.get(l))} |"
+        rows += [f"| {l} | {describe((before or {}).get(l))} | "
+                 f"{'not re-run' if l in skipped else describe(after.get(l))} |"
                  for l in labels]
+    if skipped:
+        rows += ["", f"Not re-run: {len(skipped)} probe row(s) of the baseline, swept "
+                     "under another probe set and so not compared."]
     if times:
         rows += ["", "Sweep time: " + ", ".join(f"{k} {v}" for k, v in times.items())]
     return "\n".join(rows)

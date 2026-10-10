@@ -58,10 +58,11 @@ directory and returns at once, so read or edit meanwhile, then `uepy.py \
 timeout); `--status` lists runs. One detached run at a time. While you work, run `uepy.py --probes-for` \
 (no paths: the probes your `git diff` can affect, one --game and one --net \
 launch; `--dry-run` lists them) instead of choosing probes by hand or \
-repeating one. Do not run the regression yourself: dev-team's gate runs a \
-smoke set of probes beside the verifiers before and after you, and fails the \
-task on a probe that newly fails. End when your change is proven by its own \
-probe.
+repeating one. Do not run the regression yourself: dev-team's gate runs the \
+verifiers before and after you, and a smoke set of probes once the run's last \
+task is done (after each task too, when the run asks for it); a probe that \
+newly fails counts against the run, or the task. End when your change is \
+proven by its own probe.
 
 {gate}
 
@@ -90,7 +91,7 @@ task may depend on them.
 """
 
 GATE = """\
-Before this session started, dev-team ran the verifier suite and a smoke set of probes (the `probe:` rows):
+Before this session started, dev-team ran the verifier suite (a `probe:` row is a probe of the gate's set, when it has one):
 
 {table}
 

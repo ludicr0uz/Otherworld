@@ -105,6 +105,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     ask = dict(interactive=args.interactive)
     baseline = parked.get("baseline") if parked else None
     probes = getattr(args, "probe_set", None)
+    ran = probe_gate.labels(probes)         # what an after-sweep is asked for
 
     def paused(stage, result=None, reports=None):
         if pauser and pauser.requested:
@@ -158,14 +159,14 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
             state = tree_state()
             baseline = cache.get(state)
             if baseline is None:
-                baseline = baseline_cache.load(ROOT, state)
+                baseline = baseline_cache.load(ROOT, state, ran)
                 if baseline:
                     print("    gate: baseline from the cache (tree unchanged)")
                     timings["baseline"] = "cached"
             if baseline is None:
                 baseline = sweep("baseline", sweep_log, pauser, probes, warm=True,
                                  timings=timings)
-                baseline_cache.save(ROOT, state, baseline)
+                baseline_cache.save(ROOT, state, baseline, ran)
         limits.wait(meter, pauser)
         paused("start")
         prompt = build_prompt(task, n, total, progress,
@@ -203,7 +204,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     close_editors()
     after = sweep("after", sweep_log, pauser, probes, timings=timings)
     paused("gate", result, reports)
-    problems = gate.regressions(baseline, after, gate.load_known())
+    problems = gate.regressions(baseline, after, gate.load_known(), ran)
     attempts = 0
     while problems and attempts < args.fix_attempts and result.get("session_id"):
         attempts += 1
@@ -211,7 +212,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
               f"({attempts}/{args.fix_attempts})")
         for p in problems:
             print(f"      - {p[:200]}")
-        fix = build_fix_prompt(problems, gate.table(baseline, after), args.commit)
+        fix = build_fix_prompt(problems, gate.table(baseline, after, probes=ran), args.commit)
         # Triage guessed low and the gate disagrees: fix at the default effort.
         fix_opts = dict(common, effort=args.effort) if task.triage else common
         head0, tree0 = git_head(ROOT), tree_fingerprint()
@@ -225,8 +226,8 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
             break
         after = sweep("after fix", sweep_log, pauser, probes, timings=timings)
         paused("gate", result, reports)
-        problems = gate.regressions(baseline, after, gate.load_known())
-    gate_table = gate.table(baseline, after, timings)
+        problems = gate.regressions(baseline, after, gate.load_known(), ran)
+    gate_table = gate.table(baseline, after, timings, ran)
     if problems:
         ok = False
         reports.append("FAILED: the verifier gate still regresses:\n"

@@ -378,8 +378,8 @@ class RunOneTest(unittest.TestCase):
                                    (work.gate, "run_sweep", run_sweep),
                                    (work, "close_editors", lambda: True),
                                    (work, "tree_state", lambda: ("h", "")),
-                                   (work.baseline_cache, "load", lambda root, state: None),
-                                   (work.baseline_cache, "save", lambda root, state, rows: None),
+                                   (work.baseline_cache, "load", lambda root, state, probes=(): None),
+                                   (work.baseline_cache, "save", lambda root, state, rows, probes=(): None),
                                    (work, "print", lambda *a, **k: None)):
             patcher = mock.patch.object(target, name, fake, create=True)
             patcher.start()

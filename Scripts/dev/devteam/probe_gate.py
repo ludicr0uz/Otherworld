@@ -39,6 +39,11 @@ def launches(probe_set):
     return out
 
 
+def labels(probe_set):
+    """The row labels of a set, sorted (none for no set)."""
+    return sorted(PREFIX + n for _l, _f, names in launches(probe_set or {}) for n in names)
+
+
 def parse_output(text, names):
     """{PREFIX+name: row} from a launch's output. ``names`` are the probes it
     was asked to run; any with no [probe] line gets a failed row."""

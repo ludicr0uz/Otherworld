@@ -52,10 +52,16 @@ and puts the numbers in the prompt; after the session it runs them again. A
 suite that newly fails -- or fails more checks than before -- sends the
 session back (``--resume``) with the failures, up to --fix-attempts times,
 then fails the task. --no-gate skips both sweeps. Beside the verifiers the
-gate runs a named probe set (Scripts/probes/sets.py), batched per boot: SMOKE
-by default (one --game launch, one --net --clients 2 launch), FULL, or none
-(--gate-probes); each probe is a ``probe:<name>`` row in the table and a probe
-that newly fails fails the task like a verifier.
+gate can run a named probe set (Scripts/probes/sets.py), batched per boot:
+none by default, SMOKE (one --game launch, one --net --clients 2 launch) or
+FULL (--gate-probes); each probe is a ``probe:<name>`` row in the table and a
+probe that newly fails fails the task like a verifier.
+
+**The final probes.** The probes are swept once a run instead (--final-probes,
+SMOKE by default; devteam/final.py): in the run's first baseline, and again
+after the last task. A probe that newly fails is written to progress.md under
+"Final probes" with the run's commit range and makes the run exit non-zero,
+but fails no task. A run that was paused, interrupted or stopped skips it.
 
 Sessions run unattended, so they cannot ask questions. The default permission
 mode is ``auto`` (a classifier approves or blocks each action); pass
@@ -118,7 +124,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(1, os.path.dirname(HERE))        # Scripts/: asset_pipeline
 
-from devteam import baseline_cache, fab, fast, limits, pause                         # noqa: E402
+from devteam import baseline_cache, fab, fast, final, limits, pause, probe_gate  # noqa: E402
 from devteam.accounting import git_head                             # noqa: E402
 from devteam.tasks import Task, parse_tasks, requeue, tick          # noqa: E402
 from devteam.triage import triage                                   # noqa: E402
@@ -159,9 +165,12 @@ def parse_args():
     p.add_argument("--budget", type=float, metavar="USD", help="per-task spending cap")
     p.add_argument("--no-gate", dest="gate", action="store_false",
                    help="skip the verifier sweeps before and after each task")
-    p.add_argument("--gate-probes", default="SMOKE", metavar="SET",
-                   help="probe set the gate runs beside the verifiers: SMOKE (default), "
-                        "FULL or none (Scripts/probes/sets.py)")
+    p.add_argument("--gate-probes", default="none", metavar="SET",
+                   help="probe set the gate runs beside the verifiers, after every task: "
+                        "none (default), SMOKE or FULL (Scripts/probes/sets.py)")
+    p.add_argument("--final-probes", default="SMOKE", metavar="SET",
+                   help="probe set swept once, after the run's last task, against the "
+                        "run's first baseline: SMOKE (default), FULL or none")
     p.add_argument("--fix-attempts", type=int, default=1, metavar="N",
                    help="times a session is sent back to fix a gate regression (default 1)")
     p.add_argument("--dry-run", action="store_true",
@@ -230,14 +239,24 @@ def reread(task_file, pending, attempted, args, n):
     return queue, cost
 
 
+def probe_sets(args):
+    """Resolve --gate-probes and --final-probes onto args (None: no probes)."""
+    for attr, name in (("probe_set", args.gate_probes), ("final_set", args.final_probes)):
+        setattr(args, attr, None)
+        if args.gate and name.lower() != "none":
+            try:
+                setattr(args, attr, sets.resolve(name))
+            except ValueError as err:
+                sys.exit(f"dev-team: {err}")
+    if not args.gate:
+        return "  gate: off"
+    return (f"  gate: the verifiers round each task; probes per task: {args.gate_probes}; "
+            f"final probes: {args.final_probes}")
+
+
 def main():
     args = parse_args()
-    args.probe_set = None
-    if args.gate and args.gate_probes.lower() != "none":
-        try:
-            args.probe_set = sets.resolve(args.gate_probes)
-        except ValueError as err:
-            sys.exit(f"dev-team: {err}")
+    gate_line = probe_sets(args)
     # Fab assets are asked for at the terminal; '-' has used stdin up.
     args.interactive = sys.stdin.isatty() and args.tasks != ["-"]
     # 'pause' is typed at the same terminal (devteam/pause.py).
@@ -257,6 +276,7 @@ def main():
     triage_cost = size(todo, args)
     for i, t in enumerate(todo, 1):
         print(describe(i, t))
+    print(gate_line)
     if args.dry_run:
         return
 
@@ -268,6 +288,8 @@ def main():
         f.write(f"# dev-team run {stamp}\n")
 
     outcomes, total_cost, cache = [], triage_cost, {}
+    finale = final.Finale(args, run_dir, progress) if args.final_set else None
+    halted = False      # paused, interrupted or stopped: no final sweep
     attempted = []      # run already and still unticked: not to be queued again
     if pauser.enabled:
         print(f"dev-team: type '{pause.WORD}' and Enter to pause the task in hand")
@@ -277,23 +299,29 @@ def main():
         print(f"\n[{n}/{total}] {task.title}")
         if not close_editors():
             print("dev-team: stopping -- an editor of this project is still running")
+            halted = True
             break
         before = git_head(ROOT)
         try:
+            if finale:
+                finale.begin(cache, pauser)
             ok, reports, result, gate_table, swept = run_one(
                 task, n, total, args, run_dir, progress, cache, meter, pauser)
         except pause.Paused as stop:
             park_task(stop, task, n, total, args, run_dir, before, task_file)
             outcomes.append((todo.pop(0), "paused"))
+            halted = True
             break
         except KeyboardInterrupt:
             print("\ndev-team: interrupted -- this task stays unticked")
             outcomes.append((todo.pop(0), "interrupted"))
+            halted = True
             break
         except fab.FabStop as stop:
             print(f"\ndev-team: stopped while waiting for Fab asset {stop} "
                   "-- this task stays unticked")
             outcomes.append((todo.pop(0), "stopped"))
+            halted = True
             break
         status, cost = write_up(task, n, ok, args, before, reports, result, gate_table,
                                 run_dir, progress)
@@ -306,7 +334,9 @@ def main():
         if ok and swept:
             # The next task's baseline, as long as nothing changes in between.
             cache[tree_state()] = swept
-            baseline_cache.save(ROOT, tree_state(), swept)
+            baseline_cache.save(ROOT, tree_state(), swept, probe_gate.labels(args.probe_set))
+            if finale:
+                finale.seen(tree_state(), swept)
         if not ok and not args.keep_going:
             print("dev-team: stopping (use --keep-going to continue past failures)")
             break
@@ -316,12 +346,18 @@ def main():
 
     if server.stop(SERVE_DIR):
         print("\ndev-team: stopped the last session's warm editor")
+    probes_ok = True
+    if finale and not halted:
+        try:
+            probes_ok = finale.finish()
+        except KeyboardInterrupt:
+            print("\ndev-team: interrupted -- the final probes were not swept")
     print(f"\ndev-team: finished -- ${total_cost:.2f} total, progress in {progress}")
     for task, status in outcomes:
         print(f"  {status:>11}  {task.title}")
     for task in todo:
         print(f"  {'not run':>11}  {task.title}")
-    sys.exit(0 if all(s == "done" for _t, s in outcomes) and not todo else 1)
+    sys.exit(0 if all(s == "done" for _t, s in outcomes) and not todo and probes_ok else 1)
 
 
 if __name__ == "__main__":

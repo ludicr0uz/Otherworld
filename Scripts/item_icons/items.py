@@ -61,12 +61,14 @@ ITEMS = (
     Item("Stick", f"{WEAPON_DIR}/BP_Stick", roll=-60.0, length=0.60),
     Item("Mushroom", f"{SURVIVAL_DIR}/BP_Mushroom", length=0.40),
     Item("Canteen", f"{SURVIVAL_DIR}/BP_WaterCanteen", length=0.40),
-    # The garments' stand-in models (Scripts/clothing/specs.py), seen from
-    # above and in front, as they lie on the ground.
+    # The garments as they lie on the ground, seen from above and in front:
+    # their stand-in models, or the mesh they are worn as (Scripts/clothing).
     Item("Hat", f"{CLOTHING_DIR}/BP_Hat", pitch=35.0, length=0.55),
     Item("Glasses", f"{CLOTHING_DIR}/BP_Glasses", yaw=0.0, pitch=20.0, length=0.50),
     Item("Shirt", f"{CLOTHING_DIR}/BP_Shirt", pitch=35.0, length=0.55),
-    Item("Jacket", f"{CLOTHING_DIR}/BP_Jacket", pitch=35.0, length=0.60),
+    # The hoodie lies with its hood on +Y (clothing/specs.py): seen from its
+    # hem, high up, so it stands the right way up in the slot.
+    Item("Jacket", f"{CLOTHING_DIR}/BP_Jacket", yaw=-90.0, pitch=60.0, length=0.60),
     Item("Gloves", f"{CLOTHING_DIR}/BP_Gloves", pitch=35.0, length=0.45),
     Item("Pants", f"{CLOTHING_DIR}/BP_Pants", pitch=35.0, length=0.60),
     Item("Boots", f"{CLOTHING_DIR}/BP_Boots", pitch=25.0, length=0.50),

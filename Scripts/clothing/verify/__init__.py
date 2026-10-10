@@ -2,7 +2,8 @@
 run() is self-contained.
 
   garments    each BP_<Garment>: a BP_WeaponItem, Consumable, Dropped, its
-              ClothingSlot, name, model, icon, and held in the fist
+              ClothingSlot, name, model (the three with a worn mesh lie as
+              it), icon, and held in the fist
   test_items  the test garments laid in front of the 200 m map's PlayerStart
 """
 

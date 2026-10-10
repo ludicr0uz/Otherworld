@@ -11,6 +11,8 @@ clothing.verify. Design and traps: CLAUDE.md here.
   items       BP_<Garment> per row: a Consumable BP_WeaponItem with its
               ClothingSlot, WornPart and WornMesh, Dropped, and a flat
               material
+  ground_model  the mesh a garment with a WornMesh lies as: one skeletal
+              mesh component in its reference pose, laid flat and centred
   placement   the test garments in a row 3 m in front of Lvl_Forest_200m's
               PlayerStart (tag OW_TestClothing, idempotent)
   verify/     the verifier's sections (verify/__init__.py lists them)

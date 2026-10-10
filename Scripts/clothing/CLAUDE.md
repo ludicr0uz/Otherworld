@@ -17,6 +17,7 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 | piece | owner |
 |---|---|
 | the garments (`/Game/Clothing/BP_<Garment>`), their stand-in models and materials | this package (`specs.py`, `items.py`) |
+| what a garment lies on the ground as: its stand-in cubes, or, with a `WornMesh`, that mesh ("On the ground" below) | `ground_model.py` (checks: `verify/garments.py`; in a game: `probes/probe_clothing_ground.py`) |
 | the test garments on `Lvl_Forest_200m` | this package (`placement.py`) |
 | the mesh a garment is drawn as, worn: `Garment.worn` (the body component it fills, the skeletal mesh, from `metahuman_paths.CLOTHING`), written onto the item as `WornPart` and `WornMesh`. Jacket, Pants and Boots have one | `specs.py`, `items.py`; the variables `combat/item_vars.py` |
 | drawing a worn garment on the body, and taking it off it: the `DrawWorn` event | `combat/weapon_component/wear_draw.py` (checks: `combat/verify/wear_draw.py`; in a game: `probes/probe_clothing_draw.py`, run by `probe_clothing.py`) |
@@ -74,6 +75,29 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   `Lvl_Forest_200m`'s PlayerStart, 55 cm apart (tag `OW_TestClothing`; `build_clothing.py`
   places them, idempotently, and saves the level). Regenerating the level drops them, as it
   drops the forage: run `build_clothing.py` again.
+
+## On the ground
+
+- **A garment with a `WornMesh` lies as that mesh** (K9): the jacket, the pants and the
+  boots are a hoodie, jeans and a pair of shoes on the ground, in the hand and in their
+  icons. One skeletal mesh component, `Model`, under the item's `Body`, with no anim
+  class, so it holds its reference pose, at the size it is worn at; the other five keep
+  their cubes.
+- **Laid by the row's `lay`** (`specs.py`), a quarter-turn rotation: the hoodie and the
+  jeans on their backs, the shoes on their soles. `ground_model.py` then moves the mesh
+  so the middle of its bounds is over the item's origin and its lowest point on it. The
+  origin is where a pick-up is measured from and where the glimmer hangs; neither moved.
+  The hoodie's collar points along the test row, not away from the player: its sleeves
+  are 97 cm across and the row's garments 55 cm apart.
+- **Its `parts` are still in the row, built by nothing:** they say where the fist holds
+  it (`GripLocation` is solved on the first part, as before), as a model gun's outline
+  does. Held, the hoodie is a stiff, full-size hoodie in the fist.
+- **The mesh asset's post-process anim Blueprint is switched off on the component**
+  (`disable_post_process_blueprint`): the hoodie's and the shoes' copy the pose of a body
+  they are attached under, and an item has none. The engine still makes the instance; it
+  does not run.
+- **To see it:** `uepy.py --game --windowed --probe Scripts/probes/probe_clothing_ground.py`
+  saves one picture of the test row to `Saved/Screenshots/MacEditor`.
 
 ## Drawn on the body
 
@@ -136,4 +160,5 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 - No loot table names a garment yet (`Scripts/loot/tables.py`); a looted one would go into
   the bag like any item.
 - **Still needs a play session:** the I key and the panel's look, the cursor on its
-  slots, dragging a garment on and off, and how the stand-in models read on the ground.
+  slots, dragging a garment on and off, how the models read on the ground, and a hoodie
+  carried in the fist.

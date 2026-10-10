@@ -66,7 +66,8 @@ updates the bullet here.
   onto the hand or a bag slot and a carried one onto the worn slots to wear it
   (`combat/weapon_component/wear_drag.py`), and a portrait of the character, facing
   forward, stands left of the panel (a render of the MetaHuman in boxers, the same whatever is worn: `item_icons/portrait.py`). The jacket, the pants and the boots are drawn on the body when worn (the MetaHuman's hoodie, jeans and shoes), to the wearer and, on a server, to everyone who sees them; the other five are drawn as nothing, and wearing changes nothing else. A saved
-  profile keeps what is worn. One of
+  profile keeps what is worn. Those three lie on the ground, and are carried and pictured in
+  their icons, as that hoodie, jeans and shoes; the other five as stand-in cubes. One of
   each lies 3 m in front of the start on `Lvl_Forest_200m` (`Scripts/clothing/CLAUDE.md`).
 - **Item icons:** every item's icon, in the inventory grid and in the loot window, is a
   picture of its own 3D model, lit as a studio shot (its own shadows, gloss), fitted to the

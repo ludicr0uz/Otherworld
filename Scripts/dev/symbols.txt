@@ -1248,10 +1248,15 @@ build_ui_art.py:323: PANELS
 build_ui_art.py:334: SLOTS
 build_ui_art.py:338: FRAMES
 build_ui_art.py:347: BARS
-clothing/items.py:32: EMISSIVE_SHARE
-clothing/items.py:35: parts_of
-clothing/items.py:41: build_garment
-clothing/items.py:87: build_garments
+clothing/ground_model.py:23: MODEL
+clothing/ground_model.py:27: _turned
+clothing/ground_model.py:31: lying_box
+clothing/ground_model.py:41: model_of
+clothing/ground_model.py:50: build_ground_model
+clothing/items.py:34: EMISSIVE_SHARE
+clothing/items.py:37: parts_of
+clothing/items.py:43: build_garment
+clothing/items.py:94: build_garments
 clothing/placement.py:20: TEST_LEVEL
 clothing/placement.py:21: TEST_TAG
 clothing/placement.py:22: AHEAD_CM
@@ -1261,15 +1266,16 @@ clothing/placement.py:27: row_spots
 clothing/placement.py:38: _sub
 clothing/placement.py:42: place_test_clothing
 clothing/placement.py:77: test_clothing_in_level
-clothing/specs.py:21: CLOTHING_DIR
-clothing/specs.py:22: MAT_DIR
-clothing/specs.py:26: class Garment
-clothing/specs.py:51: _worn
-clothing/specs.py:60: _pair
-clothing/specs.py:66: GARMENTS
-clothing/verify/__init__.py:9: SECTIONS
-clothing/verify/garments.py:14: WORN_PARTS
-clothing/verify/garments.py:17: _path
+clothing/specs.py:24: CLOTHING_DIR
+clothing/specs.py:25: MAT_DIR
+clothing/specs.py:29: class Garment
+clothing/specs.py:55: _worn
+clothing/specs.py:71: _pair
+clothing/specs.py:77: GARMENTS
+clothing/verify/__init__.py:10: SECTIONS
+clothing/verify/garments.py:17: WORN_PARTS
+clothing/verify/garments.py:20: _path
+clothing/verify/garments.py:24: _check_ground_model
 combat/aim_pitch.py:53: AIM_PITCH_VAR
 combat/aim_pitch.py:55: ROLL_PER_DEGREE
 combat/aim_pitch.py:57: MODIFY_BONE_CLASS
@@ -5935,7 +5941,7 @@ item_icons/items.py:26: ICON_TINT
 item_icons/items.py:29: icon_name
 item_icons/items.py:35: class Item
 item_icons/items.py:51: ITEMS
-item_icons/items.py:76: DISPLAYS
+item_icons/items.py:78: DISPLAYS
 item_icons/light.py:30: KEY_LIGHT
 item_icons/light.py:31: KEY
 item_icons/light.py:32: KEY_COLOUR
@@ -6725,6 +6731,11 @@ probes/probe_clothing_draw.py:60: _gap
 probes/probe_clothing_draw.py:65: _walk
 probes/probe_clothing_draw.py:79: jacket_checks
 probes/probe_clothing_draw.py:114: pants_checks
+probes/probe_clothing_ground.py:29: SHOTS_DIR
+probes/probe_clothing_ground.py:32: OVER_CM
+probes/probe_clothing_ground.py:34: SETTLE
+probes/probe_clothing_ground.py:37: _named
+probes/probe_clothing_ground.py:42: _lies_as_mesh
 probes/probe_clothing_save.py:43: WORN
 probes/probe_clothing_save.py:44: GS
 probes/probe_clothing_save.py:47: _spec

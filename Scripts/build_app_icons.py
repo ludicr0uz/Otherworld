@@ -13,8 +13,9 @@ looks for it (all three tracked, so a clone packages with them):
     macOS    Build/Mac/Resources/Assets.xcassets/AppIcon.appiconset
              Xcode compiles the project's catalog in place of the engine's
              (XcodeProject.cs, ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon).
-             The art sits in Apple's 824 px of a 1024 px canvas, as the Dock's
-             other icons do.
+             The art sits in Apple's 824 px of a 1024 px canvas and is cut to
+             Apple's corner, rounder than the frame's own: macOS 26 draws an
+             icon of any other outline small, on a grey plate.
     Windows  Build/Windows/Application.ico
              UBT compiles it into the exe, and the packaging stamps it again.
     Linux    Content/Splash/Icon.bmp
@@ -49,13 +50,14 @@ FRAME_RADIUS = 0.105
 
 MASTER = 1024
 MAC_ART = 824                       # Apple's icon grid: the art's side in 1024
+MAC_RADIUS = 0.225                  # and its corner, as a fraction of that side
 MAC_POINTS = (16, 32, 128, 256, 512)
 WINDOWS_SIZES = (16, 24, 32, 48, 64, 128, 256)
 LINUX_SIZE = 256
 
 
-def cut(source):
-    """The frame and what is in it, MASTER px square, clear outside the frame."""
+def cut(source, radius=FRAME_RADIUS):
+    """The frame and what is in it, MASTER px square, clear past its corners."""
     picture = Image.open(source).convert("RGB")
     if picture.width != picture.height:
         sys.exit(f"{source}: {picture.width}x{picture.height}, not square")
@@ -65,7 +67,7 @@ def cut(source):
     big = MASTER * 4                # drawn large and shrunk: a smooth edge
     mask = Image.new("L", (big, big), 0)
     ImageDraw.Draw(mask).rounded_rectangle(
-        (0, 0, big - 1, big - 1), radius=round(FRAME_RADIUS * big), fill=255)
+        (0, 0, big - 1, big - 1), radius=round(radius * big), fill=255)
     art.putalpha(mask.resize((MASTER, MASTER), Image.LANCZOS))
     return art
 
@@ -131,7 +133,7 @@ def main(argv):
     if not os.path.isfile(source):
         sys.exit(f"no picture at {source}")
     art = cut(source)
-    write_mac(art)
+    write_mac(cut(source, MAC_RADIUS))
     write_windows(art)
     write_linux(art)
     for path in (MAC_ICONSET, WINDOWS_ICO, LINUX_BMP):

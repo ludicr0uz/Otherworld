@@ -1,3 +1,5 @@
 # Content/ is binary and goes through Git LFS.
 Content/**/*.uasset filter=lfs diff=lfs merge=lfs -text
 Content/**/*.umap filter=lfs diff=lfs merge=lfs -text
+# The Mac launcher icon is an Xcode asset catalog, which is PNGs (Scripts/build_app_icons.py).
+Build/Mac/Resources/Assets.xcassets/**/*.png filter=lfs diff=lfs merge=lfs -text

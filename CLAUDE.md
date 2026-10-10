@@ -464,3 +464,10 @@ console's `set`, the inbox heartbeat): `docs/headless_runs.md#probes`.
   With the key macOS scales the whole window in under the notch. It is in
   `Build/Mac/Resources/Info.Template.plist` (tracked; the packaging copies its keys into the
   app), guarded by `Scripts/dev/tests/test_mac_plist.py`, and takes a re-package to reach a build.
+- **The launcher icon** is cut from one picture (git-ignored `assets/icon/`) by
+  `python3 Scripts/build_app_icons.py`, run outside the editor, into the three places the
+  packaging reads, all tracked: `Build/Mac/Resources/Assets.xcassets` (Xcode compiles it in
+  place of the engine's), `Build/Windows/Application.ico` (compiled into the exe) and
+  `Content/Splash/Icon.bmp` (a Linux binary holds no icon: the game sets its window's from
+  this loose file, staged by `DirectoriesToAlwaysStageAsNonUFS` in `DefaultGame.ini`). Each
+  takes a re-package; `Scripts/dev/tests/test_app_icons.py` guards the files and the setting.

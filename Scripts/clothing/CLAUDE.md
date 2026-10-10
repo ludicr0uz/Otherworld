@@ -6,7 +6,7 @@ worn (the jacket, the pants, the boots: "Drawn on the body" below), to the weare
 a server, to every client; wearing one changes no number.
 
 ```bash
-python3 Scripts/dev/uepy.py Scripts/build_clothing.py      # after build_weapons_and_combat.py
+python3 Scripts/dev/uepy.py Scripts/build_clothing.py      # after build_weapons_and_combat.py, before build_survival.py
 python3 Scripts/dev/uepy.py Scripts/verify_clothing.py
 python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
 python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_clothing.py

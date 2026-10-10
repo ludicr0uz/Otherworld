@@ -49,8 +49,8 @@ updates the bullet here.
   The zombie idles, shambles, runs and swings with Mixamo's zombie packs
   (`asset_pipeline/import_mixamo.py`, zips in `assets/cache/mixamo/`); the wendigo keeps the
   mannequin's set, plus that pack's scream for its roar.
-- **Corpse loot:** a wanderer the player kills carries what its loot table rolls (for now, water:
-  a canteen at 50%). Near any body, loot or none, **Tab** kneels the player over it (Quaternius
+- **Corpse loot:** a wanderer the player kills carries what its loot table rolls (water:
+  a canteen at 50%; and the jacket, the pants and the boots at 10% each). Near any body, loot or none, **Tab** kneels the player over it (Quaternius
   UAL's `Fixing_Kneeling`) and opens a loot window showing what it carries as item icons;
   Up/Down pick and Enter takes the item into the bag (`Scripts/loot/CLAUDE.md`).
 - **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature

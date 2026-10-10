@@ -50,6 +50,8 @@ from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
 from graphics_menu.loot_consts import LOOT_OPEN_VAR, LOOT_TAKE_VAR, LOOT_TARGET_VAR
 from loot.consts import LOOT_CHANCES_VAR, LOOT_TAKE_REACH_CM, LOOT_VAR
+from loot.tables import forced_chances
+from survival.paths import CANTEEN_BP_PATH
 from probes.probe_chop_tree import _flat, _items
 
 RUNS_ON = ("server", "client")
@@ -156,7 +158,7 @@ def _kill(p, npc, at):
     forced: it carries one thing. Returns its health component."""
     npc.set_actor_location(at + unreal.Vector(0.0, 0.0, 100.0), False, True)
     health = p.component(npc, HEALTH_CLASS_PATH)
-    p.set(health, LOOT_CHANCES_VAR, [1.0])
+    p.set(health, LOOT_CHANCES_VAR, forced_chances(CANTEEN_BP_PATH))
     p.set(health, DAMAGED_BY_PLAYER_VAR, True)
     p.set(health, HV.Health, 0.0)
     yield from _await(lambda: p.get(health, HV.Dead) and len(p.get(health, LOOT_VAR)) > 0, 10.0)

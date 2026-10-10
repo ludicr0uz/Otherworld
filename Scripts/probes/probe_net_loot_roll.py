@@ -34,9 +34,14 @@ from combat.game_state import NPC_ID_VAR
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH
 from combat import health_vars as HV
 from loot.consts import LOOT_CHANCES_VAR, LOOT_NAMES_VAR, LOOT_VAR
+from loot.tables import forced_chances
+from survival.paths import CANTEEN_BP_PATH
 
 RUNS_ON = ("server", "client", "standalone")
 WRITABLE = [(HEALTH_BP_PATH, LOOT_CHANCES_VAR)]
+# A chance per row of the table: the canteen for sure, or nothing at all.
+SURE = forced_chances(CANTEEN_BP_PATH)
+NEVER = forced_chances()
 
 WAIT = 40.0             # wall seconds any one step may take
 RING_CM = 900.0         # where the wanderers are stood: round the players, in sight
@@ -102,8 +107,8 @@ def _roll(p, watchers):
                 "two against the server's",
                 all(p.posted(w, "set") == len(ids) for w in watchers),
                 f"{[p.posted(w, 'set') for w in watchers]} of {len(ids)}")
-    p.set(bodies[sure], LOOT_CHANCES_VAR, [1.0])
-    p.set(bodies[never], LOOT_CHANCES_VAR, [0.0])
+    p.set(bodies[sure], LOOT_CHANCES_VAR, SURE)
+    p.set(bodies[never], LOOT_CHANCES_VAR, NEVER)
     for h in bodies.values():
         h.call_method(TAKE_HIT, (FATAL, AHEAD, killer, None))
     yield from _await(lambda: all(p.get(h, HV.Dead) for h in bodies.values()))
@@ -115,8 +120,10 @@ def _roll(p, watchers):
             and len(p.get(bodies[sure], LOOT_NAMES_VAR)) == 1, str(_loot(p, bodies[sure])))
     p.check("the body sure to carry nothing carries nothing",
             _loot(p, bodies[never]) == [], str(_loot(p, bodies[never])))
-    p.check("no body carries more than the table can give it (one roll per entry)",
-            all(len(_loot(p, h)) <= 1 for h in bodies.values()), str(_carries(p, bodies)))
+    p.check("no body carries more than the table can give it (one roll per entry: "
+            "nothing twice)",
+            all(len(set(_loot(p, h))) == len(_loot(p, h)) <= len(SURE)
+                for h in bodies.values()), str(_carries(p, bodies)))
     return bodies
 
 
@@ -128,7 +135,7 @@ def probe_server(p):
         return
     rolled = _carries(p, bodies)
     full = sum(1 for v in rolled.values() if v)
-    p.note(f"the server rolled a canteen onto {full} of {len(rolled)} bodies")
+    p.note(f"the server rolled something onto {full} of {len(rolled)} bodies")
     p.post("rolled", rolled)
     yield from _await(lambda: all(p.posted(w, "read") is not None for w in watchers))
     for w in watchers:
@@ -153,9 +160,9 @@ def probe_client(p):
             len(mine) == len(ids), f"{sorted(mine)} of {ids}")
     # Loaded the other way round from the server: a roll made here would show.
     if plan["sure"] in mine:
-        p.set(mine[plan["sure"]], LOOT_CHANCES_VAR, [0.0])
+        p.set(mine[plan["sure"]], LOOT_CHANCES_VAR, NEVER)
     if plan["never"] in mine:
-        p.set(mine[plan["never"]], LOOT_CHANCES_VAR, [1.0])
+        p.set(mine[plan["never"]], LOOT_CHANCES_VAR, SURE)
     p.post("set", len(mine))
 
     yield from _await(lambda: p.posted("server", "rolled") is not None, 120.0)

@@ -1,9 +1,9 @@
 """Corpse loot: a killed wanderer carries its roll, every body can be searched,
 and the loot window shows the roll as icons and takes it; searching kneels.
 
-The table's 50% is forced per wanderer by writing its LootChances (1.0, then
-0.0), so each case is decided rather than a coin toss; the default table is
-read first. Kills are Health = 0 with DamagedByPlayer set, as a shot leaves
+The table's chances are forced per wanderer by writing its LootChances (one
+per row: loot.tables.forced_chances), so each case is decided rather than a
+coin toss; the default table is read first. Kills are Health = 0 with DamagedByPlayer set, as a shot leaves
 them. The window is opened and the take asked for by writing the HUD's
 LootOpen / LootTakeRequested (a probe has no keyboard; the verifier checks the
 Tab / Enter polls).
@@ -17,6 +17,8 @@ body in reach is the one just made):
   a lucky kill carries a canteen, shown as its icon in its tint and not as a
     name; taking puts a carried canteen in the bag and empties the body, which
     stays the target with the window open on NOTHING;
+  a kill forced to carry a jacket carries only that; taken, it is in the bag,
+    and the fire key on it in hand wears it (Worn[jacket], out of the bag);
   a death nobody caused (no DamagedByPlayer, as the world-floor net) carries
     nothing even at 100%, and can be searched too.
 
@@ -48,14 +50,26 @@ from loot.consts import (
     LOOT_CHANCES_VAR, LOOT_ICONS_VAR, LOOT_NAMES_VAR, LOOT_TABLE_VAR, LOOT_TINTS_VAR,
     LOOT_VAR,
 )
+from loot.tables import JACKET_BP_PATH, WANDERER_LOOT, forced_chances
+from combat.paths import WEAPON_COMP_BP_PATH
+from combat.wear_tuning import WEAR_SLOTS, WORN_VAR
+from combat.weapon_component import vars as WV
+from combat.weapon_component.tick import FIRE_FORCED_VAR
+from probes.dressed import fire as _fire, hold as _hold
+from survival.paths import CANTEEN_BP_PATH
 from combat import health_vars as HV
 from combat.game_state import DAMAGED_BY_PLAYER_VAR
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HEALTH_BP_PATH, HV.Health), (HEALTH_BP_PATH, DAMAGED_BY_PLAYER_VAR),
             (HEALTH_BP_PATH, LOOT_CHANCES_VAR),
-            (HUD_BP_PATH, LOOT_OPEN_VAR), (HUD_BP_PATH, LOOT_TAKE_VAR)]
+            (HUD_BP_PATH, LOOT_OPEN_VAR), (HUD_BP_PATH, LOOT_TAKE_VAR),
+            (WEAPON_COMP_BP_PATH, WV.EquippedIndex), (WEAPON_COMP_BP_PATH, WV.NeedsRefresh),
+            (WEAPON_COMP_BP_PATH, FIRE_FORCED_VAR)]
 CANTEEN = "BP_WaterCanteen_C"
+JACKET = "BP_Jacket_C"
+NOTHING, WATER, A_JACKET = (forced_chances(), forced_chances(CANTEEN_BP_PATH),
+                            forced_chances(JACKET_BP_PATH))
 IN_FRONT_CM = 150.0
 BESIDE_CM = 90.0          # where the player stands to search: beside the body
 SETTLE = 0.3
@@ -84,9 +98,9 @@ def _wanderers(p):
             and not p.get(p.component(x, HEALTH_CLASS_PATH), "Dead")]
 
 
-def _kill(p, npc, chance, by_player=True):
+def _kill(p, npc, chances, by_player=True):
     """Stand the player where ``npc`` is and ``npc`` in front of it, force its
-    roll, kill it, and step up to where the ragdoll came to rest (it can
+    roll (``chances``, one per row of the table), kill it, and step up to where the ragdoll came to rest (it can
     slide a couple of metres down a slope, out of reach); returns its health
     component."""
     player = p.pawn()
@@ -95,7 +109,7 @@ def _kill(p, npc, chance, by_player=True):
     spot = player.get_actor_location() + player.get_actor_forward_vector() * IN_FRONT_CM
     npc.set_actor_location(spot, False, True)
     health = p.component(npc, HEALTH_CLASS_PATH)
-    p.set(health, LOOT_CHANCES_VAR, [chance])
+    p.set(health, LOOT_CHANCES_VAR, chances)
     p.set(health, "DamagedByPlayer", by_player)
     p.set(health, "Health", 0.0)
     yield lambda: p.get(health, "Dead")
@@ -247,11 +261,11 @@ def probe(p):
 
 
 def _run(p):
-    yield lambda: _live_hud(p) is not None and len(_wanderers(p)) >= 3
+    yield lambda: _live_hud(p) is not None and len(_wanderers(p)) >= 4
     hud = _live_hud(p)
     player = p.pawn()
     wc = p.component(player, WEAPON_COMP_CLASS_PATH)
-    first, second, third = _wanderers(p)[:3]
+    first, second, third, fourth = _wanderers(p)[:4]
     # A headless game renders nothing, and by default an unrendered mesh
     # never refreshes its bones (the kneel is measured off them).
     player.get_editor_property("mesh").set_editor_property(
@@ -262,13 +276,16 @@ def _run(p):
     table = p.component(first, HEALTH_CLASS_PATH)
     items = [c.get_name() for c in p.get(table, LOOT_TABLE_VAR)]
     chances = [round(float(c), 3) for c in p.get(table, LOOT_CHANCES_VAR)]
-    p.check("a live wanderer's loot table is water at 50%",
-            items == [CANTEEN] and chances == [0.5], f"{items} {chances}")
+    want = [(e.item_bp.rsplit("/", 1)[1] + "_C", e.chance) for e in WANDERER_LOOT]
+    p.check("a live wanderer's loot table is the table's: water at 50%, and the "
+            "jacket, the pants and the boots at 10% each",
+            list(zip(items, chances)) == want and want[0] == (CANTEEN, 0.5)
+            and (JACKET, 0.1) in want and len(want) == 4, f"{items} {chances}")
     p.check("no body in reach: nothing to search, standing",
             p.get(hud, LOOT_TARGET_VAR) is None and not p.get(wc, SEARCHING_VAR))
 
     # --- an unlucky kill: nothing on it, searched all the same ------------------
-    body = yield from _kill(p, first, 0.0)
+    body = yield from _kill(p, first, NOTHING)
     stand_hips = _hips(player)
     p.check("an unlucky kill carries nothing", len(p.get(body, LOOT_VAR)) == 0,
             str(_names(p, body)))
@@ -279,7 +296,7 @@ def _run(p):
     yield from _check_kneel(p, hud, wc, stand_hips)
 
     # --- a lucky kill ---------------------------------------------------------
-    body = yield from _kill(p, second, 1.0)
+    body = yield from _kill(p, second, WATER)
     p.check("a lucky counted kill carries a canteen",
             [c.get_name() for c in p.get(body, LOOT_VAR)] == [CANTEEN]
             and _names(p, body) == ["Canteen"], str(_names(p, body)))
@@ -316,8 +333,39 @@ def _run(p):
     p.set(hud, LOOT_OPEN_VAR, False)
     yield SETTLE
 
+    # --- a kill that carries a jacket: taken, and worn -------------------------
+    body = yield from _kill(p, fourth, A_JACKET)
+    p.check("a kill forced to carry a jacket carries that and nothing else",
+            [c.get_name() for c in p.get(body, LOOT_VAR)] == [JACKET]
+            and _names(p, body) == ["Jacket"], str(_names(p, body)))
+    yield lambda: p.get(hud, LOOT_TARGET_VAR) == body
+    p.set(hud, LOOT_OPEN_VAR, True)
+    yield SETTLE
+    before = _bag(p, wc)
+    p.set(hud, LOOT_TAKE_VAR, True)
+    yield lambda: not p.get(hud, LOOT_TAKE_VAR)
+    yield SETTLE
+    after = _bag(p, wc)
+    jackets = [i for i in p.get(wc, "Inventory") if i.get_class().get_name() == JACKET]
+    p.check("...taking puts the jacket in the bag, and empties the body",
+            len(jackets) == 1 and len(after) == len(before) + 1
+            and len(p.get(body, LOOT_VAR)) == 0, f"{before} -> {after}")
+    p.set(hud, LOOT_OPEN_VAR, False)
+    yield lambda: not p.get(wc, SEARCHING_VAR)
+    yield SETTLE
+    if jackets:
+        jacket, slot = jackets[0], WEAR_SLOTS.index("jacket")
+        yield from _hold(p, wc, jacket)
+        yield from _fire(p, wc, jacket)
+        worn = list(p.get(wc, WORN_VAR))
+        p.check("...and the fire key on it in hand wears it: Worn[jacket] is the "
+                "jacket off the body, out of the bag",
+                slot < len(worn) and worn[slot] == jacket
+                and jacket not in p.get(wc, "Inventory"),
+                f"{[w.get_class().get_name() if w else None for w in worn]}")
+
     # --- a death nobody caused ---------------------------------------------------
-    body = yield from _kill(p, third, 1.0, by_player=False)
+    body = yield from _kill(p, third, [1.0] * len(WANDERER_LOOT), by_player=False)
     p.check("a death nobody caused carries nothing, even at 100%",
             len(p.get(body, LOOT_VAR)) == 0, str(_names(p, body)))
     yield lambda: p.get(hud, LOOT_TARGET_VAR) == body

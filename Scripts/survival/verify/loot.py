@@ -8,7 +8,7 @@ from loot.consts import (
     LOOT_CHANCES_VAR, LOOT_TABLE_ICONS_VAR, LOOT_TABLE_NAMES_VAR, LOOT_TABLE_TINTS_VAR,
     LOOT_TABLE_VAR,
 )
-from loot.tables import WANDERER_LOOT
+from loot.tables import CLOTHING_LOOT, WANDERER_LOOT
 from survival.paths import CANTEEN_BP_PATH
 
 
@@ -40,3 +40,6 @@ def run():
           f"{[i.get_name() if i else None for i in icons]}")
     water = [e.chance for e in WANDERER_LOOT if e.item_bp == CANTEEN_BP_PATH]
     check("half the wanderers carry water (a canteen at 50%)", water == [0.5], str(water))
+    worn = [e.chance for e in WANDERER_LOOT if e.item_bp in CLOTHING_LOOT]
+    check("one wanderer in ten carries each of the jacket, the pants and the boots",
+          worn == [0.1] * 3 and len(CLOTHING_LOOT) == 3, str(worn))

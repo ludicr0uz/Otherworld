@@ -14,14 +14,21 @@ has (`Scripts/net/CLAUDE.md`, "Death"). In single player a player's body carries
 
 - **A loot table is a row list in `tables.py`:** `LootEntry(item_bp, chance)`. Each entry is
   rolled on its own, once per counted kill, so a body can carry several things or nothing.
-  Today: `WANDERER_LOOT` = the canteen (water) at 50%.
+  Today: `WANDERER_LOOT` = the canteen (water) at 50%, and the jacket, the pants and the
+  boots at 10% each (the three garments drawn on the body when worn).
+- **The garments' paths are written in `tables.py`, not imported:** `clothing` imports
+  `combat`, so neither `loot` nor `combat` may import it. `Scripts/dev/tests/test_loot_paths.py`
+  holds them to `clothing/specs.py`.
+- **The roll reads one chance per row of the table.** A probe that forces a body's roll
+  writes the whole `LootChances` (`tables.forced_chances(<item paths>)`), never `[1.0]`.
 - **It lives on `BP_HealthComponent`'s defaults** as parallel arrays (`LootTable`,
   `LootChances`, `LootTableNames`, `LootTableIcons`, `LootTableTints`), because Python can't
   author a Blueprint struct. The name, icon and tint are the item's own `DisplayName`, `Icon`
   and `SlotColor`, copied at install: a body holds classes, and a class of Actor has no `Icon`
   to read in a graph. `consts.LOOT_ARRAYS` pairs each table array with the body's.
-- **`build_survival.py` fills them** (`install.fill_loot_tables`), because it is the last
-  builder to make an item. `build_weapons_and_combat.py` re-declares the variables and so
+- **`build_survival.py` fills them** (`install.fill_loot_tables`), once every item the table
+  names exists: **run it after `build_clothing.py`**, which makes the garments (a garment
+  that is missing, or has no icon yet, raises in `install.table_rows`). `build_weapons_and_combat.py` re-declares the variables and so
   **empties the table**: re-run `build_survival.py` after it (the documented order). An empty
   table is legal; the roll loops zero times. `verify_survival.py` catches it.
 - **One table for every wanderer.** A child Blueprint's override of an inherited component is
@@ -103,7 +110,8 @@ has (`Scripts/net/CLAUDE.md`, "Death"). In single player a player's body carries
   the icon row, `Searching` and the move-input edge.
   `dev_guns_checks._looting` keeps the take's nodes out of the cheat's counts.
 - `uepy.py --game --probe Scripts/probes/probe_corpse_loot.py`: forced unlucky, lucky and
-  unearned kills, each body found, the drawn window (NOTHING, or the icon), a take, and the
+  unearned kills, each body found, the drawn window (NOTHING, or the icon), a take, a
+  jacket forced onto a body, taken and worn, and the
   kneel (the hips down, move input ignored, standing again). It steps the player up to where
   each ragdoll came to rest: one can slide out of reach down a slope.
 

@@ -5,10 +5,11 @@ reads it back. The code is this package (`__init__.py` is the map).
 
 ## Build order
 
-Run it after `build_weapons_and_combat.py` and before `build_graphics_menu.py`:
+Run it after `build_weapons_and_combat.py` and `build_clothing.py` (the corpse loot table
+it installs names three garments) and before `build_graphics_menu.py`:
 
 ```bash
-python3 Scripts/dev/uepy.py Scripts/build_weapons_and_combat.py \
+python3 Scripts/dev/uepy.py Scripts/build_weapons_and_combat.py Scripts/build_clothing.py \
     Scripts/build_survival.py Scripts/build_graphics_menu.py Scripts/place_forage.py
 python3 Scripts/dev/uepy.py Scripts/verify_survival.py
 ```
@@ -144,7 +145,8 @@ intended rule for a respawn; for a logout it is the save's job.
   waist (`combat/hold_pose.py`), and there is no eating animation.
 
 - **Water is also corpse loot:** `build_survival.py` fills the wanderers' loot table
-  (`Scripts/loot/`), a canteen at 50%, because it builds the items the table names.
+  (`Scripts/loot/`), a canteen at 50% (and three garments at 10% each, which
+  `build_clothing.py` makes first), because it builds the last items the table names.
 
 ## The campfire (`campfire.py`)
 

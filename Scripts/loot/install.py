@@ -1,7 +1,7 @@
 """Writing the loot tables onto BP_HealthComponent's defaults.
 
-Run by build_survival.py, the last builder to make an item, so every class a
-table names exists. build_weapons_and_combat.py re-declares the variables and
+Run by build_survival.py once every class a table names exists: after
+build_clothing.py too, which makes the garments. build_weapons_and_combat.py re-declares the variables and
 so empties the table: re-run build_survival.py after it (the documented order).
 The name, the icon and its tint come off each item's own DisplayName, Icon and
 SlotColor, so the loot window shows what the inventory will.

@@ -1,7 +1,8 @@
 """
 build_survival.py -- hunger, thirst, food, water and debuffs.
 
-Run inside the editor, AFTER build_weapons_and_combat.py:
+Run inside the editor, AFTER build_weapons_and_combat.py and build_clothing.py
+(the corpse loot table names three garments):
     python3 Scripts/dev/uepy.py Scripts/build_survival.py
 
 This file is only the entry point: main() runs the steps in dependency order.

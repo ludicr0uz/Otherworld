@@ -25,7 +25,8 @@ Client 1's own screen: the death menu with the server's hint, a click on it
 restarting nothing, no pause; then the HUD again.
 
 Single player: the body keeps what it held, carries no loot, the world pauses
-and no new body comes. (The profile's delete is probe_profile's.)
+and no new body comes. It dies with the pants worn (probes/dressed.py): they
+stay worn, drawn, and on the ragdoll's legs. (The profile's delete is probe_profile's.)
 
 Join order varies, so a player is known by its player id, never by index.
 """
@@ -52,11 +53,18 @@ from graphics_menu.loot_consts import (
     LOOT_OPEN_VAR, LOOT_PANEL, LOOT_TAKE_VAR, LOOT_TARGET_VAR)
 from loot.consts import LOOT_NAMES_VAR, LOOT_VAR
 
+from combat.metahuman_body import BODY
+from probes import dressed
+from probes.dressed import drawn, part, put_on
+
 RUNS_ON = ("server", "client", "standalone")
+GARMENT = "Pants"
+LEG_BONES = ("thigh_l", "calf_l")
+ON_BODY_CM = 1.0
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(WEAPON_COMP_BP_PATH, WORN_VAR), (HUD_BP_PATH, LOOT_OPEN_VAR),
-            (HUD_BP_PATH, LOOT_TAKE_VAR), (HUD_BP_PATH, CURSOR_ACCEPT_VAR)]
+            (HUD_BP_PATH, LOOT_TAKE_VAR), (HUD_BP_PATH, CURSOR_ACCEPT_VAR)] + dressed.WRITABLE
 
 WAIT = 40.0             # wall seconds any one step may take
 VICTIM, LOOTER = "client 1", "client 2"
@@ -380,6 +388,11 @@ def probe_standalone(p):
     world = p.world()
     body, mine = p.pawn(), p.player_state()
     yield from _await(lambda: len(_carried(p, body)) > 0)
+    # Dressed: the pants, drawn on the body's own skeleton (leader pose).
+    pants = yield from put_on(p, body, _wc(p, body), GARMENT)
+    legs = part(body, GARMENT)
+    p.check("single player: the pants are picked up and worn, and drawn on the body",
+            pants is not None and drawn(legs, GARMENT), str(pants))
     issued = _carried(p, body)
     _health(p, body).call_method(TAKE_HIT, (FATAL, AHEAD, None, None))
     yield from _await(lambda: unreal.GameplayStatics.is_game_paused(world), 60.0)
@@ -390,6 +403,17 @@ def probe_standalone(p):
             "nothing is shed and it carries no loot",
             _limp(body) and p.get(wc, OWNER_DEAD_VAR) and _carried(p, body) == issued
             and len(_loot(p, body)) == 0, f"{_carried(p, body)}, loot {_loot(p, body)}")
+    if legs is not None:
+        flesh = next(c for c in body.get_components_by_class(unreal.SkeletalMeshComponent)
+                     if c.get_name() == BODY)
+        gap = max((legs.get_socket_location(b) - flesh.get_socket_location(b)).length()
+                  for b in LEG_BONES)
+        p.check("...and keeps its pants on: still worn, drawn for its owner too, and "
+                f"on the ragdoll's legs (thigh and calf within {ON_BODY_CM:g} cm)",
+                pants in list(p.get(wc, WORN_VAR)) and drawn(legs, GARMENT)
+                and not legs.get_editor_property("owner_no_see") and gap < ON_BODY_CM,
+                f"worn {pants in list(p.get(wc, WORN_VAR))}, drawn {drawn(legs, GARMENT)}, "
+                f"gap {gap:.2f} cm")
     hud = p.hud()
     _draw(hud)
     up, hint = _death_screen(p, hud)

@@ -42,6 +42,9 @@ Scripts/net/CLAUDE.md has the conventions and the traps.
               probe_gas_idle and probe_gas_locomotion
               (probe_gas_traversal: the crouch, the slide and a mantle, G5;
               probe_net_slide: the slide predicted under lag)
+  dressed     a probe's player with a garment on: the pick-up and the wear, as a player
+              does them, and the component that then draws it; shared by probe_clothing,
+              probe_scope_hide, probe_head_hide and probe_net_death
   probe_*     the probes themselves, one behaviour each
 
   systems  The systems a probe may declare in its SYSTEMS tuple

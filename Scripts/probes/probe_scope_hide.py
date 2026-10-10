@@ -11,6 +11,9 @@ way Q does (EquippedIndex + NeedsRefresh).
 Scoped: the sniper hidden, the body OwnerNoSee. Let go: both back. The
 shotgun (irons) held at the same blend: nothing hidden.
 
+Then all of it once more with the jacket worn (probes/dressed.py): the hoodie
+on the body goes out of the owner's view with the body and comes back with it.
+
 Any profile on disk is set aside first, so the game starts on the issued
 loadout, and put back at the end.
 """
@@ -29,13 +32,16 @@ from combat.weapon_component.sights import SCOPE_HIDE_BLEND
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
 from combat.weapon_component import vars as WV
+from probes import dressed
+from probes.dressed import drawn, part, put_on
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
             (WEAPON_COMP_BP_PATH, WV.EquippedIndex),
             (WEAPON_COMP_BP_PATH, WV.NeedsRefresh),
             (WEAPON_COMP_BP_PATH, SIGHTS_FORCED_VAR),
-            (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)]
+            (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)] + dressed.WRITABLE
+GARMENT = "Jacket"
 SNIPER = "BP_SniperRifle_C"
 SHOTGUN = "BP_Shotgun_C"
 SEATED = 0.99
@@ -108,33 +114,61 @@ def _run(p):
     p.set(wc, RAISE_FORCED_VAR, True)
     p.set(hud, DEV_GUNS_REQUEST_VAR, True)
     yield lambda: not p.get(hud, DEV_GUNS_REQUEST_VAR)
-    yield from _equip(p, wc, SNIPER)
-    p.check("the sniper is in hand", _held_name(p, wc) == SNIPER, str(_held_name(p, wc)))
-    if _held_name(p, wc) != SNIPER:
+    ok = yield from _scoped(p, wc, mesh, "", None)
+    if not ok:
         return
-    p.check("...seen, body and all, before the sights come up",
-            _state(p, wc, mesh)[:2] == (False, False), str(_state(p, wc, mesh)))
+    # Once more dressed: the hoodie hangs under the body as a component of
+    # its own, which the hides reach only through body_parts.py's loop.
+    jacket = yield from put_on(p, p.pawn(), wc, GARMENT)
+    torso = part(p.pawn(), GARMENT)
+    p.check("the jacket is picked up and worn, and drawn on the body",
+            jacket is not None and drawn(torso, GARMENT), str(jacket))
+    if jacket is not None and torso is not None:
+        yield from _scoped(p, wc, mesh, "dressed: ", torso)
+
+
+def _scoped(p, wc, mesh, tag, garment):
+    """The sniper's scope and the shotgun's irons. ``garment``: the worn
+    garment's component, held to what the body gets. False: no sniper."""
+    def seen():
+        return garment is None or (not garment.get_editor_property("owner_no_see")
+                                   and drawn(garment, GARMENT))
+
+    yield from _equip(p, wc, SNIPER)
+    p.check(f"{tag}the sniper is in hand", _held_name(p, wc) == SNIPER, str(_held_name(p, wc)))
+    if _held_name(p, wc) != SNIPER:
+        return False
+    p.check(f"{tag}...seen, body and all, before the sights come up",
+            _state(p, wc, mesh)[:2] == (False, False) and seen(), str(_state(p, wc, mesh)))
 
     yield from _hold_sights(p, wc)
     hidden, no_see, blend = _state(p, wc, mesh)
-    p.check(f"down the scope ({SEAT_VAR} {blend:.3f} > {SCOPE_HIDE_BLEND:g}) the "
+    p.check(f"{tag}down the scope ({SEAT_VAR} {blend:.3f} > {SCOPE_HIDE_BLEND:g}) the "
             "sniper is hidden", blend > SCOPE_HIDE_BLEND and hidden, str(hidden))
-    p.check("...and the player's body is hidden from their own camera",
+    p.check(f"{tag}...and the player's body is hidden from their own camera",
             no_see, str(no_see))
-    p.check("...but still drawn for everyone else (not hidden in game)",
+    p.check(f"{tag}...but still drawn for everyone else (not hidden in game)",
             not p.pawn().get_editor_property("hidden") and _drawn(mesh).is_visible(),
             f"{p.pawn().get_editor_property('hidden')} {_drawn(mesh).is_visible()}")
+    if garment is not None:
+        p.check(f"{tag}...and so is the jacket: out of its owner's view, still drawn "
+                "for everyone else",
+                garment.get_editor_property("owner_no_see") and drawn(garment, GARMENT),
+                f"owner_no_see {garment.get_editor_property('owner_no_see')}, "
+                f"drawn {drawn(garment, GARMENT)}")
 
     p.set(wc, SIGHTS_FORCED_VAR, False)
     yield lambda: p.get(wc, SEAT_VAR) < 0.05
     hidden, no_see, _ = _state(p, wc, mesh)
-    p.check("sights down: the sniper and the body are back",
-            not hidden and not no_see, f"{hidden} {no_see}")
+    p.check(f"{tag}sights down: the sniper and the body are back",
+            not hidden and not no_see and seen(), f"{hidden} {no_see} {seen()}")
 
     yield from _equip(p, wc, SHOTGUN)
     yield from _hold_sights(p, wc)
     hidden, no_see, blend = _state(p, wc, mesh)
-    p.check(f"the shotgun's irons ({SEAT_VAR} {blend:.3f}) hide nothing",
-            blend > SCOPE_HIDE_BLEND and not hidden and not no_see,
-            f"{hidden} {no_see}")
+    p.check(f"{tag}the shotgun's irons ({SEAT_VAR} {blend:.3f}) hide nothing",
+            blend > SCOPE_HIDE_BLEND and not hidden and not no_see and seen(),
+            f"{hidden} {no_see} {seen()}")
     p.set(wc, SIGHTS_FORCED_VAR, False)
+    yield lambda: p.get(wc, SEAT_VAR) < 0.05
+    return True

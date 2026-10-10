@@ -51,6 +51,10 @@ from graphics_menu.umg_consts import SLOT_AMMO, SLOT_GHOST, SLOT_ICON
 from graphics_menu.wear_consts import (
     WEAR_OPEN_VAR, WEAR_PANEL, WEAR_SEL_VAR, WEAR_SLOTS_BOX, WEAR_TAKE_VAR,
 )
+from probes.dressed import (
+    LOOK_DOWN_DEG, SETTLE, bag as _bag, fire as _fire, hold as _hold, pick_up as _pick_up,
+    still as _still,
+)
 from probes.probe_clothing_drag import drag_checks
 from probes.probe_clothing_draw import bare, dress, jacket_checks, pants_checks
 from combat.weapon_component import vars as WV
@@ -60,12 +64,6 @@ WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
              (WV.EquippedIndex, WV.NeedsRefresh, INTERACT_FORCED_VAR, FIRE_FORCED_VAR,
               WORN_VAR, TAKE_OFF_VAR, TAKE_OFF_TO_VAR, WEAR_REQUEST_VAR, DROP_REQUEST_VAR)]
             + [(HUD_BP_PATH, v) for v in (WEAR_OPEN_VAR, WEAR_SEL_VAR, WEAR_TAKE_VAR)])
-
-RING_CM = 150.0
-DOWN_CM = 60.0
-LOOK_DOWN_DEG = -35.0
-SETTLE = 0.2
-
 
 def _file():
     return os.path.join(unreal.Paths.project_saved_dir(), "SaveGames",
@@ -85,25 +83,6 @@ def probe(p):
             shutil.move(backup, _file())
 
 
-def _still(p, held, stop):
-    """The level's wanderers reach the player about six seconds in, and a dead
-    player sheds the bag this probe is working. They are rooted where they
-    stand while it runs (no movement mode) and walk again as it ends: the
-    probes after this one in a launch share them."""
-    if stop:
-        ctrls = unreal.GameplayStatics.get_all_actors_of_class(p.world(), unreal.AIController)
-        held.extend(c.get_controlled_pawn() for c in ctrls
-                    if c.get_class().get_name().startswith("BP_ForestWandererAI")
-                    and c.get_controlled_pawn() is not None)
-    for pawn in held:
-        if unreal.SystemLibrary.is_valid(pawn):
-            move = pawn.get_movement_component()
-            if stop:
-                move.disable_movement()
-            else:
-                move.set_movement_mode(unreal.MovementMode.MOVE_WALKING)
-
-
 def _slot(name):
     return WEAR_SLOTS.index(next(g.slot for g in GARMENTS if g.display == name))
 
@@ -115,45 +94,6 @@ def _worn(p, wc):
 def _worn_at(p, wc, slot):
     worn = _worn(p, wc)
     return worn[slot] if slot < len(worn) else None
-
-
-def _bag(p, wc):
-    return list(p.get(wc, "Inventory"))
-
-
-def _pick_up(p, player, wc, item, yaw):
-    """Lay ``item`` 150 cm ahead and press E. The take of a level actor destroys
-    it and puts a fresh one of its class in the bag (task A2, pickup.py):
-    returns that one, or None if nothing of its kind arrived."""
-    a = math.radians(yaw)
-    here = player.get_actor_location()
-    before = list(_bag(p, wc))
-    item.set_actor_location(
-        here + unreal.Vector(RING_CM * math.cos(a), RING_CM * math.sin(a), -DOWN_CM),
-        False, True)
-    yield SETTLE
-    p.set(wc, INTERACT_FORCED_VAR, True)
-    yield lambda: not p.get(wc, INTERACT_FORCED_VAR)
-    yield 0.05
-    fresh = [b for b in _bag(p, wc) if b not in before and b.get_class() == item.get_class()]
-    return fresh[0] if fresh and not unreal.SystemLibrary.is_valid(item) else None
-
-
-def _hold(p, wc, item):
-    p.set(wc, "EquippedIndex", _bag(p, wc).index(item))
-    p.set(wc, "NeedsRefresh", True)
-    yield lambda: p.get(wc, "Held") == item
-    yield 0.05
-
-
-def _fire(p, wc, item):
-    """One press on ``item`` in hand. FireForced is a held key that counts as a
-    press on every frame it is up, so it comes down on the first frame the
-    item has left the bag: held longer, it wears what slides into the hand."""
-    p.set(wc, FIRE_FORCED_VAR, True)
-    yield lambda: item not in _bag(p, wc)
-    p.set(wc, FIRE_FORCED_VAR, False)
-    yield 0.1
 
 
 def _check_row(p, player, mine):

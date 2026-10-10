@@ -13,8 +13,11 @@ raise and the release:
   - seated, the rest of the body is still drawn (the arms are the sight
     picture) unless the gun is scoped.
 
-Then the player is killed down the sights: the dead gate shows the head again
-(the Tick that would have no longer runs).
+All of it once more with the jacket worn (probes/dressed.py): the hoodie on
+the body is hidden from its owner exactly when the body is.
+
+Then the player is killed down a scope: the dead gate shows the head, the
+body and the jacket again (the Tick that would have no longer runs).
 
 Any profile on disk is set aside first, so the game starts on the issued
 loadout, and put back at the end. What the picture looks like is
@@ -40,13 +43,16 @@ from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
 from combat import health_vars as HV
 from combat.weapon_component import vars as WV
+from probes import dressed
+from probes.dressed import drawn, part, put_on
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
             (WEAPON_COMP_BP_PATH, WV.EquippedIndex),
             (WEAPON_COMP_BP_PATH, WV.NeedsRefresh),
             (WEAPON_COMP_BP_PATH, SIGHTS_FORCED_VAR),
-            (HEALTH_BP_PATH, HV.Health)]
+            (HEALTH_BP_PATH, HV.Health)] + dressed.WRITABLE
+GARMENT = "Jacket"
 SEATED = 0.99           # the camera is on the sights
 HOME = 0.01             # ...and back on the boom
 # A head still drawn is never nearer the camera than this (cm): it goes before
@@ -160,36 +166,33 @@ def _run(p):
     p.check("the bag holds guns with sights to look down", len(guns) >= 5,
             str([bag[i].get_class().get_name() for i in guns]))
 
-    for index in guns:
-        gun = bag[index].get_class().get_name()[3:-2]
-        yield from _equip(p, wc, index)
-        watch = _Watch(p, wc, mesh, cam, head)
-        p.check(f"{gun}: carried, the head is drawn", not watch.hidden())
-        yield from _raise(p, wc, watch)
-        p.check(f"{gun}: down the sights the head is hidden",
-                watch.hidden(), f"SightSeat {p.get(wc, SEAT_VAR):.3f}")
-        p.check(f"{gun}: ...from SightSeat {HEAD_HIDE_SEAT:g} on, and not before "
-                f"({watch.frames} frames)", not watch.wrong, str(watch.wrong[:6]))
-        p.check(f"{gun}: ...before the camera, coming from behind, was within "
-                f"{CLEAR_CM:g} cm of it", watch.nearest > CLEAR_CM,
-                f"nearest to a head still drawn {watch.nearest:.1f} cm")
-        scoped = bag[index].get_editor_property("Scoped")
-        p.check(f"{gun}: ...and the rest of the body is "
-                + ("behind the scope's glass" if scoped else "still drawn: the "
-                   "arms are the sight picture"),
-                _drawn(mesh).get_editor_property("owner_no_see") == scoped
-                and _drawn(mesh).is_visible(),
-                f"owner_no_see {_drawn(mesh).get_editor_property('owner_no_see')}")
-        back = _Watch(p, wc, mesh, cam, head)
-        p.set(wc, SIGHTS_FORCED_VAR, False)
-        yield lambda: back.sample() < HOME
-        p.check(f"{gun}: sights down, the head is back", not back.hidden()
-                and not back.wrong, str(back.wrong[:6]))
+    yield from _guns(p, wc, mesh, cam, head, bag, guns, "", None)
 
-    # Killed down the sights: the Tick stops at its dead gate, which shows it.
+    # Once more dressed: the hoodie is a component of its own under the body
+    # (it has the head bone too, so _Watch.hidden() holds it to the head's
+    # rule), reached only by body_parts.py's loop.
+    jacket = yield from put_on(p, p.pawn(), wc, GARMENT)
+    torso = part(p.pawn(), GARMENT)
+    p.check("the jacket is picked up and worn, and drawn on the body",
+            jacket is not None and drawn(torso, GARMENT), str(jacket))
+    if jacket is None or torso is None:
+        return
+    bag = p.get(wc, "Inventory")
+    guns = [i for i, item in enumerate(bag) if _has_sights(item)]
+    yield from _guns(p, wc, mesh, cam, head, bag, guns, "dressed: ", torso)
+
+    # Killed down a scope (the body and the jacket out of the owner's view):
+    # the Tick stops at its dead gate, which shows them again.
+    scoped = [i for i in guns if bag[i].get_editor_property("Scoped")]
+    p.check("the bag holds a scoped gun to die behind", bool(scoped))
+    if scoped:
+        yield from _equip(p, wc, scoped[0])
     watch = _Watch(p, wc, mesh, cam, head)
     yield from _raise(p, wc, watch)
     p.check("down the sights again, the head is hidden", watch.hidden())
+    p.check("...and the body and the jacket are out of the owner's view",
+            _drawn(mesh).get_editor_property("owner_no_see")
+            and torso.get_editor_property("owner_no_see"))
     health = p.component(p.pawn(), HEALTH_CLASS_PATH)
     p.set(health, "Health", 0.0)
     yield lambda: p.get(wc, OWNER_DEAD_VAR)
@@ -197,4 +200,46 @@ def _run(p):
     p.check("killed down the sights, the corpse has its head",
             p.get(wc, OWNER_DEAD_VAR) and not watch.hidden(),
             f"OwnerDead {p.get(wc, OWNER_DEAD_VAR)}, hidden {watch.hidden()}")
+    p.check("...and its body and its jacket are back in its owner's view, the "
+            "jacket still on it",
+            not _drawn(mesh).get_editor_property("owner_no_see")
+            and not torso.get_editor_property("owner_no_see") and drawn(torso, GARMENT),
+            f"body {_drawn(mesh).get_editor_property('owner_no_see')}, jacket "
+            f"{torso.get_editor_property('owner_no_see')}, drawn {drawn(torso, GARMENT)}")
     p.set(wc, SIGHTS_FORCED_VAR, False)
+
+
+def _guns(p, wc, mesh, cam, head, bag, guns, tag, garment):
+    """Every gun's sights, raised and let go. ``garment``: the worn garment's
+    component, held to what the body gets."""
+    for index in guns:
+        gun = bag[index].get_class().get_name()[3:-2]
+        yield from _equip(p, wc, index)
+        watch = _Watch(p, wc, mesh, cam, head)
+        p.check(f"{tag}{gun}: carried, the head is drawn", not watch.hidden())
+        yield from _raise(p, wc, watch)
+        p.check(f"{tag}{gun}: down the sights the head is hidden",
+                watch.hidden(), f"SightSeat {p.get(wc, SEAT_VAR):.3f}")
+        p.check(f"{tag}{gun}: ...from SightSeat {HEAD_HIDE_SEAT:g} on, and not before "
+                f"({watch.frames} frames)", not watch.wrong, str(watch.wrong[:6]))
+        p.check(f"{tag}{gun}: ...before the camera, coming from behind, was within "
+                f"{CLEAR_CM:g} cm of it", watch.nearest > CLEAR_CM,
+                f"nearest to a head still drawn {watch.nearest:.1f} cm")
+        scoped = bag[index].get_editor_property("Scoped")
+        p.check(f"{tag}{gun}: ...and the rest of the body is "
+                + ("behind the scope's glass" if scoped else "still drawn: the "
+                   "arms are the sight picture"),
+                _drawn(mesh).get_editor_property("owner_no_see") == scoped
+                and _drawn(mesh).is_visible(),
+                f"owner_no_see {_drawn(mesh).get_editor_property('owner_no_see')}")
+        if garment is not None:
+            p.check(f"{tag}{gun}: ...and the jacket with it",
+                    garment.get_editor_property("owner_no_see") == scoped
+                    and drawn(garment, GARMENT),
+                    f"owner_no_see {garment.get_editor_property('owner_no_see')}, "
+                    f"drawn {drawn(garment, GARMENT)}")
+        back = _Watch(p, wc, mesh, cam, head)
+        p.set(wc, SIGHTS_FORCED_VAR, False)
+        yield lambda: back.sample() < HOME
+        p.check(f"{tag}{gun}: sights down, the head is back", not back.hidden()
+                and not back.wrong, str(back.wrong[:6]))

@@ -95,6 +95,13 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   stands 1.4 cm off the idle body's spine and forearm, and 0.00 cm with the option set.
 - **`Worn[slot]` is a pure read:** an off-call handed it runs before the slot is
   rewritten (`verify/wear_draw.py` holds the three to that).
+- **It gets what the body gets** (K4), with no code of its own: the per-view hides loop
+  over everything under the mannequin (`combat/weapon_component/body_parts.py`), so a worn
+  garment is out of its owner's view behind a scope and back when the sights come down or
+  the player dies, and in single player it stays worn and drawn on the ragdoll. Proven
+  bare and dressed by `probe_scope_hide.py`, `probe_head_hide.py` and
+  `probe_net_death.py`'s standalone arm; a probe dresses its player with
+  `probes/dressed.py` `put_on`.
 - **Not yet:** another player sees nothing (the record's `Worn` goes to the owner only,
   and a client's picture of it, `view_worn.py`, does not call `DrawWorn`); a death
   empties `Worn` without taking the mesh off the body; a loaded profile wears nothing.

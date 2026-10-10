@@ -1,6 +1,7 @@
 """A client's worn garments: a picture of the worn slots the server sent
 (combat/record_vars.py; read with WornRow, uebp/nodes/inventory.py), as its
-bag is of the record's rows (view.py). Never run with authority.
+bag is of the record's rows (view.py). Never run with authority, but for the one call per slot a loaded
+profile makes of ViewWorn to wear what it saved (graphics_menu/profile_read.py).
 
 The owner is sent the record, and WornRow reads its Worn. Everyone else is
 sent the same classes beside HandClass (the record component's WornClasses,

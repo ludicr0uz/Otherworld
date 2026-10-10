@@ -111,8 +111,7 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   `probe_net_clothing.py` has client 2 see the hoodie come and go, and with `--title`
   join late and see it.
 - **Not yet:** a death empties `Worn` without taking the mesh off the body (the dead gate
-  stops a client's view, so a corpse stays dressed on every machine); a loaded profile
-  wears nothing.
+  stops a client's view, so a corpse stays dressed on every machine).
 
 ## Traps
 
@@ -135,8 +134,11 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   `python3 Scripts/asset_pipeline/swap_player_body.py <id>`
   (`Scripts/asset_pipeline/CLAUDE.md`). `SKM_Adventurer02`, the first try in loose boxers,
   is kept only as test data.
-- The saved profile (`graphics_menu/CLAUDE.md`, "Save and exit") stores the bag, not `Worn`:
-  what was worn is lost on save and exit.
+- The saved profile (`graphics_menu/CLAUDE.md`, "Save and exit") stores what is worn as a
+  class per slot (`WornClasses`), and the load wears each again through the weapon
+  component's `ViewWorn`: spawned into `Worn[slot]` hidden and drawn on the body
+  (`probes/probe_clothing_save.py`). It is a fresh actor of the class, as every loaded
+  item is.
 - No loot table names a garment yet (`Scripts/loot/tables.py`); a looted one would go into
   the bag like any item.
 - **Still needs a play session:** the I key and the panel's look, the cursor on its

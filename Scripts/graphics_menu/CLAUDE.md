@@ -275,7 +275,9 @@ sync:
 - **Stored:** Health, Stamina, Hunger, Thirst, Temperature, the kill count, the equipped slot,
   and each carried item's class, `Loaded`, `Reserve` and `Slot` (`ITEM_FIELDS`: where it
   was carried; a profile saved before slots had no `ItemSlot`, and loads with the first
-  item in hand and the rest in the bag). **Never the location**; the verifier
+  item in hand and the rest in the bag), and each worn slot's class (`WornClasses`, indexed
+  like the weapon component's `Worn`, none where nothing is worn; a profile saved before
+  it loads wearing nothing). **Never the location**; the verifier
   asserts BP_Profile has no other field.
 - **The character can't move during the countdown.** Every Tick it waits, the pawn's
   `CharacterMovement` gets `DisableMovement` (keyed off `ExitPending`, not the ask, so the
@@ -288,9 +290,12 @@ sync:
 - **Loading:** the first Tick of a started game (after NEW GAME, or at once with `-nomenu`) on
   which the weapon component's Inventory is non-empty sets `ProfileChecked` and, if the slot
   exists, applies it: stats back, the issued loadout destroyed, the saved items spawned with
-  `Dropped = false`, then `NeedsRefresh` so the component equips them itself. Gating on the
+  `Dropped = false`, the saved garments worn again (one call of the weapon component's
+  `ViewWorn` per slot: it spawns the class into `Worn[slot]` hidden, as a wear leaves it,
+  and draws it on the body; `probes/probe_clothing_save.py`), then `NeedsRefresh` so the
+  component equips them itself. Gating on the
   loadout keeps the issued guns from being added after the saved ones.
-- **Death deletes the slot.** `Health <= 0` on Tick, once (`ProfileForgotten`). Tick, not
+- **Death deletes the slot,** what was worn with the bag. `Health <= 0` on Tick, once (`ProfileForgotten`). Tick, not
   DrawHUD: the death pause comes after a 2.2 s settle, and a `-nullrhi` probe never draws.
 - **Probe:** `uepy.py --game --probe Scripts/probes/probe_save_exit.py`. It covers the freeze, a
   hit calling the exit off and freeing the pawn, the save, the reload and restore, a crafted inventory replacing the

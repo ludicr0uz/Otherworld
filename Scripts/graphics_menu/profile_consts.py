@@ -1,7 +1,7 @@
 """The saved profile and the save-and-exit countdown: names and numbers only.
 
 The profile is what a character carries between sessions: its stats and what
-is in its inventory, never where it stood. BP_Profile (a USaveGame, slot
+is in its inventory and what it wears, never where it stood. BP_Profile (a USaveGame, slot
 PROFILE_SLOT) is written when the save-and-exit countdown (the weapon
 component's: combat/weapon_component/save_exit.py) runs out, read the
 first time a started game's HUD finds the player's loadout, and deleted the
@@ -39,9 +39,14 @@ EQUIPPED_FIELD = Var("EquippedIndex", INT)
 ITEM_CLASSES_FIELD = Var("ItemClasses", array(cls(ITEM_CLASS_PATH)))
 ITEM_FIELDS = ((Var("ItemLoaded", array(INT)), "Loaded"), (Var("ItemReserve", array(INT)), "Reserve"),
                (Var("ItemSlot", array(INT)), "Slot"))
+# What is worn, indexed like BP_WeaponComponent.Worn (combat/wear_tuning.py's
+# WEAR_SLOTS): the garment's class, or none where nothing is worn. A garment
+# has no ammunition and is in no slot of the bag, so its class is all of it.
+WORN_CLASSES_FIELD = Var("WornClasses", array(cls(ITEM_CLASS_PATH)))
 # BP_Profile's fields, which profile_asset.py declares.
 PROFILE_TABLE = (*(field for field, _owner, _var in STAT_FIELDS), KILLS_FIELD, EQUIPPED_FIELD,
-                 ITEM_CLASSES_FIELD, *(field for field, _item_var in ITEM_FIELDS))
+                 ITEM_CLASSES_FIELD, *(field for field, _item_var in ITEM_FIELDS),
+                 WORN_CLASSES_FIELD)
 
 # --- the countdown -----------------------------------------------------------
 # The M panel's "save and exit" row starts it (Enter or a click on the row;

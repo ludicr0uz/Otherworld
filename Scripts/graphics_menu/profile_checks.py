@@ -6,6 +6,8 @@ in the verifier, which is over its size budget.
 import unreal
 
 from graphics_menu import profile_consts as PC
+from combat.record_vars import VIEW_WORN
+from combat.wear_tuning import WORN_VAR
 from combat import ask_consts as AC
 from graphics_menu.ask_checks import asks, fed, feeders
 from graphics_menu.pause_checks import row_gates
@@ -96,3 +98,21 @@ def check_profile(check, bp, nodes):
           len(refresh) == 1 and _value(refresh[0], "NeedsRefresh") == "true"
           and len(dropped) == 1 and _value(dropped[0], "Dropped") == "false",
           f"{len(refresh)} NeedsRefresh, {len(dropped)} Dropped")
+    # What is worn (K6): saved by class per slot, worn again through the
+    # weapon component's ViewWorn, which spawns, hides and draws it.
+    adds = [n for n in nodes if "TargetArray" in _pins(n) and "NewItem" in _pins(n)
+            and any(_title(f) == f"Get {PC.WORN_CLASSES_FIELD}"
+                    for f in _feeders(n, "TargetArray"))]
+    from_worn = [n for n in adds for k in _feeders(n, "NewItem")
+                 for loop in _feeders(k, "Object")
+                 if any(_title(w) == f"Get {WORN_VAR}" for w in _feeders(loop, "Array"))]
+    check(f"the save writes each slot of {WORN_VAR} down as its garment's class "
+          f"({PC.WORN_CLASSES_FIELD}), before the one save",
+          len(adds) == 1 and len(from_worn) == 1, f"{len(adds)} Add, {len(from_worn)} off Worn")
+    wears = [n for n in nodes if _title(n).replace(" ", "") == VIEW_WORN
+             and {"Slot", "Class", "self"} <= _pins(n)]
+    saved = [n for n in wears for loop in _feeders(n, "Class")
+             if any(_title(w) == f"Get {PC.WORN_CLASSES_FIELD}" for w in _feeders(loop, "Array"))]
+    check(f"the load wears each saved class again, slot by slot, through the weapon "
+          f"component's {VIEW_WORN} (hidden, in {WORN_VAR}, drawn on the body)",
+          len(wears) == 1 and len(saved) == 1, f"{len(wears)} call, {len(saved)} off the save")

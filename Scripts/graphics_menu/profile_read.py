@@ -9,11 +9,20 @@ there to be replaced, rather than spawned after the saved ones and added twice.
       -> destroy every item carried now, clear Inventory
       -> for each saved class: spawn it at the pawn, Dropped = false,
                                Loaded/Reserve from the save, Inventory += it
+      -> for each saved worn class, by slot: ViewWorn(slot, class), the
+         weapon component's (combat/weapon_component/view_worn.py)
       -> EquippedIndex from the save, NeedsRefresh = true
 
 NeedsRefresh hands the equipping to the weapon component's own Tick, the one
 place attaching is authored. Location is never read: a loaded character
 starts wherever the level puts it.
+
+The worn garments go through ViewWorn, the event a client's picture of the
+worn slots is made with: it spawns the class into Worn[slot] hidden, not
+Dropped and UNPLACED, as a wear leaves it, and draws it on the body
+(DrawWorn), or leaves the slot empty for no class. Here it runs with
+authority, once, on a character that wears nothing yet; its write of Worn is
+marked for the record there (combat/dirty.py).
 """
 
 from combat.game_state import KILL_COUNT_VAR
@@ -23,8 +32,10 @@ from combat.paths import ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.player_parts import STATE, PAWN
 from graphics_menu.profile_consts import (
     ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD, PROFILE_CLASS_PATH,
-    PROFILE_SLOT, PROFILE_USER_INDEX, STAT_FIELDS)
+    PROFILE_SLOT, PROFILE_USER_INDEX, STAT_FIELDS, WORN_CLASSES_FIELD)
+from graphics_menu.ask import ask
 from graphics_menu.profile_write import copy_var
+from combat.record_vars import VIEW_WORN
 from uebp.nodes.actor import FN_DESTROY, FN_GET_TRANSFORM
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR, FN_ARR_GET
 from uebp.nodes.move import FN_SET_STAMINA
@@ -94,6 +105,18 @@ def _author_respawn_items(ed, prof, wc, pawn_out, exec_in, made):
     return _loose_pin(loop, "Completed", is_input=False)
 
 
+def _author_rewear(ed, prof, wc, exec_in, made):
+    """The saved garments, worn again. Returns the loop's Completed."""
+    classes = ed.add_get_member_variable_node(WORN_CLASSES_FIELD, PROFILE_CLASS_PATH)
+    _connect(prof, _pin(classes, "self"))
+    made.append(classes)
+    loop = _for_each(ed, out(classes, WORN_CLASSES_FIELD), exec_in, made)
+    ask(ed, wc, VIEW_WORN, [_loose_pin(loop, "LoopBody", is_input=False)], made,
+        Slot=_loose_pin(loop, "ArrayIndex", is_input=False),
+        Class=_loose_pin(loop, "ArrayElement", is_input=False))
+    return _loose_pin(loop, "Completed", is_input=False)
+
+
 def author_read_profile(ed, in_exec, parts, made):
     """Load the profile slot onto ``parts`` (player_parts). Returns the exec
     pins that continue: applied, or the save would not cast."""
@@ -141,6 +164,7 @@ def author_read_profile(ed, in_exec, parts, made):
 
     # --- in with the saved one ----------------------------------------------
     done = _author_respawn_items(ed, prof, wc, parts[PAWN], then(wipe), made)
+    done = _author_rewear(ed, prof, wc, done, made)
     flow = copy_var(ed, prof, PROFILE_CLASS_PATH, EQUIPPED_FIELD, wc,
                  WEAPON_COMP_CLASS_PATH, "EquippedIndex", done, made)
     dirty = ed.add_set_member_variable_node(WV.NeedsRefresh, WEAPON_COMP_CLASS_PATH)
@@ -151,7 +175,7 @@ def author_read_profile(ed, in_exec, parts, made):
     ed.add_comment_to_nodes(
         f"The saved profile ({PROFILE_SLOT!r}) back onto the player: stats, kill "
         f"count, and the inventory -- the issued loadout destroyed and the saved "
-        f"items spawned in its place. NeedsRefresh makes the weapon component "
+        f"items spawned in its place, the saved garments worn. NeedsRefresh makes the weapon component "
         f"equip, so attaching stays authored once. Position is never restored.",
         [load, cast, drop_all, wipe, dirty])
     return [then(dirty), out(cast, "CastFailed")]

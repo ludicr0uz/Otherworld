@@ -130,8 +130,8 @@ def _check_keys(check, nodes):
 def _check_draw(check, nodes):
     worn = [n for n in nodes if _title(n) == f"Get {WORN_VAR}"]
     check(f"the panel shows the weapon component's {WORN_VAR}, off a cast (the draw's "
-          "read, and the drag's)",
-          len(worn) == 2
+          "read, and the drag's; the third is the profile's save, profile_write.py)",
+          len(worn) == 3
           and all(any("Cast" in _title(f) for f in _feeders(n, "self")) for n in worn),
           str(len(worn)))
     def off_worn(n):

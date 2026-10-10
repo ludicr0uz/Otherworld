@@ -1,4 +1,5 @@
-"""Writing the profile: the player's stats and inventory into BP_Profile.
+"""Writing the profile: the player's stats, inventory and worn garments into
+BP_Profile.
 
 Run once, when the save-and-exit countdown runs out (save_exit.py). A fresh
 BP_Profile every time rather than an edit of the loaded one, so a field that
@@ -8,6 +9,7 @@ was dropped from the character (an item eaten) cannot survive in the save.
       -> Health, Stamina, Hunger, Thirst, Temperature, Kills, EquippedIndex
       -> for each Inventory item: ItemClasses += its class,
                                   ItemLoaded += Loaded, ItemReserve += Reserve
+      -> for each slot of Worn: WornClasses += the garment's class, or none
       -> SaveGameToSlot(PROFILE_SLOT)
 """
 
@@ -15,10 +17,11 @@ from combat.game_state import KILL_COUNT_VAR
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
 from net.state_consts import PLAYER_STATE_CLASS_PATH
 from combat.paths import ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
+from combat.wear_tuning import WORN_VAR
 from graphics_menu.player_parts import STATE
 from graphics_menu.profile_consts import (
     ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD, PROFILE_CLASS_PATH,
-    PROFILE_SLOT, PROFILE_USER_INDEX, STAT_FIELDS)
+    PROFILE_SLOT, PROFILE_USER_INDEX, STAT_FIELDS, WORN_CLASSES_FIELD)
 from uebp.nodes.array import FN_ARR_ADD
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_PROFILE
 from uebp.nodes.system import FN_CREATE_SAVE, FN_OBJECT_CLASS, FN_WRITE_SAVE
@@ -92,14 +95,32 @@ def author_write_profile(ed, in_exec, parts, made):
         made += [arr, add]
         body = then(add)
 
+    # --- what is worn, one entry per slot: none where nothing is worn --------
+    worn = ed.add_get_member_variable_node(WORN_VAR, WEAPON_COMP_CLASS_PATH)
+    _connect(parts[WEAPON_COMP_CLASS_PATH], _pin(worn, "self"))
+    slots = ed.add_macro_node(MACRO_FOR_EACH)
+    if not slots:
+        raise RuntimeError("could not create the ForEachLoop macro node")
+    _connect(out(worn, WORN_VAR), _loose_pin(slots, "Array"))
+    _connect(_loose_pin(loop, "Completed", is_input=False), _loose_pin(slots, "Exec"))
+    garment = _node(ed, FN_OBJECT_CLASS)
+    _connect(_loose_pin(slots, "ArrayElement", is_input=False), _pin(garment, "Object"))
+    arr = ed.add_get_member_variable_node(WORN_CLASSES_FIELD, PROFILE_CLASS_PATH)
+    _connect(prof, _pin(arr, "self"))
+    add = _node(ed, FN_ARR_ADD)
+    _connect(out(arr, WORN_CLASSES_FIELD), _loose_pin(add, "TargetArray"))
+    _connect(out(garment), _loose_pin(add, "NewItem"))
+    _connect(_loose_pin(slots, "LoopBody", is_input=False), _pin(add, "execute"))
+    made += [worn, slots, garment, arr, add]
+
     save = _node(ed, FN_WRITE_SAVE)
     _connect(prof, _pin(save, "SaveGameObject"))
     _set(save, "SlotName", PROFILE_SLOT)
     _set(save, "UserIndex", PROFILE_USER_INDEX)
-    _connect(_loose_pin(loop, "Completed", is_input=False), _pin(save, "execute"))
+    _connect(_loose_pin(slots, "Completed", is_input=False), _pin(save, "execute"))
     made.append(save)
     ed.add_comment_to_nodes(
-        f"The profile: the player's stats and inventory into a fresh BP_Profile, "
+        f"The profile: the player's stats, inventory and worn garments into a fresh BP_Profile, "
         f"saved to slot {PROFILE_SLOT!r}. Not where the player stands: a loaded "
         f"character starts wherever the level puts it.",
         [fresh, cast, loop, save])

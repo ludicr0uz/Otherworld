@@ -65,10 +65,8 @@ updates the bullet here.
   open, Up/Down and Enter (or a click) take one off into the bag, the mouse drags a worn garment
   onto the hand or a bag slot and a carried one onto the worn slots to wear it
   (`combat/weapon_component/wear_drag.py`), and a portrait of the character, facing
-  forward, stands left of the panel (a render of the MetaHuman in boxers, the same whatever is worn: `item_icons/portrait.py`). The jacket, the pants and the boots are drawn on the body when worn (the MetaHuman's hoodie, jeans and shoes), to the wearer and, on a server, to everyone who sees them; the other five are drawn as nothing, and wearing changes nothing else. The body
-  the garments will be drawn on is generated: the adventurer in skin-tight shorts
-  (`SKM_Adventurer03`, Meshy), which the player now wears
-  (`Scripts/asset_pipeline/CLAUDE.md`). One of
+  forward, stands left of the panel (a render of the MetaHuman in boxers, the same whatever is worn: `item_icons/portrait.py`). The jacket, the pants and the boots are drawn on the body when worn (the MetaHuman's hoodie, jeans and shoes), to the wearer and, on a server, to everyone who sees them; the other five are drawn as nothing, and wearing changes nothing else. A saved
+  profile keeps what is worn. One of
   each lies 3 m in front of the start on `Lvl_Forest_200m` (`Scripts/clothing/CLAUDE.md`).
 - **Item icons:** every item's icon, in the inventory grid and in the loot window, is a
   picture of its own 3D model, lit as a studio shot (its own shadows, gloss), fitted to the

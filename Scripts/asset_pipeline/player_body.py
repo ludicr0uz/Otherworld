@@ -44,13 +44,10 @@ PLAYER_BODY = "adventurer_03"
 #                the hidden mannequin, which still runs everything: its
 #                pose reaches the MetaHuman body through an IK retargeter
 #                every frame (build_metahuman_retarget.py, combat/
-#                metahuman_body.py).  PLAYER_BODY is then the garments'
-#                base only.  Where the project went on 2026-10-07.
+#                metahuman_body.py).  PLAYER_BODY is then not drawn: the
+#                garments are drawn on the MetaHuman (Scripts/clothing).
+#                Where the project went on 2026-10-07.
 PLAYER_RIG = "metahuman"
-
-# The catalog id of the body the garments are drawn on (Scripts/clothing): the
-# player with every clothing slot empty.
-CLOTHING_BASE_BODY = "adventurer_03"
 
 
 def name_of(spec_id):
@@ -69,4 +66,3 @@ def reference_of(name):
 
 
 PLAYER_NAME = name_of(PLAYER_BODY)
-CLOTHING_BASE_NAME = name_of(CLOTHING_BASE_BODY)

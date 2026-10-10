@@ -7,8 +7,7 @@ clothing.verify. Design and traps: CLAUDE.md here.
 
   specs       GARMENTS: each garment's path, name, slot, stand-in model and,
               for three, the mesh it is drawn as worn (no unreal: the
-              verifier and the placement read it); BASE_BODY_*,
-              the body in boxers the garments will be drawn on
+              verifier and the placement read it)
   items       BP_<Garment> per row: a Consumable BP_WeaponItem with its
               ClothingSlot, WornPart and WornMesh, Dropped, and a flat
               material

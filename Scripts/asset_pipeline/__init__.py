@@ -10,8 +10,7 @@ Host-side (no ``unreal``):
     skeleton_probe.py           fingerprint a cached GLB's bone hierarchy
     rig_compat.py               can one cached rig replace another: compatible,
                                 normalise or fail (tests: dev/tests/test_rig_compat.py)
-    player_body.py              constants: THE setting naming the player's body,
-                                and the clothing base body
+    player_body.py              constants: THE setting naming the player's body
     swap_player_body.py         entry point: write that setting, import, rebuild, verify
     fab_library.py              Fab manifest (fab_library.json) + CLI; acquisition is manual
     fab_scan.py                 entry point: scan a downloaded Fab pack, then copy it

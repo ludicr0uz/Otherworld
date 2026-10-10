@@ -2,8 +2,8 @@
 
 The player wears eight garments, one per slot: **hat, glasses, shirt, jacket, gloves, pants,
 boots, backpack** (`combat/wear_tuning.WEAR_SLOTS`, in that order). Three are drawn on the MetaHuman when
-worn (the jacket, the pants, the boots: "Drawn on the body" below), in single player only
-so far; wearing one changes no number.
+worn (the jacket, the pants, the boots: "Drawn on the body" below), to the wearer and, on
+a server, to every client; wearing one changes no number.
 
 ```bash
 python3 Scripts/dev/uepy.py Scripts/build_clothing.py      # after build_weapons_and_combat.py
@@ -25,7 +25,8 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 | what is worn, as the owning client is told it and pictures it | the record's `Worn` (`combat/record_vars.py`; C++, read with `WornRow`: `uebp/nodes/inventory.py`), `view_worn.py` |
 | the **I** panel, and the character's portrait in it | `graphics_menu/wear_*.py`, `wbp_wear.py` (checks: `graphics_menu/wear_checks.py`); the picture: `item_icons/portrait.py` |
 | the icons | `item_icons/items.py` rows, `python3 Scripts/build_item_icons.py Hat ...` |
-| the base body in boxers, what the garments will be drawn on | `asset_pipeline/player_body.py` `CLOTHING_BASE_BODY` (a `catalog.py` spec); names in `specs.py` `BASE_BODY_*` (checks: `verify/base_body.py`) |
+| the body the garments are drawn on: the MetaHuman in boxers, with a bare, hidden `Torso`, `Legs` and `Feet` component for a garment to fill | `combat/metahuman_body.py`; the meshes `asset_pipeline/metahuman_paths.py` `CLOTHING` (`Scripts/asset_pipeline/CLAUDE.md`, "The MetaHuman") |
+| what is worn, in a saved profile | `WornClasses` (`Scripts/graphics_menu/CLAUDE.md`, "Save and exit"; in a game: `probes/probe_clothing_save.py`) |
 
 ## The design
 
@@ -110,6 +111,11 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   player's garments in `Worn` too: hidden local actors, as the owner's are.
   `probe_net_clothing.py` has client 2 see the hoodie come and go, and with `--title`
   join late and see it.
+- **A saved profile wears it again** (K6). The profile (`graphics_menu/CLAUDE.md`, "Save and exit") stores what is worn as a
+  class per slot (`WornClasses`), and the load wears each again through the weapon
+  component's `ViewWorn`: spawned into `Worn[slot]` hidden and drawn on the body
+  (`probes/probe_clothing_save.py`). It is a fresh actor of the class, as every loaded
+  item is.
 - **Not yet:** a death empties `Worn` without taking the mesh off the body (the dead gate
   stops a client's view, so a corpse stays dressed on every machine).
 
@@ -127,18 +133,6 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 
 - Five garments are drawn as nothing worn (no mesh), and a worn garment does nothing (no
   warmth, no carry space).
-- **The base body is worn:** the player is `SKM_Adventurer03`, the man in skin-tight
-  shorts, generated to swap in for the dressed `SKM_Adventurer01`
-  (`asset_pipeline/player_body.py` `PLAYER_BODY` and `CLOTHING_BASE_BODY`;
-  `verify/base_body.py` checks it). Garments are not drawn on it yet. Swapping bodies is
-  `python3 Scripts/asset_pipeline/swap_player_body.py <id>`
-  (`Scripts/asset_pipeline/CLAUDE.md`). `SKM_Adventurer02`, the first try in loose boxers,
-  is kept only as test data.
-- The saved profile (`graphics_menu/CLAUDE.md`, "Save and exit") stores what is worn as a
-  class per slot (`WornClasses`), and the load wears each again through the weapon
-  component's `ViewWorn`: spawned into `Worn[slot]` hidden and drawn on the body
-  (`probes/probe_clothing_save.py`). It is a fresh actor of the class, as every loaded
-  item is.
 - No loot table names a garment yet (`Scripts/loot/tables.py`); a looted one would go into
   the bag like any item.
 - **Still needs a play session:** the I key and the panel's look, the cursor on its

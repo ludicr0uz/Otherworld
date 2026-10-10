@@ -13,8 +13,8 @@ by changing one setting, with no per-character hand-tuning, for any number of fu
 
 - The pipeline exists and is proven on two bodies that were not compatible as generated
   (`adventurer_02`, `adventurer_03`).
-- **The player currently wears `adventurer_03`** (the man in skin-tight dark shorts). It is
-  also the clothing base body.
+- **The player currently wears `adventurer_03`** (the man in skin-tight dark shorts). (Since then
+  the game draws the MetaHuman, and the garments on it: `Scripts/clothing/CLAUDE.md`.)
 - A swap takes about 4 minutes 20 seconds. It is a rebuild, not an instant mesh change
   (section 8 says why, and what would make it instant).
 
@@ -22,7 +22,6 @@ Current settings, in `Scripts/asset_pipeline/player_body.py`:
 
 ```python
 PLAYER_BODY = "adventurer_03"
-CLOTHING_BASE_BODY = "adventurer_03"
 ```
 
 Last verified state with `adventurer_03` worn:
@@ -148,10 +147,10 @@ spine line is too tight.
 
 ### 4.3 One setting, and the swap
 
-- `asset_pipeline/player_body.py`: `PLAYER_BODY`, `CLOTHING_BASE_BODY`, `name_of()`,
+- `asset_pipeline/player_body.py`: `PLAYER_BODY`, `name_of()`,
   `reference_of()`.
 - Derived from it: `combat/skin.py` (`ADVENTURER`, `SKIN_ADVENTURER`),
-  `quaternius_paths.UAL_CHARACTERS`, `clothing/specs.py` (`BASE_BODY_*`),
+  `quaternius_paths.UAL_CHARACTERS`,
   `item_icons/portrait.py`.
 - `combat/verify/body_setting.py` checks that all of those agree, that the player wears the
   named body and not the mannequin fallback, and that a body with a reference has a physics

@@ -17,8 +17,9 @@ python3 Scripts/asset_pipeline/swap_player_body.py adventurer_03
 `swap_player_body.py --plan <id>` prints the commands instead; `--check` runs the verifiers
 alone. The setting it writes is `player_body.PLAYER_BODY`: **the one place that names the
 player's body**. `combat/skin.py`, `quaternius_paths.UAL_CHARACTERS` and the checks in
-`combat/verify/body_setting.py` all follow it. `CLOTHING_BASE_BODY`, beside it, names the
-body the garments are drawn on.
+`combat/verify/body_setting.py` all follow it. Under the
+"metahuman" rig (`PLAYER_RIG`, what the game wears) that body is not drawn: the MetaHuman
+is, and the garments are drawn on it (`Scripts/clothing/CLAUDE.md`).
 
 ## Why it is checked afterwards, not asked for
 
@@ -79,9 +80,11 @@ bound and never add a number for one character.**
   hold-pose and gait probes, with nothing in the repo tuned for it. It took two previews: the
   first, worded "boxer briefs", came back in loose boxing shorts
   (`assets/cache/meshy/_adventurer_03_attempt1`, preview only). 60 credits in all.
-- **The player wears `adventurer_03`**, which is also the clothing base body
-  (`CLOTHING_BASE_BODY`). Back to the dressed one is
-  `swap_player_body.py adventurer_01`.
+- **`PLAYER_BODY` is `adventurer_03`.** Back to the dressed one is
+  `swap_player_body.py adventurer_01`. Since 2026-10-07 the game draws the MetaHuman
+  instead (`PLAYER_RIG = "metahuman"`), and the garments are drawn on that: no generated
+  body is a clothing base any more, and the swap matters to the "own" and "mannequin"
+  rigs only.
 - Three more things turned out to be one body's accident, and are general now: which side of
   a flat open hand is the palm (`palm_twist.hand_frame`: the two hands vote together), a
   handle no easing fully fits (`grip._eased` goes as far as it may), and how the guard's lean

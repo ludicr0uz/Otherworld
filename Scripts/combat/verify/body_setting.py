@@ -50,7 +50,7 @@ def check_one_setting():
              and unreal.EditorAssetLibrary.does_asset_exist(SKIN_BOUND.mesh))
     # A "metahuman" rig wears the MetaHuman under its hidden mannequin: the
     # Character's own mesh is then the mannequin, and the generated body is
-    # the garments' base only (player_body.CLOTHING_BASE_BODY).
+    # not drawn.
     metahuman = player_body.PLAYER_RIG == "metahuman" and player_skin().metahuman
     # The hidden mesh is the mannequin, or under the motion matching the UEFN
     # one (combat/skin.SKIN_GAS).

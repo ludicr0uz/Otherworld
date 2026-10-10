@@ -19,6 +19,7 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 | the garments (`/Game/Clothing/BP_<Garment>`), their stand-in models and materials | this package (`specs.py`, `items.py`) |
 | what a garment lies on the ground as: its stand-in cubes, or, with a `WornMesh`, that mesh ("On the ground" below) | `ground_model.py` (checks: `verify/garments.py`; in a game: `probes/probe_clothing_ground.py`) |
 | the test garments on `Lvl_Forest_200m` | this package (`placement.py`) |
+| the garments found in the forest: jackets, pants and boots on every generated level | this package (`scatter.py` where, `scatter_level.py` into the level; checks: `verify/scattered.py`, `dev/tests/test_clothing_scatter.py`) |
 | the mesh a garment is drawn as, worn: `Garment.worn` (the body component it fills, the skeletal mesh, from `metahuman_paths.CLOTHING`), written onto the item as `WornPart` and `WornMesh`. Jacket, Pants and Boots have one | `specs.py`, `items.py`; the variables `combat/item_vars.py` |
 | drawing a worn garment on the body, and taking it off it: the `DrawWorn` event | `combat/weapon_component/wear_draw.py` (checks: `combat/verify/wear_draw.py`; in a game: `probes/probe_clothing_draw.py`, run by `probe_clothing.py`) |
 | the slots, `ClothingSlot` on the item, `Worn`/`TakeOffSlot` on the weapon component | `combat/wear_tuning.py` |
@@ -75,6 +76,16 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   `Lvl_Forest_200m`'s PlayerStart, 55 cm apart (tag `OW_TestClothing`; `build_clothing.py`
   places them, idempotently, and saves the level). Regenerating the level drops them, as it
   drops the forage: run `build_clothing.py` again.
+- **Found in the forest** (K11): the three garments drawn when worn, the jacket, the
+  pants and the boots in turn, lie through every generated level, about one a hectare
+  and at least one (4 on the 200 m map, 100 on the 1 km one, a jacket on the probes'
+  50 m level), tag `OW_Clothing`. `scatter.py` says where, in pure Python from one seed:
+  20 m apart, clear of the trunks, of the map's edge and of the PlayerStart (so never in
+  the test row), and of the forage lying there when it runs. `build_clothing.py` places
+  them after the test row, removing the old ones first, and saves each level; a
+  regenerated level loses them as it loses the test row.
+  **A probe that wants the test row asks for `OW_TestClothing`,** not for the garments
+  in the world: there are others now.
 
 ## On the ground
 

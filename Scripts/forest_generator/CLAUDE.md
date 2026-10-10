@@ -53,8 +53,9 @@ bowl's corners outgrow the navmesh's Z limit, so larger maps use:
 **Grass transforms live in a git-ignored `grass_<Level>.json` sidecar,** not in the generated
 script.
 
-**After an import, re-run `place_forage.py` and `build_day_night.py`.** The import rebuilds the
-level from scratch, which drops the forage and the day/night cycle actor.
+**After an import, re-run `place_forage.py`, `build_clothing.py` and `build_day_night.py`.** The
+import rebuilds the level from scratch, which drops the forage, the garments lying in it and
+the day/night cycle actor.
 
 ## Navmesh
 

@@ -5,6 +5,8 @@ run() is self-contained.
               ClothingSlot, name, model (the three with a worn mesh lie as
               it), icon, and held in the fist
   test_items  the test garments laid in front of the 200 m map's PlayerStart
+  scattered   the jackets, pants and boots scattered through each generated
+              level: the count, the kinds, Dropped, off the trunks
 """
 
-SECTIONS = ("garments", "test_items")
+SECTIONS = ("garments", "test_items", "scattered")

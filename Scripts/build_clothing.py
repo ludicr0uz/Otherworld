@@ -1,8 +1,10 @@
 """
-build_clothing.py -- the garments, and the test ones on the 200 m map.
+build_clothing.py -- the garments, the test ones on the 200 m map, and the
+ones found in the forest.
 
 Run inside the editor, AFTER build_weapons_and_combat.py (a garment is a
-BP_WeaponItem, and the weapon component is what wears it):
+BP_WeaponItem, and the weapon component is what wears it) and after
+place_forage.py (the scattered garments keep off the forage):
     python3 Scripts/dev/uepy.py Scripts/build_clothing.py
 
 This file is only the entry point; the code is the ``clothing`` package next
@@ -12,7 +14,9 @@ to it (Scripts/clothing/__init__.py is the map). Checked by verify_clothing.py.
   BP_Hat, BP_Glasses, BP_Shirt, BP_Jacket, BP_Gloves, BP_Pants, BP_Boots,
   BP_Backpack                    children of BP_WeaponItem, worn by the fire key
   Materials/M_Cloth_<Garment>    their flat colours
-and lays one of each 3 m in front of Lvl_Forest_200m's PlayerStart.
+and lays one of each 3 m in front of Lvl_Forest_200m's PlayerStart, then
+scatters jackets, pants and boots through every generated level, about one a
+hectare (tag OW_Clothing; removed and placed again from the same seed).
 """
 
 import os
@@ -28,6 +32,7 @@ import unreal                                                     # noqa: E402
 from combat.log import _log                                       # noqa: E402
 from clothing.items import build_garments                         # noqa: E402
 from clothing.placement import TEST_LEVEL, place_test_clothing    # noqa: E402
+from clothing.scatter_level import place_scattered_clothing, scatter_levels  # noqa: E402
 
 
 def main():
@@ -38,8 +43,11 @@ def main():
         place_test_clothing(TEST_LEVEL)
     else:
         _log(f"note: {TEST_LEVEL} does not exist -- no test garments placed")
+    last = TEST_LEVEL
+    for last in scatter_levels():
+        place_scattered_clothing(last)
     # Put the editor back where it was, as place_forage.py does.
-    if was_open and was_open != TEST_LEVEL:
+    if was_open and was_open != last:
         unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).load_level(was_open)
     _log(f"done -- {', '.join(built)}")
 

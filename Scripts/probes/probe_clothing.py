@@ -43,7 +43,7 @@ from combat.wear_tuning import (
 )
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR
-from clothing.placement import AHEAD_CM
+from clothing.placement import AHEAD_CM, TEST_TAG
 from clothing.specs import GARMENTS
 from graphics_menu.inv_consts import BAG_PANEL
 from graphics_menu.profile_consts import PROFILE_SLOT
@@ -121,8 +121,10 @@ def _run(p, held):
     yield lambda: p.get(wc, "Held") is not None
     every = unreal.GameplayStatics.get_all_actors_of_class(
         p.world(), p.load_class(ITEM_CLASS_PATH))
+    # The test row's, by its tag: jackets, pants and boots lie in the forest too.
     mine = {a.get_editor_property("DisplayName"): a for a in every
-            if a.get_editor_property("ClothingSlot") != NOT_CLOTHING}
+            if a.get_editor_property("ClothingSlot") != NOT_CLOTHING
+            and a.actor_has_tag(TEST_TAG)}
     _check_row(p, player, mine)
     if not all(k in mine for k in ("Hat", "Jacket", "Shirt")):
         return

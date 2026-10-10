@@ -16,6 +16,10 @@ it off through the I panel, and a swap.
    is held.
 5. A swap: a garment already in the shirt's slot (the jacket, written there:
    there is only one of each) goes back into the bag when the shirt is worn.
+   Worn in its own slot first, the jacket is drawn on the body, follows it
+   through a walk, and is gone from it taken off or set down
+   (probe_clothing_draw.py); the hat, which has no mesh, changes nothing.
+   The pants, at the end, follow it the other way (leader pose).
 6. The panel drawn (DrawHUD by hand): each slot reads what is worn there.
 
 No key can be injected into a headless game, so every press is a variable
@@ -32,6 +36,7 @@ import shutil
 import unreal
 
 from combat.paths import ITEM_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
+from combat.slot_tuning import DROP_REQUEST_VAR
 from combat.tuning import INTERACT_RADIUS
 from combat.wear_tuning import (
     NOT_CLOTHING, TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_REQUEST_VAR, WEAR_SLOTS, WORN_VAR,
@@ -47,12 +52,13 @@ from graphics_menu.wear_consts import (
     WEAR_OPEN_VAR, WEAR_PANEL, WEAR_SEL_VAR, WEAR_SLOTS_BOX, WEAR_TAKE_VAR,
 )
 from probes.probe_clothing_drag import drag_checks
+from probes.probe_clothing_draw import bare, dress, jacket_checks, pants_checks
 from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
              (WV.EquippedIndex, WV.NeedsRefresh, INTERACT_FORCED_VAR, FIRE_FORCED_VAR,
-              WORN_VAR, TAKE_OFF_VAR, TAKE_OFF_TO_VAR, WEAR_REQUEST_VAR)]
+              WORN_VAR, TAKE_OFF_VAR, TAKE_OFF_TO_VAR, WEAR_REQUEST_VAR, DROP_REQUEST_VAR)]
             + [(HUD_BP_PATH, v) for v in (WEAR_OPEN_VAR, WEAR_SEL_VAR, WEAR_TAKE_VAR)])
 
 RING_CM = 150.0
@@ -70,11 +76,32 @@ def probe(p):
     backup = _file() + ".probe-backup"
     if os.path.exists(_file()):
         shutil.move(_file(), backup)
+    held = []
     try:
-        yield from _run(p)
+        yield from _run(p, held)
     finally:
+        _still(p, held, False)
         if os.path.exists(backup):
             shutil.move(backup, _file())
+
+
+def _still(p, held, stop):
+    """The level's wanderers reach the player about six seconds in, and a dead
+    player sheds the bag this probe is working. They are rooted where they
+    stand while it runs (no movement mode) and walk again as it ends: the
+    probes after this one in a launch share them."""
+    if stop:
+        ctrls = unreal.GameplayStatics.get_all_actors_of_class(p.world(), unreal.AIController)
+        held.extend(c.get_controlled_pawn() for c in ctrls
+                    if c.get_class().get_name().startswith("BP_ForestWandererAI")
+                    and c.get_controlled_pawn() is not None)
+    for pawn in held:
+        if unreal.SystemLibrary.is_valid(pawn):
+            move = pawn.get_movement_component()
+            if stop:
+                move.disable_movement()
+            else:
+                move.set_movement_mode(unreal.MovementMode.MOVE_WALKING)
 
 
 def _slot(name):
@@ -144,12 +171,13 @@ def _check_row(p, player, mine):
                     for a in mine.values()))
 
 
-def _run(p):
+def _run(p, held):
     yield lambda: p.pawn() is not None
     yield 0.5
     player = p.pawn()
     wc = p.component(player, WEAPON_COMP_CLASS_PATH)
     hud = p.hud()
+    _still(p, held, True)
     yield lambda: p.get(wc, "Held") is not None
     every = unreal.GameplayStatics.get_all_actors_of_class(
         p.world(), p.load_class(ITEM_CLASS_PATH))
@@ -180,6 +208,7 @@ def _run(p):
     hat, jacket, shirt = took
 
     # Wear the hat.
+    before = dress(player)
     yield from _hold(p, wc, hat)
     yield from _fire(p, wc, hat)
     p.check("the fire key on the hat in hand wears it, and only it: Worn[hat] is that hat",
@@ -187,7 +216,10 @@ def _run(p):
             str([w.get_name() if w else None for w in _worn(p, wc)]))
     p.check("...out of the bag and out of the hand",
             hat not in _bag(p, wc) and p.get(wc, "Held") != hat)
-    p.check("...and hidden (nothing is drawn worn yet)", hat.get_editor_property("hidden"))
+    p.check("...and hidden", hat.get_editor_property("hidden"))
+    p.check("...and the hat, a garment with no mesh to be drawn as, changes no "
+            "component of the body: all three garment components still bare",
+            dress(player) == before and bare(player), f"{before} -> {dress(player)}")
 
     # Take it off through the I panel.
     p.set(hud, WEAR_OPEN_VAR, True)
@@ -212,6 +244,19 @@ def _run(p):
     yield from _fire(p, wc, jacket)
     p.check("the jacket is worn in its own slot",
             _worn_at(p, wc, _slot("Jacket")) == jacket, str(_worn(p, wc)))
+
+    def wear(item):
+        yield from _hold(p, wc, item)
+        yield from _fire(p, wc, item)
+
+    # Drawn on the body, and off it again; it ends on the ground.
+    yield from jacket_checks(p, player, wc, jacket, _slot("Jacket"), wear)
+    # Not a level actor any more, so the take keeps the very actor.
+    yield from _pick_up(p, player, wc, jacket, p.controller().get_control_rotation().yaw)
+    p.check("the jacket set down is picked up again", jacket in _bag(p, wc))
+    if jacket not in _bag(p, wc):
+        return
+    yield from wear(jacket)
     worn = _worn(p, wc)
     worn[_slot("Shirt")], worn[_slot("Jacket")] = jacket, None
     p.set(wc, WORN_VAR, worn)
@@ -252,3 +297,13 @@ def _run(p):
             and bag.get_visibility() != unreal.SlateVisibility.COLLAPSED)
 
     yield from drag_checks(p, wc, hat, jacket, shirt, _slot, _worn_at, _bag, _hold)
+
+    # The pants last: the garment that follows the body by leader pose.
+    if "Pants" in mine:
+        pants = yield from _pick_up(p, player, wc, mine["Pants"],
+                                    p.controller().get_control_rotation().yaw)
+        p.check("the pants are picked up", pants is not None)
+        if pants is not None:
+            yield from pants_checks(p, player, wc, pants, wear)
+    # The first weapon back in hand, for whatever probe shares this game next.
+    yield from _hold(p, wc, _bag(p, wc)[0])

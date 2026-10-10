@@ -30,6 +30,7 @@ from combat.weapon_component.view import author_view_events
 from combat.weapon_component.view_worn import author_view_worn_event
 from combat.weapon_component.consume import author_consume_event
 from combat.weapon_component.wear import author_wear_event
+from combat.weapon_component.wear_draw import author_draw_worn_event
 from combat.weapon_component.shot import author_shot_events, replicate_shot
 from combat.weapon_component import native
 from combat.weapon_component.headshot import replicate_headshot
@@ -124,6 +125,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # What a screen asks of the component: one event each (combat/ask_consts.py).
     # The slots' keys call theirs, and the upkeep the view's two (view.py).
     author_asks(ed)
+    author_draw_worn_event(ed)      # before the wears, which call it by name
     author_wear_event(ed)
     author_consume_event(ed)
     author_view_events(ed)

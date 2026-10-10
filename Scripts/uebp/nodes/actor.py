@@ -169,6 +169,14 @@ FN_LINKED_ANIM_INSTANCE = "/Script/Engine.SkeletalMeshComponent.GetLinkedAnimGra
 # see RAGDOLL_PROFILE. SkeletalMeshComponent has no SetSimulatePhysics
 # UFunction at all, so there is no node to reach for by mistake.
 FN_SIMULATE_ALL = "/Script/Engine.SkeletalMeshComponent.SetAllBodiesSimulatePhysics"
+# A worn garment drawn on the body (weapon_component/wear_draw.py): the mesh,
+# and whose bones it takes.
+FN_SET_SKELETAL_MESH = "/Script/Engine.SkeletalMeshComponent.SetSkeletalMeshAsset"
+FN_SKELETAL_MESH_OF = "/Script/Engine.SkeletalMeshComponent.GetSkeletalMeshAsset"
+FN_SKELETON_OF = "/Script/Engine.SkeletalMesh.GetSkeleton"
+FN_SET_LEADER_POSE = "/Script/Engine.SkinnedMeshComponent.SetLeaderPoseComponent"
+FN_ATTACH_PARENT = "/Script/Engine.SceneComponent.GetAttachParent"
+FN_SET_HIDDEN_IN_GAME = "/Script/Engine.SceneComponent.SetHiddenInGame"
 
 FN_CLOSEST_BONE = "/Script/Engine.SkinnedMeshComponent.FindClosestBone_K2"
 FN_HIDE_BONE = "/Script/Engine.SkinnedMeshComponent.HideBoneByName"

@@ -193,6 +193,10 @@ _author_* fragment per concern, each in its own module:
   wear_drag   WearRequest (the I panel's drag onto the worn grid), served
               with authority: a slot's garment is worn from wherever it is
               carried
+  wear_draw   DrawWorn: a worn garment's WornMesh set on the body component
+              named by its WornPart and shown, following the body (leader pose
+              on its skeleton, else the mesh's own copy pose); bare and hidden
+              again when it comes off or is dropped
   view_worn   a client's worn garments: Worn made a picture of the record's
               worn slots (WornRow, ViewWorn), called by view
   drop_request  the drop: the drop key and a probe's DropForced ask (AskDrop,

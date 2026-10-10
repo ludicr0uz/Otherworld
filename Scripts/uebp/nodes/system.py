@@ -74,6 +74,7 @@ FN_LITERAL_NAME = "/Script/Engine.KismetSystemLibrary.MakeLiteralName"
 # An object pin of EqualEqual_ObjectObject takes no asset literal, so a mesh
 # is told by its name (npc/stalk_cover.py).
 FN_OBJECT_NAME = "/Script/Engine.KismetSystemLibrary.GetObjectName"
+FN_NAME_TO_STRING = "/Script/Engine.KismetStringLibrary.Conv_NameToString"
 # The combat trace (npc/combat_trace.py) and the corpse state (npc/corpse.py).
 FN_PRINT = "/Script/Engine.KismetSystemLibrary.PrintString"
 FN_QUIT = "/Script/Engine.KismetSystemLibrary.QuitGame"

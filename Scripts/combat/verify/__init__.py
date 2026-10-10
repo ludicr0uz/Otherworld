@@ -27,6 +27,9 @@ and it never relies on a variable another section left behind.
   wear        clothing: the wear behind the Consumable tap (Server_Wear), the
               take-off the I panel asks for (TakeOffSlot), served with
               authority, Worn and ClothingSlot's defaults
+  wear_draw   a worn garment drawn on the body: the DrawWorn event (the mesh,
+              leader pose or the mesh's own copy pose, shown; off on a
+              dedicated server) and its six calls
   asks        what a screen asks of the weapon component: an event per action
               (none an RPC yet), the loot take's refusals and what it moves,
               save and exit's countdown, freeze and call-off
@@ -193,6 +196,6 @@ SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "ammo_graph", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "melee_clips", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "glimmer", "heat",
-    "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
+    "settings_and_tuning", "firing", "tracer", "consume", "wear", "wear_draw", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
     "var_tables",
 )

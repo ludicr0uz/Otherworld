@@ -8,8 +8,10 @@
     garment:
         WearItem = Held, WearSlot = Held.ClothingSlot
         Inventory.RemoveIndex(EquippedIndex)
-        what Worn[WearSlot] holds (if anything) -> Inventory      (a swap)
-        Worn[WearSlot] = WearItem (grown to fit), WearItem hidden and UNPLACED
+        what Worn[WearSlot] holds (if anything) -> Inventory      (a swap),
+            and off the body
+        Worn[WearSlot] = WearItem (grown to fit), WearItem hidden and UNPLACED,
+            and drawn on the body (DrawWorn: wear_draw.py)
         Held = None, EquippedIndex clamped, NeedsRefresh
 
     where the keys are (_author_wear_asks): a probe's TakeOffForced and
@@ -24,7 +26,7 @@
             Inventory += Worn[slot], its Slot = SlotPick if that is the hand
             or a bag slot (a drag dropped it there; the slot sync sends it to
             the first free bag slot if another item has that one), else
-            UNPLACED; Worn[slot] = None, NeedsRefresh
+            UNPLACED; off the body, Worn[slot] = None, NeedsRefresh
 
 Dragging a slot's garment onto the worn grid is wear_drag.py's.
 
@@ -58,6 +60,7 @@ from combat.wear_tuning import (
 from uebp.g import _G
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.slot_moves import _ask
+from combat.weapon_component.wear_draw import draw_worn
 from uebp.nodes.actor import FN_SET_HIDDEN
 from uebp.nodes.array import (
     FN_ARR_ADD, FN_ARR_GET, FN_ARR_LEN, FN_ARR_REMOVE, FN_ARR_SET, FN_ARR_VALID)
@@ -151,10 +154,12 @@ def _author_wear(ed, held, exec_in):
     there, empty = g.branch(valid, [flow])
     worn, bare = g.branch(out(g.call(FN_IS_VALID, Object=old)), [there])
     back = g.call(FN_ARR_ADD, [worn], TargetArray=g.get(WV.Inventory), NewItem=old)
+    # Before the slot is rewritten: old is a pure read of it.
+    undrawn = draw_worn(g, old, False, [then(back)])
 
     item = g.get(WEAR_ITEM_VAR)
     put_on = g.call(FN_ARR_SET,
-                    [then(back), bare, empty],
+                    [undrawn, bare, empty],
                     TargetArray=g.get(WORN_VAR),
                     Index=g.get(WEAR_SLOT_VAR), Item=item)
     _set(put_on, "bSizeToFit", True)
@@ -163,6 +168,7 @@ def _author_wear(ed, held, exec_in):
     # Out of every slot: taken off, it comes back UNPLACED and the slot sync
     # finds it a bag slot, rather than claiming the hand it left.
     flow = g.iput(item, SLOT_VAR, str(UNPLACED), [then(hide)])
+    flow = draw_worn(g, item, True, [flow])
     flow = g.put(WV.Held, None, [flow])
 
     # Min(EquippedIndex, Length - 1), as eating leaves it (consume.py).
@@ -204,6 +210,8 @@ def _author_take_off(ed, in_execs):
     place = g.call(FN_OR, A=out(g.call(FN_EQ_II, A=to, B=HAND)), B=out(in_bag))
     code = g.call(FN_SELECT_II, A=to, B=UNPLACED, bPickA=out(place))
     placed = g.iput(item, SLOT_VAR, out(code), [then(back)])
+    # Off the body while Worn[slot] still reads it: item is a pure read.
+    placed = draw_worn(g, item, False, [placed])
     # Item left unconnected: Worn[slot] = None.
     off = g.call(FN_ARR_SET, [placed], TargetArray=g.get(WORN_VAR), Index=g.get(WEAR_SLOT_VAR))
     flow = g.put(WV.NeedsRefresh, "true", [then(off)])

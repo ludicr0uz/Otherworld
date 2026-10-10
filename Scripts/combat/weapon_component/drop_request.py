@@ -38,6 +38,7 @@ from combat.slot_tuning import (
     UNPLACED,
 )
 from combat.wear_tuning import WORN_VAR
+from combat.weapon_component.wear_draw import draw_worn
 from combat.paths import ITEM_CLASS_PATH
 from uebp.g import _G
 from combat.weapon_component.inventory import _author_set_down
@@ -92,10 +93,12 @@ def _author_drop_request(ed, in_execs):
     flow = g.put(DROP_ITEM_VAR, out(got, "Item"), [known])
     dressed, bare = g.branch(valid(g, g.get(DROP_ITEM_VAR)), [flow])
     off = g.call(FN_ARR_SET, [dressed], TargetArray=g.get(WORN_VAR), Index=at)
+    # And off the body (wear_draw.py); DropItem is stored, so it still reads.
+    undrawn = draw_worn(g, g.get(DROP_ITEM_VAR), False, [then(off)])
 
     # Either way it is one exec in: a Branch that is always taken joins them.
     item = g.get(DROP_ITEM_VAR)
-    go, gone = g.branch(valid(g, item), [then(taken), then(off)])
+    go, gone = g.branch(valid(g, item), [then(taken), undrawn])
     owner = out(g.call(FN_GET_OWNER))
     on_ground, in_air = _author_set_down(ed, item, owner, go, g.keep)
     flow = g.iput(item, SLOT_VAR, str(UNPLACED), [on_ground, in_air])

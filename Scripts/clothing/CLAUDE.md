@@ -1,8 +1,9 @@
 # Clothing
 
 The player wears eight garments, one per slot: **hat, glasses, shirt, jacket, gloves, pants,
-boots, backpack** (`combat/wear_tuning.WEAR_SLOTS`, in that order). Only the state exists:
-nothing is drawn on the player when a garment is worn, and wearing one changes no number.
+boots, backpack** (`combat/wear_tuning.WEAR_SLOTS`, in that order). Three are drawn on the MetaHuman when
+worn (the jacket, the pants, the boots: "Drawn on the body" below), in single player only
+so far; wearing one changes no number.
 
 ```bash
 python3 Scripts/dev/uepy.py Scripts/build_clothing.py      # after build_weapons_and_combat.py
@@ -17,7 +18,8 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 |---|---|
 | the garments (`/Game/Clothing/BP_<Garment>`), their stand-in models and materials | this package (`specs.py`, `items.py`) |
 | the test garments on `Lvl_Forest_200m` | this package (`placement.py`) |
-| the mesh a garment is drawn as, worn: `Garment.worn` (the body component it fills, the skeletal mesh, from `metahuman_paths.CLOTHING`), written onto the item as `WornPart` and `WornMesh`. Jacket, Pants and Boots have one; data only, nothing reads it yet | `specs.py`, `items.py`; the variables `combat/item_vars.py` |
+| the mesh a garment is drawn as, worn: `Garment.worn` (the body component it fills, the skeletal mesh, from `metahuman_paths.CLOTHING`), written onto the item as `WornPart` and `WornMesh`. Jacket, Pants and Boots have one | `specs.py`, `items.py`; the variables `combat/item_vars.py` |
+| drawing a worn garment on the body, and taking it off it: the `DrawWorn` event | `combat/weapon_component/wear_draw.py` (checks: `combat/verify/wear_draw.py`; in a game: `probes/probe_clothing_draw.py`, run by `probe_clothing.py`) |
 | the slots, `ClothingSlot` on the item, `Worn`/`TakeOffSlot` on the weapon component | `combat/wear_tuning.py` |
 | putting one on, taking one off (the server's: `Scripts/net/CLAUDE.md`, "Clothing") | `combat/weapon_component/wear.py`, `wear_drag.py` (checks: `combat/verify/wear.py`) |
 | what is worn, as the owning client is told it and pictures it | the record's `Worn` (`combat/record_vars.py`; C++, read with `WornRow`: `uebp/nodes/inventory.py`), `view_worn.py` |
@@ -72,6 +74,31 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   places them, idempotently, and saves the level). Regenerating the level drops them, as it
   drops the forage: run `build_clothing.py` again.
 
+## Drawn on the body
+
+- **`DrawWorn(Item, On)`** on the weapon component sets the garment's `WornMesh` on the
+  component under the MetaHuman's body named by its `WornPart` (`Torso`, `Legs`, `Feet`:
+  `combat/metahuman_body.py`) and shows it; off, the component is bare and hidden again,
+  as the build leaves it. The wear and the dragged wear call it on (and off for the
+  garment they swap out), the take-off and the drop of a worn garment off. A garment with
+  no `WornMesh` (the other five), a skin with no such component (a mannequin) and a
+  dedicated server draw nothing.
+- **How the mesh follows the body is set with the mesh.** `MetaHumanComponentUE` does it
+  only at BeginPlay, when the components are bare. A mesh on the body's skeleton
+  (`metahuman_base_skel`: the jeans) takes the body as its leader pose. One on a skeleton
+  of its own (the hoodie, the shoes) has a post-process anim Blueprint on the mesh asset
+  that copies the attach parent's pose, started when the mesh is set; a leader pose
+  would stop it, so it is cleared.
+- **The component is posed whether or not it is rendered**
+  (`AlwaysTickPoseAndRefreshBones`, as the body is). `MetaHumanComponentUE` leaves the
+  garments `OnlyTickPoseWhenRendered`: measured in a headless game, the hoodie then
+  stands 1.4 cm off the idle body's spine and forearm, and 0.00 cm with the option set.
+- **`Worn[slot]` is a pure read:** an off-call handed it runs before the slot is
+  rewritten (`verify/wear_draw.py` holds the three to that).
+- **Not yet:** another player sees nothing (the record's `Worn` goes to the owner only,
+  and a client's picture of it, `view_worn.py`, does not call `DrawWorn`); a death
+  empties `Worn` without taking the mesh off the body; a loaded profile wears nothing.
+
 ## Traps
 
 - **No part may be called `Body`:** it is the inherited root the parts hang off, and
@@ -84,7 +111,8 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 
 ## Not done yet
 
-- Nothing is drawn worn, and a worn garment does nothing (no warmth, no carry space).
+- Five garments are drawn as nothing worn (no mesh), and a worn garment does nothing (no
+  warmth, no carry space). On a server no one sees a garment drawn yet, the wearer included.
 - **The base body is worn:** the player is `SKM_Adventurer03`, the man in skin-tight
   shorts, generated to swap in for the dressed `SKM_Adventurer01`
   (`asset_pipeline/player_body.py` `PLAYER_BODY` and `CLOTHING_BASE_BODY`;

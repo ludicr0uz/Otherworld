@@ -35,3 +35,6 @@ SERVER_WEAR = "Server_Wear"            # the fire key's wear, asked of the serve
 WEAR_REQUEST_VAR = "WearRequest"      # on the component: a slot code whose item
                                       # is to be worn (a drag onto the worn
                                       # grid), or NOT_CLOTHING
+DRAW_WORN = "DrawWorn"                # on the component: draws a worn garment on
+                                      # the body, or takes it off it
+                                      # (weapon_component/wear_draw.py)

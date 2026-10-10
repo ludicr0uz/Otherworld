@@ -104,5 +104,38 @@ class RenderArgsTest(unittest.TestCase):
         self.assertNotIn("-nullrhi", args)
 
 
+class VerdictsTest(unittest.TestCase):
+    """game.verdicts and game.asked_verdicts: the per-probe table --probes-for ends on."""
+
+    def probe(self, name, ok=True, error=None):
+        return {"name": name, "checks": [{"ok": ok, "label": "x", "detail": ""}],
+                "notes": [], "error": error}
+
+    def test_each_probe_in_run_order(self):
+        payload = {"probes": [self.probe("a"), self.probe("b", ok=False),
+                              self.probe("c", error="boom")], "setup_errors": []}
+        self.assertEqual(game.verdicts(payload), [("a", True), ("b", False), ("c", False)])
+
+    def test_a_setup_error_fails_them_all_and_no_payload_is_nothing(self):
+        payload = {"probes": [self.probe("a")], "setup_errors": ["no map"]}
+        self.assertEqual(game.verdicts(payload), [("a", False)])
+        self.assertEqual(game.verdicts(None), [])
+
+    def test_asked_probes_never_reported_count_as_failed(self):
+        probes = ["/p/probe_a.py", "/p/probe_b.py"]
+        payload = {"probes": [self.probe("probe_a")], "setup_errors": []}
+        self.assertEqual(game.asked_verdicts(probes, [payload]),
+                         [("probe_a", True), ("probe_b", False)])
+        self.assertEqual(game.asked_verdicts(probes, [None]),
+                         [("probe_a", False), ("probe_b", False)])
+
+    def test_a_net_probe_passes_only_when_every_process_did(self):
+        probes = ["/p/probe_net_x.py"]
+        server = {"probes": [self.probe("probe_net_x")], "setup_errors": []}
+        client = {"probes": [self.probe("probe_net_x", ok=False)], "setup_errors": []}
+        self.assertEqual(game.asked_verdicts(probes, [server, client]), [("probe_net_x", False)])
+        self.assertEqual(game.asked_verdicts(probes, [server, server]), [("probe_net_x", True)])
+
+
 if __name__ == "__main__":
     unittest.main()

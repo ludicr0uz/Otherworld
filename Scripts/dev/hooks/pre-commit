@@ -76,6 +76,27 @@ if [ -n "$pyfiles" ]; then
     fi
 fi
 
+# The dev unit tests, when the dev tooling changed (Scripts/dev, hooks aside):
+# about 30 s, and the one place they run, so a session never spends a turn on
+# them (Scripts/dev/devteam/session.py).
+if printf '%s\n' "$files" | grep -q '^Scripts/dev/.*\.py$'; then
+    testlog=$(mktemp)
+    if python3 -m unittest discover -s Scripts/dev/tests > "$testlog" 2>&1; then
+        tail -1 "$testlog" | sed 's/^/pre-commit: dev unit tests: /'
+    else
+        tail -25 "$testlog"
+        echo "pre-commit: the dev unit tests fail (python3 -m unittest discover -s Scripts/dev/tests)"
+        echo "TESTS" >> "$GIT_DIR/.precommit_fail"
+    fi
+    rm -f "$testlog"
+fi
+
+# Say which verifiers this change maps to (uepylib/probe_map.py): the gate
+# runs them all around a dev-team session; by hand, `uepy.py --verify-for`
+# runs these alone, and a change that maps to none has nothing to verify.
+printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 python3 Scripts/dev/uepy.py --dry-run --verify-for 2>/dev/null \
+    | sed 's/^\[uepy\]/pre-commit:/' | head -3
+
 if [ -f "$GIT_DIR/.precommit_fail" ]; then
     rm -f "$GIT_DIR/.precommit_fail"
     echo

@@ -198,6 +198,34 @@ class QueueTest(unittest.TestCase):
     def test_empty_queue_is_done(self):
         self.assertTrue(Queue([]).advance())
 
+    def test_a_finished_probe_hands_the_tick_back_before_the_next_starts(self):
+        # boot.py opens the level again between probes: it needs the tick on
+        # which one ends, before the next has run a step.
+        game, wall = Clock(), Clock()
+        started = []
+
+        def make(name):
+            ledger = Ledger(name)
+
+            def probe():
+                started.append(name)
+                ledger.check(f"{name} ran", True)
+                yield 0
+            return ProbeRun(ledger, probe, game, wall)
+
+        queue = Queue([make("a"), make("b")])
+        self.assertEqual(queue.index, 0)
+        self.assertIs(queue.current, queue.runs[0])
+        self.assertFalse(queue.advance())          # a starts and waits its tick
+        self.assertFalse(queue.advance())          # a finishes: the tick comes back
+        self.assertEqual(queue.index, 1)
+        self.assertEqual(started, ["a"])           # b has not started yet
+        self.assertIs(queue.current, queue.runs[1])
+        self.assertFalse(queue.advance())
+        self.assertTrue(queue.advance())
+        self.assertEqual(started, ["a", "b"])
+        self.assertIsNone(queue.current)
+
 
 class ProbeContextTest(unittest.TestCase):
 

@@ -16,6 +16,28 @@ import uepy  # noqa: E402
 from uepylib.targets import TargetResult  # noqa: E402
 
 
+class VerdictTableTest(unittest.TestCase):
+    """uepy.verdict_table: what --wait shows a session after --probes-for."""
+
+    def test_failures_first_then_the_count(self):
+        rows = [("--game", "probe_a", True), ("--net --clients 2", "probe_net_b", False),
+                ("--game", "probe_c", False)]
+        lines = uepy.verdict_table(rows, False)
+        body = [l for l in lines if l.startswith("[probes-for] probe_")]
+        self.assertEqual([l.split()[1] for l in body], ["probe_c", "probe_net_b", "probe_a"])
+        self.assertIn("FAIL", body[0])
+        self.assertIn("--net --clients 2", body[1])
+        self.assertIn("1 of 3 probes passed; failed: probe_net_b probe_c", lines[-1])
+
+    def test_all_passing_but_a_dirty_log_says_so(self):
+        lines = uepy.verdict_table([("--game", "probe_a", True)], False)
+        self.assertIn("1 of 1 probes passed; a launch's log failed it", lines[-1])
+        self.assertNotIn("log failed", uepy.verdict_table([("--game", "probe_a", True)], True)[-1])
+
+    def test_nothing_ran(self):
+        self.assertEqual(uepy.verdict_table([], True), ["[probes-for] nothing ran"])
+
+
 class ReporterTest(unittest.TestCase):
 
     def setUp(self):

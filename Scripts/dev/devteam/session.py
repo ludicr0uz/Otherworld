@@ -51,14 +51,30 @@ start a run to poll for later. This headless session is never told when a \
 background command finishes, so a session that waits for one ends with its \
 work unverified and uncommitted. Give a long run a timeout instead (up to \
 600000 ms), and put several probes in one launch (`--probe A --probe B`) \
-rather than one launch each. A long --game or --net run can instead be \
-detached: `uepy.py --net --clients 2 --detach --probe P` prints a run \
-directory and returns at once, so read or edit meanwhile, then `uepy.py \
---wait <run dir> --timeout 500` prints the usual report (and fails on \
-timeout); `--status` lists runs. One detached run at a time. While you work, run `uepy.py --probes-for` \
-(no paths: the probes your `git diff` can affect, one --game and one --net \
-launch; `--dry-run` lists them) instead of choosing probes by hand or \
-repeating one. Do not run the regression yourself: dev-team's gate runs the \
+rather than one launch each: the level is opened again between probes, so \
+one probe's leavings never decide the next one's verdict. A long --game or \
+--net run can instead be detached: `uepy.py --net --clients 2 --detach \
+--probe P` prints a run directory and returns at once, so read or edit \
+meanwhile, then `uepy.py --wait <run dir> --timeout 900` prints the usual \
+report (and fails on timeout); `--status` lists runs. One detached run at a \
+time.
+
+Probes: run `uepy.py --probes-for` (no paths: the probes your `git diff` can \
+affect, one --game and one --net launch; `--dry-run` lists them), never a \
+hand-picked set unless it lists nothing. It detaches itself and prints a run \
+directory at once; its launches take 5-14 minutes (measured), so write the \
+docs and the commit message meanwhile, then `uepy.py --wait <run dir> \
+--timeout 900` prints every probe's verdict in one table. Read that table, \
+not the launches' reports, and rerun only a probe that failed on your change.
+
+Verifiers: never run a `verify_*.py` by hand or the full suite (a verifier is \
+85 s cold; the gate runs all nine around your session, and sessions that ran \
+them anyway spent 4 minutes a task on it). After a rebuild run `uepy.py \
+--verify-for` (no paths: your `git diff`), which runs only the verifiers your \
+change maps to, warm, and says "none" for a change to probes, docs or \
+Scripts/dev: then there is nothing to verify, and no reason to run it again \
+after editing those. The dev unit tests run in the pre-commit hook when \
+Scripts/dev changed: do not run them yourself. Dev-team's gate runs the \
 verifiers before and after you, and a smoke set of probes once the run's last \
 task is done (after each task too, when the run asks for it); a probe that \
 newly fails counts against the run, or the task. End when your change is \

@@ -20,6 +20,8 @@ uepy_inbox.py, then the engine's multicast remote execution), which turns those
     Scripts/dev/uepy.py --net --clients 2 --detach --probe P   # prints a run dir, returns at once
     Scripts/dev/uepy.py --wait <run dir> [--timeout S]       # ...later: its report and exit code
     Scripts/dev/uepy.py --status                              # detached runs
+    Scripts/dev/uepy.py --probes-for [paths]   # the probes a change can affect: detached, --wait it
+    Scripts/dev/uepy.py --verify-for [paths]   # only the verifiers a change maps to (or none)
     Scripts/dev/uepy.py --cold Scripts/verify_level.py   # force a fresh editor
     Scripts/dev/uepy.py --close-editors              # save, quit, or kill them
 
@@ -150,9 +152,16 @@ def parse_args():
     ap.add_argument("--probes-for", nargs="*", metavar="PATH",
                     help="run the probes the changed PATHS can affect (default: git diff "
                          "--name-only): one --game launch and one --net launch "
-                         "(uepylib/probe_map.py)")
+                         "(uepylib/probe_map.py). Detaches itself: prints a run "
+                         "directory at once; --wait it for every probe's verdict")
+    ap.add_argument("--verify-for", nargs="*", metavar="PATH",
+                    help="run only the verifiers the changed PATHS map to (default: git "
+                         "diff --name-only), warm; says so when none does")
     ap.add_argument("--dry-run", action="store_true",
-                    help="with --probes-for: print the launches, run nothing")
+                    help="with --probes-for or --verify-for: print what would run, run nothing")
+    ap.add_argument("--foreground", action="store_true",
+                    help="with --probes-for: run the launches in this process rather "
+                         "than detached")
     ap.add_argument("--close-editors", action="store_true",
                     help="save and quit (or kill) this project's editors, then exit")
     ap.add_argument("--compile", action="store_true",
@@ -246,23 +255,57 @@ def probes_for(engine, args):
                 ("net", f"--net --clients {plan['clients']}", plan["net"]),
                 ("net-title", "--net --title", plan["net-title"])]
     ok = True
+    rows = []           # (launch flags, probe name, passed), for the table at the end
     for kind, flags, probes in launches:
         if not probes:
             continue
         log(f"{flags}: {names(probes)}")
         if args.dry_run:
             continue
+        got = []
         if kind == "game" or kind == "title":
             for level, group in probe_level.by_level(probes, args.map):
                 ok &= game.run_game(engine, level, args.seconds or max(game.PROBE_SECONDS, 30 * len(group) + 60), [],
-                                    group, args.probe_timeout, args.windowed, kind == "title")
+                                    group, args.probe_timeout, args.windowed, kind == "title",
+                                    collect=got)
         else:
             clients = plan["clients"] if kind == "net" else 1
             for level, group in probe_level.by_level(probes, args.map):
                 ok &= net.run_net(engine, level, clients, args.port, args.seconds, group,
                                   args.probe_timeout, args.windowed, args.allow_pie,
-                                  kind == "net-title", args.lag, 0, False)
+                                  kind == "net-title", args.lag, 0, False, collect=got)
+        rows += [(flags, name, passed) for name, passed in got]
+    if not args.dry_run:
+        for line in verdict_table(rows, ok):
+            print(line, flush=True)
     return 0 if ok else 1
+
+
+def verdict_table(rows, clean):
+    """One line per probe over every launch, the failures first, then the
+    count: what a session reads instead of each launch's report."""
+    if not rows:
+        return ["[probes-for] nothing ran"]
+    width = max(len(name) for _f, name, _p in rows)
+    lines = ["", f"[probes-for] {'probe':<{width}}  verdict  launch"]
+    for flags, name, passed in sorted(rows, key=lambda r: (r[2], r[0], r[1])):
+        lines.append(f"[probes-for] {name:<{width}}  {'ok   ' if passed else 'FAIL '}   {flags}")
+    failed = [name for _f, name, passed in rows if not passed]
+    lines.append(f"[probes-for] {len(rows) - len(failed)} of {len(rows)} probes passed"
+                 + (f"; failed: {' '.join(failed)}" if failed else "")
+                 + ("" if clean or failed else "; a launch's log failed it (errors above)"))
+    return lines
+
+
+def verify_for(args):
+    """The verifier scripts the given (or git-changed) paths map to, as the
+    scripts this call then runs; or None when there is nothing to verify."""
+    paths = args.verify_for or probe_map.changed_paths()
+    scripts = probe_map.verifiers_for(paths)
+    log(f"paths: {len(paths)}; verifiers: "
+        + (" ".join(os.path.basename(s) for s in scripts) if scripts
+           else "none (nothing in this change is read by a verifier)"))
+    return [os.path.join(probe_map.ROOT, s) for s in scripts]
 
 
 def main():
@@ -273,7 +316,24 @@ def main():
     if args.list_probes:
         return list_probes()
     if args.probes_for is not None:
-        return probes_for(engine, args)
+        if args.dry_run or args.foreground:
+            return probes_for(engine, args)
+        # The launches take 5-14 minutes: detached, so the caller gets its run
+        # directory now and does other work until `--wait` (the session's
+        # foreground limit is 10 minutes; a run that outgrows it is lost).
+        run = detach.start(sys.argv[1:] + ["--foreground"], detach.runs_root(),
+                           os.path.abspath(__file__))
+        if run is None:
+            return 1
+        print(run, flush=True)
+        log(f"detached; collect every probe's verdict with: uepy.py --wait {run} "
+            "--timeout 900 (do other work meanwhile)")
+        return 0
+    if args.verify_for is not None:
+        scripts = verify_for(args)
+        if not scripts or args.dry_run:
+            return 0
+        args.scripts, args.summary, args.full = scripts, not args.full, args.full
     if args.list:
         list_listeners(engine)
         return 0

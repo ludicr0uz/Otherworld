@@ -20,7 +20,7 @@ import shutil
 import subprocess
 import time
 
-from uepylib import editors, inbox, net_memory, net_plan, net_report
+from uepylib import editors, game, inbox, net_memory, net_plan, net_report
 from uepylib.paths import editor_cmd, log, saved_uepy, serve_inbox, uproject
 
 # With no probe: how long everyone plays after the last client has joined.
@@ -104,8 +104,11 @@ def _wait(running, seconds, has_probes, meter):
 
 
 def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout=None,
-            windowed=False, allow_pie=False, title=False, lag_ms=0, bots=0, trace=False):
-    """Run the server and the clients, print the report. True when clean."""
+            windowed=False, allow_pie=False, title=False, lag_ms=0, bots=0, trace=False,
+            collect=None):
+    """Run the server and the clients, print the report. True when clean.
+    ``collect``, a list, receives (probe name, passed) per probe asked for,
+    passed only when every process that ran it passed (uepylib/game.py)."""
     beat = pie_editor()
     if beat and not allow_pie:
         log(f"the editor ({inbox.describe(beat)}) is in PIE -- a network run beside a "
@@ -159,6 +162,8 @@ def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout
                                   net_memory.lines(meter.usage, [p.name for p in plan]))
     for line in lines:
         print(line, flush=True)
+    if collect is not None and probes:
+        collect.extend(game.asked_verdicts(probes, [r.payload for r in reports]))
     log(f"{time.time() - started:.0f}s; one log per process in {folder}")
     if trace:
         path = plan[0].trace

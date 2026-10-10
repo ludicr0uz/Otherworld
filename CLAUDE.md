@@ -183,7 +183,8 @@ python3 Scripts/dev/uepy.py -c "import unreal; unreal.log_warning('hi')"
 python3 Scripts/dev/uepy.py --list                 # which editors are listening
 python3 Scripts/dev/uepy.py --game --seconds 25    # headless -game run + error summary
 python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py   # see below
-python3 Scripts/dev/uepy.py --probes-for [paths]   # the probes a change can affect (default: git diff); --dry-run lists them
+python3 Scripts/dev/uepy.py --probes-for [paths]   # the probes a change can affect (default: git diff); detaches itself, --wait the run dir for one verdict table; --dry-run lists them
+python3 Scripts/dev/uepy.py --verify-for [paths]   # only the verifiers a change maps to (default: git diff), warm; "none" for probes, docs, Scripts/dev
 python3 Scripts/dev/uepy.py --game --windowed --probe <probe>   # rendered, in a 1280x720 window
 python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_join.py   # a server and 2 clients, see below
 python3 Scripts/dev/uepy.py --net --clients 1 --lag 120 --probe Scripts/probes/probe_net_move_states.py   # with 120 ms of lag
@@ -263,10 +264,19 @@ editor.
    200 m level, 38 s on the probe level; `--net --clients 2` 74 s and 73 s. The level is only
    2–4 s of it: about 21 s is the engine's boot, ~7 s the Blueprints and anim graphs the
    Entry map loads before the level opens. So batch probes into one launch rather than
-   expecting the small level to make a launch cheap. A batch shares a world: ~100 probes in
-   one `--game` launch stall (the same on the 200 m level), so run big sets in chunks.
-3. **Scope verification to what you changed.** Run the full sweep (level, weapons, NPC, HUD,
-   survival) once before calling the work done.
+   expecting the small level to make a launch cheap. Between probes a single-player launch
+   opens the level again (`Scripts/probes/boot.py`; measured 10 Oct 2026: 0.7–0.8 s on the
+   probe level, 1.0–1.3 s on the 200 m level), so a probe's place in a batch cannot change
+   its verdict: the player, the slots, the actors and the title are the level's own each
+   time. Measured with it: 7 menu probes in one launch 51 s; the gate's 12-probe smoke set
+   155 s over its two levels, the same forward and reversed. A network launch has no
+   reset: order its probes so the fights come last. ~100 probes in one `--game` launch
+   stall, so run big sets in chunks.
+3. **Scope verification to what you changed.** `uepy.py --verify-for` runs only the verifiers
+   the changed paths map to (`uepylib/probe_map.py`), and names none for a change to probes,
+   docs or `Scripts/dev`. A verifier is 85 s cold, so never run one that reads nothing you
+   wrote; dev-team's gate runs the whole suite around a session anyway. `--probes-for` is the
+   same rule for probes.
 4. **For a guard, zero errors proves nothing.** A gate that never opens logs the same as one that
    works. Probe the positive case too, with a probe in `Scripts/probes` (below).
 5. **Batch several scripts into one `uepy.py` call.**

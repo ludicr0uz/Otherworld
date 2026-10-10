@@ -85,6 +85,35 @@ class DetachTest(unittest.TestCase):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 uepy.main()
 
+    def test_probes_for_detaches_itself(self):
+        # The launches take 5-14 minutes: the caller gets a run directory at once
+        # and the detached child runs the same command in the foreground.
+        with mock.patch.object(sys, "argv", ["uepy.py", "--probes-for", "Scripts/npc/x.py"]), \
+                mock.patch.object(uepy.detach, "start", return_value="/runs/1") as start, \
+                mock.patch.object(uepy, "probes_for") as run:
+            code, out = self.quiet(uepy.main)
+        self.assertEqual(code, 0)
+        self.assertIn("/runs/1", out)
+        self.assertIn("--wait", out)
+        run.assert_not_called()
+        argv = start.call_args[0][0]
+        self.assertEqual(argv, ["--probes-for", "Scripts/npc/x.py", "--foreground"])
+
+    def test_probes_for_dry_run_and_foreground_stay_in_process(self):
+        for flag in ("--dry-run", "--foreground"):
+            with mock.patch.object(sys, "argv", ["uepy.py", "--probes-for", flag]), \
+                    mock.patch.object(uepy.detach, "start") as start, \
+                    mock.patch.object(uepy, "probes_for", return_value=0) as run:
+                self.quiet(uepy.main)
+            start.assert_not_called()
+            run.assert_called_once()
+
+    def test_probes_for_refuses_while_a_run_is_detached(self):
+        with mock.patch.object(sys, "argv", ["uepy.py", "--probes-for"]), \
+                mock.patch.object(uepy.detach, "start", return_value=None):
+            code, _ = self.quiet(uepy.main)
+        self.assertEqual(code, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -84,6 +84,23 @@ def probe_report(payload):
     return lines, ok
 
 
+def verdicts(payload):
+    """Each probe's (name, passed) from a results payload, in run order; a run
+    that never wrote results, or failed its setup, gives every probe it was
+    asked for as failed only when the caller knows their names (it passes
+    ``None`` here and gets an empty list)."""
+    if payload is None:
+        return []
+    out = []
+    setup_failed = bool(payload.get("setup_errors"))
+    for probe in payload.get("probes") or []:
+        checks = probe.get("checks") or []
+        good = (not setup_failed and not probe.get("error")
+                and all(c.get("ok") for c in checks))
+        out.append((probe.get("name"), good))
+    return out
+
+
 def game_env(base, level, probes, results_path, probe_timeout, title=False):
     """The environment for the -game process."""
     env = dict(base)
@@ -136,11 +153,13 @@ def title_args(level, title=False):
 
 
 def run_game(engine, level, seconds, extra_patterns=(), probes=(), probe_timeout=None,
-             windowed=False, title=False):
+             windowed=False, title=False, collect=None):
     """Boot the level in -game and summarise the log. Returns True when clean.
 
     The process is killed at the end, which the engine records as a crash via
     GracefulTerminationHandler -- expected, and not a failure of the run.
+    ``collect``, a list, receives (probe name, passed) for every probe asked
+    for: one the run never reported counts as failed.
     """
     tmp = tempfile.mkdtemp(prefix="uepy-game-")
     logfile = os.path.join(tmp, "game.log")
@@ -178,9 +197,24 @@ def run_game(engine, level, seconds, extra_patterns=(), probes=(), probe_timeout
     for line in notable_lines(text):
         print(f"  | {line}", flush=True)
     if probes:
-        lines, ok = probe_report(_read_json(results_path))
+        payload = _read_json(results_path)
+        lines, ok = probe_report(payload)
         for line in lines:
             print(line, flush=True)
         clean = clean and ok
+        if collect is not None:
+            collect.extend(asked_verdicts(probes, [payload]))
     log(f"{time.time() - started:.0f}s; log kept at {logfile}")
     return clean
+
+
+def asked_verdicts(probes, payloads):
+    """(name, passed) for each probe file asked for, over the payloads of the
+    processes that ran: passed only when every process that reported it did,
+    and failed when none reported it (the run never got that far)."""
+    seen = {}
+    for payload in payloads:
+        for name, good in verdicts(payload):
+            seen[name] = seen.get(name, True) and good
+    return [(n, seen.get(n, False))
+            for n in (os.path.splitext(os.path.basename(p))[0] for p in probes)]

@@ -31,6 +31,17 @@ ticker's.
 once the title has paused it, and a network run's client opens the level
 alone, its probe joining the server through the menu. The probes outlive the
 travel: they are driven from the engine's tick, not from the level.
+
+Between probes the level is opened again (single player only; UEPY_PROBE_RESET=0
+switches it off). A probe leaves the player dead, the slots moved, actors
+spawned, a menu open; the next probe in the same launch used to inherit all of
+it, and half of a batch failed for that while each passed alone. Reopening the
+level costs 0.7-0.8 s on Lvl_Probe_50m and 1.0-1.3 s on Lvl_Forest_200m
+(measured 10 Oct 2026) against the 36-38 s a launch costs, and gives every
+probe the level as it loads: a fresh player at the start, the built tables,
+the level's actors and nothing else, and on ``--title`` the title again. The
+WRITABLE classes survive it (they are held in ``_state["keep"]``). A network
+run has no reset: a server travel would drop its clients.
 """
 
 import json
@@ -55,6 +66,8 @@ READY_GAME_SECONDS = 0.5    # let BeginPlay and the first ticks settle
 TITLE = bool(os.environ.get("UEPY_TITLE"))
 READY_TIMEOUT = 120.0       # wall seconds for the level to load and spawn
 NET_READY_TIMEOUT = 240.0   # ... and, in a network run, for everyone to boot and join
+# The level is reopened between probes (the module doc says why); 0 keeps one world.
+RESET = os.environ.get("UEPY_PROBE_RESET", "1") != "0"
 
 _state = {"handle": None, "queue": None, "phase": "prepare", "since": 0.0,
           "writable": [], "keep": [], "where": Where()}
@@ -184,6 +197,9 @@ def _ready(world, where):
     """Is the level up, with whoever this process waits for in it?"""
     if not world:
         return False
+    old = _state.get("old_world")
+    if old is not None and world == old:
+        return False            # the level being left, not yet the new one
     # A run on the real title (uepy.py --title) is paused a quarter second
     # in, and game time stops there: the pause is the title being up.
     titled = TITLE and unreal.GameplayStatics.is_game_paused(world)
@@ -233,10 +249,23 @@ def _tick(_delta):
                 _finish([f"{map_path} never came up with {_awaited(where)} "
                          f"within {limit:.0f} s"])
             return
-        if _state["phase"] == "run" and _state["queue"].advance():
-            _finish([])
+        if _state["phase"] == "run":
+            queue = _state["queue"]
+            finished = queue.index
+            if queue.advance():
+                _finish([])
+            elif queue.index != finished and _resets(where):
+                # One probe is over, another waits: the level again, as it loads.
+                _log(f"reset: opening {map_path} again before {queue.current.ledger.name}")
+                _open(map_path)
     except Exception:
         _finish([traceback.format_exc(limit=6).strip()])
+
+
+def _resets(where):
+    """Does this run open the level again between probes? Single player only:
+    a network run's server travel would drop its clients."""
+    return RESET and not where.networked
 
 
 def start():
@@ -305,10 +334,16 @@ def _prepare(map_path):
 
 
 def _open(url):
-    """Leave Entry for the level, or for the server that runs it."""
-    # The Entry world is the only one loaded; any world works as the context.
-    entry = unreal.find_object(None, "/Engine/Maps/Entry.Entry")
+    """Leave Entry for the level, or for the server that runs it; or, between
+    probes, leave the level for itself again."""
+    # Any loaded world works as the context: Entry the first time, after that
+    # the level. The level being left is remembered, so the load phase does
+    # not take it for the new one on the tick before the travel.
+    map_path = os.environ.get("UEPY_PROBE_MAP", "")
+    current = _world(map_path)
+    _state["old_world"] = current
+    context = current or unreal.find_object(None, "/Engine/Maps/Entry.Entry")
     _log(f"opening {url}")
-    unreal.GameplayStatics.open_level(entry, url, True, "")
+    unreal.GameplayStatics.open_level(context, url, True, "")
     _state["phase"] = "load"
     _state["since"] = time.time()

@@ -27,8 +27,9 @@ Scripts/net/CLAUDE.md has the conventions and the traps.
               switches on the inventory record's audit for every run, so a
               change to what a player carries that nothing marked fails it
               (INVENTORY-RECORD-STALE: Scripts/combat/dirty.py)
-  sets        the named probe sets dev-team's gate runs (SMOKE, FULL); order matters, the
-              probes of a launch share one boot and one world
+  sets        the named probe sets dev-team's gate runs (SMOKE, FULL); the probes of a
+              launch share one boot, and a --game launch opens the level again between
+              them (boot.py), so each gets the level fresh; a --net launch does not
   kept_slots  the tuning tabs' save slots, set aside for a run and put back
   net         a network run: which process this is (Where), RUNS_ON, the shared board
   bots        the load test's bots (uepy.py --net --bots N): the server's stand-ins for

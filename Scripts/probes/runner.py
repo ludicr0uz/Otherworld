@@ -133,7 +133,13 @@ class ProbeRun(object):
 
 
 class Queue(object):
-    """Runs probes one after another. ``advance()`` is called once per tick."""
+    """Runs probes one after another. ``advance()`` is called once per tick.
+
+    A probe that finishes hands the tick back before the next one starts
+    (``index`` has moved on, ``done`` says whether any is left), so the driver
+    can put the world back between them (Scripts/probes/boot.py reopens the
+    level) rather than let one probe's leavings decide the next one's verdict.
+    """
 
     def __init__(self, runs):
         self.runs = list(runs)
@@ -143,12 +149,22 @@ class Queue(object):
     def done(self):
         return self._index >= len(self.runs)
 
+    @property
+    def index(self):
+        """Which run is current: the count of finished probes."""
+        return self._index
+
+    @property
+    def current(self):
+        return None if self.done else self.runs[self._index]
+
     def advance(self):
-        while not self.done:
-            if not self.runs[self._index].advance():
-                return False
+        """One step of the current probe. True once every probe has finished."""
+        if self.done:
+            return True
+        if self.runs[self._index].advance():
             self._index += 1
-        return True
+        return self.done
 
     def results(self):
         return [r.ledger.as_dict() for r in self.runs]

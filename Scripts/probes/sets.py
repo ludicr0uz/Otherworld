@@ -14,8 +14,9 @@ import os
 PROBES_DIR = os.path.dirname(os.path.abspath(__file__))
 
 SMOKE = {
-    # Order matters: the probes share one boot, so those that read the level as
-    # it starts come first and the ones that fight (and may get the player killed) last.
+    # The probes share one boot. A --game launch opens the level again between
+    # probes (probes/boot.py), so their order is free; the net launch has no
+    # reset, so there the probes that fight (and may get a player killed) come last.
     "game": [
         "probe_slots",              # inventory
         "probe_main_menu",          # menu

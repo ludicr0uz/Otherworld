@@ -607,3 +607,15 @@ class KnownFailuresTest(unittest.TestCase):
         self.assertIn("known_failures.md",
                       build_prompt(task, 1, 1, "/p", "| t |", False))
         self.assertIn("known_failures.md", build_prompt(task, 1, 1, "/p", None, False))
+
+    def test_prompt_names_the_scoped_forms_with_their_costs(self):
+        # The probes and the verifiers a change needs, by tool rather than by
+        # hand: each rule travels with the minutes it is meant to save.
+        prompt = build_prompt(mock.Mock(text="t"), 1, 1, "/p", "| t |", False)
+        self.assertIn("uepy.py --probes-for", prompt)
+        self.assertIn("--wait <run dir>", prompt)
+        self.assertIn("5-14 minutes", prompt)
+        self.assertIn("uepy.py --verify-for", prompt)
+        self.assertIn("85 s", prompt)
+        self.assertIn("pre-commit hook", prompt)
+        self.assertIn("opened again between probes", prompt)

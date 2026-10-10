@@ -7,9 +7,15 @@ the compose here (Pillow + numpy), and the import
 
   items     the table: each item's DisplayName, Blueprint, camera view and
             share of the slot; the texture's name and size; the white tint
-  portrait  the character's portrait (the I panel's): the player's body from
-            the front, posed; its texture's name and size, the mesh, the clip
-  paths     where the passes, the PNGs and the contact sheet go (assets/)
+  portrait  the character's portrait (the I panel's): the player's MetaHuman
+            from the front, posed; its texture's name and size, the meshes,
+            the grooms, the clip
+  portrait_capture  in the editor: that body, face and hair stood before the
+            camera in the idle's first frame, and shot through capture's passes
+  paths     where the passes, the PNGs and the contact sheet go (assets/);
+            the names of a picture's part masks
+  parts     outside it: what light mends by the part masks (the seam between
+            face and body, the hair's missing normals)
   capture   in the editor: the item alone before an orthographic
             SceneCapture2D, written as base colour, normals, a mask and depth
   exr       outside it: reads the depth pass (an EXR, which Pillow cannot)

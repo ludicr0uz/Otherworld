@@ -30,8 +30,7 @@ import os
 import unreal
 
 from item_icons.items import ITEMS
-from item_icons.paths import PASSES_DIR
-from item_icons.portrait import PORTRAIT, PORTRAIT_MESH, PORTRAIT_POSE, PORTRAIT_YAW
+from item_icons.paths import PASSES_DIR, part_file
 
 SIZE = 1024                      # square, so any view of any model fits
 MARGIN = 1.08                    # of the model's bounding sphere
@@ -59,10 +58,10 @@ def _world():
     return unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 
 
-def _model_sphere(actor):
-    """Centre and radius of the sphere round every mesh the item shows."""
+def _model_sphere(actors):
+    """Centre and radius of the sphere round every mesh the actors show."""
     lo, hi = None, None
-    for c in actor.get_components_by_class(unreal.MeshComponent):
+    for c in [c for a in actors for c in a.get_components_by_class(unreal.MeshComponent)]:
         if not c.is_visible():
             continue
         origin, extent, _radius = unreal.SystemLibrary.get_component_bounds(c)
@@ -70,7 +69,7 @@ def _model_sphere(actor):
         lo = a if lo is None else unreal.Vector(min(lo.x, a.x), min(lo.y, a.y), min(lo.z, a.z))
         hi = b if hi is None else unreal.Vector(max(hi.x, b.x), max(hi.y, b.y), max(hi.z, b.z))
     if lo is None:
-        raise RuntimeError(f"{actor.get_class().get_name()} shows no mesh")
+        raise RuntimeError(f"{actors[0].get_class().get_name()} shows no mesh")
     return (lo + hi) * 0.5, ((hi - lo) * 0.5).length()
 
 
@@ -79,10 +78,13 @@ def _camera_rotation(item):
     return unreal.Rotator(roll=item.roll, pitch=-item.pitch, yaw=item.yaw + 180.0)
 
 
-def _shoot(world, actor, rotation, out_dir, label, spawned):
-    """The four passes and view.json of ``actor``, alone, seen along
-    ``rotation``. The camera it spawns is added to ``spawned``."""
-    centre, radius = _model_sphere(actor)
+def _shoot(world, actors, rotation, out_dir, label, spawned, also=(), parts=None):
+    """The four passes and view.json of ``actors``, alone, seen along
+    ``rotation``. ``also`` are in the picture without being framed (a groom's
+    bounds are not its hair's). ``parts`` ({name: actors}) are each written a
+    mask of their own, alone (parts.py). The camera it spawns is added to
+    ``spawned``."""
+    centre, radius = _model_sphere(actors)
     forward = unreal.MathLibrary.get_forward_vector(rotation)
     camera = unreal.EditorLevelLibrary.spawn_actor_from_class(
         unreal.SceneCapture2D, centre - forward * (radius * CAMERA_RADII + CAMERA_CLEAR), rotation)
@@ -95,7 +97,8 @@ def _shoot(world, actor, rotation, out_dir, label, spawned):
     cc.set_editor_property(
         "primitive_render_mode",
         unreal.SceneCapturePrimitiveRenderMode.PRM_USE_SHOW_ONLY_LIST)
-    cc.show_only_actor_components(actor)
+    for actor in (*actors, *also):
+        cc.show_only_actor_components(actor)
     # Without this the first capture of a model is the default material:
     # its shaders are still compiling and its textures are at their lowest
     # mip. The wait only covers what something has asked for, and the first
@@ -120,6 +123,16 @@ def _shoot(world, actor, rotation, out_dir, label, spawned):
         unreal.RenderingLibrary.export_render_target(world, target, out_dir, name)
         if not os.path.isfile(os.path.join(out_dir, name)):
             raise RuntimeError(f"{label}: the {name} pass was not written")
+    for part, shown in (parts or {}).items():
+        cc.clear_show_only_components()
+        for actor in shown:
+            cc.show_only_actor_components(actor)
+        target = unreal.RenderingLibrary.create_render_target2d(
+            world, SIZE, SIZE, getattr(unreal.TextureRenderTargetFormat, RGBA8))
+        cc.set_editor_property("texture_target", target)
+        cc.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_SCENE_COLOR_HDR)
+        cc.capture_scene()
+        unreal.RenderingLibrary.export_render_target(world, target, out_dir, part_file(part))
     view = {k: v.to_tuple() for k, v in (
         ("right", unreal.MathLibrary.get_right_vector(rotation)),
         ("up", unreal.MathLibrary.get_up_vector(rotation)),
@@ -142,65 +155,7 @@ def _capture(world, item, out_dir):
         if not actor.get_editor_property("Icon"):
             _log(f"note: {item.display} was built before its icon existed: run its "
                  "build again after this (weapons, or survival for the consumables)")
-        _shoot(world, actor, _camera_rotation(item), out_dir, item.display, spawned)
-        return True
-    finally:
-        for a in spawned:
-            a.destroy_actor()
-
-
-def _full_textures(mesh, body):
-    """Have the body's textures in at full size before it is photographed.
-
-    A generated body's atlas is hundreds of small islands packed edge to edge,
-    skin beside cloth. At the low mips a freshly loaded texture starts on,
-    every island's edge is its neighbour's colour: the man in dark shorts came
-    out blotched with skin, and his skin veined with black, in a picture taken
-    a moment after the editor started. In the game the textures have streamed
-    in and none of it shows.
-    """
-    mel = unreal.MaterialEditingLibrary
-    body.set_editor_property("force_mip_streaming", True)
-    for slot in mesh.get_editor_property("materials"):
-        mi = slot.get_editor_property("material_interface")
-        if not isinstance(mi, unreal.MaterialInstanceConstant):
-            continue
-        for name in mel.get_texture_parameter_names(mi):
-            tex = mel.get_material_instance_texture_parameter_value(mi, name)
-            if tex:
-                tex.set_force_mip_levels_to_be_resident(60.0)
-    body.prestream_textures(60.0, True)
-
-
-def capture_portrait():
-    """Write the character's passes: the player's body, posed, from the front."""
-    mesh, pose = unreal.load_asset(PORTRAIT_MESH), unreal.load_asset(PORTRAIT_POSE)
-    if not mesh:
-        _log(f"SKIPPED {PORTRAIT}: {PORTRAIT_MESH} is not imported")
-        return False
-    spawned = []
-    try:
-        actor = unreal.EditorLevelLibrary.spawn_actor_from_class(
-            unreal.SkeletalMeshActor, FAR_ABOVE)
-        spawned.append(actor)
-        body = actor.skeletal_mesh_component
-        if pose:
-            # The clip's first frame. Nothing ticks an animation here, so the
-            # clip is in place before the mesh: setting the mesh initialises
-            # the animation, and that poses the body once.
-            play = unreal.SingleAnimationPlayData()
-            play.set_editor_property("anim_to_play", pose)
-            play.set_editor_property("saved_position", 0.0)
-            play.set_editor_property("saved_playing", False)
-            body.set_editor_property("animation_mode",
-                                     unreal.AnimationMode.ANIMATION_SINGLE_NODE)
-            body.set_editor_property("animation_data", play)
-        else:
-            _log(f"note: {PORTRAIT_POSE} is missing: the portrait is the bind pose")
-        body.set_skinned_asset_and_update(mesh)
-        _full_textures(mesh, body)
-        _shoot(_world(), actor, unreal.Rotator(roll=0.0, pitch=0.0, yaw=PORTRAIT_YAW + 180.0),
-               os.path.join(PASSES_DIR, PORTRAIT), PORTRAIT, spawned)
+        _shoot(world, [actor], _camera_rotation(item), out_dir, item.display, spawned)
         return True
     finally:
         for a in spawned:
@@ -208,8 +163,8 @@ def capture_portrait():
 
 
 def capture_all(only=()):
-    """Write every item's passes, and the character's portrait's. Returns the
-    names captured."""
+    """Write every item's passes. Returns the names captured. (The character's
+    portrait is portrait_capture.py's.)"""
     world = _world()
     done = []
     for item in ITEMS:
@@ -218,6 +173,4 @@ def capture_all(only=()):
         if _capture(world, item, os.path.join(PASSES_DIR, item.display)):
             done.append(item.display)
     _log(f"{len(done)} of {len(ITEMS)} items captured")
-    if (not only or PORTRAIT in only) and capture_portrait():
-        done.append(PORTRAIT)
     return done

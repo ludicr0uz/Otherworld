@@ -159,7 +159,7 @@ mannequin's is signed the same way, and worth one look.
 ## Looking at a generated body
 
 - **Don't judge a texture from a cold capture.** `Scripts/dev/render_character.py`, and the
-  portrait before `item_icons/capture._full_textures`, photograph a body a moment after the
+  portrait before `item_icons/portrait_capture._full_textures`, photograph a body a moment after the
   editor starts, on its lowest mips: a Meshy atlas is hundreds of islands packed edge to edge,
   and at those mips every island wears its neighbour's colour (skin blotches on dark shorts).
   Look at it in a windowed game instead:

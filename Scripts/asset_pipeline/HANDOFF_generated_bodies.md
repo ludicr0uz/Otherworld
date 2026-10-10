@@ -231,7 +231,7 @@ Clip-normalisation numbers logged at build time, for reference:
    neighbour's colour. UVs and textures were verified identical to Meshy's files (9369 of
    9369 sampled corners match the GLB's UVs; texture bytes identical between the remesh and
    rigged GLBs). The portrait capture now forces full mips
-   (`item_icons/capture._full_textures`). `Scripts/dev/render_character.py` still has the
+   (`item_icons/portrait_capture._full_textures`). `Scripts/dev/render_character.py` still has the
    problem; do not judge a body from it. Use a windowed game.
 10. **"gun guard ... chest leans back" fails on a new body.** The old check looked at where
     the neck ended up, which depends on the rig. It now reads the chest's own lean

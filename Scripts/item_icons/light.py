@@ -24,6 +24,8 @@ import numpy as np
 from PIL import Image
 
 from item_icons.exr import read_channel
+from item_icons.parts import filled, height_normal, part, seam
+from item_icons.paths import PART_HAIR, PART_SEAM
 
 KEY_LIGHT = (-0.50, 0.62, 0.60)   # upper left, towards the viewer
 KEY = 1.05
@@ -104,12 +106,14 @@ def _blur(a, radius):
     return a
 
 
-def _height(folder, on, width_cm):
+def _height(folder, on, width_cm, hole=None):
     """The model's height field: cm towards the viewer above its furthest
-    point, 0 off the model."""
+    point, 0 off the model. ``hole`` is mended first (parts.seam)."""
     depth = read_channel(os.path.join(folder, "depth.exr"), "A")
     if depth.shape != on.shape:
         raise RuntimeError(f"{folder}: the depth pass is {depth.shape}, the mask {on.shape}")
+    if hole is not None:
+        depth = filled(depth, on & ~hole, hole)
     # Off the model the depth is the far plane; a pixel half on it is no
     # depth of the model's either.
     on = on & (depth < 4.0 * width_cm + 1000.0)
@@ -160,16 +164,27 @@ def lit(folder, level_to=LEVEL_TO):
     with open(os.path.join(folder, "view.json")) as fh:
         view = json.load(fh)
     on = alpha > 0.5
+    # A picture of several parts: the gap where two meet is mended.
+    rim, hole = part(folder, PART_SEAM), None
+    if rim is not None:
+        hole = seam(on, rim)
+        base, world_normal = filled(base, on, hole), filled(world_normal, on, hole)
+        alpha = np.where(hole, 1.0, alpha)
+        on = on | hole
     if on.mean() < MIN_COVERAGE:
         raise RuntimeError(f"{folder}: the model covers {on.mean():.1%} of its capture")
     axes = np.array([view["right"], view["up"], [-c for c in view["forward"]]],
                     dtype=np.float32)
     n = world_normal @ axes.T
     n /= np.maximum(np.linalg.norm(n, axis=-1, keepdims=True), 1e-4)
-    facing = np.clip(n[..., 2], 0.0, 1.0)
 
     px_cm = view["width_cm"] / alpha.shape[1]
-    height = _height(folder, on, view["width_cm"])
+    height = _height(folder, on, view["width_cm"], hole)
+    # Hair has no normal in the capture (parts.py): the depth's, and no gloss.
+    hair = part(folder, PART_HAIR)
+    hair = on & hair & (height > 0.0) if hair is not None else np.zeros_like(on)
+    n = np.where(hair[..., None], height_normal(height, px_cm, _blur), n)
+    facing = np.clip(n[..., 2], 0.0, 1.0)
     key, fill = _unit(KEY_LIGHT), _unit(FILL_LIGHT)
     unshadowed = 1.0 - SHADOW * _shadow(height, px_cm, key)
     open_ = 1.0 - OCCLUSION * _occlusion(height, px_cm)
@@ -193,7 +208,8 @@ def lit(folder, level_to=LEVEL_TO):
     # with the background's, which reads as grazing, and the gloss there drew
     # a pale halo round the portrait.
     inside = np.clip((_blur(on.astype(np.float32), EDGE_PX) - 0.5) * 2.0, 0.0, 1.0)
-    mirror, rim = mirror * inside, rim * inside
+    mirror, rim = mirror * inside * ~hair, rim * inside * ~hair
+    shine = shine * ~hair
     # Levelled before the gloss goes on: the gain a near-black model needs
     # would turn its faint reflections into chrome.
     colour = base * light

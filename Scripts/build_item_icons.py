@@ -38,7 +38,7 @@ sys.path.insert(0, HERE)
 
 from item_icons.compose import compose_all                          # noqa: E402
 from item_icons.items import DISPLAYS                               # noqa: E402
-from item_icons.paths import ICON_DIR, SHEET_PATH                   # noqa: E402
+from item_icons.paths import ICON_DIR, ONLY_PATH, PASSES_DIR, SHEET_PATH  # noqa: E402
 from item_icons.portrait import PORTRAIT                            # noqa: E402
 
 UEPY = os.path.join(HERE, "dev", "uepy.py")
@@ -58,7 +58,13 @@ def main(argv):
                  f"(items: {', '.join(DISPLAYS)}, and {PORTRAIT})")
 
     if editor:
-        _in_editor("capture_item_icons.py", ITEM_ICONS_ONLY=",".join(only))
+        os.makedirs(PASSES_DIR, exist_ok=True)
+        with open(ONLY_PATH, "w") as fh:
+            fh.write(",".join(only))
+        try:
+            _in_editor("capture_item_icons.py")
+        finally:
+            os.remove(ONLY_PATH)
     made = compose_all(only)
     print(f"wrote {len(made)} icons to {ICON_DIR}: {', '.join(made)}", flush=True)
     print(f"contact sheet: {SHEET_PATH}", flush=True)

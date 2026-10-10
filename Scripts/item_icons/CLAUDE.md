@@ -47,16 +47,41 @@ the black contour shows).
 ## The character's portrait (`portrait.py`)
 
 The I panel's picture of the player (`T_UI_Portrait`, 256 x 512) goes through the same three
-steps, named `Character` on the command line: the body the player wears
-(`asset_pipeline/player_body.py`), from the front, in the first frame of its idle clip.
+steps, named `Character` on the command line: the MetaHuman the player is drawn as
+(`asset_pipeline/metahuman_paths.py`), from the front, in boxers, in the first frame of the
+idle. It is the same picture whatever the player wears.
 
+- **What stands before the camera** (`portrait_capture.py`) is `combat/metahuman_body.py`'s
+  tree rebuilt from plain actors: the whole body in `MI_BodyUnderwear`, the face, the six
+  grooms. No hidden mesh, no anim blueprint: nothing ticks in the capture.
+- **The pose is a clip retargeted for the picture.** The idle is on the UEFN skeleton and
+  reaches the body through `ABP_MetaHuman_Retarget_UEFN` every frame in the game; set on a
+  spawned component that blueprint leaves the reference pose (it never updates). So
+  `IDLE_CLIP` is batch-retargeted with `RTG_MetaHuman_from_UEFN` into
+  `/Game/Sourced/MetaHuman/PortraitScratch`, played as a single node, and the folder is
+  deleted after the shot. The clip goes into `animation_data` *before* the mesh is set:
+  setting the mesh initialises the animation, which poses the body once.
+- **The face is led by the body** (leader pose: the two skeletons name spine, neck and head
+  alike), not by `Face_AnimBP`. Its expression is the mesh's own.
+- **The grooms are in the picture, as cards and unbound.** A binding follows the skin through
+  the skin cache, which nothing has filled for a face spawned in the same frame: bound, the
+  hair lay at the feet. Each groom is instead moved as the head bone moved from where the
+  face mesh was made. Strands never reach a G-buffer capture; what shows is each groom's
+  cards.
+- **Two masks mend the picture** (`part_face.png`, `part_hair.png`, written by the capture of
+  each part alone; `parts.py`): the whole body is a generic one and Taro's face ends a few
+  pixels off its neckline at the shoulders, a hairline of nothing the contour drew black, so
+  gaps of up to `SEAM_PX` between face and body are filled from the skin beside them (whether
+  the game shows the gap too was not looked at); and a groom writes
+  its strand direction where a surface writes its normal, so the hair's normal is taken from
+  the depth and it takes no gloss (lit as captured it came out chrome grey).
 - **A new body needs a re-run** (`build_item_icons.py Character`), as a re-modelled item
   does. `build_graphics_menu.py` needs the texture: on a fresh clone run this before it.
-- **Its own level, `PORTRAIT_LEVEL_TO`:** brought up to the guns' `LEVEL_TO` a clothed body
+- **Its own level, `PORTRAIT_LEVEL_TO`:** brought up to the guns' `LEVEL_TO` a body
   washes out, and left as captured it is lost on the panel's dark.
-- **Nothing ticks an animation in the capture,** so a clip set on the spawned component
-  leaves the bind pose (arms out). The clip goes into `animation_data` *before* the mesh is
-  set: setting the mesh initialises the animation, which poses the body once.
+- **The names reach the capture through a file** (`paths.ONLY_PATH`), not the environment:
+  an editor that is already open never sees the caller's, and `Character` alone used to
+  re-capture every item.
 
 ## Traps
 

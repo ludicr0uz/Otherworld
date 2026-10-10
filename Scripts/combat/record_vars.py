@@ -5,7 +5,8 @@ carried item (its class, slot code, rounds loaded and held, whether it burns
 or is hot) and a class per worn slot, held by a component on the character
 (RECORD_COMPONENT, which combat/install.py adds) and sent whole to the owning
 client. Everyone else is told what the hand holds: the component's HandClass,
-HandLit and HandHot. No Blueprint variable holds a copy of any of it.
+HandLit and HandHot; and what is worn, for the garments drawn on the body:
+WornClasses. No Blueprint variable holds a copy of any of it.
 
 The server's item actors are still what its graphs work on (Inventory, Worn,
 each item's Slot, Loaded, Reserve, Lit and Hot: CARRIED_ARRAYS, ITEM_STATE).

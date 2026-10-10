@@ -1,6 +1,12 @@
-"""A client's worn garments: a picture of the record's worn slots
+"""A client's worn garments: a picture of the worn slots the server sent
 (combat/record_vars.py; read with WornRow, uebp/nodes/inventory.py), as its
 bag is of the record's rows (view.py). Never run with authority.
+
+The owner is sent the record, and WornRow reads its Worn. Everyone else is
+sent the same classes beside HandClass (the record component's WornClasses,
+skip-owner), and on their copy of the character WornRow reads those: so every
+client's copy of a character has the garments in Worn, and each is drawn on
+the body (wear_draw.py DrawWorn) by the machine that made it.
 
     the view, when a record arrived (view.py calls this while ViewDirty):
         ViewWorn(slot, WornRow(owner, slot)) for each slot of the record
@@ -8,16 +14,17 @@ bag is of the record's rows (view.py). Never run with authority.
 
     ViewWorn(Slot, Class)
         Worn[Slot] is an actor of Class --> kept
-        otherwise --> what is there is destroyed; a Class: one spawned in its
-                      place (a local actor, never replicated), hidden, not
-                      Dropped and UNPLACED, as the server's worn garment is;
-                      none: Worn[Slot] = None
+        otherwise --> what is there is taken off the body (DrawWorn off) and
+                      destroyed; a Class: one spawned in its place (a local
+                      actor, never replicated), hidden, not Dropped and
+                      UNPLACED, as the server's worn garment is, and drawn
+                      on the body (DrawWorn on); none: Worn[Slot] = None
 
 The I panel reads Worn's actors (graphics_menu/wear_draw.py, inv_drag.py), so
-with these it draws a client's worn slots as it draws single player's. Only
-the owner is sent the record: another player's character has no rows and so
-nothing in Worn. The shed empties Worn on every copy (shed.py), and the
-server's record with it, so a dead player's picture is nothing.
+with these it draws a client's worn slots as it draws single player's. The
+shed empties Worn on every copy (shed.py), and the server's record with it,
+so a dead player's picture is nothing; the dead gate stops this view, so
+what the body was drawn in stays on the corpse.
 """
 
 from uebp.g import _G
@@ -30,6 +37,7 @@ from combat.slot_tuning import SLOT_VAR, UNPLACED
 from combat.wear_tuning import WORN_VAR
 from combat.weapon_component.slot_nodes import for_each, op, valid
 from combat.weapon_component.slot_moves import _ask
+from combat.weapon_component.wear_draw import draw_worn
 from uebp.nodes.actor import FN_DESTROY, FN_GET_OWNER, FN_GET_TRANSFORM, FN_SET_HIDDEN
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_RESIZE, FN_ARR_SET, FN_ARR_VALID
 from uebp.nodes.inventory import FN_WORN_ROW, FN_WORN_ROW_COUNT
@@ -51,7 +59,7 @@ def author_view_worn_event(ed):
     alive, gone = g.branch(valid(g, cur), [there])
     same = out(g.call(FN_EQ_CC, A=out(g.call(FN_OBJECT_CLASS, Object=cur)), B=want))
     _keep, replace = g.branch(same, [alive])
-    destroyed = then(g.call(FN_DESTROY, [replace], self=cur))
+    destroyed = then(g.call(FN_DESTROY, [draw_worn(g, cur, False, [replace])], self=cur))
 
     worn, bare = g.branch(out(g.call(FN_IS_VALID_CLASS, Class=want)),
                           [destroyed, gone, beyond])
@@ -67,15 +75,17 @@ def author_view_worn_event(ed):
     hide = g.call(FN_SET_HIDDEN, [then(put)], self=out(spawn))
     _set(hide, "bNewHidden", True)
     flow = g.iput(out(spawn), IV.Dropped, "false", [then(hide)])
-    g.iput(out(spawn), SLOT_VAR, str(UNPLACED), [flow])
+    flow = g.iput(out(spawn), SLOT_VAR, str(UNPLACED), [flow])
+    draw_worn(g, out(spawn), True, [flow])
     # Item left unconnected: Worn[Slot] = None.
     off = g.call(FN_ARR_SET, [bare], TargetArray=g.get(WORN_VAR), Index=slot)
     _set(off, "bSizeToFit", True)
     ed.add_comment_to_nodes(
         f"{VIEW_WORN} (view_worn.py), a client's: Worn[Slot] is made to be the "
         "record's row for it. A garment of the right class is kept; anything else "
-        "is destroyed, and a local actor of the class spawned there, hidden and not "
-        "Dropped, or the slot emptied.", g.made)
+        "is taken off the body and destroyed, and a local actor of the class spawned "
+        "there, hidden and not Dropped, and drawn on the body, or the slot emptied.",
+        g.made)
 
 
 def author_view_worn(g, execs):
@@ -90,6 +100,6 @@ def author_view_worn(g, execs):
     item, j, each, trimmed = for_each(g, g.get(WORN_VAR), [done])
     extra, _ = g.branch(op(g, FN_GE_II, j, rows), [each])
     real, _ = g.branch(valid(g, item), [extra])
-    g.call(FN_DESTROY, [real], self=item)
+    g.call(FN_DESTROY, [draw_worn(g, item, False, [real])], self=item)
     cut = g.call(FN_ARR_RESIZE, [trimmed], TargetArray=g.get(WORN_VAR), Size=rows)
     return then(cut)

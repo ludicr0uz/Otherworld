@@ -197,8 +197,9 @@ _author_* fragment per concern, each in its own module:
               named by its WornPart and shown, following the body (leader pose
               on its skeleton, else the mesh's own copy pose); bare and hidden
               again when it comes off or is dropped
-  view_worn   a client's worn garments: Worn made a picture of the record's
-              worn slots (WornRow, ViewWorn), called by view
+  view_worn   a client's worn garments: Worn made a picture of the worn
+              slots it was sent (WornRow, ViewWorn; the owner's record, anyone
+              else's WornClasses) and drawn on the body, called by view
   drop_request  the drop: the drop key and a probe's DropForced ask (AskDrop,
               a Server event), and DropRequest served with authority (the
               key's, or the I panel's drag released outside the inventory):

@@ -46,14 +46,14 @@ void UOtherworldInventoryLibrary::InventoryRow(const UObject* Carrier, int32 Ind
 int32 UOtherworldInventoryLibrary::WornRowCount(const UObject* Carrier)
 {
 	const UOtherworldInventoryRecordComponent* Component = UOtherworldInventoryRecordComponent::Of(Carrier);
-	return Component ? Component->Record.Worn.Num() : 0;
+	return Component ? Component->WornSlots().Num() : 0;
 }
 
 void UOtherworldInventoryLibrary::WornRow(const UObject* Carrier, int32 Slot, TSubclassOf<AActor> Kind,
 	TSubclassOf<AActor>& Class)
 {
 	const UOtherworldInventoryRecordComponent* Component = UOtherworldInventoryRecordComponent::Of(Carrier);
-	Class = Component && Component->Record.Worn.IsValidIndex(Slot) ? Component->Record.Worn[Slot] : nullptr;
+	Class = Component && Component->WornSlots().IsValidIndex(Slot) ? Component->WornSlots()[Slot] : nullptr;
 }
 
 void UOtherworldInventoryLibrary::HandRow(const UObject* Carrier, TSubclassOf<AActor> Kind,

@@ -2128,26 +2128,26 @@ combat/ragdoll.py:123: _v_rotate
 combat/ragdoll.py:132: _v_signed_angle
 combat/ragdoll.py:140: ragdoll_plan
 combat/ragdoll.py:277: tune_ragdolls
-combat/record_vars.py:37: ITEM_CLASS
-combat/record_vars.py:42: CARRIED_ARRAYS
-combat/record_vars.py:43: ITEM_STATE
-combat/record_vars.py:49: RECORD_COMPONENT
-combat/record_vars.py:50: RECORD_COMPONENT_CLASS
-combat/record_vars.py:51: RECORD_SOURCE
-combat/record_vars.py:56: RECORD_HAND_SLOT
-combat/record_vars.py:62: RECORD_VIEW
-combat/record_vars.py:69: RETIRED_ARRAYS
-combat/record_vars.py:71: RETIRED_VARS
-combat/record_vars.py:78: NO_ASK
-combat/record_vars.py:91: FORCED
-combat/record_vars.py:93: TABLE
-combat/record_vars.py:98: VIEW_ROW
-combat/record_vars.py:99: VIEW_TRIM
-combat/record_vars.py:100: ROW_PARAMS
-combat/record_vars.py:102: TRIM_PARAMS
-combat/record_vars.py:103: AMMO_UNKNOWN
-combat/record_vars.py:106: VIEW_WORN
-combat/record_vars.py:107: WORN_PARAMS
+combat/record_vars.py:38: ITEM_CLASS
+combat/record_vars.py:43: CARRIED_ARRAYS
+combat/record_vars.py:44: ITEM_STATE
+combat/record_vars.py:50: RECORD_COMPONENT
+combat/record_vars.py:51: RECORD_COMPONENT_CLASS
+combat/record_vars.py:52: RECORD_SOURCE
+combat/record_vars.py:57: RECORD_HAND_SLOT
+combat/record_vars.py:63: RECORD_VIEW
+combat/record_vars.py:70: RETIRED_ARRAYS
+combat/record_vars.py:72: RETIRED_VARS
+combat/record_vars.py:79: NO_ASK
+combat/record_vars.py:92: FORCED
+combat/record_vars.py:94: TABLE
+combat/record_vars.py:99: VIEW_ROW
+combat/record_vars.py:100: VIEW_TRIM
+combat/record_vars.py:101: ROW_PARAMS
+combat/record_vars.py:103: TRIM_PARAMS
+combat/record_vars.py:104: AMMO_UNKNOWN
+combat/record_vars.py:107: VIEW_WORN
+combat/record_vars.py:108: WORN_PARAMS
 combat/replacement.py:24: _author_replacement
 combat/respawn.py:42: RESPAWN_BAND
 combat/respawn.py:43: RESPAWN_NAV_SNAP
@@ -3163,9 +3163,10 @@ combat/verify/wear.py:138: check_take_off
 combat/verify/wear.py:159: check_wear_request
 combat/verify/wear.py:181: check_drop_request
 combat/verify/wear.py:209: check_server_wears
-combat/verify/wear_draw.py:19: _on
-combat/verify/wear_draw.py:25: check_draw_calls
-combat/verify/wear_draw.py:48: check_draw_event
+combat/verify/wear_draw.py:20: _on
+combat/verify/wear_draw.py:26: _view_calls
+combat/verify/wear_draw.py:36: check_draw_calls
+combat/verify/wear_draw.py:66: check_draw_event
 combat/verify/world_items.py:21: _data_upstream
 combat/verify/world_items.py:35: check_drop_is_asked
 combat/verify/world_items.py:59: check_item_enters_world
@@ -3510,8 +3511,8 @@ combat/weapon_component/view.py:109: _author_view_row
 combat/weapon_component/view.py:162: _author_view_trim
 combat/weapon_component/view.py:176: author_view_events
 combat/weapon_component/view.py:182: _author_view
-combat/weapon_component/view_worn.py:41: author_view_worn_event
-combat/weapon_component/view_worn.py:81: author_view_worn
+combat/weapon_component/view_worn.py:49: author_view_worn_event
+combat/weapon_component/view_worn.py:91: author_view_worn
 combat/weapon_component/wear.py:72: WEAR_SLOT_VAR
 combat/weapon_component/wear.py:75: _worn_at
 combat/weapon_component/wear.py:84: _is_garment
@@ -3522,16 +3523,16 @@ combat/weapon_component/wear.py:139: _author_wear
 combat/weapon_component/wear.py:187: _author_take_off
 combat/weapon_component/wear_drag.py:38: SLOT_ITEMS
 combat/weapon_component/wear_drag.py:41: _author_wear_request
-combat/weapon_component/wear_draw.py:49: DRAW_PARAMS
-combat/weapon_component/wear_draw.py:51: NODE_CAST_SKELETAL
-combat/weapon_component/wear_draw.py:52: AS_SKELETAL
-combat/weapon_component/wear_draw.py:53: SKINNED_CLASS
-combat/weapon_component/wear_draw.py:54: TICK_OPTION_VAR
-combat/weapon_component/wear_draw.py:55: TICK_ALWAYS
-combat/weapon_component/wear_draw.py:58: draw_worn
-combat/weapon_component/wear_draw.py:68: _shown
-combat/weapon_component/wear_draw.py:77: _author_part
-combat/weapon_component/wear_draw.py:110: author_draw_worn_event
+combat/weapon_component/wear_draw.py:51: DRAW_PARAMS
+combat/weapon_component/wear_draw.py:53: NODE_CAST_SKELETAL
+combat/weapon_component/wear_draw.py:54: AS_SKELETAL
+combat/weapon_component/wear_draw.py:55: SKINNED_CLASS
+combat/weapon_component/wear_draw.py:56: TICK_OPTION_VAR
+combat/weapon_component/wear_draw.py:57: TICK_ALWAYS
+combat/weapon_component/wear_draw.py:60: draw_worn
+combat/weapon_component/wear_draw.py:70: _shown
+combat/weapon_component/wear_draw.py:79: _author_part
+combat/weapon_component/wear_draw.py:112: author_draw_worn_event
 combat/weapon_items.py:47: build_weapon_item
 combat/weapon_items.py:90: build_parts
 combat/weapon_items.py:123: KEEP
@@ -7004,21 +7005,29 @@ probes/probe_net_campfire.py:324: _press
 probes/probe_net_campfire.py:331: _sees
 probes/probe_net_campfire.py:356: _client_two
 probes/probe_net_campfire.py:407: _client_one
-probes/probe_net_clothing.py:51: WAIT
-probes/probe_net_clothing.py:53: GLOVES
-probes/probe_net_clothing.py:54: NOTHING
-probes/probe_net_clothing.py:55: STEPS
-probes/probe_net_clothing.py:57: WANT
-probes/probe_net_clothing.py:66: _await
-probes/probe_net_clothing.py:71: _wc
-probes/probe_net_clothing.py:75: _name
-probes/probe_net_clothing.py:83: _row
-probes/probe_net_clothing.py:89: _worn
-probes/probe_net_clothing.py:93: _worn_record
-probes/probe_net_clothing.py:98: _want
-probes/probe_net_clothing.py:102: _bag
-probes/probe_net_clothing.py:107: _give
-probes/probe_net_clothing.py:120: _steps
+probes/probe_net_clothing.py:71: WAIT
+probes/probe_net_clothing.py:73: TITLE
+probes/probe_net_clothing.py:74: HOODIE
+probes/probe_net_clothing.py:78: HOLD
+probes/probe_net_clothing.py:81: GLOVES
+probes/probe_net_clothing.py:82: NOTHING
+probes/probe_net_clothing.py:83: STEPS
+probes/probe_net_clothing.py:85: WANT
+probes/probe_net_clothing.py:94: _await
+probes/probe_net_clothing.py:99: _wc
+probes/probe_net_clothing.py:103: _name
+probes/probe_net_clothing.py:111: _row
+probes/probe_net_clothing.py:117: _worn
+probes/probe_net_clothing.py:121: _worn_record
+probes/probe_net_clothing.py:126: _want
+probes/probe_net_clothing.py:130: _bag
+probes/probe_net_clothing.py:135: _give
+probes/probe_net_clothing.py:148: _steps
+probes/probe_net_clothing.py:276: _on_server
+probes/probe_net_clothing.py:284: _join
+probes/probe_net_clothing.py:307: _theirs
+probes/probe_net_clothing.py:316: _sees
+probes/probe_net_clothing.py:331: _client_two
 probes/probe_net_death.py:61: GARMENT
 probes/probe_net_death.py:62: LEG_BONES
 probes/probe_net_death.py:63: ON_BODY_CM
@@ -8966,30 +8975,30 @@ Source/Otherworld/Public/OtherworldHealthComponent.h:73: UFUNCTION void OnDied()
 Source/Otherworld/Public/OtherworldHealthComponent.h:110: UFUNCTION void OnRep_Health();
 Source/Otherworld/Public/OtherworldHealthComponent.h:113: UFUNCTION void OnRep_Dead();
 Source/Otherworld/Public/OtherworldHitHistory.h:66: UCLASS class OTHERWORLD_API UOtherworldHitHistory : public UWorldSubsystem
-Source/Otherworld/Public/OtherworldInventoryRecord.h:137: UCLASS class OTHERWORLD_API UOtherworldInventoryRecordComponent : public UAct
-Source/Otherworld/Public/OtherworldInventoryRecord.h:154: UFUNCTION void MarkDirty();
-Source/Otherworld/Public/OtherworldInventoryRecord.h:225: UFUNCTION void OnRep_Record();
-Source/Otherworld/Public/OtherworldInventoryRecord.h:229: UFUNCTION void OnRep_Hand();
-Source/Otherworld/Public/OtherworldInventoryRecord.h:245: UCLASS class OTHERWORLD_API UOtherworldInventoryRecords : public UWorldSubsys
-Source/Otherworld/Public/OtherworldInventoryRecord.h:266: UCLASS class OTHERWORLD_API UOtherworldInventoryLibrary : public UBlueprintFu
-Source/Otherworld/Public/OtherworldInventoryRecord.h:278: UFUNCTION static void MarkInventoryDirty(UObject* Carrier);
-Source/Otherworld/Public/OtherworldInventoryRecord.h:286: UFUNCTION static void MarkCarriedItemDirty(AActor* Item);
-Source/Otherworld/Public/OtherworldInventoryRecord.h:295: UFUNCTION static int32 InventoryRowCount(const UObject* Carrier);
-Source/Otherworld/Public/OtherworldInventoryRecord.h:299: UFUNCTION static void InventoryRow(const UObject* Carrier, int32 Index, TSubclas
-Source/Otherworld/Public/OtherworldInventoryRecord.h:305: UFUNCTION static int32 WornRowCount(const UObject* Carrier);
-Source/Otherworld/Public/OtherworldInventoryRecord.h:309: UFUNCTION static void WornRow(const UObject* Carrier, int32 Slot, TSubclassOf<AA
-Source/Otherworld/Public/OtherworldInventoryRecord.h:314: UFUNCTION static void HandRow(const UObject* Carrier, TSubclassOf<AActor> Kind, 
-Source/Otherworld/Public/OtherworldInventoryRecord.h:322: UFUNCTION static FOtherworldInventoryRecord InventoryRecordOf(const UObject* Car
-Source/Otherworld/Public/OtherworldInventoryRecord.h:326: UFUNCTION static TArray<uint8> InventoryRecordToBytes(const FOtherworldInventory
-Source/Otherworld/Public/OtherworldInventoryRecord.h:330: UFUNCTION static bool InventoryRecordFromBytes(const TArray<uint8>& Bytes, FOthe
-Source/Otherworld/Public/OtherworldInventoryRecord.h:334: UFUNCTION static int32 InventoryRecordSaveVersion();
-Source/Otherworld/Public/OtherworldInventoryRecord.h:338: UFUNCTION static FString DescribeRecord(const FOtherworldInventoryRecord& Record
-Source/Otherworld/Public/OtherworldInventoryRecord.h:342: UFUNCTION static FString DescribeInventoryRecord(const AActor* Carrier);
-Source/Otherworld/Public/OtherworldInventoryRecord.h:346: UFUNCTION static int32 InventoryRecordWrites(const AActor* Carrier);
-Source/Otherworld/Public/OtherworldInventoryRecord.h:350: UFUNCTION static int32 InventoryRecordStale(const AActor* Carrier);
-Source/Otherworld/Public/OtherworldInventoryRecord.h:358: UFUNCTION static void SetInventoryRecordAudit(bool bOn);
-Source/Otherworld/Public/OtherworldInventoryRecord.h:362: UFUNCTION static bool IsPushModelOn();
-Source/Otherworld/Public/OtherworldInventoryRecord.h:371: UCLASS class OTHERWORLD_API UOtherworldRecordSave : public USaveGame
+Source/Otherworld/Public/OtherworldInventoryRecord.h:138: UCLASS class OTHERWORLD_API UOtherworldInventoryRecordComponent : public UAct
+Source/Otherworld/Public/OtherworldInventoryRecord.h:155: UFUNCTION void MarkDirty();
+Source/Otherworld/Public/OtherworldInventoryRecord.h:237: UFUNCTION void OnRep_Record();
+Source/Otherworld/Public/OtherworldInventoryRecord.h:241: UFUNCTION void OnRep_Hand();
+Source/Otherworld/Public/OtherworldInventoryRecord.h:257: UCLASS class OTHERWORLD_API UOtherworldInventoryRecords : public UWorldSubsys
+Source/Otherworld/Public/OtherworldInventoryRecord.h:278: UCLASS class OTHERWORLD_API UOtherworldInventoryLibrary : public UBlueprintFu
+Source/Otherworld/Public/OtherworldInventoryRecord.h:290: UFUNCTION static void MarkInventoryDirty(UObject* Carrier);
+Source/Otherworld/Public/OtherworldInventoryRecord.h:298: UFUNCTION static void MarkCarriedItemDirty(AActor* Item);
+Source/Otherworld/Public/OtherworldInventoryRecord.h:307: UFUNCTION static int32 InventoryRowCount(const UObject* Carrier);
+Source/Otherworld/Public/OtherworldInventoryRecord.h:311: UFUNCTION static void InventoryRow(const UObject* Carrier, int32 Index, TSubclas
+Source/Otherworld/Public/OtherworldInventoryRecord.h:317: UFUNCTION static int32 WornRowCount(const UObject* Carrier);
+Source/Otherworld/Public/OtherworldInventoryRecord.h:321: UFUNCTION static void WornRow(const UObject* Carrier, int32 Slot, TSubclassOf<AA
+Source/Otherworld/Public/OtherworldInventoryRecord.h:326: UFUNCTION static void HandRow(const UObject* Carrier, TSubclassOf<AActor> Kind, 
+Source/Otherworld/Public/OtherworldInventoryRecord.h:334: UFUNCTION static FOtherworldInventoryRecord InventoryRecordOf(const UObject* Car
+Source/Otherworld/Public/OtherworldInventoryRecord.h:338: UFUNCTION static TArray<uint8> InventoryRecordToBytes(const FOtherworldInventory
+Source/Otherworld/Public/OtherworldInventoryRecord.h:342: UFUNCTION static bool InventoryRecordFromBytes(const TArray<uint8>& Bytes, FOthe
+Source/Otherworld/Public/OtherworldInventoryRecord.h:346: UFUNCTION static int32 InventoryRecordSaveVersion();
+Source/Otherworld/Public/OtherworldInventoryRecord.h:350: UFUNCTION static FString DescribeRecord(const FOtherworldInventoryRecord& Record
+Source/Otherworld/Public/OtherworldInventoryRecord.h:354: UFUNCTION static FString DescribeInventoryRecord(const AActor* Carrier);
+Source/Otherworld/Public/OtherworldInventoryRecord.h:358: UFUNCTION static int32 InventoryRecordWrites(const AActor* Carrier);
+Source/Otherworld/Public/OtherworldInventoryRecord.h:362: UFUNCTION static int32 InventoryRecordStale(const AActor* Carrier);
+Source/Otherworld/Public/OtherworldInventoryRecord.h:370: UFUNCTION static void SetInventoryRecordAudit(bool bOn);
+Source/Otherworld/Public/OtherworldInventoryRecord.h:374: UFUNCTION static bool IsPushModelOn();
+Source/Otherworld/Public/OtherworldInventoryRecord.h:383: UCLASS class OTHERWORLD_API UOtherworldRecordSave : public USaveGame
 Source/Otherworld/Public/OtherworldLoadLibrary.h:47: UCLASS class OTHERWORLD_API UOtherworldLoadLibrary : public UBlueprintFunctio
 Source/Otherworld/Public/OtherworldLoadLibrary.h:57: UFUNCTION static TArray<FOtherworldConnectionStats> ConnectionStats(const UObjec
 Source/Otherworld/Public/OtherworldLoadLibrary.h:67: UFUNCTION static void StartFrameTiming();

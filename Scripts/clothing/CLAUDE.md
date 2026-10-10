@@ -102,9 +102,17 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   bare and dressed by `probe_scope_hide.py`, `probe_head_hide.py` and
   `probe_net_death.py`'s standalone arm; a probe dresses its player with
   `probes/dressed.py` `put_on`.
-- **Not yet:** another player sees nothing (the record's `Worn` goes to the owner only,
-  and a client's picture of it, `view_worn.py`, does not call `DrawWorn`); a death
-  empties `Worn` without taking the mesh off the body; a loaded profile wears nothing.
+- **On a server every client draws it itself** (K5). The dedicated server draws no one;
+  the classes worn reach the owner in the record and everyone else in `WornClasses`
+  beside `HandClass` (`Scripts/net/CLAUDE.md`, "Clothing"), and each client's view
+  (`view_worn.py`) calls `DrawWorn` on for the garment it spawns into `Worn` and off for
+  one it is about to destroy. So a client's copy of another player's character has that
+  player's garments in `Worn` too: hidden local actors, as the owner's are.
+  `probe_net_clothing.py` has client 2 see the hoodie come and go, and with `--title`
+  join late and see it.
+- **Not yet:** a death empties `Worn` without taking the mesh off the body (the dead gate
+  stops a client's view, so a corpse stays dressed on every machine); a loaded profile
+  wears nothing.
 
 ## Traps
 
@@ -119,7 +127,7 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 ## Not done yet
 
 - Five garments are drawn as nothing worn (no mesh), and a worn garment does nothing (no
-  warmth, no carry space). On a server no one sees a garment drawn yet, the wearer included.
+  warmth, no carry space).
 - **The base body is worn:** the player is `SKM_Adventurer03`, the man in skin-tight
   shorts, generated to swap in for the dressed `SKM_Adventurer01`
   (`asset_pipeline/player_body.py` `PLAYER_BODY` and `CLOTHING_BASE_BODY`;

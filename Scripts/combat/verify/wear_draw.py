@@ -9,6 +9,7 @@ the wiring; probes/probe_clothing.py wears the jacket and the pants in a game.
 from combat.verify.common import check, graph, in_pins, pin_value
 from combat.verify.fixtures import wc, wg
 from combat.verify.record import _upstream
+from combat.record_vars import VIEW_WORN
 from combat.verify.wear import _chain, _feeders, _title
 from combat.wear_tuning import DRAW_WORN, WORN_VAR
 from combat.weapon_component.wear_draw import (
@@ -22,10 +23,27 @@ def _on(n):
     return (pin_value(n, ON_PARAM) or "false").lower() == "true"
 
 
+def _view_calls(calls):
+    """The client's view's (view_worn.py): on for the garment it spawned, off
+    for one it is about to destroy."""
+    made = [n for n in calls if any("SpawnTransform" in in_pins(f)
+                                    for f in _feeders(n, ITEM_PARAM))]
+    ended = [n for n in calls if n not in made
+             and "DestroyActor" in _title(_chain(n, 2)[-1]).replace(" ", "")]
+    return made, ended
+
+
 def check_draw_calls():
-    calls = [n for n in wg if _title(n).replace(" ", "") == DRAW_WORN
+    every = [n for n in wg if _title(n).replace(" ", "") == DRAW_WORN
              and ON_PARAM in in_pins(n)]
-    check(f"{DRAW_WORN} is called six times: on by the wear and the dragged wear, off "
+    made, ended = _view_calls(every)
+    check(f"a client's view draws what it was sent ({VIEW_WORN}): {DRAW_WORN} on for the "
+          "garment it spawned, off for one of another class and for one past the "
+          "rows, each before it is destroyed",
+          [_on(n) for n in made] == [True] and [_on(n) for n in ended] == [False, False],
+          f"{len(made)} on, {len(ended)} off")
+    calls = [n for n in every if n not in made and n not in ended]
+    check(f"{DRAW_WORN} is called six times more: on by the wear and the dragged wear, off "
           "for the garment each swaps out, by the take-off and by the drop of a worn one",
           sorted(_on(n) for n in calls) == [False, False, False, False, True, True],
           str([pin_value(n, ON_PARAM) for n in calls]))

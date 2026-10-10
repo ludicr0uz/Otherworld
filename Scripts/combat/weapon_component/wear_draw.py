@@ -1,8 +1,10 @@
 """Clothing drawn on the body: a worn garment's mesh on the component it fills.
 
     DrawWorn(Item, On), a plain event, called where Worn changes (wear.py,
-    wear_drag.py, drop_request.py). Nothing on a dedicated server, which
-    draws no one, nor for an Item that is gone or has no WornMesh (the hat):
+    wear_drag.py, drop_request.py; on a client its view, view_worn.py, for
+    its own character and everyone else's). Nothing on a dedicated server,
+    which draws no one, nor for an Item that is gone or has no WornMesh (the
+    hat):
         every SkeletalMeshComponent under OwnerMesh whose name is
         Item.WornPart (metahuman_body's Torso, Legs, Feet; a mannequin skin
         has none, and nothing is drawn):

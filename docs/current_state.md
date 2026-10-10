@@ -65,7 +65,7 @@ updates the bullet here.
   open, Up/Down and Enter (or a click) take one off into the bag, the mouse drags a worn garment
   onto the hand or a bag slot and a carried one onto the worn slots to wear it
   (`combat/weapon_component/wear_drag.py`), and a portrait of the character, facing
-  forward, stands left of the panel (a render of the player's body: `item_icons/portrait.py`). Only the state exists: nothing is drawn worn and wearing changes nothing. The body
+  forward, stands left of the panel (a render of the player's body: `item_icons/portrait.py`). The jacket, the pants and the boots are drawn on the body when worn (the MetaHuman's hoodie, jeans and shoes), to the wearer and, on a server, to everyone who sees them; the other five are drawn as nothing, and wearing changes nothing else. The body
   the garments will be drawn on is generated: the adventurer in skin-tight shorts
   (`SKM_Adventurer03`, Meshy), which the player now wears
   (`Scripts/asset_pipeline/CLAUDE.md`). One of

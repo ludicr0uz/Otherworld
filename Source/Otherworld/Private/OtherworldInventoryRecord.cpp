@@ -179,6 +179,7 @@ void UOtherworldInventoryRecordComponent::GetLifetimeReplicatedProps(TArray<FLif
 	DOREPLIFETIME_WITH_PARAMS_FAST(UOtherworldInventoryRecordComponent, HandClass, Others);
 	DOREPLIFETIME_WITH_PARAMS_FAST(UOtherworldInventoryRecordComponent, HandLit, Others);
 	DOREPLIFETIME_WITH_PARAMS_FAST(UOtherworldInventoryRecordComponent, HandHot, Others);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UOtherworldInventoryRecordComponent, WornClasses, Others);
 }
 
 void UOtherworldInventoryRecordComponent::BeginPlay()
@@ -294,6 +295,11 @@ void UOtherworldInventoryRecordComponent::Write()
 	Read(From, Now, Hand, bLit, bHot);
 
 	++Writes;
+	if (Now.Worn != WornClasses)
+	{
+		WornClasses = Now.Worn;
+		MARK_PROPERTY_DIRTY_FROM_NAME(UOtherworldInventoryRecordComponent, WornClasses, this);
+	}
 	if (Now != Record)
 	{
 		Record = MoveTemp(Now);

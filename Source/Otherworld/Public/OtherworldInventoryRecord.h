@@ -12,7 +12,8 @@
 //                                         the item actors as they then stand
 //
 // Everyone but the owner is told what the hand holds: HandClass, HandLit and
-// HandHot.
+// HandHot; and what is worn, a class per slot: WornClasses, the record's Worn
+// again, for the garments drawn on the body.
 //
 // A client's item actors are a picture of the record (task A3b): the one
 // RepNotify raises the weapon component's ViewDirty, and its view
@@ -168,6 +169,17 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_Hand, BlueprintReadOnly, Category = "Otherworld|Inventory")
 	bool HandHot = false;
 
+	/**
+	 * To everyone but the owner: the record's Worn, a class per worn slot,
+	 * for the garments another player's body is drawn in. WornRow reads it
+	 * where no record was sent.
+	 */
+	UPROPERTY(ReplicatedUsing = OnRep_Hand, BlueprintReadOnly, Category = "Otherworld|Inventory")
+	TArray<TSubclassOf<AActor>> WornClasses;
+
+	/** The worn slots this machine was told: the record's, or on another player's character WornClasses. */
+	const TArray<TSubclassOf<AActor>>& WornSlots() const { return Record.Worn.Num() ? Record.Worn : WornClasses; }
+
 	/** A client's: a record arrived. */
 	UPROPERTY(BlueprintAssignable, Category = "Otherworld|Inventory")
 	FOtherworldRecordChanged OnRecordChanged;
@@ -225,7 +237,7 @@ private:
 	UFUNCTION()
 	void OnRep_Record();
 
-	/** What another player's hand holds arrived (each of the three calls it). */
+	/** What another player's hand holds, or what they wear, arrived (each of the four calls it). */
 	UFUNCTION()
 	void OnRep_Hand();
 

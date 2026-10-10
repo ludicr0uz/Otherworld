@@ -133,6 +133,7 @@ of them, plain data, one C++ struct on its own component (`combat/record_vars.py
 |---|---|---|
 | `Record` (`FOtherworldInventoryRecord`): `Items[i]` (class, slot code, loaded, reserve, lit, hot), `Worn[slot]` (class or none) | a row per carried item, in `Inventory`'s order, and a class per worn slot | the owning client (`COND_OwnerOnly`), whole, with one RepNotify |
 | `HandClass`, `HandLit`, `HandHot` | the class in hand, or none; whether it burns or glows | everyone else (`COND_SkipOwner`), each a RepNotify |
+| `WornClasses` | the record's `Worn` again: a class per worn slot, for the garments drawn on the body | everyone else (`COND_SkipOwner`), the same RepNotify |
 
 - **The server writes it on a frame that changed it** (A3a): the component sits on the
   character beside the weapon component (`combat/install.py`).
@@ -235,6 +236,14 @@ setting one down is a reliable Server event on the weapon component.
 Wearing and taking off are the server's, on the inventory's pattern: the server keeps the
 item actors (`Worn[slot]`, the very garment that was picked up), a record of them travels,
 and the owning client's `Worn` is a picture of the record.
+
+Everyone else is sent the worn classes alone, for the garments drawn on the body (K5):
+`WornClasses` on the record component, the record's `Worn` again, `COND_SkipOwner`
+beside `HandClass` and written in the same `Write`. `WornRow` reads the record's `Worn`
+where there is one and `WornClasses` where there is not, so the one view
+(`combat/weapon_component/view_worn.py`) makes every client's copy of a character wear
+what the server's does, and calls `DrawWorn` as it does (`Scripts/clothing/CLAUDE.md`,
+"Drawn on the body"). A late joiner is sent the array with the character.
 
 - M24 clothing: docs/history/multiplayer.md#m24
 

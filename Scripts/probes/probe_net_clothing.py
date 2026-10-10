@@ -18,8 +18,19 @@ which that client's Worn is made from (view_worn.py).
                 takes the jacket off into the bag (AskTakeOff); drags the hat
                 out of the inventory (AskDrop of a worn slot). After each its
                 own worn slots are what the server says
-    client 2    is told none of it: its copy of client 1's character wears
-                nothing, and nor does its own
+    client 2    sees it (K5): the record is the owner's alone, but the classes
+                worn go to everyone else beside HandClass (WornClasses), and
+                its copy of client 1's character is drawn by them
+                (view_worn.py, wear_draw.py). With the jacket worn that copy's
+                Torso has the hoodie, shown and on the body's bones; taken
+                off, Torso is bare and hidden. It wears nothing itself
+    the server  draws no one: its copy's garment components stay bare
+
+    ... --net --clients 2 --title --probe Scripts/probes/probe_net_clothing.py
+
+On the title each client joins when its probe does: client 1 at once, and
+client 2 LATE, once the jacket is worn. The late joiner sees the hoodie on
+client 1 as soon as it sees client 1, and then sees it taken off.
 
 Single player (`--game`) does the same on the one machine: the asks are plain
 calls there.
@@ -31,13 +42,18 @@ keys are read: a Blueprint Server event called from Python is not sent.
 
 SYSTEMS = ('net', 'clothing')
 
+import os
 import time
 
 import unreal
 
+from combat import health_vars as HV
 from combat import item_vars as IV
 from combat.ask_consts import ASK_DROP, ASK_TAKE_OFF, ASK_WEAR
-from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
+from asset_pipeline.metahuman_paths import CLOTHING
+from combat.metahuman_body import BODY
+from combat.paths import (
+    HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH)
 from combat.record_vars import FORCED
 from combat.slot_tuning import BAG_FIRST, BAG_LAST, SLOT_COUNT, SLOT_VAR, UNPLACED
 from combat.strike_vars import SERVER_TAKE
@@ -45,10 +61,22 @@ from combat.wear_tuning import SERVER_WEAR, WEAR_SLOTS, WORN_VAR
 from combat.weapon_component import vars as WV
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from probes.probe_chop_tree import _items
+from probes.probe_clothing_draw import BARE, FOLLOW_CM, TORSO, _gap, _skeletal, bare, dress
+from probes.probe_hot_blade import _wanderers
+from probes.probe_net_late_join import JOIN_S, SPARE_HEALTH
 
 RUNS_ON = ("server", "client", "standalone")
-WRITABLE = [(WEAPON_COMP_BP_PATH, str(v)) for v in FORCED + (FIRE_FORCED_VAR,)]
+WRITABLE = ([(WEAPON_COMP_BP_PATH, str(v)) for v in FORCED + (FIRE_FORCED_VAR,)]
+            + [(HEALTH_BP_PATH, HV.Health)])
 WAIT = 20.0
+# uepy.py --title: client 2 joins late (see the docstring).
+TITLE = bool(os.environ.get("UEPY_TITLE"))
+HOODIE = (CLOTHING[TORSO], True)
+# Client 1 does nothing more after a step until client 2 has looked at what
+# the step named here left ({client 1's step: client 2's look}). On the title
+# client 2 joins with the jacket on, and client 1 keeps it on until it looked.
+HOLD = ({"refused": "drag", "off": "off"} if TITLE
+        else {"key": "key", "drag": "drag", "off": "off"})
 HAT, JACKET = WEAR_SLOTS.index("hat"), WEAR_SLOTS.index("jacket")
 GLOVES = WEAR_SLOTS.index("gloves")
 NOTHING = [None] * len(WEAR_SLOTS)
@@ -154,6 +182,9 @@ def _steps(p, wc, said):
     yield from agree("drag", f"{ASK_WEAR}(the jacket's slot): the jacket is worn too, out "
                      "of the bag", lambda: "Jacket" not in _bag(p, wc),
                      lambda: f"bag {_bag(p, wc)}")
+    body = wc.get_owner()
+    p.check("...and drawn on its own body: Torso has the hoodie and shows",
+            dress(body)[TORSO] == HOODIE, str(dress(body)))
 
     # --- what the server refuses --------------------------------------------------
     bag = _bag(p, wc)
@@ -172,6 +203,7 @@ def _steps(p, wc, said):
                      "the hat still worn",
                      lambda: BAG_FIRST <= _bag(p, wc).get("Jacket", UNPLACED) <= BAG_LAST,
                      lambda: f"jacket in slot {_bag(p, wc).get('Jacket')}")
+    p.check("...and Torso is bare and hidden again", bare(body), str(dress(body)))
 
     # --- out of the inventory, onto the ground ------------------------------------
     p.ask_drop(wc, SLOT_COUNT + HAT)
@@ -187,9 +219,23 @@ def _steps(p, wc, said):
 # ─── the server ──────────────────────────────────────────────────────────────
 
 def probe_server(p):
-    yield from _await(lambda: p.posted("client 1", "id") is not None)
-    by_id = {c.player_state.player_id: c.get_controlled_pawn()
-             for c in p.players() if c.player_state}
+    # The level's wanderers would kill client 1 within seconds of its join,
+    # long before the late joiner has looked; a destroyed one is replaced
+    # 10 s on, which it must outlive too.
+    yield from _await(lambda: p.players() and p.players()[0].get_controlled_pawn(), 30.0)
+    for c in p.players():
+        if c.get_controlled_pawn():
+            p.set(p.component(c.get_controlled_pawn(), HEALTH_CLASS_PATH), HV.Health,
+                  SPARE_HEALTH)
+    for ctrl in _wanderers(p):
+        if ctrl.get_controlled_pawn():
+            ctrl.get_controlled_pawn().destroy_actor()
+    yield from _await(lambda: p.posted("client 1", "id") is not None, JOIN_S + 60.0)
+    players = lambda: {c.player_state.player_id: c.get_controlled_pawn()
+                       for c in p.players() if c.player_state}
+    # On the title the server's probe starts with the first controller.
+    yield from _await(lambda: players().get(p.posted("client 1", "id")))
+    by_id = players()
     pawn = by_id.get(p.posted("client 1", "id"))
     p.check("the server has client 1's character", bool(pawn), str(sorted(by_id)))
     if not pawn:
@@ -204,13 +250,15 @@ def probe_server(p):
     p.post("given")
 
     for step in STEPS:
-        yield from _await(lambda: p.posted("client 1", step) is not None, 40.0)
+        yield from _await(lambda: p.posted("client 1", step) is not None, 200.0)
         yield 0.3
         got = _worn(p, wc)
         p.check(f"after client 1's '{step}' the server's copy wears {WANT[step] or 'nothing'}"
                 ", its item actors and its record alike",
                 got == _want(step) and _worn_record(p, wc) == got,
                 f"worn {got}, record {_worn_record(p, wc)}")
+        p.check("...and the dedicated server draws none of it: its copy's garment "
+                "components are bare", bare(pawn), str(dress(pawn)))
         p.post(f"worn-{step}", got)
     p.check("nobody else wears anything",
             all(_worn(p, c) == NOTHING and _worn_record(p, c) == NOTHING for c in others),
@@ -220,46 +268,139 @@ def probe_server(p):
             len(hats) == 1 and bool(p.get(hats[0], IV.InWorld)),
             f"{len(hats)} hat(s)")
     p.post("done")
+    yield from _await(lambda: p.posted("client 2", "judged") is not None, 60.0)
 
 
 # ─── a client ────────────────────────────────────────────────────────────────
 
+def _on_server(p):
+    """This client's pawn is one a server gave it. Not the late-join probe's
+    test: while the join is pending the title's world already says it is no
+    longer standalone, with the title's pawn still in it."""
+    pawn = p.pawn()
+    return bool(pawn) and not pawn.has_authority()
+
+
+def _join(p):
+    """Leave the title for the server. p.world() finds a world by its path,
+    and the title's has the server's path: it is collected here, or it is
+    found for as long as a minute after the travel."""
+    unreal.GameplayStatics.set_game_paused(p.world(), False)
+    unreal.GameplayStatics.open_level(p.world(), p.net.address, True, "")
+    tried = [time.time()]
+
+    def joined():
+        try:
+            if _on_server(p):
+                return True
+        except Exception:       # a world or a pawn mid-travel
+            pass
+        if time.time() - tried[0] > 2.0:
+            tried[0] = time.time()
+            unreal.SystemLibrary.collect_garbage()
+        return False
+    yield from _await(joined, JOIN_S)
+    p.check(f"{p.where} joined the server from the title", _on_server(p))
+    return _on_server(p)
+
+
+def _theirs(p):
+    """The other players' characters on this machine."""
+    mine = p.pawn()
+    if not mine:
+        return []
+    return [a for a in unreal.GameplayStatics.get_all_actors_of_class(p.world(), mine.get_class())
+            if a != mine]
+
+
+def _sees(p, step, label):
+    """Client 2, once the server has said ``step`` is done: its copy of client
+    1's character wears what the server's does, by the classes it was sent.
+    Returns that character."""
+    yield from _await(lambda: p.posted("server", f"worn-{step}") is not None, 90.0)
+    want = _want(step)
+    yield from _await(lambda: len(_theirs(p)) == 1 and _worn(p, _wc(p, _theirs(p)[0])) == want)
+    yield 0.5
+    theirs = _theirs(p)
+    got = [_worn(p, _wc(p, a)) for a in theirs]
+    p.check(f"client 2, after '{step}': {label}", len(theirs) == 1 and got == [want],
+            f"{got}")
+    return theirs[0] if theirs else None
+
+
+def _client_two(p):
+    mine = p.pawn()
+    wc = _wc(p, mine)
+    if not TITLE:
+        yield from _sees(p, "key", "its copy of client 1's character wears the hat, "
+                         "which draws nothing")
+        p.check("...and nothing is drawn on it yet", all(bare(a) for a in _theirs(p)),
+                str([dress(a) for a in _theirs(p)]))
+        p.post("saw-key")
+    one = yield from _sees(p, "drag", "its copy of client 1's character wears the hat "
+                           "and the jacket" + (", joined after both were worn" if TITLE else ""))
+    if not one:
+        return
+    yield from _await(lambda: dress(one)[TORSO] == HOODIE, 8.0)
+    seen = dress(one)
+    p.check("...and client 2 sees the hoodie on client 1's Torso, shown, Legs and Feet bare",
+            seen == {**{n: BARE for n in CLOTHING}, TORSO: HOODIE}, str(seen))
+    torso, body = _skeletal(one, TORSO), _skeletal(one, BODY)
+    yield 0.5
+    gap = _gap(torso, body) if torso and body else -1.0
+    p.check(f"...on the body's bones: its spine and its forearm within {FOLLOW_CM:.0f} cm",
+            0.0 <= gap < FOLLOW_CM, f"{gap:.2f} cm")
+    p.check("...and the record itself is still the owner's alone",
+            _worn_record(p, _wc(p, one)) == NOTHING, str(_worn_record(p, _wc(p, one))))
+    p.post("saw-drag")
+    yield from _sees(p, "off", "the jacket is off its copy of client 1's character")
+    yield from _await(lambda: bare(one), 8.0)
+    p.check("...and client 2 sees the hoodie gone: Torso is bare and hidden", bare(one),
+            str(dress(one)))
+    p.post("saw-off")
+    yield from _sees(p, "drop", "its copy of client 1's character wears nothing")
+    p.check("client 2 wears nothing itself, and nothing is drawn on it",
+            _worn(p, wc) == NOTHING and bare(mine), f"{_worn(p, wc)} {dress(mine)}")
+    p.post("judged")
+    yield from _await(lambda: p.posted("server", "done") is not None, 90.0)
+
+
 def probe_client(p):
+    if TITLE:
+        if p.client != 1:
+            # Wall time: game time stands still on the paused title.
+            yield from _await(lambda: p.posted("server", "worn-drag") is not None, 150.0)
+            if p.posted("server", "worn-drag") is None:
+                p.check("the server said the jacket is worn", False, "no post")
+                return
+        if not (yield from _join(p)):
+            return
     mine = p.pawn()
     wc = _wc(p, mine)
     yield from _await(lambda: p.get(wc, WV.Held) is not None
                       and p.player_state() is not None)
-    if p.client == 1:
-        p.post("id", p.player_state().player_id)
-        yield from _await(lambda: p.posted("server", "given") is not None, 60.0)
-        yield from _await(lambda: {"Hat", "Jacket"} <= set(_bag(p, wc)), 8.0)
-        p.check("client 1's bag holds the hat and the jacket the server gave it, and "
-                "it wears nothing", {"Hat", "Jacket"} <= set(_bag(p, wc))
-                and _worn(p, wc) == NOTHING, f"{_bag(p, wc)}")
-
-        def said(step):
-            p.post(step)
-            yield from _await(lambda: p.posted("server", f"worn-{step}") is not None)
-            return p.posted("server", f"worn-{step}")
-
-        yield from _steps(p, wc, said)
-        p.check("its worn slots are a picture of the record it was sent, and it has "
-                "authority over none of it", _worn_record(p, wc) == _worn(p, wc)
-                and not mine.has_authority(), f"record {_worn_record(p, wc)}")
+    if p.client != 1:
+        yield from _client_two(p)
         return
+    p.post("id", p.player_state().player_id)
+    yield from _await(lambda: p.posted("server", "given") is not None, 60.0)
+    yield from _await(lambda: {"Hat", "Jacket"} <= set(_bag(p, wc)), 8.0)
+    p.check("client 1's bag holds the hat and the jacket the server gave it, and "
+            "it wears nothing", {"Hat", "Jacket"} <= set(_bag(p, wc))
+            and _worn(p, wc) == NOTHING, f"{_bag(p, wc)}")
 
-    yield from _await(lambda: p.posted("server", "worn-drag") is not None, 90.0)
-    yield 0.5
-    cls = mine.get_class()
-    theirs = [_wc(p, a) for a in
-              unreal.GameplayStatics.get_all_actors_of_class(p.world(), cls) if a != mine]
-    p.check("client 2 is told nothing of what client 1 wears (the record is the "
-            "owner's): its copy of that character wears nothing",
-            len(theirs) == p.clients - 1
-            and all(_worn(p, c) == NOTHING and _worn_record(p, c) == NOTHING for c in theirs),
-            f"{[_worn(p, c) for c in theirs]}")
-    p.check("and client 2 wears nothing itself", _worn(p, wc) == NOTHING, f"{_worn(p, wc)}")
-    yield from _await(lambda: p.posted("server", "done") is not None, 90.0)
+    def said(step):
+        p.post(step)
+        yield from _await(lambda: p.posted("server", f"worn-{step}") is not None)
+        if step in HOLD and p.clients > 1:
+            yield from _await(lambda: p.posted("client 2", f"saw-{HOLD[step]}") is not None,
+                              150.0)
+        return p.posted("server", f"worn-{step}")
+
+    yield from _steps(p, wc, said)
+    p.check("its worn slots are a picture of the record it was sent, and it has "
+            "authority over none of it", _worn_record(p, wc) == _worn(p, wc)
+            and not mine.has_authority(), f"record {_worn_record(p, wc)}")
 
 
 # ─── single player ───────────────────────────────────────────────────────────

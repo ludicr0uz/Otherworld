@@ -39,10 +39,6 @@ MULTI = Page(PAGE_MULTI, "MultiPanel", MODE_MULTI_TEXT, "MultiBack", "MultiRows"
 MULTI_ADDRESS_ROW, MULTI_JOIN_ROW = 0, 1
 PAGES = (SINGLE, MULTI)
 
-# In play as a client of a server the menu's save-and-exit row is this instead:
-# back to the title, the single-player profile neither read nor written.
-LEAVE_ROW_LABEL = "Leave Server"
-
 # Under the Multiplayer page's rows: that a join is under way, or why the
 # last one failed or the last session dropped (the GameInstance's NetReason).
 MULTI_STATUS = "MultiStatus"

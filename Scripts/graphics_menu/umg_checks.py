@@ -12,10 +12,8 @@ import unreal
 
 from graphics_menu import inv_consts as IC
 from graphics_menu import settings_rows as S
-from graphics_menu.wear_consts import WEAR_SEL_VAR
 from ui_art.slot_ghosts import ghost_name
 from graphics_menu import umg_consts as C
-from graphics_menu.mode_consts import LEAVE_ROW_LABEL
 from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT, EXIT_ROW_LABEL
 from graphics_menu.umg_author import toolset
 
@@ -124,8 +122,8 @@ def check_trees(check):
           len(S.BIND_LABELS) == len(S.BIND_VARS), f"{len(S.BIND_LABELS)} labels")
     pause_rows = _labels(pause, C.PAUSE_ROWS)
     check("the menu lists single player first and multiplayer second, then "
-          "controls, debug, save and exit, "
-          "the cheat and the tabs, and exit game last",
+          "controls, debug, the cheat and the tabs, and the one way out last "
+          "(exit game; save and exit in play)",
           pause_rows == list(C.PAUSE_ROW_LABELS)
           and pause_rows[C.PAUSE_START_ROW] == C.SINGLE_ROW_LABEL
           and pause_rows[1] == C.MULTI_ROW_LABEL
@@ -351,12 +349,12 @@ def check_hud_graph(check, nodes):
     literal = {text_literal(n) for n in texts if not _sources(n, "InText")}
     check("the menu's rows are the only literals written: debug reads ON or OFF, "
           "the first row single player or resume, the Single Player page's new "
-          "game or continue game, the exit row save and exit or leave server, "
+          "game or continue game, the last row exit game or save and exit, "
           "the mode under the title, and the rows that need a game, or the "
           "title, say so; and the death menu's hint as a client of a server",
           literal == {C.DEBUG_ON, C.DEBUG_OFF, C.START_ROW_LABEL, C.RESUME_ROW_LABEL,
                       C.CONTINUE_ROW_LABEL, C.IN_GAME_ONLY, C.SINGLE_ROW_LABEL, C.TITLE_ONLY,
-                      EXIT_ROW_LABEL, LEAVE_ROW_LABEL, C.MODE_SINGLE_TEXT,
+                      EXIT_ROW_LABEL, C.QUIT_ROW_LABEL, C.MODE_SINGLE_TEXT,
                       C.MODE_MULTI_TEXT, C.DEATH_HINT_SERVER, ""}, str(sorted(literal)))
 
     # The loot window's rows set a brush too, out of the body's LootIcons

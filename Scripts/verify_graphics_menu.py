@@ -459,9 +459,11 @@ def main():
     # Eighteen: and the weapon component the player tab writes (player_tune_tick.py).
     # Twenty: and the I panel's two -- the take-off it asks for (wear_tick.py)
     # and the Worn it lists (wear_draw.py).
+    # Twenty-one: and a client's weapon component, asked for save and exit
+    # (mode_tick.py).
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 20 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 21 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # The canvas's sized draws: a wanderer's fill from its health fraction,

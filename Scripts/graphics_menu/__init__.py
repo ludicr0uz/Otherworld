@@ -72,7 +72,8 @@ Input, settings and state
                   taken M-panel row (the rows have no hotkeys); the Escape
                   poll (BACK in every menu) and "a tuning tab is open"
   menu_main       Tick: the menu's own rows (single player or resume, the
-                  Single Player page's new game, controls, exit game), M, and
+                  Single Player page's new game, controls, the last row as
+                  exit game on the title), M, and
                   Escape shutting the menu in play; BeginPlay's "tick while
                   paused" for the title; Tick's split on a game in play
   mode_consts     the title's two mode pages (Single Player, Multiplayer):
@@ -86,7 +87,8 @@ Input, settings and state
   mode_tick       BeginPlay: only a standalone process has a title, and one
                   whose session ended opens on the Multiplayer page. Tick:
                   the Multiplayer row, Join Server, a join given up; in play
-                  as a client, Leave Server in save and exit's place
+                  as a client, save and exit's row and countdown too, ending
+                  in a disconnect where single player saves
   mode_checks     the verifier's checks for those five, and the session's
   menu_still      Tick: the controller ignores move input while the M panel
                   is open, so the arrows only work the menu

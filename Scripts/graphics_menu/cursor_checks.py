@@ -332,9 +332,10 @@ def _check_clicks(check, nodes):
     check("the M panel's taken row is lowered every frame, and each row's "
           "action answers to its own row",
           len(lowered) == 1 and _value(lowered[0], CC.PAUSE_CLICK_VAR) == str(CC.NO_ROW)
-          # (the exit row twice: save and exit, and a client's leave server)
+          # (the exit row three times: the title's exit game, save and exit,
+          # and a client's)
           and served == sorted(list(range(len(UC.PAUSE_ROW_ACTIONS)))
-                               + [UC.PAUSE_ROW_ACTIONS.index(EXIT_ACTION)]),
+                               + [UC.PAUSE_ROW_ACTIONS.index(EXIT_ACTION)] * 2),
           f"{len(lowered)}, {served}")
     # The first row as the menu's close button in play (resume) is
     # mode_checks.py's: on the title the same row opens the Single Player page.

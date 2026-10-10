@@ -13,7 +13,7 @@ DrawText scale x 10: Roboto's LegacyFontSize is 10, so a DrawText at 2.2 was
 
 from graphics_menu.dev_consts import DEV_GUNS_ACTION, DEV_GUNS_ROW_LABEL
 from graphics_menu.gfx_tune_consts import GFX_TUNE_ACTION, GFX_TUNE_ROW_LABEL
-from graphics_menu.profile_consts import EXIT_ACTION, EXIT_ROW_LABEL
+from graphics_menu.profile_consts import EXIT_ACTION
 from graphics_menu.tune_consts import TUNE_ACTION, TUNE_ROW_LABEL
 from graphics_menu.monster_tune_consts import MON_TUNE_ACTION, MON_TUNE_ROW_LABEL
 from graphics_menu.player_tune_consts import PLAYER_TUNE_ACTION, PLAYER_TUNE_ROW_LABEL
@@ -240,7 +240,7 @@ PAUSE_TITLE = GAME_TITLE
 START_ACTION, SETTINGS_ACTION = "start", "settings"
 # The second row: on the title, the Multiplayer page (mode_consts.py).
 MULTI_ACTION = "multiplayer"
-DEBUG_ACTION, QUIT_ACTION = "debug", "quit"
+DEBUG_ACTION = "debug"
 # The title offers the two modes, its first two rows, each opening a page of
 # its own in the rows' place (mode_consts.py). In play the first row shuts the
 # menu, as M does, and says so (the HUD writes its label every frame).
@@ -253,22 +253,25 @@ CONTINUE_ROW_LABEL = "Continue Game"
 # The settings page's row: the page is the key binds and the mouse.
 SETTINGS_ROW_LABEL = "Controls"
 DEBUG_ROW_LABEL = "Debug"
-# The last row leaves the game for the desktop, saving nothing.
+# The last row is the way out (EXIT_ACTION, one row): on the title it leaves
+# the game for the desktop, saving nothing, and reads this; in play it is
+# save and exit (EXIT_ROW_LABEL, which the HUD writes there every frame).
 QUIT_ROW_LABEL = "Exit Game"
 PAUSE_ROW_LABELS = (SINGLE_ROW_LABEL, MULTI_ROW_LABEL, SETTINGS_ROW_LABEL, DEBUG_ROW_LABEL,
-                    EXIT_ROW_LABEL, DEV_GUNS_ROW_LABEL, TUNE_ROW_LABEL,
+                    DEV_GUNS_ROW_LABEL, TUNE_ROW_LABEL,
                     MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL, PLAYER_TUNE_ROW_LABEL,
                     SOUND_TUNE_ROW_LABEL, GFX_TUNE_ROW_LABEL, QUIT_ROW_LABEL)
 # What each row does, in row order: taking row i raises PauseClick = i, and
 # Tick's fragment for that action serves it (menu_nav.pause_row_taken).
-PAUSE_ROW_ACTIONS = (START_ACTION, MULTI_ACTION, SETTINGS_ACTION, DEBUG_ACTION, EXIT_ACTION,
+PAUSE_ROW_ACTIONS = (START_ACTION, MULTI_ACTION, SETTINGS_ACTION, DEBUG_ACTION,
                      DEV_GUNS_ACTION, TUNE_ACTION, MON_TUNE_ACTION,
                      WORLD_TUNE_ACTION, PLAYER_TUNE_ACTION, SOUND_TUNE_ACTION,
-                     GFX_TUNE_ACTION, QUIT_ACTION)
+                     GFX_TUNE_ACTION, EXIT_ACTION)
 PAUSE_START_ROW = PAUSE_ROW_ACTIONS.index(START_ACTION)
 PAUSE_DEBUG_ROW = PAUSE_ROW_ACTIONS.index(DEBUG_ACTION)
 # The rows that need a game in play: on the title they do nothing and say so.
-IN_GAME_ACTIONS = (EXIT_ACTION, DEV_GUNS_ACTION)
+# (Not the exit row: on the title it is exit game.)
+IN_GAME_ACTIONS = (DEV_GUNS_ACTION,)
 IN_GAME_ONLY = "in game only"
 # ...and the one that needs the title: a game in play is already in a mode.
 TITLE_ACTIONS = (MULTI_ACTION,)

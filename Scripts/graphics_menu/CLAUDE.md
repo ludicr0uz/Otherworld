@@ -34,10 +34,11 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   shuts the menu), `Multiplayer` (on the title it opens the Multiplayer page: the server's
   address and `Join Server`; in play it does nothing and says `from the title`), `Controls` (the settings page, titled
   **CONTROLS**; the code still calls it the settings page), `Debug` (wanderer numbers, pellet tracers and impact damage,
-  the wanderers' sight cones; not the FPS readout, which is always on), `Save and Exit`
-  (as a client of a server it reads `Leave Server`), `Dev All Guns`, `Gun Settings`,
-  `Monster Settings`, `World Settings`, `Player Settings`, `Graphics Settings`, `Exit Game` (quits to the desktop,
-  saving nothing). The quality presets are not
+  the wanderers' sight cones; not the FPS readout, which is always on), `Dev All Guns`, `Gun Settings`,
+  `Monster Settings`, `World Settings`, `Player Settings`, `Sound Settings`, `Graphics Settings`, and last
+  the one way out (`EXIT_ACTION`): on the title it reads `Exit Game` and quits to the desktop,
+  saving nothing; in play it reads `Save and Exit`, in single player and as a client of a
+  server alike, and starts the 15 s countdown (below: "Save and exit"). The quality presets are not
   rows: Low / Medium / High / Custom is the graphics tab's first row.
 - **The settings page or a tuning tab stands in place of the menu's rows**, and its **BACK**
   row, its top row, returns to them (below: "The M panel as a menu").
@@ -80,10 +81,14 @@ link under it, names its part there.
   (`WBP_MainMenu.SettingsPanel`, at `PAUSE_POS` like the menu) shows while `MenuPage` says
   so and the menu's `Panel` is collapsed; its BACK row sets `MenuPage` back. In play the
   page does not pause either, and its accept keys include Space, which also jumps.
-- **`exit game`** is `QuitGame` for the owning player: the one such node in the graph.
+- **`exit game`** is the last row on the title: `QuitGame` for the owning player, the one
+  such node in the graph, behind the row's Branch and then the title's arm of one on
+  `GameStarted` (`menu_main._author_quit`). In play the same row is save and exit and
+  quits nothing; DrawHUD writes its label every frame off `GameStarted`
+  (`mode_draw.author_mode_words`).
 - **What needs a game in play is kept off the title:** Tick splits on `GameStarted`
   (`author_in_play`), and save and exit (with the profile load, the death wipe and the
-  cheat) and the loot window run only in play. On the title those rows' value column reads
+  cheat) and the loot window run only in play. On the title the cheat's value column reads
   `in game only` (`IN_GAME_ACTIONS`). The tuning tabs and debug work on the title.
 - **M is polled only in play** (a Branch on `GameStarted`, then the key): the title's menu
   has nothing under it to go back to.
@@ -96,8 +101,9 @@ link under it, names its part there.
   paused. `menu_main_checks` checks the Branch; `probe_net_menu_overlay.py` (`uepy.py --net`)
   is the client's half, with `--windowed` for the fire press, which DrawHUD holds.
 - **Probes:** `probe_main_menu.py` pauses the game itself and shows both halves: with the
-  HUD not ticking a taken row is not served, ticking it is; save and exit does nothing
-  there; the first row starts the game, and in play only shuts the menu.
+  HUD not ticking a taken row is not served, ticking it is; the first row starts the
+  game, and in play only shuts the menu. It never takes the last row on the title: that
+  is exit game, and would end the run (the verifier holds the quit to the title).
   `probe_umg_screens.py` reads what the title shows.
 - **A probe's game sees the real title only when asked:** `uepy.py --game` passes
   `-nomenu`; `--title` leaves it off, and `probes/boot.py` then takes the title's pause
@@ -141,13 +147,18 @@ The title's first two rows are the modes, each a page in the rows' place. The st
   blocked by a title, whether it joined from this page or with an address on the command
   line.
 - **In play the menu says the mode** (`PauseMode`, under the title: `SINGLE PLAYER` or
-  `MULTIPLAYER`), and as a client its exit row reads `Leave Server`: the session is cleared
-  and the engine's `disconnect` returns the process to the title. **The profile's whole
+  `MULTIPLAYER`). As a client its last row is `Save and Exit` too: the same row asks the
+  same countdown of the client's own weapon component (`save_exit.author_exit_row`, called
+  from `mode_tick.author_mode_in_play`), and once the component says `ExitDue` the HUD
+  (once: `ExitLeaving`) clears the session and the engine's `disconnect` returns the
+  process to the title. Nothing is saved there yet (the server's save is M35), and the
+  countdown is the client's copy's: the server does not know of it, so it holds an honest
+  client still and no more. **The profile's whole
   fragment (`save_exit.py`: the load, save and exit, the wipe on death, and the cheat
   chained after it) runs in standalone only** (`mode_tick.author_mode_in_play`), so a
   server's character never reads the single-player profile and leaving never writes it.
-- **IsStandalone is false on the title while a join is pending.** The exit row's label
-  flips to `Leave Server` under the open page (unseen); nothing else on the title asks it.
+- **IsStandalone is false on the title while a join is pending.** Nothing on the title
+  but the pause asks it (the last row's label is off `GameStarted`).
 - **Probes:** `probe_title_single.py` and `probe_join_dead_address.py`
   (`uepy.py --game --title`: the real title, no `-nomenu`), `probe_net_title.py`
   (`--net --title --windowed --clients 1`), and `probe_main_menu.py` and

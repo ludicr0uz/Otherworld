@@ -54,19 +54,23 @@ def check_profile(check, bp, nodes):
     starts = asks(nodes, AC.ASK_SAVE_EXIT)
     check("the M panel's save-and-exit row asks the weapon component for the exit "
           f"({AC.ASK_SAVE_EXIT}; the row has no key: only an open panel's row can be "
-          "taken), with none running",
-          len(starts) == 1 and row_gates(starts[0], PC.EXIT_ACTION)
-          and any(f"Get {AC.EXIT_PENDING_VAR}" in fed(c, "A")
-                  for g in feeders(starts[0], "execute") for x in feeders(g, "Condition")
-                  for c in feeders(x, "A") + feeders(x, "B"))
+          "taken), with none running: once in single player's Tick and once in a "
+          "client's",
+          len(starts) == 2 and all(
+              row_gates(s, PC.EXIT_ACTION)
+              and any(f"Get {AC.EXIT_PENDING_VAR}" in fed(c, "A")
+                      for g in feeders(s, "execute") for x in feeders(g, "Condition")
+                      for c in feeders(x, "A") + feeders(x, "B")) for s in starts)
           and not [n for n in nodes if {"Key", "self"} <= _pins(n)
                    and _value(n, "Key") == "X"], str(len(starts)))
     leaves = [n for n in nodes if _title(n) == f"Set {PC.EXIT_LEAVING_VAR}"]
     due = {t for n in leaves for g in _feeders(n, "execute") for c in _feeders(g, "Condition")
            for t in fed(c, "A") + [x for f in _feeders(c, "B") for x in fed(f, "A")]}
     check(f"the HUD leaves once the component says the countdown is over "
-          f"({AC.EXIT_DUE_VAR}), and only once ({PC.EXIT_LEAVING_VAR})",
-          len(leaves) == 1 and _value(leaves[0], PC.EXIT_LEAVING_VAR) == "true"
+          f"({AC.EXIT_DUE_VAR}), and only once ({PC.EXIT_LEAVING_VAR}), in either "
+          f"mode (single player's save, a client's disconnect: mode_checks.py)",
+          len(leaves) == 2
+          and all(_value(n, PC.EXIT_LEAVING_VAR) == "true" for n in leaves)
           and due == {f"Get {AC.EXIT_DUE_VAR}", f"Get {PC.EXIT_LEAVING_VAR}"},
           f"{len(leaves)} Set, on {sorted(due)}")
 

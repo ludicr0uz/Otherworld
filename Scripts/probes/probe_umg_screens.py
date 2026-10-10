@@ -24,6 +24,7 @@ from combat.paths import (
 from graphics_menu import mode_consts as MC
 from graphics_menu import umg_consts as C
 from net.session_consts import SERVER_ADDRESS_VAR
+from graphics_menu.profile_consts import EXIT_ROW_LABEL
 from graphics_menu.profile_consts import (
     PROFILE_CLASS_PATH, PROFILE_SLOT, PROFILE_USER_INDEX)
 from graphics_menu.settings_rows import (
@@ -171,9 +172,11 @@ def probe(p):
     first = _text(_row(rows, C.PAUSE_START_ROW).get_editor_property(C.ROW_LABEL))
     needs = [_text(_row(rows, C.PAUSE_ROW_ACTIONS.index(a)).get_editor_property(C.ROW_VALUE))
              for a in C.IN_GAME_ACTIONS]
-    p.check("...and in play its first row reads resume, and no row says it needs a game",
-            first == C.RESUME_ROW_LABEL and needs == [""] * len(needs),
-            f"'{first}', {needs}")
+    last = _text(_row(rows, len(C.PAUSE_ROW_LABELS) - 1).get_editor_property(C.ROW_LABEL))
+    p.check("...and in play its first row reads resume, its last save and exit, and "
+            "no row says it needs a game",
+            first == C.RESUME_ROW_LABEL and last == EXIT_ROW_LABEL
+            and needs == [""] * len(needs), f"'{first}', '{last}', {needs}")
     p.set(hud, "MenuOpen", False)
     _draw(hud)
     p.check("...and closing it takes it down", ui["UiPause"].get_visibility() == HIDDEN)

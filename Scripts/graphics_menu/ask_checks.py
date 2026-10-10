@@ -49,10 +49,11 @@ def check_asks(check, nodes):
     counts = {name: len(asks(nodes, name)) for name in AC.ALL_ASKS}
     # AskNext is the Q key's, on the component: no screen asks it.
     want = {AC.ASK_SLOT: 2, AC.ASK_MOVE: 1, AC.ASK_NEXT: 0, AC.ASK_TAKE_OFF: 2, AC.ASK_WEAR: 1,
-            AC.ASK_DROP: 1, AC.ASK_LOOT_TAKE: 1, AC.ASK_SAVE_EXIT: 1}
+            AC.ASK_DROP: 1, AC.ASK_LOOT_TAKE: 1, AC.ASK_SAVE_EXIT: 2}
     check("the HUD asks the weapon component for each thing the player does through "
           "a screen: a slot to hand and a take-off (the keys, and the mouse), a move, "
-          "a wear, a drop, a loot take, save and exit", counts == want, str(counts))
+          "a wear, a drop, a loot take, save and exit (single player's Tick, and a "
+          "client's)", counts == want, str(counts))
     writes = sorted(_title(n) for n in nodes
                     if _title(n) in {f"Set {v}" for v in COMPONENT_ONLY})
     check("...and writes none of its requests or its countdown itself", not writes,

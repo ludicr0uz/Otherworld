@@ -10,7 +10,8 @@ the settings page, leaving for the desktop, and M.
                                   HUD stops ticking while paused, and the
                                   world unpauses
         settings taken            MenuPage = the settings page, caret on top
-        exit game taken           QuitGame
+        exit game taken           on the title: QuitGame. (In play the row is
+                                  save and exit: save_exit.py)
         M, in play                MenuOpen flips
         Escape, in play           on the menu's own rows: MenuOpen = false
 
@@ -34,9 +35,10 @@ from graphics_menu.loot_find import put
 from graphics_menu.menu_nav import any_tab_open, escape_pressed, pause_row_taken
 from graphics_menu.mode_consts import PAGE_SINGLE, SINGLE, SINGLE_START_ROW
 from graphics_menu.mode_tick import page_row_taken
+from graphics_menu.profile_consts import EXIT_ACTION
 from graphics_menu.settings_rows import PAGE_SETTINGS, PAGE_TITLE
 from graphics_menu.umg_consts import (
-    GAME_STARTED_VAR, MENU_KEY, QUIT_ACTION, SETTINGS_ACTION, START_ACTION)
+    GAME_STARTED_VAR, MENU_KEY, SETTINGS_ACTION, START_ACTION)
 from uebp.nodes.actor import FN_ACTOR_TICK_PAUSED, FN_COMP_TICK_PAUSED, FN_WAS_PRESSED
 from uebp.nodes.math import FN_AND, FN_EQ_II, FN_NOT, FN_OR
 from uebp.nodes.system import FN_QUIT
@@ -104,10 +106,13 @@ def _author_settings(ed, in_execs, made):
 
 
 def _author_quit(ed, pc_out, in_execs, made):
-    """The exit-game row: out to the desktop, saving nothing."""
-    take, rest = _branch(ed, pause_row_taken(ed, QUIT_ACTION, made), in_execs, made)
+    """The last row on the title, exit game: out to the desktop, saving
+    nothing. In play the same row is save and exit (save_exit.py, and a
+    client's in mode_tick.py), so nothing here answers it."""
+    take, rest = _branch(ed, pause_row_taken(ed, EXIT_ACTION, made), in_execs, made)
+    in_play, on_title = _branch(ed, _get(ed, GAME_STARTED_VAR, made), [take], made)
     quit_game = _call(ed, FN_QUIT, made, SpecificPlayer=pc_out)
-    return [_then(quit_game, [take]), rest]
+    return [_then(quit_game, [on_title]), in_play, rest]
 
 
 def _author_toggle(ed, pc_out, in_execs, made):
@@ -148,7 +153,8 @@ def author_main_rows_tick(ed, pc_out, in_execs):
         f"The menu's own rows, and {MENU_KEY}. The first row opens the Single "
         f"Player page on the title, whose row starts the game (unpausing "
         f"last), and shuts the menu in play; settings "
-        f"opens its page in the rows' place; exit game quits to the desktop. "
+        f"opens its page in the rows' place; the last row, on the title, is exit "
+        f"game and quits to the desktop (in play it is save and exit). "
         f"{MENU_KEY} toggles the menu, in play only, and Escape on its own rows "
         f"shuts it. Polled on Tick rather than "
         f"bound as an input action: an FInputActionValue binding would need an "

@@ -11,8 +11,9 @@
                        a join is under way, or why the last one ended
   author_mode_hidden   on the menu's own rows: both panels collapsed
   author_mode_words    the menu's rows: single player (resume in play),
-                       multiplayer (from the title only), save and exit
-                       (leave server as a client), and the mode under the title
+                       multiplayer (from the title only), the last row (exit
+                       game on the title, save and exit in play), and the
+                       mode under the title
 
 DrawHUD, like the settings page's keys: the title is a paused world. What a
 taken row does is Tick's (mode_tick.py).
@@ -26,7 +27,7 @@ from graphics_menu.loot_find import put
 from graphics_menu.menu_nav import _emit_row_nav
 from graphics_menu.mode_consts import (
     ADDRESS_CARET, ADDRESS_ERASE_KEY, ADDRESS_MAX, CONNECTING_PREFIX, CONNECTING_SUFFIX,
-    LEAVE_ROW_LABEL, MULTI_ADDRESS_ROW, MULTI_STATUS, PAGES, SINGLE, SINGLE_START_ROW,
+    MULTI_ADDRESS_ROW, MULTI_STATUS, PAGES, SINGLE, SINGLE_START_ROW,
     AddressChars, AddressKeys)
 from graphics_menu.mode_session import address, put_address, session, sget
 from graphics_menu.profile_consts import (
@@ -35,7 +36,7 @@ from graphics_menu.settings_rows import PAGE_TITLE
 from graphics_menu.ui_graph import mark_rows, member, part, row_at, row_value, set_shown, set_text
 from graphics_menu.umg_consts import (
     CONTINUE_ROW_LABEL, GAME_STARTED_VAR, MODE_MULTI_TEXT, MODE_SINGLE_TEXT, PAUSE_ACCEPT_KEY,
-    PAUSE_MODE, PAUSE_ROW_ACTIONS, PAUSE_START_ROW, RESUME_ROW_LABEL, ROW_CARET, ROW_LABEL,
+    PAUSE_MODE, PAUSE_ROW_ACTIONS, PAUSE_START_ROW, QUIT_ROW_LABEL, RESUME_ROW_LABEL, ROW_CARET, ROW_LABEL,
     ROW_VALUE, SINGLE_ROW_LABEL, START_ROW_LABEL, TITLE_ACTIONS, TITLE_ONLY, WBP_MENU_ROW,
     WBP_PAUSE_MENU)
 from net import session_consts as S
@@ -197,11 +198,11 @@ def author_mode_words(ed, rows, in_execs, made):
         playing, title = started([found])
         flow = [set_text(ed, text, TITLE_ONLY, [playing]),
                 set_text(ed, text, "", [title]), missing]
-    # Save and exit is single player's; a client leaves its server instead.
+    # The last row: exit game on the title, save and exit in play, either mode.
     text, found, missing = words(EXIT_ACTION, ROW_LABEL, flow)
-    single, client = alone([found])
-    flow = [set_text(ed, text, EXIT_ROW_LABEL, [single]),
-            set_text(ed, text, LEAVE_ROW_LABEL, [client]), missing]
+    playing, title = started([found])
+    flow = [set_text(ed, text, EXIT_ROW_LABEL, [playing]),
+            set_text(ed, text, QUIT_ROW_LABEL, [title]), missing]
     # The mode, under the menu's title, once a game is in play.
     mode = part(ed, WBP_PAUSE_MENU, PAUSE_MODE)
     playing, title = started(flow)

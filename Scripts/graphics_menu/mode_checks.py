@@ -13,8 +13,11 @@ from graphics_menu import cursor_consts as CC
 from graphics_menu import mode_consts as MC
 from graphics_menu import umg_consts as UC
 from graphics_menu.pause_checks import (
-    _feeds, _gates, _is_row_test, _pins, _sets, _sources, _title, _value)
-from graphics_menu.profile_consts import EXIT_ACTION, PROFILE_SLOT
+    _feeds, _gates, _is_row_test, _pins, _sets, _sources, _title, _value, row_gates)
+from graphics_menu.ask_checks import asks
+from combat.ask_consts import ASK_SAVE_EXIT, EXIT_DUE_VAR
+from graphics_menu.profile_consts import (
+    EXIT_ACTION, EXIT_LEAVING_VAR, EXIT_ROW_LABEL, PROFILE_SLOT)
 from graphics_menu.settings_rows import BACK_LABEL, PAGE_TITLE, SETTINGS_SLOT
 from graphics_menu.umg_checks import _labels, _tree
 from net import session_consts as S
@@ -307,16 +310,23 @@ def _check_in_play(check, nodes):
               and _value(n, "Command") == S.LEAVE_COMMAND]
     gates = [g for g in _standalone_gates(nodes)
              if leaves and any(g in _upstream(n) for n in leaves)]
-    rowed = [n for n in leaves if any(_is_row_test(c, EXIT_ACTION) for u in _upstream(n)
-                                      if "Condition" in _pins(u)
-                                      for c in _sources(u, "Condition"))]
+    # Not off the row: off the countdown the row asked for, once it is due.
+    before = [u for n in leaves for u in _upstream(n)]
+    due = [u for u in before if _title(u) == f"Set {EXIT_LEAVING_VAR}"
+           and any(f"Get {EXIT_DUE_VAR}" in _feeds(c, "A")
+                   for g in _sources(u, "execute") for c in _sources(g, "Condition"))]
+    asked = [a for a in asks(nodes, ASK_SAVE_EXIT)
+             if a in before and row_gates(a, EXIT_ACTION)]
     cleared = [_title(u) for n in leaves for u in _upstream(n)
                if _title(u) in (f"Set {S.JoinAddress}", f"Set {S.NetReason}")]
-    check("as a client the menu's exit row leaves the server: the session "
-          f"cleared (no reason to show), then the engine's {S.LEAVE_COMMAND}",
-          len(leaves) == 1 and len(gates) == 1 and len(rowed) == 1
+    check("as a client the menu's exit row is save and exit too: it asks the "
+          f"weapon component's countdown ({ASK_SAVE_EXIT}), and only once that is "
+          f"due ({EXIT_DUE_VAR}) is the session cleared (no reason to show) and "
+          f"the engine's {S.LEAVE_COMMAND} called",
+          len(leaves) == 1 and len(gates) == 1 and len(due) == 1 and len(asked) == 1
           and sorted(set(cleared)) == [f"Set {S.JoinAddress}", f"Set {S.NetReason}"],
-          f"{len(leaves)} leave, {len(gates)} gate, {len(rowed)} rowed, {cleared}")
+          f"{len(leaves)} leave, {len(gates)} gate, {len(due)} due, "
+          f"{len(asked)} asked, {cleared}")
     if len(gates) != 1:
         return
     gate = gates[0]
@@ -337,12 +347,20 @@ def _check_in_play(check, nodes):
           f"{len(through_client)} by the client's arm")
     words = sorted(v for n in nodes if {"self", "InText"} <= _pins(n)
                    for v in [_value(n, "InText")]
-                   if any(w in v for w in (MC.LEAVE_ROW_LABEL, UC.MODE_SINGLE_TEXT,
-                                           UC.MODE_MULTI_TEXT))
+                   if any(w in v for w in (UC.MODE_SINGLE_TEXT, UC.MODE_MULTI_TEXT))
                    and any("IsStandalone" in [_bare(c) for c in _sources(g, "Condition")]
                            for g in _gates(n)))
-    check("the menu says which mode the game in play is, and its exit row reads "
-          "leave server as a client (both off IsStandalone)", len(words) == 3, str(words))
+    check("the menu says which mode the game in play is (off IsStandalone)",
+          len(words) == 2, str(words))
+    exits = sorted(v for n in nodes if {"self", "InText"} <= _pins(n)
+                   for v in [_value(n, "InText")]
+                   if any(w in v for w in (EXIT_ROW_LABEL, UC.QUIT_ROW_LABEL))
+                   and any(_feeds(g, "Condition") == [f"Get {UC.GAME_STARTED_VAR}"]
+                           for g in _gates(n)))
+    check("the menu's last row reads exit game on the title and save and exit in "
+          "play, in either mode (off GameStarted, not the mode)",
+          len(exits) == 2 and EXIT_ROW_LABEL in exits[1] and UC.QUIT_ROW_LABEL in exits[0],
+          str(exits))
 
 
 def check_modes(check, bp, nodes):

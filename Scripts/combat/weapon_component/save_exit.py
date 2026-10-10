@@ -15,8 +15,9 @@
 
 The component decides that the exit is due and nothing more. What leaving is
 belongs to whoever watches ExitDue: in single player the HUD writes the
-profile and reopens the level (graphics_menu/save_exit.py); on a server the
-save is the server's (M35). The dead gate lowers ExitPending (dead.py's
+profile and reopens the level (graphics_menu/save_exit.py); as a client of a
+server the HUD asks the same way, of the client's own copy, and disconnects
+(graphics_menu/mode_tick.py), and the save is the server's (M35). The dead gate lowers ExitPending (dead.py's
 LET_GO_VARS): a death calls the exit off.
 
 Every Tick rather than once at the ask: a probe starts the countdown by

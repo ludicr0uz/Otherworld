@@ -1,5 +1,6 @@
 """The two modes from one title, in one process: join a server through the
-Multiplayer page, leave it with Leave Server, then start a single-player game.
+Multiplayer page, leave it with Save and Exit (its 15 s countdown, as in
+single player), then start a single-player game.
 
     python3 Scripts/dev/uepy.py --net --title --windowed --clients 1 \\
         --probe-timeout 240 --probe Scripts/probes/probe_net_title.py
@@ -12,8 +13,10 @@ noted, not made, without it).
   client 1   the title: Single Player and Multiplayer, its first two rows
              Multiplayer: the address typed, Join Server, "connecting to ..."
              on the server: no title, in play, nothing paused; the menu says
-             MULTIPLAYER and its exit row Leave Server
-             Leave Server: back on the title, alone, no reason to show, the
+             MULTIPLAYER and its last row Save and Exit
+             Save and Exit: the weapon component's countdown starts, the
+             character stands still, the client stays on the server; once
+             it is due: back on the title, alone, no reason to show, the
              single-player profile's file untouched
              Single Player, New Game: a game, alone, in the same process
   server     has the player while they are on it, and not after they leave
@@ -25,9 +28,13 @@ The client's world and HUD are new after each travel: every step asks again
 SYSTEMS = ('net', 'title')
 
 import os
+import time
 
 import unreal
 
+from combat import ask_consts as AC
+from combat import health_vars as HV
+from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu import hud_vars as MV
 from graphics_menu import mode_consts as MC
 from graphics_menu import umg_consts as C
@@ -43,8 +50,21 @@ EXIT_ROW = C.PAUSE_ROW_ACTIONS.index(EXIT_ACTION)
 MULTI_ROW = C.PAUSE_ROW_ACTIONS.index(C.MULTI_ACTION)
 
 
+def _clear_wanderers(p):
+    """No wanderer left on the server: a hit calls save and exit off, and the
+    client stands through its countdown."""
+    ctrls = unreal.GameplayStatics.get_all_actors_of_class(p.world(), unreal.AIController)
+    for ctrl in ctrls:
+        if "ForestWandererAI" in ctrl.get_class().get_name():
+            pawn = ctrl.get_controlled_pawn()
+            if pawn is not None:
+                pawn.destroy_actor()
+            ctrl.destroy_actor()
+
+
 def probe_server(p):
     # boot.py starts this once the client's player has joined.
+    _clear_wanderers(p)
     pawns = [c.get_controlled_pawn() for c in p.players()]
     p.check("the server has the player who joined from the title, with a pawn",
             len(pawns) == 1 and bool(pawns[0]), f"{len(pawns)} player(s)")
@@ -138,17 +158,36 @@ def _both_modes(p, gi, profile):
     p.set(hud, MV.MenuOpen, True)
     yield _frames()
     p.check("the menu up as a client pauses nothing", not T.paused(p))
-    _shown(p, "the menu says which mode this is, and its exit row reads Leave Server",
+    _shown(p, "the menu says which mode this is, and its last row reads Save and Exit",
            lambda: [T.menu_text(p, C.PAUSE_MODE), T.row_text(p, C.PAUSE_ROWS, EXIT_ROW),
                     T.row_text(p, C.PAUSE_ROWS, C.PAUSE_START_ROW),
                     T.row_text(p, C.PAUSE_ROWS, MULTI_ROW, C.ROW_VALUE)],
-           [C.MODE_MULTI_TEXT, MC.LEAVE_ROW_LABEL, C.RESUME_ROW_LABEL, C.TITLE_ONLY])
+           [C.MODE_MULTI_TEXT, EXIT_ROW_LABEL, C.RESUME_ROW_LABEL, C.TITLE_ONLY])
 
-    # --- Leave Server ----------------------------------------------------------
-    yield from T.take_row(p, EXIT_ACTION, lambda: T.on_title(p), TRAVEL_S)
-    left = T.on_title(p)
-    p.check("Leave Server returns to the title: alone, paused, a new HUD",
-            left and p.hud() != hud, f"on the title {left}")
+    # --- Save and Exit, as a client ---------------------------------------------
+    wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
+    moves = p.pawn().get_editor_property("character_movement")
+    yield from T.take_row(p, EXIT_ACTION, lambda: p.get(wc, AC.EXIT_PENDING_VAR), 10.0)
+    asked = time.time()
+    yield from T.wait(lambda: False, 2.0)
+    span = p.get(wc, AC.EXIT_AT_VAR) - p.get(wc, AC.EXIT_STARTED_VAR)
+    health = p.component(p.pawn(), HEALTH_CLASS_PATH)
+    p.check(f"as a client the last row starts the same {AC.EXIT_SECONDS:.0f} s "
+            "countdown and shuts the menu: 2 s on, still on the server, in play",
+            p.get(wc, AC.EXIT_PENDING_VAR) is True and abs(span - AC.EXIT_SECONDS) < 1e-3
+            and p.get(hud, MV.MenuOpen) is False and T.in_play(p) and not T.alone(p)
+            and p.hud() == hud,
+            f"pending {p.get(wc, AC.EXIT_PENDING_VAR)}, {span:.2f} s, alone {T.alone(p)}, "
+            f"called off at {p.get(wc, AC.EXIT_CALLED_OFF_VAR):.1f}, "
+            f"health {p.get(health, HV.Health):.0f}")
+    p.check("...the character standing still meanwhile",
+            moves.movement_mode == unreal.MovementMode.MOVE_NONE, str(moves.movement_mode))
+    yield from T.wait(lambda: T.on_title(p), AC.EXIT_SECONDS + TRAVEL_S)
+    left, waited = T.on_title(p), time.time() - asked
+    p.check("the countdown over, the client is back on the title: alone, paused, "
+            "a new HUD, and not before the countdown ran",
+            left and p.hud() != hud and waited >= AC.EXIT_SECONDS - 1.5,
+            f"on the title {left}, after {waited:.1f} s")
     if not left:
         return
     p.post("left")

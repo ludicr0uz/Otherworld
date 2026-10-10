@@ -149,9 +149,10 @@ def _author_load_once(ed, parts, in_execs, made):
     return loaded + [none, not_yet, skip]
 
 
-def _author_start(ed, wc, in_execs, made):
+def author_exit_row(ed, wc, in_execs, made):
     """The M panel's save-and-exit row, with no exit running, asks the weapon
-    component for the countdown, and the panel closes."""
+    component for the countdown, and the panel closes. Either mode's: a
+    client's Tick runs it too (mode_tick.author_mode_in_play)."""
     idle = _call(ed, FN_NOT, made, A=_get(ed, EXIT_PENDING_VAR, made, WEAPON_COMP_CLASS_PATH, wc))
     asked = pause_row_taken(ed, EXIT_ACTION, made)
     go = _call(ed, FN_AND, made, A=asked, B=out(idle))
@@ -186,7 +187,7 @@ def author_save_exit_tick(ed, pc_out, in_execs):
     ok, fails, parts = author_player_parts(ed, in_execs, made)
     alive, dead_tails = _author_forget_on_death(ed, parts[HEALTH_CLASS_PATH], [ok], made)
     flow = _author_load_once(ed, parts, [alive], made)
-    flow = _author_start(ed, parts[WEAPON_COMP_CLASS_PATH], flow, made)
+    flow = author_exit_row(ed, parts[WEAPON_COMP_CLASS_PATH], flow, made)
     flow = _author_leave(ed, parts, flow, made)
     flow = author_dev_guns(ed, pc_out, parts, flow, made)
     ed.add_comment_to_nodes(

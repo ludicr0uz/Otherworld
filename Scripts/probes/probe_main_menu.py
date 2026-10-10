@@ -35,7 +35,6 @@ from graphics_menu import mode_consts as MC
 from graphics_menu import umg_consts as C
 from combat.ask_consts import EXIT_PENDING_VAR
 from combat.paths import WEAPON_COMP_CLASS_PATH
-from graphics_menu.profile_consts import EXIT_ACTION
 from graphics_menu.settings_rows import PAGE_TITLE
 from graphics_menu.tune_consts import GUN_TAB
 from graphics_menu import hud_vars as MV
@@ -96,11 +95,10 @@ def probe(p):
     p.check("...and a tuning tab opens there", p.get(hud, GUN_TAB.open_var) is True)
     p.set(hud, GUN_TAB.open_var, False)
 
+    # The last row is exit game here (QuitGame: taking it would end this run;
+    # the verifier holds it to the title). The rows above served no exit.
     wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
-    p.set(hud, CC.PAUSE_CLICK_VAR, _row(EXIT_ACTION))
-    yield _after(0.5)
-    p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
-    p.check("...but save and exit does nothing: it needs a game in play",
+    p.check("...and no save and exit is running on the title",
             p.get(wc, EXIT_PENDING_VAR) is False and p.get(hud, "MenuOpen") is True,
             f"pending {p.get(wc, EXIT_PENDING_VAR)}, open {p.get(hud, 'MenuOpen')}")
     p.check("...and the world is still paused under the menu",

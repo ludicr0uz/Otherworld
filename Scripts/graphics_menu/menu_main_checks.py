@@ -1,19 +1,29 @@
 """verify_graphics_menu.py's checks for the one menu (menu_main.py, and
 menu_screens.author_title): the title is the menu held open over a paused
 world, with the HUD ticking under it; its settings row opens the settings
-page in the rows' place, and its last row quits. Its first two rows, the
+page in the rows' place, and its last row quits (on the title only). Its first two rows, the
 modes, are mode_checks.py's. The graph only: the rows served under a real pause are
 probes/probe_main_menu.py's.
 """
+
+import unreal
 
 from graphics_menu import umg_consts as UC
 from graphics_menu.gfx_tune_consts import TUNER_COMPONENT
 from graphics_menu.pause_checks import (
     _feeds, _gates, _is_row_test, _pins, _sets, _sources, _value)
+from graphics_menu.profile_consts import EXIT_ACTION
 from graphics_menu.settings_rows import PAGE_SETTINGS
 from net.pause_checks import check_standalone_pause
 
+BEL = unreal.BlueprintEditorLibrary
+PIN = unreal.BlueprintGraphPinLibrary
 TICK_PIN, PAUSE_PIN = "bTickableWhenPaused", "bPaused"
+
+
+def _arm(gate, then):
+    pin = BEL.find_then_pin(gate) if then else BEL.find_else_pin(gate)
+    return [PIN.get_owning_node(q) for q in pin.list_connected_pins()] if pin else []
 
 
 def _flag(n, pin):
@@ -59,8 +69,14 @@ def _check_rows(check, nodes):
           and len(tops) == 1, f"{len(pages)} pages, {len(tops)} carets")
 
     quits = [n for n in nodes if "QuitPreference" in _pins(n)]
-    check("the exit game row, and nothing else, quits the game for the owning player",
-          len(quits) == 1 and _taken(quits[0], UC.QUIT_ACTION)
+    # Nested under the row's Branch: the title's arm of one on GameStarted.
+    titled = [g for n in quits for g in _sources(n, "execute")
+              if _feeds(g, "Condition") == [f"Get {UC.GAME_STARTED_VAR}"]
+              and n in _arm(g, False) and n not in _arm(g, True)
+              and _taken(g, EXIT_ACTION)]
+    check("the last row on the title, exit game, and nothing else, quits the game "
+          "for the owning player; in play the row quits nothing (it is save and exit)",
+          len(quits) == 1 and len(titled) == 1
           and bool(_sources(quits[0], "SpecificPlayer"))
           and _value(quits[0], "QuitPreference").endswith("Quit"),
           f"{len(quits)} QuitGame")

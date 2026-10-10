@@ -129,9 +129,9 @@ def _over(widget, other):
 
 def _check_rows(check, nodes):
     check("the menu has no quality-preset rows and no hotkey in any row's label: "
-          "single player, multiplayer, settings, debug, save and exit, the cheat, "
-          "the six tabs, exit game",
-          len(UC.PAUSE_ROW_LABELS) == len(UC.PAUSE_ROW_ACTIONS) == 13
+          "single player, multiplayer, settings, debug, the cheat, the six tabs, "
+          "and the one way out (exit game; save and exit in play)",
+          len(UC.PAUSE_ROW_LABELS) == len(UC.PAUSE_ROW_ACTIONS) == 12
           and not any("[" in label for label in UC.PAUSE_ROW_LABELS),
           str(UC.PAUSE_ROW_LABELS))
     # Up / Down on PauseRow, round the rows.

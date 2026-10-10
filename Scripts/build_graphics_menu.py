@@ -587,8 +587,9 @@ def _author_tick(ed, tick):
     # its keys, a take. The title's Tick skips them (menu_main.py).
     stilled = author_menu_still(ed, pc_out, [then(tick)])
     in_play, on_title = author_in_play(ed, stilled)
-    # Single player's alone: as a client the exit row leaves the server and
-    # the profile is neither read nor written (mode_tick.py).
+    # Single player's alone: as a client the exit row asks the same countdown
+    # and then leaves the server, the profile neither read nor written
+    # (mode_tick.py).
     single, as_client = author_mode_in_play(ed, pc_out, [in_play])
     saved = author_save_exit_tick(ed, pc_out, [single])
     looted = author_loot_tick(ed, pc_out, [*saved, *as_client])
@@ -604,7 +605,8 @@ def _author_tick(ed, tick):
     tuned = author_player_tune_tick(ed, pc_out, tuned)
     # The sound one also tells the game's sound mix its volumes, first Tick on.
     tuned = author_sound_tune_tick(ed, pc_out, tuned)
-    # Then the menu's own rows (new game or resume, settings, exit game) and M.
+    # Then the menu's own rows (new game or resume, settings, the title's exit
+    # game) and M.
     toggled = author_main_rows_tick(ed, pc_out, tuned)
 
     # --- the menu's debug row, gated on the menu being open -----------------

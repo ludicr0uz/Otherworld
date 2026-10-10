@@ -49,8 +49,9 @@ PROFILE_TABLE = (*(field for field, _owner, _var in STAT_FIELDS), KILLS_FIELD, E
                  WORN_CLASSES_FIELD)
 
 # --- the countdown -----------------------------------------------------------
-# The M panel's "save and exit" row starts it (Enter or a click on the row;
-# EXIT_ACTION is what PauseClick is matched against).
+# The M panel's last row starts it in play, in either mode (Enter or a click
+# on the row; EXIT_ACTION is what PauseClick is matched against). On the
+# title the same row is exit game (umg_consts.QUIT_ROW_LABEL, menu_main.py).
 EXIT_ACTION = "save_exit"
 EXIT_ROW_LABEL = "Save and Exit"
 

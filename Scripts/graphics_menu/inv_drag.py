@@ -4,6 +4,9 @@
     InvOver := the slot code under the cursor (the hand's cell, a weapon
                cell or a bag cell; a worn cell i is WORN_CODE_FIRST + i, and
                moves the caret, WearSel, there), NO_SLOT over none
+    right button pressed over a slot (not a worn cell) -> the weapon
+        component's AskUseSlot(InvOver): a garment worn, a weapon into a weapon
+        slot, anything else to hand (weapon_component/use_request.py)
     left button pressed over a filled slot -> InvDragFrom := InvOver
     left button released with a drag on:
         over the slot it started on (a click): a weapon or bag slot ->
@@ -39,7 +42,7 @@ probe writes the component's request variables instead.
 from uebp.vars import declare, defaults
 from graphics_menu.inv_consts import DRAG_TABLE
 from uebp.graph import out
-from combat.ask_consts import ASK_DROP, ASK_MOVE, ASK_SLOT, ASK_TAKE_OFF, ASK_WEAR
+from combat.ask_consts import ASK_DROP, ASK_MOVE, ASK_SLOT, ASK_TAKE_OFF, ASK_USE, ASK_WEAR
 from combat.paths import WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import PRIMARY, SLOT_ITEMS_VAR
 from combat.wear_tuning import WORN_VAR
@@ -48,13 +51,13 @@ from graphics_menu.cursor import _clicked, _pc, _under, author_row_cursor
 from graphics_menu.cursor_consts import CLICK_KEY, CURSOR_ROW_VAR
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.inv_consts import (
-    DRAG_BOXES, DRAG_FROM_VAR, INV_AREAS, INV_OVER_VAR, NO_SLOT, WORN_CODE_FIRST,
+    DRAG_BOXES, DRAG_FROM_VAR, INV_AREAS, INV_OVER_VAR, NO_SLOT, USE_KEY, WORN_CODE_FIRST,
 )
 from graphics_menu.loot_find import put
 from graphics_menu.ui_graph import part
 from graphics_menu.umg_consts import WBP_HUD
 from graphics_menu.wear_consts import WEAR_SEL_VAR, WEAR_SLOTS_BOX, WEAR_TAKE_VAR
-from uebp.nodes.actor import FN_RELEASED
+from uebp.nodes.actor import FN_RELEASED, FN_WAS_PRESSED
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_VALID
 from uebp.nodes.math import FN_ADD_II, FN_AND, FN_EQ_II, FN_GE_II, FN_LESS_II, FN_OR, FN_SUB_II
 from uebp.nodes.system import FN_IS_VALID
@@ -82,6 +85,19 @@ def _author_over(ed, in_execs, made):
         code = out(_call(ed, FN_ADD_II, made, A=row, B=first))
         flow = [put(ed, INV_OVER_VAR, code, [hit], made), miss]
     return flow
+
+
+def _author_use(ed, wc, in_execs, made):
+    """The right button over a slot asks for its item used (AskUseSlot); the
+    component decides what that is, and that there is one. Returns the
+    exec tails."""
+    over = _get(ed, INV_OVER_VAR, made)
+    on_slot = _call(ed, FN_AND, made, A=out(_call(ed, FN_GE_II, made, A=over, B=0)),
+                    B=out(_call(ed, FN_LESS_II, made, A=over, B=WORN_CODE_FIRST)))
+    pressed = _call(ed, FN_WAS_PRESSED, made, self=_pc(ed, made), Key=USE_KEY)
+    used = _call(ed, FN_AND, made, A=out(pressed), B=out(on_slot))
+    hit, miss = _branch(ed, out(used), in_execs, made)
+    return [ask(ed, wc, ASK_USE, [hit], made, From=over), miss]
 
 
 def _author_press(ed, wc, in_execs, made):
@@ -164,10 +180,12 @@ def author_inv_drag(ed, wc, in_execs):
     ``wc``: the cast weapon component's pin. Returns the exec tails."""
     made = []
     flow = _author_over(ed, in_execs, made)
+    flow = _author_use(ed, wc, flow, made)
     flow = _author_press(ed, wc, flow, made)
     flow = _author_release(ed, wc, flow, made)
     ed.add_comment_to_nodes(
-        "The mouse on the inventory's slots with the I panel open: a press on a "
+        "The mouse on the inventory's slots with the I panel open: the right "
+        "button on a slot asks for its item used (AskUseSlot); a press on a "
         "filled slot starts a drag; the release on the same slot asks for it "
         "in hand (AskSlot) or, worn, off (WearTakeOffRequested); on another "
         "asks for the move (AskMove), the take-off into it (AskTakeOff) or the "

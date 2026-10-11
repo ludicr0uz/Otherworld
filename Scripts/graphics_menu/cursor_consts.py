@@ -57,6 +57,7 @@ PAGE_CLICK_VAR = Var("PageClick", INT, NO_ROW)
 # The weapon component's spent-press latch (combat/weapon_component/consume.py),
 # held up while the cursor shows in a running game so a click fires nothing.
 TRIGGER_SPENT_VAR = "TriggerSpent"
+AIM_HELD_VAR = "AimHeld"            # ...and its shoulder aim off, while the cursor is up
 
 # A scrolling list's bar is being dragged (the left button went down on it and
 # is still down), and how far down the list's window the cursor is, 0..1.

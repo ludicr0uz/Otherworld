@@ -5,7 +5,8 @@ is a custom event on BP_WeaponComponent (combat/weapon_component/asks.py,
 loot_take.py, save_exit.py), which the HUD calls with what was picked and
 nothing else; the component decides whether it happens. One event per action,
 so a multiplayer task that makes one a server request (M18 did the slots',
-M23 the drop and the loot window's take, M24 the garments': SERVER_ASKS; M35)
+M23 the drop and the loot window's take, M24 the garments': SERVER_ASKS; M35;
+the I panel's right click, AskUseSlot, from the start)
 has one node to turn into a Server event. Constants only.
 """
 
@@ -17,6 +18,8 @@ ASK_NEXT = "AskNext"            # the bag's next item to hand (the Q key)
 ASK_TAKE_OFF = "AskTakeOff"     # a worn garment off: into the bag, or onto a slot
 ASK_WEAR = "AskWear"            # a slot's garment dragged onto the worn grid
 ASK_DROP = "AskDrop"            # a slot's item or a worn garment set down
+ASK_USE = "AskUseSlot"              # a right click on a slot in the I panel: a garment
+                                # worn, a weapon into a weapon slot, the rest to hand
 SLOT_PARAM, FROM_PARAM, TO_PARAM = "Slot", "From", "To"
 INT_ASKS = (
     (ASK_SLOT, (SLOT_PARAM,)),
@@ -25,6 +28,7 @@ INT_ASKS = (
     (ASK_TAKE_OFF, (SLOT_PARAM, TO_PARAM)),
     (ASK_WEAR, (FROM_PARAM,)),
     (ASK_DROP, (FROM_PARAM,)),
+    (ASK_USE, (FROM_PARAM,)),
 )
 
 # The loot window's take: the body searched (its BP_HealthComponent), which
@@ -39,7 +43,7 @@ BODY_PARAM, INDEX_PARAM, WANT_PARAM = "Body", "Index", "Want"
 # server serves the request, where what fits where and who gets what is
 # decided. The rest are plain calls until their task (M35).
 SERVER_ASKS = (ASK_SLOT, ASK_MOVE, ASK_NEXT, ASK_DROP, ASK_LOOT_TAKE, ASK_TAKE_OFF,
-               ASK_WEAR)
+               ASK_WEAR, ASK_USE)
 
 # Save and exit: the M panel's row starts the countdown.
 ASK_SAVE_EXIT = "AskSaveExit"

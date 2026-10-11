@@ -12,9 +12,11 @@ from combat.slot_tuning import (
     BAG_FIRST, BAG_LAST, BAG_SIZE, HAND, HAND_FROM_VAR, HAS_ROOM_VAR, LONG_GUN, MELEE_KIND, MELEE_SLOT,
     MOVE_FROM_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, NO_REQUEST, NOT_A_WEAPON, PISTOL_KIND, PISTOL_SLOT,
     PRIMARY, SECONDARY, SLOT_COUNT, SLOT_ITEMS_VAR, SLOT_KEYS, SLOT_REQUEST_VAR, SLOT_VAR,
-    STARTER_HAND_FROM, STARTER_SLOTS, UNPLACED, WEAPON_KIND_VAR, fits,
+    STARTER_HAND_FROM, STARTER_SLOTS, UNPLACED, USE_FIT_VAR, USE_FREE_VAR, USE_REQUEST_VAR,
+    USE_WANT_VAR, WEAPON_KIND_VAR, fits,
 )
 from combat.ask_consts import ASK_MOVE, ASK_NEXT, ASK_SLOT, FROM_PARAM, SLOT_PARAM, TO_PARAM
+from combat.wear_tuning import CLOTHING_SLOT_VAR, WEAR_REQUEST_VAR
 from combat.record_vars import FORCED, NO_ASK, MoveForcedFrom, MoveForcedTo, SlotForced
 from combat.verify.common import (
     BEL, PIN, before_marks, by_pins, cdo, check, in_pins, load, num_pin, pin_value)
@@ -217,6 +219,47 @@ def check_keys():
           wc_cdo.get_editor_property(NEXT_REQUEST_VAR) == NO_REQUEST)
 
 
+def check_use_request():
+    """use_request.py: the I panel's right click, served into the requests
+    the Tick already serves."""
+    rest = {v: wc_cdo.get_editor_property(v) for v in (
+        USE_REQUEST_VAR, USE_WANT_VAR, USE_FREE_VAR, USE_FIT_VAR)}
+    check(f"{USE_REQUEST_VAR} and its scratch start at {NO_REQUEST}: no request",
+          all(v == NO_REQUEST for v in rest.values()), str(rest))
+    copies = [n for n in wg if _title(n) == f"Set {USE_WANT_VAR}"]
+    check(f"the use is copied ({USE_WANT_VAR}) off {USE_REQUEST_VAR} and the request lowered",
+          [_title(f) for n in copies for f in _feeders(n, USE_WANT_VAR)] == [f"Get {USE_REQUEST_VAR}"]
+          and [pin_value(n, USE_REQUEST_VAR) for n in wg if _title(n) == f"Set {USE_REQUEST_VAR}"
+               and not _feeders(n, USE_REQUEST_VAR)] == [str(NO_REQUEST)],
+          str(len(copies)))
+    raised = {v: [_title(f) for n in wg if _title(n) == f"Set {v}"
+                  for f in _feeders(n, v) if _title(f) == f"Get {USE_WANT_VAR}"]
+              for v in (WEAR_REQUEST_VAR, SLOT_REQUEST_VAR, MOVE_FROM_VAR)}
+    check("it raises a wear (a garment), a slot request (a weapon slot's item, or "
+          "anything but a weapon: to hand) or a move (a weapon in the hand or the bag), "
+          "each off the copy, and nothing else",
+          {v: len(r) for v, r in raised.items()}
+          == {WEAR_REQUEST_VAR: 1, SLOT_REQUEST_VAR: 1, MOVE_FROM_VAR: 1}, str(raised))
+    moves = [n for n in wg if _title(n) == f"Set {MOVE_TO_VAR}"
+             and any(_title(f) == "SelectInt" for f in _feeders(n, MOVE_TO_VAR))]
+    picks = [sorted(_title(g) for pin in ("A", "B") for g in _feeders(s, pin))
+             for n in moves for s in _feeders(n, MOVE_TO_VAR)]
+    check(f"the weapon's slot is the first free one it fits ({USE_FREE_VAR}), else the "
+          f"first it fits at all ({USE_FIT_VAR}: a long gun's the primary, which the "
+          "move then swaps)",
+          picks == [[f"Get {USE_FIT_VAR}", f"Get {USE_FREE_VAR}"]], str(picks))
+    spans = [(num_pin(w, "FirstIndex"), num_pin(w, "LastIndex"))
+             for w in by_pins(wg, "FirstIndex", "LastIndex")]
+    check(f"...searched over the weapon slots alone ({PRIMARY}..{MELEE_SLOT})",
+          (float(PRIMARY), float(MELEE_SLOT)) in spans, str(spans))
+    gates = [n for n in wg if "Condition" in in_pins(n)
+             for c in _feeders(n, "Condition")
+             for a in _feeders(c, "A") if _title(a) == f"Get {CLOTHING_SLOT_VAR}"
+             and any(_title(i) == "Get" for i in _feeders(a, "self"))]
+    check("a garment is told by its ClothingSlot, read off the slot's item",
+          len(gates) == 1, str(len(gates)))
+
+
 def run():
     check_slot_rule()
     check_item_slots()
@@ -225,3 +268,4 @@ def run():
     check_sync()
     check_weapon_slot_first()
     check_keys()
+    check_use_request()

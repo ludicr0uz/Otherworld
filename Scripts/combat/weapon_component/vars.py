@@ -28,6 +28,7 @@ from combat.slot_tuning import (
     DROP_ITEM_VAR, DROP_REQUEST_VAR, DROP_WANT_VAR, HAND_FROM_VAR, HAS_ROOM_VAR,
     MOVE_DST_VAR, MOVE_FROM_VAR, MOVE_SRC_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, NO_REQUEST,
     SLOT_ITEMS_VAR, SLOT_KEYS, SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_WANT_VAR,
+    USE_FIT_VAR, USE_FREE_VAR, USE_REQUEST_VAR, USE_WANT_VAR,
     STARTER_HAND_FROM,
 )
 from combat.sprint_tuning import (
@@ -213,7 +214,8 @@ SlotItems = Var(SLOT_ITEMS_VAR, array(_ITEM))
 HandFrom = Var(HAND_FROM_VAR, INT, STARTER_HAND_FROM)
 SLOT_REQUESTS = tuple(Var(name, INT, NO_REQUEST) for name in (
     SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_WANT_VAR, MOVE_FROM_VAR, MOVE_TO_VAR,
-    MOVE_SRC_VAR, MOVE_DST_VAR, DROP_REQUEST_VAR, DROP_WANT_VAR, NEXT_REQUEST_VAR))
+    MOVE_SRC_VAR, MOVE_DST_VAR, DROP_REQUEST_VAR, DROP_WANT_VAR, NEXT_REQUEST_VAR,
+    USE_REQUEST_VAR, USE_WANT_VAR, USE_FREE_VAR, USE_FIT_VAR))
 HasRoom = Var(HAS_ROOM_VAR, BOOL, True)
 # What the ready pose should reflect (carry.py writes it) and what it
 # currently does. The pair is what makes the pose edge-triggered (see
@@ -251,6 +253,10 @@ FireForced = Var("FireForced", BOOL, False)
 FirePressedAt = Var("FirePressedAt", FLOAT, -1.0)
 SprintForced = Var(SPRINT_FORCED_VAR, BOOL, False)
 AimForced = Var("AimForced", BOOL, False)
+# The HUD's cursor is up over a running game (the I panel, the M panel, the
+# loot window): the shoulder aim key is a click there, not an aim
+# (graphics_menu/cursor.author_hold_fire writes it; ads.py reads it).
+AimHeld = Var("AimHeld", BOOL, False)
 # The GameMode's DebugMode, cached at the moment of firing so the pellet loop
 # can branch on a plain bool instead of casting eight times.
 DebugMode = Var("DebugMode", BOOL, False)
@@ -354,7 +360,7 @@ STATE = (
     AimSpread, RecoilScale, ReticleSpread, ShotDirection, TriggerSpent, Worn, WearItem,
     DropItem, TakeOffSlot, TakeOffTo, WearRequest, WearSlot, OwnerDead, FireForced,
     FirePressedAt,
-    SprintForced, AimForced, DebugMode, HitBone, HitPoint, ShotgunClass, PistolClass,
+    SprintForced, AimForced, AimHeld, DebugMode, HitBone, HitPoint, ShotgunClass, PistolClass,
     KnifeClass, AxeClass, MatchesClass, StickClass, ImpactClass, CampfireClass, PunchAnim,
     PunchQueued, PunchPending, NextPunchTime, PunchDueTime, BlowDamage, KnifeAnim, AxeAnim,
     AxePose, KnifeQueued, KnifePending, NextKnifeTime, KnifeDueTime, InteractTarget,

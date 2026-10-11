@@ -38,7 +38,10 @@ The defaults are all rebindable on the settings screen:
   **C** toggles crouch (in a sprint it slides: G5, "Crouch, slide and traversal from the sample"), **Z** toggles prone, **Left Alt** held down the sights holds the breath (`docs/aiming.md`), **V** held cocks the arm and shows the throw's arc, which ends on the reticle's point, and a click throws (see below).
 - **R** reloads, and restarts from the death menu.
 - M belongs to the graphics menu; **I** (the inventory: the backpack and the worn
-  garments, with drag and drop) and Tab (the loot window) to the HUD.
+  garments, with drag and drop; a right click on a slot uses its item: a garment is
+  worn, a weapon goes into a weapon slot, anything else to hand, `AskUseSlot` served by
+  `weapon_component/use_request.py`; the HUD's cursor up holds the shoulder aim off,
+  `AimHeld`) and Tab (the loot window) to the HUD.
 
 The keys are CDO defaults on `BP_WeaponComponent`. The HUD pushes them from `BP_Settings`
 every frame. Sprint and every other key live on the component, not on the character, because

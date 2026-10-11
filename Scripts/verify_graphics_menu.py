@@ -29,6 +29,7 @@ from graphics_menu.profile_checks import check_profile
 from graphics_menu.dev_guns_checks import check_dev_guns
 from graphics_menu import loot_consts as LC
 from graphics_menu import wear_consts as WEAR
+from graphics_menu import inv_consts as IC
 from graphics_menu import tune_tab as TT
 from graphics_menu.loot_checks import check_loot
 from graphics_menu.wear_checks import check_wear
@@ -169,10 +170,11 @@ def main():
                          LC.LOOT_KEY, LC.LOOT_UP, LC.LOOT_DOWN, LC.LOOT_TAKE_KEY,
                          WEAR.WEAR_KEY, WEAR.WEAR_UP, WEAR.WEAR_DOWN, WEAR.WEAR_TAKE_KEY,
                          TT.TUNE_UP, TT.TUNE_DOWN, TT.TUNE_LESS,
-                         TT.TUNE_MORE, TT.TUNE_SAVE_KEY, MC.ADDRESS_ERASE_KEY)
+                         TT.TUNE_MORE, TT.TUNE_SAVE_KEY, MC.ADDRESS_ERASE_KEY,
+                         IC.USE_KEY)
                         + N.START_KEYS + CC.CURSOR_KEYS)
     check("polls exactly the menu, restart, start, nav, back, loot, I panel and tuning-tab keys, "
-          "the address row's Backspace "
+          "the address row's Backspace, the I panel's right click (the use) "
           "and the cursor's click (never the wheel): no row of the M panel has a hotkey",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")

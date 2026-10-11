@@ -7,6 +7,7 @@ HUD calls in place of writing the component's request variables.
     AskTakeOff(Slot, To)   TakeOffTo := To, TakeOffSlot := Slot
     AskWear(From)          WearRequest := From
     AskDrop(From)          DropRequest := From
+    AskUseSlot(From)           UseRequest := From (use_request.py)
 
 Each raises the request the component's own Tick already serves (slot_moves.py,
 wear.py, wear_drag.py, drop_request.py), where what fits where is decided, so
@@ -32,11 +33,13 @@ from uebp.graph import _connect, _pin, _set, out, then
 from uebp.net import custom_event, server_event
 from uebp.vars import INT
 from combat.ask_consts import (
-    ASK_DROP, ASK_MOVE, ASK_NEXT, ASK_SLOT, ASK_TAKE_OFF, ASK_WEAR, FROM_PARAM, INT_ASKS,
+    ASK_DROP, ASK_MOVE, ASK_NEXT, ASK_SLOT, ASK_TAKE_OFF, ASK_USE, ASK_WEAR, FROM_PARAM,
+    INT_ASKS,
     SERVER_ASKS, SLOT_PARAM, TO_PARAM,
 )
 from combat.slot_tuning import (
-    DROP_REQUEST_VAR, MOVE_FROM_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, SLOT_REQUEST_VAR)
+    DROP_REQUEST_VAR, MOVE_FROM_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, SLOT_REQUEST_VAR,
+    USE_REQUEST_VAR)
 from combat.wear_tuning import TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_REQUEST_VAR
 
 # event -> the (request variable, the parameter it takes), in write order. A
@@ -49,6 +52,7 @@ WRITES = {
     ASK_TAKE_OFF: ((TAKE_OFF_TO_VAR, TO_PARAM), (TAKE_OFF_VAR, SLOT_PARAM)),
     ASK_WEAR: ((WEAR_REQUEST_VAR, FROM_PARAM),),
     ASK_DROP: ((DROP_REQUEST_VAR, FROM_PARAM),),
+    ASK_USE: ((USE_REQUEST_VAR, FROM_PARAM),),
 }
 
 

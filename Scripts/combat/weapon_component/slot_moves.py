@@ -54,6 +54,7 @@ from combat.weapon_component import vars as WV
 from Sound.sound_items import author_handled
 from uebp.g import _G
 from combat.weapon_component.slot_nodes import fits, for_loop, not_, op, slot_at, valid
+from combat.weapon_component.use_request import _author_use_request
 from uebp.graph import _node, _pin, _set, _connect, out, then
 from uebp.nodes.actor import FN_WAS_PRESSED
 from uebp.nodes.math import (
@@ -208,10 +209,12 @@ def _author_next_request(g, in_execs):
 
 
 def _author_slot_serve(ed, in_execs):
-    """Q's request, the slot request, then the move: the server's (and
-    single player's). Returns the exec tails."""
+    """The use (use_request.py), Q's request, the slot request, then the
+    move: the server's (and single player's). Returns the exec tails."""
     g = _G(ed, ITEM_CLASS_PATH)
-    tails = _author_next_request(g, in_execs)
+    # The I panel's right click first: what it raises is served below.
+    tails = _author_use_request(g, in_execs)
+    tails = _author_next_request(g, tails)
     tails = _author_slot_request(g, tails)
     tails = _author_slot_move(g, tails)
     # Whatever either moved is heard, by its type (Sound/sound_items.py).

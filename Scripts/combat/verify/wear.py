@@ -94,11 +94,16 @@ def check_wear():
         for up in _feeders(f, "execute") for g in _feeders(up, "Condition")
         for p in BEL.list_output_pins(g))]
     every = _gated_on(CLOTHING_SLOT_VAR)
+    # The use serve's (use_request.py) reads a slot's item, not Held: a
+    # garment right-clicked in the I panel is worn from where it lies.
+    off_slot = [b for b in every if any(
+        _title(i) == "Get" for c in _feeders(b, "Condition") for a in _feeders(c, "A")
+        for i in _feeders(a, "self"))]
     check(f"three Branches on Held.{CLOTHING_SLOT_VAR} >= 0: the key's, behind the "
           f"Consumable tap, {SERVER_WEAR}'s own refusal, and {SERVER_CONSUME}'s (a "
-          "garment is not eaten)",
-          len(every) == 3 and len(gates) == 1,
-          f"{len(every)} gates, {len(gates)} behind the tap")
+          "garment is not eaten); and one on a slot's item's, the I panel's use",
+          len(every) == 4 and len(gates) == 1 and len(off_slot) == 1,
+          f"{len(every)} gates, {len(gates)} behind the tap, {len(off_slot)} off a slot")
     if not gates:
         return
     titles = [_title(n).replace(" ", "") for n in _chain(

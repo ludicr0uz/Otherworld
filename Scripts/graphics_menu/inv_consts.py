@@ -12,6 +12,10 @@ mouse) read one table. The slot codes are combat/slot_tuning.py's.
         drag a worn garment onto the hand or a bag slot   take it off into it
         drag a carried garment onto the worn grid          wear it
         click a slot     bring it to hand (a bag or a weapon slot)
+        right-click a slot   use it (USE_KEY; the component's AskUseSlot): a
+            garment is worn, a weapon goes into a free weapon slot it fits
+            (else swaps with the first it fits: a long gun's the primary),
+            anything else comes to hand
         drag anything out of the inventory (released over none of
             INV_AREAS)   set it down on the ground (the component's DropRequest)
     while a drag is on, its item's icon is carried on the cursor (DRAG_ICON)
@@ -50,6 +54,9 @@ BAG_LABEL_TEXTS = tuple(str(k) for k in range(5, 10))     # over the bag's top r
 INV_LABEL_FONT = 10.0
 HAND_GAP = 6.0                      # px between the hand slot and the weapon row
 KIT_BOTTOM = 44.0                   # the kit's bottom edge, over the watermark
+
+# The right button on a slot: use it (inv_drag.py's _author_use).
+USE_KEY = "RightMouseButton"
 
 # The HUD's variables. InvDragFrom: the slot a press in the I panel started a
 # drag on (NO_SLOT when none). InvOver: the slot under the cursor this frame.

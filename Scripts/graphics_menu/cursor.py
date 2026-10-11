@@ -36,7 +36,7 @@ from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.cursor_consts import (
     BACK_KEY, CLICK_KEY, ESCAPE_KEY, CURSOR_MOVED_VAR, CURSOR_POS_VAR, CURSOR_ROW_VAR,
     CURSOR_SHOWN_VAR, CURSOR_WANTED_VAR, NO_ROW, PAGE_CLICK_VAR, PAUSE_CLICK_VAR,
-    TRIGGER_SPENT_VAR,
+    TRIGGER_SPENT_VAR, AIM_HELD_VAR,
 )
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.loot_find import put
@@ -168,9 +168,10 @@ def author_hold_fire(ed, in_execs):
     """While the cursor shows over a running game (the M panel, the loot
     window): the weapon component's TriggerSpent, every frame. Its Tick keeps
     a spent press spent while the fire key is down, so a click on a row
-    neither fires, slashes nor punches. Returns the exec tails."""
+    neither fires, slashes nor punches. Its AimHeld follows CursorWanted
+    every frame, so the right click, the I panel's use, is no aim either.
+    Returns the exec tails."""
     made = []
-    held, free = _branch(ed, _get(ed, CURSOR_WANTED_VAR, made), in_execs, made)
     pawn = _call(ed, FN_GET_OWNING_PAWN, made)
     comp = _call(ed, FN_GET_COMP, made, self=out(pawn))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
@@ -178,12 +179,22 @@ def author_hold_fire(ed, in_execs):
     cast = _palette(ed, NODE_CAST_WEAPON)
     made.append(cast)
     _connect(out(comp), _pin(cast, "Object"))
-    _connect(held, _pin(cast, "execute"))
-    spent = _setter(ed, TRIGGER_SPENT_VAR, "true", [then(cast)], made, WEAPON_COMP_CLASS_PATH,
-                    _loose_pin(cast, "AsBPWeaponComponent", is_input=False))
+    for e in in_execs:
+        _connect(e, _pin(cast, "execute"))
+    wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
+    # The aim key is a click while the cursor is up (the I panel's use):
+    # AimHeld follows CursorWanted, both ways.
+    aim = ed.add_set_member_variable_node(AIM_HELD_VAR, WEAPON_COMP_CLASS_PATH)
+    made.append(aim)
+    _connect(wc, _pin(aim, "self"))
+    _connect(_get(ed, CURSOR_WANTED_VAR, made), _pin(aim, AIM_HELD_VAR))
+    _connect(then(cast), _pin(aim, "execute"))
+    flow = then(aim)
+    held, free = _branch(ed, _get(ed, CURSOR_WANTED_VAR, made), [flow], made)
+    spent = _setter(ed, TRIGGER_SPENT_VAR, "true", [held], made, WEAPON_COMP_CLASS_PATH, wc)
     ed.add_comment_to_nodes(
-        "A click on a menu row is not a shot: the cursor showing keeps the "
-        "weapon component's fire press spent.", made)
+        "A click on a menu row is not a shot, nor an aim: the cursor showing keeps "
+        "the weapon component's fire press spent and its AimHeld up.", made)
     return [spent, free, out(cast, "CastFailed")]
 
 

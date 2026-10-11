@@ -62,6 +62,15 @@ MOVE_SRC_VAR, MOVE_DST_VAR = "MoveSrc", "MoveDst"
 DROP_REQUEST_VAR = "DropRequest"
 DROP_WANT_VAR = "DropWant"        # its copy, read after it is lowered
 DROP_ITEM_VAR = "DropItem"        # the item being set down, held still
+# A right click on a slot in the I panel (graphics_menu/inv_drag.py): use
+# this slot's item. A garment is worn (WearRequest), a weapon goes into a
+# free weapon slot it fits, else swaps with the first it fits (MoveFrom/To;
+# a long gun's is the primary), a weapon slot's item and anything else come
+# to hand (SlotRequest) (weapon_component/use_request.py).
+USE_REQUEST_VAR = "UseRequest"
+USE_WANT_VAR = "UseWant"          # its copy, read after it is lowered
+USE_FREE_VAR = "UseFree"          # the search: the first free weapon slot it fits
+USE_FIT_VAR = "UseFit"            # ... and the first weapon slot it fits at all
 
 # The number keys: (component variable, default key, the slot it brings to
 # hand). 1-4 the weapon slots, 5-9 the bag's first five. Fixed keys on the

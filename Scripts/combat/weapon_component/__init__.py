@@ -102,6 +102,10 @@ _author_* fragment per concern, each in its own module:
   inventory   equip, the set-down (drop_request's), BeginPlay loadout (each
               issued item into its slot)
   slot_nodes  the slot fragments' shared shapes: loops, SlotItems[c], fits()
+  use_request UseRequest (the I panel's right click on a slot, AskUseSlot), served
+              with authority first in the slot serve: a garment worn, a weapon
+              into a free weapon slot it fits (else swapping with the first it
+              fits), anything else to hand, each as a request the Tick serves
   slot_moves  1-9 ask for a slot (AskSlot), Q for the bag's next item (AskNext):
               Server events; the serve, with authority: the request (the hand's
               item home, the asked one up) and the HUD's drag (MoveFrom/To)

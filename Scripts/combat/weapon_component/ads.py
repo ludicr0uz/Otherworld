@@ -30,7 +30,8 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
                       exec_ins, keep):
     """Read the two aim keys into the aim state and the FOV to zoom to.
 
-        shoulder  = IsInputKeyDown(KeyAim)
+        shoulder  = (IsInputKeyDown(KeyAim) OR AimForced) AND NOT AimHeld
+                    (AimHeld: the HUD's cursor is up, cursor.author_hold_fire)
         sights    = (IsInputKeyDown(KeySights) OR SightsForced) AND NOT Using
         Aiming    = (shoulder OR sights) AND NOT Sprinting AND IsValid(Held)
         if Aiming:
@@ -85,7 +86,15 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
     shoulder_or = keep(_node(ed, FN_OR))
     _connect(held_down("KeyAim"), _pin(shoulder_or, "A"))
     _connect(out(forced, AIM_FORCED_VAR), _pin(shoulder_or, "B"))
-    shoulder = out(shoulder_or)
+    # Not while the HUD's cursor is up: there a right click is the I
+    # panel's use (graphics_menu/inv_drag.py), not an aim.
+    cursor_up = keep(ed.add_get_member_variable_node(WV.AimHeld))
+    free = keep(_node(ed, FN_NOT))
+    _connect(out(cursor_up, WV.AimHeld), _pin(free, "A"))
+    shoulder_and = keep(_node(ed, FN_AND))
+    _connect(out(shoulder_or), _pin(shoulder_and, "A"))
+    _connect(out(free), _pin(shoulder_and, "B"))
+    shoulder = out(shoulder_and)
     # The same key uses an item that has no sights (use.py): then it is not
     # an aim key this frame.
     using = keep(ed.add_get_member_variable_node(USING_VAR))

@@ -57,6 +57,8 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   component's own Tick serves it (into the bag while there is room, `HasRoom`: a bag slot
   or the hand free; the slot emptied).
   The HUD never touches the bag.
+- **A right click on a bag slot's garment wears it** (`AskUseSlot`, `weapon_component/use_request.py`:
+  it raises `WearRequest`, so the swap below is the same one).
 - **The mouse does both, in the I panel** (`graphics_menu/inv_drag.py` asks,
   `probes/probe_clothing_drag.py` checks): a worn garment dragged onto the hand or a bag
   slot is taken off into it (`TakeOffTo` with `TakeOffSlot`; a filled slot or a weapon

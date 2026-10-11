@@ -5,7 +5,8 @@ import unreal
 
 from combat import ask_consts as AC
 from combat.slot_tuning import (
-    DROP_REQUEST_VAR, MOVE_FROM_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, SLOT_REQUEST_VAR)
+    DROP_REQUEST_VAR, MOVE_FROM_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, SLOT_REQUEST_VAR,
+    USE_REQUEST_VAR)
 from combat.wear_tuning import TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_REQUEST_VAR
 from loot.consts import BODY_ARRAYS
 
@@ -16,7 +17,7 @@ PIN = unreal.BlueprintGraphPinLibrary
 # is carried, and what a body carries.
 COMPONENT_ONLY = (
     SLOT_REQUEST_VAR, NEXT_REQUEST_VAR, MOVE_FROM_VAR, MOVE_TO_VAR, DROP_REQUEST_VAR,
-    TAKE_OFF_VAR, TAKE_OFF_TO_VAR, WEAR_REQUEST_VAR, AC.EXIT_PENDING_VAR, AC.EXIT_AT_VAR,
+    USE_REQUEST_VAR, TAKE_OFF_VAR, TAKE_OFF_TO_VAR, WEAR_REQUEST_VAR, AC.EXIT_PENDING_VAR, AC.EXIT_AT_VAR,
     AC.EXIT_STARTED_VAR, AC.EXIT_CALLED_OFF_VAR, AC.EXIT_DUE_VAR)
 
 
@@ -49,10 +50,10 @@ def check_asks(check, nodes):
     counts = {name: len(asks(nodes, name)) for name in AC.ALL_ASKS}
     # AskNext is the Q key's, on the component: no screen asks it.
     want = {AC.ASK_SLOT: 2, AC.ASK_MOVE: 1, AC.ASK_NEXT: 0, AC.ASK_TAKE_OFF: 2, AC.ASK_WEAR: 1,
-            AC.ASK_DROP: 1, AC.ASK_LOOT_TAKE: 1, AC.ASK_SAVE_EXIT: 2}
+            AC.ASK_DROP: 1, AC.ASK_USE: 1, AC.ASK_LOOT_TAKE: 1, AC.ASK_SAVE_EXIT: 2}
     check("the HUD asks the weapon component for each thing the player does through "
           "a screen: a slot to hand and a take-off (the keys, and the mouse), a move, "
-          "a wear, a drop, a loot take, save and exit (single player's Tick, and a "
+          "a wear, a drop, a use (the right click), a loot take, save and exit (single player's Tick, and a "
           "client's)", counts == want, str(counts))
     writes = sorted(_title(n) for n in nodes
                     if _title(n) in {f"Set {v}" for v in COMPONENT_ONLY})

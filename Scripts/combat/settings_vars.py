@@ -17,10 +17,11 @@ ScopeSensitivity = Var("ScopeSensitivity", FLOAT, COMBAT.ads_scope_sens_scale)
 # BIND_VARS is what says which index means which action.
 Binds = Var("Binds", array(struct("/Script/InputCore.Key")))
 # Whether the developer overlays (tracers, wanderer numbers)
-# are on. ON by default, and a save written before this field existed loads
-# it as the default too. The HUD copies it onto the GameMode's DebugMode at
-# BeginPlay and writes it back whenever D flips it.
-DebugMode = Var("DebugMode", BOOL, True)
+# are on. OFF by default (they are instrumentation, not what the game looks
+# like), and a save written before this field existed loads it as the default
+# too. The HUD copies it onto the GameState's DebugMode at BeginPlay and writes
+# it back whenever the menu's debug row flips it.
+DebugMode = Var("DebugMode", BOOL, False)
 
 # The server the title's Multiplayer page joins, as the player last typed it
 # (graphics_menu/mode_draw.py). Local settings, not the character's profile;

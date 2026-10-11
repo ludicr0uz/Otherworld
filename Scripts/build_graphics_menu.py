@@ -186,7 +186,7 @@ MENU_KEY = "M"
 # a copy taken once per frame at the top of DrawHUD so the draw code can branch
 # on a plain bool instead of casting to the GameMode for every wanderer.
 #
-# The player's choice is kept in BP_Settings.DebugMode (default ON), so it
+# The player's choice is kept in BP_Settings.DebugMode (default OFF), so it
 # survives a restart: BeginPlay copies it onto the GameMode once the save is
 # loaded, and the M panel's debug row writes it back and saves on the spot.
 DEBUG_MODE_VAR = "DebugMode"
@@ -482,7 +482,7 @@ def _author_restore_debug(ed, in_execs):
     _connect(out(saved, DEBUG_MODE_VAR), _pin(put, DEBUG_MODE_VAR))
     _connect(state.then, _pin(put, "execute"))
     ed.add_comment_to_nodes(
-        "Debug mode as the player last left it (BP_Settings.DebugMode, on for "
+        "Debug mode as the player last left it (BP_Settings.DebugMode, off for "
         "a first run), onto the GameState where the HUD and the weapon read "
         "it, on the machine that owns it.",
         [*state.nodes, settings, saved, put])

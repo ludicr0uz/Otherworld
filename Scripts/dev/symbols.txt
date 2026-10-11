@@ -2288,7 +2288,7 @@ combat/server_pose.py:38: TICK_OPTION
 combat/server_pose.py:39: ALWAYS_REFRESH
 combat/server_pose.py:42: author_server_pose
 combat/settings_savegame.py:17: build_settings_savegame
-combat/settings_vars.py:34: TABLE
+combat/settings_vars.py:35: TABLE
 combat/shot_vars.py:32: SERVER_FIRE
 combat/shot_vars.py:33: AIM_PARAM
 combat/shot_vars.py:34: SHOT_FIRED

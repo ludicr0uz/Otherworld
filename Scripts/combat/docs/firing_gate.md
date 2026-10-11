@@ -78,7 +78,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   `ReloadNow`, and a client of a server runs it on its own copy first. A reload that moved
   rounds raises `Reloaded`, where the graph tells or predicts the clack.
 - **Debug mode:**
-  - `DebugMode` lives on the GameMode, because a component can't reach the HUD. It is on by
+  - `DebugMode` lives on the GameMode, because a component can't reach the HUD. It is off by
     default and persisted as `BP_Settings.DebugMode`. The HUD copies it at BeginPlay, and D writes
     both it and the save.
   - It shows the FPS readout, pellet tracers, per-impact damage (`39.0 (x1.5)`, only on actors

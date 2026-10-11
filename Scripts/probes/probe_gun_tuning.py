@@ -46,7 +46,7 @@ WRITABLE = [(HUD_BP_PATH, v) for v in (TC.TUNE_OPEN_VAR, TC.TUNE_ROW_VAR,
                                        TC.TUNE_WEAPON_VAR, TC.TUNE_NUDGE_VAR,
                                        TC.TUNE_SAVE_VAR, MV.MenuOpen)]
 COLS = [s[0] for s in TUNE_STATS]
-N = len(TUNE_STATS)
+N = TC.STAT_COUNT   # a weapon's cells: its TUNE_STATS, then the grip's
 
 
 def _profile():

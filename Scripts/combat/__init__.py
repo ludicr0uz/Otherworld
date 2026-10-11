@@ -214,6 +214,10 @@ ASSETS AND PATCHES
   grip_handle       the Grip component the game seats an item by and the
                     editor can move: seeded from the solve, never written
                     over once somebody placed it
+  grip_nudges       Content/Tuning/grip_nudges.csv: a row of position and
+                    rotation nudges per held item, laid over its Grip by the
+                    running game (C++), so a number is a relaunch; the format
+                    in Python (GRIP_STATS, read_table, write_table)
   lodge             how a thrown blade sits in the tree it lodged in, out of
                     its model: lodge_pose -> LodgeTurn, LodgePoint
   settings_savegame BP_Settings

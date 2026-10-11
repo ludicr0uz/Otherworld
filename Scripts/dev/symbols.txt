@@ -1859,6 +1859,17 @@ combat/grip_handle.py:72: seed_of
 combat/grip_handle.py:78: placed_by_hand
 combat/grip_handle.py:88: seed_grip
 combat/grip_handle.py:124: _tag
+combat/grip_nudges.py:34: CSV_PATH
+combat/grip_nudges.py:38: ITEM_COLUMN
+combat/grip_nudges.py:41: GRIP_STATS
+combat/grip_nudges.py:49: GRIP_COLUMNS
+combat/grip_nudges.py:51: GRIP_MIN
+combat/grip_nudges.py:52: ZERO
+combat/grip_nudges.py:55: row_of
+combat/grip_nudges.py:61: read_table
+combat/grip_nudges.py:76: format_value
+combat/grip_nudges.py:83: write_table
+combat/grip_nudges.py:94: is_zero
 combat/gun_drop.py:28: _mode_var
 combat/gun_drop.py:37: _author_seed_streams
 combat/gun_drop.py:68: _author_gun_drop
@@ -2775,14 +2786,17 @@ combat/verify/glimmer.py:117: _own_ticks
 combat/verify/glimmer.py:124: _item_children
 combat/verify/glimmer.py:140: check_item_glimmer
 combat/verify/glimmer.py:186: check_ammo_glimmer
-combat/verify/grip_fit.py:35: FIST_MISS_CM
-combat/verify/grip_fit.py:38: JOINT_SINK_CM
-combat/verify/grip_fit.py:41: JOINT_REACH_CM
-combat/verify/grip_fit.py:44: PLACED_MISS_CM
-combat/verify/grip_fit.py:50: grip_fit
-combat/verify/grip_fit.py:73: fist_off
-combat/verify/grip_fit.py:84: check_has_grip
-combat/verify/grip_fit.py:96: check_handles_in_fist
+combat/verify/grip_fit.py:22: BEL
+combat/verify/grip_fit.py:23: PIN
+combat/verify/grip_fit.py:38: FIST_MISS_CM
+combat/verify/grip_fit.py:41: JOINT_SINK_CM
+combat/verify/grip_fit.py:44: JOINT_REACH_CM
+combat/verify/grip_fit.py:47: PLACED_MISS_CM
+combat/verify/grip_fit.py:53: grip_fit
+combat/verify/grip_fit.py:76: fist_off
+combat/verify/grip_fit.py:87: check_has_grip
+combat/verify/grip_fit.py:99: check_handles_in_fist
+combat/verify/grip_fit.py:130: check_seat_graph
 combat/verify/guard.py:31: BGE
 combat/verify/guard.py:32: SCRIPTS
 combat/verify/guard.py:34: NOT_BUILDERS
@@ -5117,6 +5131,9 @@ graphics_menu/gfx_tuner_wind.py:45: _distance_cm
 graphics_menu/gfx_tuner_wind.py:50: _author_walk
 graphics_menu/gfx_tuner_wind.py:82: _author_params
 graphics_menu/gfx_tuner_wind.py:98: author_wind
+graphics_menu/grip_tune.py:34: _author_cells
+graphics_menu/grip_tune.py:48: author_grip_read
+graphics_menu/grip_tune.py:53: author_grip_write
 graphics_menu/hit_marker.py:16: WEAPON_COMP_CLASS_PATH
 graphics_menu/hit_marker.py:20: MARK_INNER
 graphics_menu/hit_marker.py:21: MARK_OUTER
@@ -5322,7 +5339,7 @@ graphics_menu/mode_checks.py:222: _check_address
 graphics_menu/mode_checks.py:259: _check_join
 graphics_menu/mode_checks.py:287: _check_begin
 graphics_menu/mode_checks.py:308: _check_in_play
-graphics_menu/mode_checks.py:366: check_modes
+graphics_menu/mode_checks.py:369: check_modes
 graphics_menu/mode_consts.py:18: PAGE_SINGLE
 graphics_menu/mode_consts.py:19: PAGE_MULTI
 graphics_menu/mode_consts.py:22: class Page
@@ -5610,19 +5627,20 @@ graphics_menu/stamina_bar.py:28: _author_stamina
 graphics_menu/survival_bars.py:28: _author_bar
 graphics_menu/survival_bars.py:41: _author_debuff_labels
 graphics_menu/survival_bars.py:71: author_survival_bars
-graphics_menu/tune_checks.py:21: BEL
-graphics_menu/tune_checks.py:22: PIN
-graphics_menu/tune_checks.py:25: _title
-graphics_menu/tune_checks.py:29: _pins
-graphics_menu/tune_checks.py:33: _same
-graphics_menu/tune_checks.py:40: _weapons
-graphics_menu/tune_checks.py:46: _check_csv
-graphics_menu/tune_checks.py:76: _check_widgets
-graphics_menu/tune_checks.py:92: _check_graph
-graphics_menu/tune_checks.py:128: _check_apply_goes_on
-graphics_menu/tune_checks.py:148: _from_live
-graphics_menu/tune_checks.py:157: _check_melee
-graphics_menu/tune_checks.py:187: check_tune
+graphics_menu/tune_checks.py:22: BEL
+graphics_menu/tune_checks.py:23: PIN
+graphics_menu/tune_checks.py:26: _title
+graphics_menu/tune_checks.py:30: _pins
+graphics_menu/tune_checks.py:34: _same
+graphics_menu/tune_checks.py:41: _weapons
+graphics_menu/tune_checks.py:47: _check_csv
+graphics_menu/tune_checks.py:77: _check_widgets
+graphics_menu/tune_checks.py:93: _check_graph
+graphics_menu/tune_checks.py:129: _check_apply_goes_on
+graphics_menu/tune_checks.py:149: _from_live
+graphics_menu/tune_checks.py:158: _check_melee
+graphics_menu/tune_checks.py:188: _check_grip
+graphics_menu/tune_checks.py:212: check_tune
 graphics_menu/tune_consts.py:32: TUNE_ACTION
 graphics_menu/tune_consts.py:33: TUNE_ROW_LABEL
 graphics_menu/tune_consts.py:37: TUNE_OPEN_VAR
@@ -6988,7 +7006,25 @@ probes/probe_grip_handle.py:26: MOVE_CM
 probes/probe_grip_handle.py:29: _rel
 probes/probe_grip_handle.py:35: _grip
 probes/probe_grip_handle.py:39: _seat
-probes/probe_grip_handle.py:44: _equip
+probes/probe_grip_handle.py:44: _seated
+probes/probe_grip_handle.py:50: _equip
+probes/probe_grip_nudge.py:30: HUD_BP_PATH
+probes/probe_grip_nudge.py:35: LIB
+probes/probe_grip_nudge.py:36: NEAR_CM
+probes/probe_grip_nudge.py:37: NEAR_DEG
+probes/probe_grip_nudge.py:40: SAME
+probes/probe_grip_nudge.py:42: MOVE
+probes/probe_grip_nudge.py:43: TURN
+probes/probe_grip_nudge.py:46: _row
+probes/probe_grip_nudge.py:53: _rel
+probes/probe_grip_nudge.py:61: _by_grip
+probes/probe_grip_nudge.py:67: _off
+probes/probe_grip_nudge.py:74: _near
+probes/probe_grip_nudge.py:79: _equip
+probes/probe_grip_nudge.py:88: _relaunch
+probes/probe_grip_nudge.py:94: _carried
+probes/probe_grip_nudge.py:99: _live_hud
+probes/probe_grip_nudge.py:121: _run
 probes/probe_gun_tuning.py:44: HUD_BP_PATH
 probes/probe_gun_tuning.py:48: COLS
 probes/probe_gun_tuning.py:49: N
@@ -8564,6 +8600,11 @@ uebp/nodes/gas.py:19: FN_REMOVE_GRANTING
 uebp/nodes/gas.py:21: FN_TAG_COUNT
 uebp/nodes/gas.py:23: FN_AVATAR
 uebp/nodes/gas.py:24: FN_END_ABILITY
+uebp/nodes/grip.py:7: GRIP_LIBRARY
+uebp/nodes/grip.py:10: FN_GRIP_SEAT
+uebp/nodes/grip.py:12: FN_HELD_ITEM_OF
+uebp/nodes/grip.py:15: FN_READ_GRIP_CELLS
+uebp/nodes/grip.py:16: FN_WRITE_GRIP_CELLS
 uebp/nodes/guard.py:7: GUARD_CLASS
 uebp/nodes/guard.py:10: FN_GUARD_ALLOW
 uebp/nodes/guard.py:12: FN_GUARD_AIM_ALLOWED
@@ -9173,6 +9214,18 @@ Source/Otherworld/Public/OtherworldCharacter.h:31: UCLASS class OTHERWORLD_API A
 Source/Otherworld/Public/OtherworldCharacter.h:59: UFUNCTION void SetFireKey(FKey Key);
 Source/Otherworld/Public/OtherworldCharacter.h:67: UFUNCTION void OnRep_Prone();
 Source/Otherworld/Public/OtherworldCharacterMovement.h:98: UCLASS class OTHERWORLD_API UOtherworldCharacterMovement : public UCharacterM
+Source/Otherworld/Public/OtherworldGripLibrary.h:24: UCLASS class OTHERWORLD_API UOtherworldGripLibrary : public UBlueprintFunctio
+Source/Otherworld/Public/OtherworldGripLibrary.h:34: UFUNCTION static FName GripRowOf(const AActor* Item);
+Source/Otherworld/Public/OtherworldGripLibrary.h:38: UFUNCTION static FTransform GripNudge(FName Row);
+Source/Otherworld/Public/OtherworldGripLibrary.h:46: UFUNCTION static FTransform GripSeat(const AActor* Item);
+Source/Otherworld/Public/OtherworldGripLibrary.h:50: UFUNCTION static AActor* HeldItemOf(const APawn* Pawn);
+Source/Otherworld/Public/OtherworldGripLibrary.h:57: UFUNCTION static void ReadGripCells(const AActor* Item, UPARAM(ref) TArray<doubl
+Source/Otherworld/Public/OtherworldGripLibrary.h:65: UFUNCTION static bool WriteGripCells(AActor* Item, const TArray<double>& Table, 
+Source/Otherworld/Public/OtherworldGripLibrary.h:69: UFUNCTION static void SetGripNudge(FName Row, FVector Location, FRotator Rotatio
+Source/Otherworld/Public/OtherworldGripLibrary.h:73: UFUNCTION static bool SaveGripNudges();
+Source/Otherworld/Public/OtherworldGripLibrary.h:77: UFUNCTION static int32 ReloadGripNudges();
+Source/Otherworld/Public/OtherworldGripLibrary.h:81: UFUNCTION static FString GripNudgeFile();
+Source/Otherworld/Public/OtherworldGripLibrary.h:88: UFUNCTION static void SetGripNudgeFile(const FString& Path);
 Source/Otherworld/Public/OtherworldHealthComponent.h:32: UCLASS class OTHERWORLD_API UOtherworldHealthComponent : public UActorCompone
 Source/Otherworld/Public/OtherworldHealthComponent.h:51: UFUNCTION void TakeHit(double Amount, FVector From, AController* InstigatedBy, A
 Source/Otherworld/Public/OtherworldHealthComponent.h:59: UFUNCTION void Die();

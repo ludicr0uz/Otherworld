@@ -144,6 +144,9 @@ Input, settings and state
   tune_tick       Tick: any tab's keys, nudge and save (author_tab_flow), and
                   the gun table onto every carried gun, and the knife's and
                   the axe's throw rows onto them (run after loot_tick's)
+  grip_tune       Tick: the GUN SETTINGS tab's grip rows are the held item's row
+                  of the nudge table (combat/grip_nudges), read before the
+                  tab's keys and written back after, in C++
   tune_scroll     DrawHUD: a scrolling tab's bar dragged by the mouse (the
                   list scrolled a whole row at a time, the caret kept in it)
   tune_draw       DrawHUD: a tab's panel, the subject and its values, the

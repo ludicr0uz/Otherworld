@@ -350,6 +350,40 @@ item's build step (`UEPY_BUILD_ONLY=weapons` for a gun, `knife`, `axe`, `wood`, 
 `stick`; `build_survival.py`; `build_clothing.py`): it is seeded again. Until that build,
 an item with no `Grip` hangs from the wrist and logs an `Accessed None` at each equip.
 
+### The grip nudges: the last centimetre, from inside the game
+
+`Content/Tuning/grip_nudges.csv` has a row per held item, named by its Blueprint
+(`BP_Knife`): `x, y, z` in centimetres and `pitch, yaw, roll` in degrees, in the grip
+socket's frame, all zero until somebody tunes one. The row is laid over whatever the
+`Grip` component gives:
+
+    seat under the socket = inverse(Grip) * row
+
+so the item turns about the socket (the hand) by the row's rotation and then moves by its
+position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
+
+- **The running game reads it, not the build.** `UOtherworldGripLibrary` (C++,
+  `Source/Otherworld/Public/OtherworldGripLibrary.h`) reads the file the first time an item
+  is seated, on a server, a client and the title alike; the equip's one node is its
+  `GripSeat(Item)` (`weapon_component/inventory.py`). So a number edited in the CSV is a
+  relaunch and no build, and a rebuild, a re-seeded `Grip` or a new ready pose keeps it.
+- **In play: the GUN SETTINGS tab's last six rows** (`grip x (cm)` … `grip roll (deg)`,
+  `graphics_menu/grip_tune.py`). They are the **held** item's row, whichever weapon the tab
+  shows, so hold the item, open the tab, go down to the grip rows and press Left/Right:
+  0.1 cm or 1 degree a step. The item moves that frame and the CSV is written that frame;
+  there is no Enter for them. Empty hands show zeros and move nothing.
+- **Which way:** `x`, `y` and `z` are the socket's axes, the same frame as `GripLocation`.
+  Nudge one and watch; the step is small enough to walk it.
+- **A packaged build carries the file loose** (`DefaultGame.ini`,
+  `DirectoriesToAlwaysStageAsNonUFS`, `Tuning`), so it ships the tuned rows.
+- **What a nudge does not move:** what a placed grip does not (the shotgun's left hand, the
+  knife's blade grip for the throw). And a nudge made in play on a server's client reaches
+  that machine's table alone until the others are launched again on the written file.
+- **The format in Python** is `combat/grip_nudges.py` (`read_table`, `write_table`), held by
+  `Scripts/dev/tests/test_grip_nudges.py`; that a row moves the item by exactly the row, and
+  that a step on the tab moves it and writes the file, is `probes/probe_grip_nudge.py`, which
+  points the game at a scratch file (`SetGripNudgeFile`) so the tracked one is not written.
+
 - **`GripLocation` is solved too** (`grip._grip_location`): it puts the weapon's `Grip` part in
   the middle of the fist in the ready pose.
   - Each closing finger's three joints lie on a circle. The centre of that circle is what the

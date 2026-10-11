@@ -28,6 +28,10 @@ the table written onto every carried gun.
                    every TUNE_STATS variable that is its own := its cell
                    (ints rounded): a gun's, or for the melee weapons listed
                    after the guns only the throw's (gun_tuning.columns_of)
+    TuneOpen -> the grip rows are the held item's (grip_tune.py): its row of
+                   the nudge table into the shown weapon's grip cells before
+                   the keys are served, and those cells back after, which
+                   moves the item and writes grip_nudges.csv when one changed
 
 The keys, the nudge and the save are any TuneTab's (tune_tab.py):
 author_tab_flow() is also MONSTER SETTINGS's (monster_tune_tick.py), and
@@ -46,6 +50,7 @@ from graphics_menu.tune_tab import tab_table
 import unreal
 
 from uebp.graph import _connect, _loose_pin, _palette, _pin, out, then
+from combat.grip_nudges import GRIP_MIN, GRIP_STATS
 from combat.gun_tuning import GUN_COLUMNS, MELEE_COLUMNS, TUNE_COLUMNS, TUNE_STATS, columns_of
 from combat.melee_tuning import melee_specs
 from combat.paths import (
@@ -53,6 +58,7 @@ from combat.paths import (
 )
 from combat.weapon_specs import _weapon_specs
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
+from graphics_menu.grip_tune import author_grip_read, author_grip_write
 from graphics_menu.menu_nav import pause_row_taken
 from graphics_menu.loot_find import put
 from graphics_menu.tune_consts import (
@@ -98,19 +104,26 @@ def tune_table():
     """(weapons, values, live): the built guns' DisplayNames, then the melee
     weapons'; their TUNE_STATS cells, flattened weapon by weapon -- the
     specs, so gun_tuning.csv's numbers; and per cell whether the stat is that
-    weapon's own. A cell that is not holds 0 and is never read."""
+    weapon's own. A cell that is not holds 0 and is never read. Each row
+    ends with the grip's cells: every weapon's own, and built zero (they are
+    the held item's row of the nudge table, read in play: grip_tune.py)."""
     rows = ([(sp["display"], sp) for sp in _weapon_specs()] + melee_specs())
     names = [name for name, _spec in rows]
-    live = [col in columns_of(name) for name, _spec in rows for col in TUNE_COLUMNS]
-    values = [float(spec[col]) if col in columns_of(name) else 0.0
-              for name, spec in rows for col in TUNE_COLUMNS]
+    grip = len(GRIP_STATS)
+    live, values = [], []
+    for name, spec in rows:
+        own = columns_of(name)
+        live += [col in own for col in TUNE_COLUMNS] + [True] * grip
+        values += ([float(spec[col]) if col in own else 0.0 for col in TUNE_COLUMNS]
+                   + [0.0] * grip)
     return names, values, live
 
 
 def tune_defaults():
     names, values, live = tune_table()
-    return {**tab_defaults(GUN_TAB, names, values, [float(st[3]) for st in TUNE_STATS],
-                           [float(st[4]) for st in TUNE_STATS]),
+    steps = [float(st[3]) for st in TUNE_STATS] + [float(st[2]) for st in GRIP_STATS]
+    mins = [float(st[4]) for st in TUNE_STATS] + [GRIP_MIN] * len(GRIP_STATS)
+    return {**tab_defaults(GUN_TAB, names, values, steps, mins),
             TUNE_LIVE_VAR: live}
 
 
@@ -297,11 +310,14 @@ def author_tune_tick(ed, pc_out, in_execs):
     """The whole fragment (see the module docstring). Returns the exec tails."""
     made = []
     weapons = len(tune_table()[0])
-    flow = author_tab_flow(ed, pc_out, in_execs, made, GUN_TAB, weapons, other_open_vars(GUN_TAB))
+    flow = author_grip_read(ed, in_execs, made)
+    flow = author_tab_flow(ed, pc_out, flow, made, GUN_TAB, weapons, other_open_vars(GUN_TAB))
+    flow = author_grip_write(ed, flow, made)
     tails = _author_apply(ed, flow, made, weapons - len(melee_specs()))
     ed.add_comment_to_nodes(
         "Gun tuning (its row in the M panel): Up/Down pick a row, Left/Right "
         "change the gun or the stat, Enter saves gun_tuning.csv. Once anything is "
         "tuned, every carried gun takes the table each Tick, and the knife and "
-        "the axe their throw's rows.", made[:1])
+        "the axe their throw's rows. The grip rows are the held item's row of "
+        "the nudge table, read before the keys and written back after.", made[:1])
     return tails

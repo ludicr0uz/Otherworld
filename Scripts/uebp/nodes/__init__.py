@@ -32,6 +32,9 @@ Scripts/dev/check_node_catalog.py.
   inventory.py  the game's own inventory library (C++, Source/Otherworld): a
               graph's word that what a player carries changed, so the server
               writes its record that frame (A3a)
+  grip.py     the game's own grip library (C++, Source/Otherworld): where a
+              held item sits under the grip socket, its Grip and its row of
+              the nudge table, and the tuning tab's reads and writes of it (H2)
   locomotion.py  what the player's motion-matching anim blueprint reads its
               character through: the movement component, and the Game
               Animation Sample's structs and enums

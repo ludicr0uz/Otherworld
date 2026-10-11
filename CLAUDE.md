@@ -35,7 +35,7 @@ architecture.
 
    | system | entry points | read |
    |---|---|---|
-   | weapons, inventory, the glimmer over an item on the ground, health, death, blood, bullet impacts, audio, hit boxes, chopping trees for wood, the matches, the use key and the stick that burns, the knife or axe heated at a fire | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
+   | weapons, inventory, the glimmer over an item on the ground, health, death, blood, bullet impacts, audio, hit boxes, chopping trees for wood, the matches, the use key and the stick that burns, the knife or axe heated at a fire, the grip nudges (a CSV row per held item the running game reads: `Content/Tuning/grip_nudges.csv`, `combat/docs/aiming.md`) | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
    | NPCs: behaviour tree, pack, patrol and agro | `build_`/`verify_npc_blueprints.py` | `Scripts/npc/CLAUDE.md` |
    | the menu (the title's, and M's in play), graphics presets and tuning, settings, HUD | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
    | survival: GAS, debuffs, on-hit effects and bleeding, forage, the campfire | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |

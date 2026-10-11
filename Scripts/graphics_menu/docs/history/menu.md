@@ -371,6 +371,15 @@ the gun row or one of the 21 stat rows (`combat/gun_tuning.TUNE_STATS`); Left/Ri
 gun, or move the stat one step (never under its minimum); **Enter** saves
 `Scripts/combat/gun_tuning.csv`.
 
+- **The last six rows are the grip's** (H2, `grip_tune.py`, `combat/grip_nudges.GRIP_STATS`):
+  the HELD item's row of the nudge table, whichever weapon the tab shows, signed
+  (`GRIP_MIN`), every weapon's own in `TuneLive`. While the tab is open the row is read
+  into the shown weapon's grip cells before the keys are served and written back after,
+  one C++ node each (`ReadGripCells`, `WriteGripCells`): a step moves the item that frame
+  and writes `Content/Tuning/grip_nudges.csv`, with no Enter. The cells are a working
+  copy for the Tick, built zero; they are no column of `gun_tuning.csv` (`tune_save.py`
+  skips them) and a kept save of them is never read by anything. `TC.STAT_COUNT` is a
+  weapon's cells (`TUNE_STATS` and the grip's), `TC.GRIP_FIRST` where the grip's begin.
 - **The knife and the axe are subjects too,** after the five guns, with only their throw's
   rows: `throw arc` and `throw damage` (`combat/melee_tuning.py`). A stat that is not the
   shown weapon's own (`gun_tuning.columns_of`: a gun has no throw damage, a melee weapon

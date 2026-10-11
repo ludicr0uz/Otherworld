@@ -6,6 +6,7 @@ in the verifier, which is over its size budget.
 import unreal
 
 from combat.axe import AXE_DISPLAY
+from combat.grip_nudges import GRIP_MIN, GRIP_STATS
 from combat.gun_tuning import (
     CSV_PATH, GUN_COLUMNS, MELEE_COLUMNS, MELEE_WEAPONS, TUNE_COLUMNS, TUNE_STATS,
     columns_of, read_table,
@@ -184,6 +185,30 @@ def _check_melee(check, nodes):
           str(len(picks)))
 
 
+def _check_grip(check, nodes):
+    """The grip rows (grip_tune.py): the held item's row of the nudge table
+    into the table's grip cells and back, one C++ node each."""
+    cells = [n for n in nodes if {"Item", "Table", "First"} <= _pins(n)]
+    wired = [n for n in cells
+             if any(_title(PIN.get_owning_node(q)) == f"Get {TC.TUNE_VALUES_VAR}"
+                    for q in BEL.find_input_pin(n, "Table").list_connected_pins())
+             and any("HeldItemOf" in _title(PIN.get_owning_node(q)).replace(" ", "")
+                     for q in BEL.find_input_pin(n, "Item").list_connected_pins())
+             and BEL.find_input_pin(n, "execute").list_connected_pins()]
+    kinds = sorted(_title(n).replace(" ", "") for n in wired)
+    check("the grip rows are the held item's row of the nudge table: read into "
+          f"{TC.TUNE_VALUES_VAR} and written back, once each",
+          len(cells) == 2 and kinds == ["ReadGripCells", "WriteGripCells"], str(kinds))
+    labels = TC.TUNE_ROW_LABELS[1 + TC.GRIP_FIRST:]
+    check(f"...the tab's last {len(GRIP_STATS)} rows, a step and a signed minimum each",
+          labels == tuple(s[1] for s in GRIP_STATS)
+          and TC.STAT_COUNT == len(TUNE_STATS) + len(GRIP_STATS)
+          and tune_defaults()[TC.TUNE_MINS_VAR][TC.GRIP_FIRST:] == [GRIP_MIN] * len(GRIP_STATS)
+          and all(tune_defaults()[TC.TUNE_LIVE_VAR][w * TC.STAT_COUNT + TC.GRIP_FIRST + i]
+                  for w in range(len(tune_defaults()[TC.TUNE_WEAPONS_VAR]))
+                  for i in range(len(GRIP_STATS))), str(labels))
+
+
 def check_tune(check, bp, nodes):
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     defaults = tune_defaults()
@@ -196,3 +221,4 @@ def check_tune(check, bp, nodes):
     _check_csv(check)
     _check_widgets(check)
     _check_graph(check, nodes)
+    _check_grip(check, nodes)

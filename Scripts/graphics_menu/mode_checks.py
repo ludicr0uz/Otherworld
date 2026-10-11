@@ -359,8 +359,11 @@ def _check_in_play(check, nodes):
                            for g in _gates(n)))
     check("the menu's last row reads exit game on the title and save and exit in "
           "play, in either mode (off GameStarted, not the mode)",
-          len(exits) == 2 and EXIT_ROW_LABEL in exits[1] and UC.QUIT_ROW_LABEL in exits[0],
-          str(exits))
+          # Either order: a text literal reads back with its key in front
+          # (NSLOCTEXT("", "<guid>", "Exit Game")), new at every build, so
+          # the sort is by the key.
+          len(exits) == 2 and any(EXIT_ROW_LABEL in v for v in exits)
+          and any(UC.QUIT_ROW_LABEL in v for v in exits), str(exits))
 
 
 def check_modes(check, bp, nodes):

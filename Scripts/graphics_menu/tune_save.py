@@ -11,7 +11,8 @@ Editable flag; only writing a Blueprint variable from Python does.
 import unreal
 
 from combat.gun_tuning import CSV_PATH, TUNE_STATS, columns_of, write_table
-from graphics_menu.tune_consts import HUD_CLASS_PATH, TUNE_VALUES_VAR, TUNE_WEAPONS_VAR
+from graphics_menu.tune_consts import (
+    HUD_CLASS_PATH, STAT_COUNT, TUNE_VALUES_VAR, TUNE_WEAPONS_VAR)
 
 
 def _live_hud():
@@ -30,10 +31,12 @@ def save(path=CSV_PATH):
     hud = _live_hud()
     guns = [str(g) for g in hud.get_editor_property(TUNE_WEAPONS_VAR)]
     values = [float(v) for v in hud.get_editor_property(TUNE_VALUES_VAR)]
-    n = len(TUNE_STATS)
+    # A weapon's cells: its TUNE_STATS first, then the grip's, which are no
+    # column of this CSV (grip_nudges.csv is written as they move).
+    n = STAT_COUNT
     if len(values) != n * len(guns):
         raise RuntimeError(f"TuneValues holds {len(values)} numbers, not "
-                           f"{len(guns)} guns x {n} stats")
+                           f"{len(guns)} guns x {n} cells")
     # Only each weapon's own columns: the rest of its row stays empty.
     rows = [(gun, {st[0]: values[w * n + s] for s, st in enumerate(TUNE_STATS)
                    if st[0] in columns_of(gun)})

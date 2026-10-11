@@ -41,6 +41,12 @@ def _seat(item):
     return _grip(item).get_relative_transform().inverse().translation
 
 
+def _seated(item):
+    """...and with its row of the nudge table laid over that (H2,
+    combat/grip_nudges.py): zeros unless somebody tuned it."""
+    return unreal.OtherworldGripLibrary.grip_seat(item).translation
+
+
 def _equip(p, wc, item):
     p.set(wc, "EquippedIndex", list(p.get(wc, "Inventory")).index(item))
     p.set(wc, "NeedsRefresh", True)
@@ -69,7 +75,7 @@ def probe(p):
         yield from _equip(p, wc, item)
         got, want = _rel(item), _seat(item)
         p.check(f"{name}: sits in the hand where its Grip says",
-                (got - want).length() < NEAR_CM, f"{got} for {want}")
+                (got - _seated(item)).length() < NEAR_CM, f"{got} for {_seated(item)}")
         seed = item.get_editor_property("GripLocation")
         p.check(f"{name}: an unmoved Grip is the solved grip",
                 (want - seed).length() < NEAR_CM, f"{want} for {seed}")
@@ -90,8 +96,8 @@ def probe(p):
     p.check("a Grip moved 2 cm seats the knife 2 cm away at the next equip",
             abs((after - before).length() - MOVE_CM) < NEAR_CM,
             f"{before} -> {after}")
-    p.check("...where the moved Grip says", (after - _seat(knife)).length() < NEAR_CM,
-            f"{after} for {_seat(knife)}")
+    p.check("...where the moved Grip says", (after - _seated(knife)).length() < NEAR_CM,
+            f"{after} for {_seated(knife)}")
     seed = knife.get_editor_property("GripLocation")
     p.check("...and not where GripLocation, the seed, still says",
             (after - seed).length() > MOVE_CM - NEAR_CM, f"{after} against {seed}")

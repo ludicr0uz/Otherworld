@@ -19,6 +19,9 @@ the one it fits in).
 
 import unreal
 
+BEL = unreal.BlueprintEditorLibrary
+PIN = unreal.BlueprintGraphPinLibrary
+
 from combat.grip import (
     box_distance, fist_in_socket, placed_part, wrapping_joints,
 )
@@ -28,7 +31,7 @@ from combat.paths import (
 )
 from combat.weapon_models import TRIGGER_REACH_CM
 from combat.weapon_specs import _weapon_specs
-from combat.verify.common import check, component_template, load
+from combat.verify.common import by_pins, check, component_template, load
 
 # The handle's centre may sit this far off the fist's centre (the build eases
 # it up to grip.SEAT_EASE_MAX_CM off, out of a joint that would stand in it).
@@ -124,7 +127,22 @@ def check_handles_in_fist(items):
                   f"{by_hand}{fit['trigger']:.2f} cm off")
 
 
+def check_seat_graph():
+    """The equip seats the item by the C++ GripSeat: its Grip and its row of
+    the nudge table (grip_nudges.py), read off the live item. That a row
+    moves it by exactly the row is probes/probe_grip_nudge.py."""
+    from combat.verify.fixtures import wg
+    seats = [n for n in wg if str(BEL.get_node_title(n)).replace(" ", "") == "GripSeat"]
+    fed = [n for n in by_pins(wg, "self", "NewRelativeTransform")
+           if any(PIN.get_owning_node(q) in seats
+                  for q in BEL.find_input_pin(n, "NewRelativeTransform").list_connected_pins())]
+    check("the equip sets the item's place under the socket to GripSeat: its Grip "
+          "and its row of the nudge table", len(seats) == 1 and len(fed) == 1,
+          f"{len(seats)} GripSeat, {len(fed)} relative transforms set from it")
+
+
 def run():
+    check_seat_graph()
     check_handles_in_fist([(s["display"], s["path"], s["aim"], s["parts"],
                             "Grip", "TriggerGuard",
                             s.get("trigger_reach", TRIGGER_REACH_CM))

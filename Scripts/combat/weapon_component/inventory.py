@@ -20,13 +20,12 @@ from combat.weapon_component.sights import _author_camera_after_boom
 from uebp.nodes.actor import (
     FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_ATTACH, FN_DETACH, FN_GET_COMP, FN_GET_OWNER,
     FN_GET_TRANSFORM, FN_PLAY_SLOT, FN_SET_ACTOR_LOC,
-    FN_COMP_REL_XFORM, FN_FIND_BY_TAG, FN_IS_PLAYING_SLOT, FN_SET_HIDDEN, FN_SET_REL_XFORM,
-    FN_STOP_SLOT, SCENE_COMPONENT_CLASS)
-from combat.grip_handle import GRIP
+    FN_IS_PLAYING_SLOT, FN_SET_HIDDEN, FN_SET_REL_XFORM, FN_STOP_SLOT)
+from uebp.nodes.grip import FN_GRIP_SEAT
 from combat.weapon_component.throw_windup import THROW_ANIM_VAR
 from uebp.nodes.array import FN_ARR_ADD
 from uebp.nodes.math import (
-    FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_INVERT_TRANSFORM, FN_MUL_VF, FN_NOT)
+    FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_MUL_VF, FN_NOT)
 from uebp.nodes.palette import (
     MACRO_FOR_EACH, MACRO_SWITCH_AUTHORITY_COMP, NODE_BREAK_HIT, NODE_CAST_CHAR, NODE_SPAWN)
 from uebp.nodes.system import FN_IS_VALID, FN_TRACE
@@ -196,20 +195,14 @@ def _author_equip(ed, exec_in):
         _set(attach, rule, "SnapToTarget")
     _connect(then(show), _pin(attach, "execute"))
 
-    # Seated by its Grip (grip_handle.py): the component marks where the
-    # socket is in the item's frame, so the item's place under the socket is
-    # the inverse of it. Read off the live item, not off a variable baked at
-    # build: a grip moved in the editor is the grip the next game uses.
-    # The resting orientation only for a gun: from the next frame on, Tick
-    # points the held weapon at the aim point.
-    grip = keep(_node(ed, FN_FIND_BY_TAG))
-    _connect(item, _pin(grip, "self"))
-    _pin(grip, "ComponentClass").set_pin_value(SCENE_COMPONENT_CLASS)
-    _set(grip, "Tag", GRIP)
-    at = keep(_node(ed, FN_COMP_REL_XFORM))
-    _connect(out(grip), _pin(at, "self"))
-    seat = keep(_node(ed, FN_INVERT_TRANSFORM))
-    _connect(out(at), _pin(seat, "T"))
+    # Seated by its Grip (grip_handle.py) and its row of the nudge table
+    # (grip_nudges.py): the component marks where the socket is in the item's
+    # frame, so the item's place under the socket is the inverse of it, and
+    # the row is laid over that. Both are read off the live item, in C++
+    # (GripSeat), not off a variable baked at build: a grip moved in the
+    # editor, or a row edited in the CSV, is what the next game uses.
+    seat = keep(_node(ed, FN_GRIP_SEAT))
+    _connect(item, _pin(seat, "Item"))
     turn = keep(_node(ed, FN_SET_REL_XFORM))
     _connect(item, _pin(turn, "self"))
     _connect(out(seat), _pin(turn, "NewRelativeTransform"))

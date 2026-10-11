@@ -15,11 +15,17 @@ The melee weapons (the knife, the axe) are subjects too, after the guns, with
 only their throw's rows: a stat that is not the shown weapon's own
 (gun_tuning.columns_of) shows a dash and does not move (TuneLive).
 
+Under the stats are the grip rows (combat/grip_nudges.GRIP_STATS, grip_tune.py):
+six numbers that are the HELD item's, whichever weapon the tab shows, and no
+column of gun_tuning.csv. A step of one moves the item in the hand that frame
+and writes grip_nudges.csv, with no Enter.
+
 The stats, their steps and minimums are combat/gun_tuning.TUNE_STATS. GUN_TAB
 is the same names as a TuneTab (tune_tab.py), which is what the shared
 fragments take.
 """
 
+from combat.grip_nudges import GRIP_STATS
 from combat.gun_tuning import TUNE_STATS
 from graphics_menu.tune_tab import TuneTab, save_command
 
@@ -35,8 +41,10 @@ TUNE_NUDGE_VAR = "TuneNudge"        # -1 / +1 asked for this Tick, 0 = none
 TUNE_SAVE_VAR = "TuneSaveRequested"
 TUNE_SAVED_VAR = "TuneSaved"        # the last save succeeded, nothing moved since
 TUNE_TOUCHED_VAR = "TuneTouched"    # something was tuned: apply every Tick
-# The table: TuneValues[w * len(TUNE_STATS) + s] is gun w's stat s. Seeded
-# from the built specs (so gun_tuning.csv), the page's working copy.
+# The table: TuneValues[w * STAT_COUNT + s] is gun w's stat s. Seeded
+# from the built specs (so gun_tuning.csv), the page's working copy. The
+# last len(GRIP_STATS) cells of a row are the grip's: built zero, and the
+# held item's row of the nudge table while the tab is open (grip_tune.py).
 TUNE_VALUES_VAR = "TuneValues"
 TUNE_WEAPONS_VAR = "TuneWeapons"    # the guns' DisplayNames, in spec order
 # TuneLive[w * len(TUNE_STATS) + s]: is stat s weapon w's own (a gun has no
@@ -46,7 +54,9 @@ TUNE_DASH = "-"                     # what a row that is not shows
 TUNE_STEPS_VAR = "TuneSteps"        # per stat
 TUNE_MINS_VAR = "TuneMins"          # per stat
 
-STAT_COUNT = len(TUNE_STATS)
+# A weapon's cells: its TUNE_STATS, then the grip's from GRIP_FIRST on.
+GRIP_FIRST = len(TUNE_STATS)
+STAT_COUNT = GRIP_FIRST + len(GRIP_STATS)
 TUNE_ROW_COUNT = 1 + STAT_COUNT
 
 # WBP_PauseMenu's widgets.
@@ -55,7 +65,8 @@ TUNE_ROWS_BOX = "TuneRows"
 TUNE_SAVED_TEXT = "TuneSavedText"
 TUNE_TITLE_TEXT = "GUN SETTINGS"
 TUNE_GUN_LABEL = "gun"
-TUNE_ROW_LABELS = (TUNE_GUN_LABEL,) + tuple(s[2] for s in TUNE_STATS)
+TUNE_ROW_LABELS = ((TUNE_GUN_LABEL,) + tuple(s[2] for s in TUNE_STATS)
+                   + tuple(s[1] for s in GRIP_STATS))
 TUNE_HINT_TEXT = ("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "
                   "ENTER  save to gun_tuning.csv")
 TUNE_SAVED_WORDS = "saved to Scripts/combat/gun_tuning.csv"

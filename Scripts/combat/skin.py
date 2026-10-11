@@ -143,6 +143,10 @@ class PlayerSkin:
     # library, played into the upper-body slot. None where the rig has none:
     # the item then leaves the hand on the click, with no clip.
     throw: str = None
+    # Picking an item up off the ground (weapon_component/pickup_clip.py),
+    # from the same library, played into the upper-body slot. None where the
+    # rig has none: the item is then taken with no clip.
+    pickup: str = None
     # A carried item's hand is closed as the pistol pose closes it
     # (hold_pose.closed_fist). Where that pose does not close the index, the
     # ready pose its index is taken from instead; None where it does.
@@ -246,6 +250,7 @@ SKIN_ADVENTURER = PlayerSkin(
     prone_crawl=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Swim_Fwd_Loop",
     search_kneel=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Fixing_Kneeling",
     throw=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL2_OverhandThrow",
+    pickup=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL2_Farm_Harvest",
 )
 
 
@@ -265,7 +270,8 @@ SKIN_BOUND = dataclasses.replace(
     crouch_walk=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL1_Crouch_Fwd_Loop",
     prone_crawl=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL1_Swim_Fwd_Loop",
     search_kneel=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL1_Fixing_Kneeling",
-    throw=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL2_OverhandThrow")
+    throw=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL2_OverhandThrow",
+    pickup=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL2_Farm_Harvest")
 
 # Epic's sample MetaHuman (asset_pipeline/import_metahuman.py), drawn under
 # a hidden mannequin that runs everything (combat/metahuman_body.py). The
@@ -311,7 +317,8 @@ SKIN_GAS = dataclasses.replace(
     crouch_walk=f"{GAS_UAL_ANIMS}UAL1_Crouch_Fwd_Loop",
     prone_crawl=MIXAMO.player_clip("prone_crawl"),
     search_kneel=f"{GAS_UAL_ANIMS}UAL1_Fixing_Kneeling",
-    throw=f"{GAS_UAL_ANIMS}UAL2_OverhandThrow")
+    throw=f"{GAS_UAL_ANIMS}UAL2_OverhandThrow",
+    pickup=f"{GAS_UAL_ANIMS}UAL2_Farm_Harvest")
 
 
 # Every skin there is, most specific first: what a running game, which has no
@@ -327,12 +334,16 @@ def skin_of_mesh(worn):
 
 
 def _without_missing_clips(skin, eas, who, builder):
-    """``skin`` less the optional clips that are not built: the throw, and
-    the four stance clips (all of them or none)."""
+    """``skin`` less the optional clips that are not built: the throw, the
+    pick-up, and the four stance clips (all of them or none)."""
     if not eas.does_asset_exist(skin.throw):
         _log(f"note: no Quaternius throw clip yet — {who} throws without one. "
              f"Run asset_pipeline/{builder}.")
         skin = dataclasses.replace(skin, throw=None)
+    if not eas.does_asset_exist(skin.pickup):
+        _log(f"note: no Quaternius pick-up clip yet — {who} picks up without one. "
+             f"Run asset_pipeline/{builder}.")
+        skin = dataclasses.replace(skin, pickup=None)
     stances = (skin.crouch_idle, skin.crouch_walk, skin.prone_crawl, skin.search_kneel)
     if all(eas.does_asset_exist(p) for p in stances):
         return skin

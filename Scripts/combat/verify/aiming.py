@@ -6,6 +6,7 @@ from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR
 from combat.tuning import COMBAT
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, w, wc_cdo, wg
+from combat.verify.pickup import is_pickup_play
 from combat.verify.throw import is_throw_play
 from combat.verify.knife import is_melee_play
 from combat.verify.common import (
@@ -317,9 +318,10 @@ def check_sprint_drops_ready_pose():
           str(sorted({t for t in titles if "=" in t})))
     # The pose itself: the branch that decides whether to play or stop the slot
     # has a NOT Lowered in its condition, and Lowered is made of Sprinting.
-    # ...the ready pose's: not a melee clip's, nor the throw's (Fx_ThrowClip).
+    # ...the ready pose's: not a melee clip's, nor the throw's (Fx_ThrowClip),
+    # nor the pick-up's (Fx_PickUpClip).
     plays = [n for n in by_pins(wg, "Asset", "SlotNodeName", "InPlayRate")
-             if not is_melee_play(n) and not is_throw_play(n)]
+             if not is_melee_play(n) and not is_throw_play(n) and not is_pickup_play(n)]
     if plays:
         node, reached = plays[0], False
         ins = BEL.find_input_pin(node, "execute")

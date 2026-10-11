@@ -344,6 +344,9 @@ ThrowAnim = Var("ThrowAnim", _CLIP)
 ThrowReadyAnim = Var("ThrowReadyAnim", _CLIP)
 ThrowWinding = Var("ThrowWinding", _ITEM)
 ThrowDueTime = Var("ThrowDueTime", FLOAT, 0.0)
+# The pick-up's clip (pickup_clip.py): the reach down for an item taken off
+# the ground. The builder fills it where the skin has one.
+PickUpAnim = Var("PickUpAnim", _CLIP)
 # Chopping a tree (chop.py): the tree being cut, the blows on it, where the
 # wood lands, and the wood.
 ChopTree = Var(CHOP_TREE_VAR, obj("/Script/Engine.PrimitiveComponent"))
@@ -385,7 +388,8 @@ STATE = (
     AxePose, KnifeQueued, KnifePending, NextKnifeTime, KnifeDueTime, InteractTarget,
     InteractGap, InteractForced, CrouchForced, ThrowAiming, ThrowKeyForced, ThrowClickForced,
     Thrown, ThrowStart, ThrowVelocity, ThrowLast, ThrowTime, ThrowPast, ThrowBone, ThrowSkin,
-    ThrowAnim, ThrowReadyAnim, ThrowWinding, ThrowDueTime, ChopTree, ChopItem, ChopCount,
+    ThrowAnim, ThrowReadyAnim, ThrowWinding, ThrowDueTime, PickUpAnim, ChopTree, ChopItem,
+    ChopCount,
     WoodSpot, WoodClass, LightWood, ThrowArc, ThrowArcClass,
 )
 TABLE = CORE + STATE

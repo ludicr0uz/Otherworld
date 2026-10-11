@@ -22,10 +22,11 @@ from uebp.nodes.actor import (
     FN_GET_TRANSFORM, FN_PLAY_SLOT, FN_SET_ACTOR_LOC,
     FN_IS_PLAYING_SLOT, FN_SET_HIDDEN, FN_SET_REL_XFORM, FN_STOP_SLOT)
 from uebp.nodes.grip import FN_GRIP_SEAT
+from combat.weapon_component.pickup_clip import picking_up
 from combat.weapon_component.throw_windup import THROW_ANIM_VAR
 from uebp.nodes.array import FN_ARR_ADD
 from uebp.nodes.math import (
-    FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_MUL_VF, FN_NOT)
+    FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_MUL_VF, FN_NOT, FN_OR)
 from uebp.nodes.palette import (
     MACRO_FOR_EACH, MACRO_SWITCH_AUTHORITY_COMP, NODE_BREAK_HIT, NODE_CAST_CHAR, NODE_SPAWN)
 from uebp.nodes.system import FN_IS_VALID, FN_TRACE
@@ -246,8 +247,13 @@ def _author_equip(ed, exec_in):
     throw_anim = keep(ed.add_get_member_variable_node(THROW_ANIM_VAR))
     _connect(out(throw_anim, THROW_ANIM_VAR), _pin(throwing, "Asset"))
     _set(throwing, "SlotNodeName", AIM_SLOT)
+    # ...nor the pick-up's (pickup_clip.py): the take's own NeedsRefresh
+    # runs this equip the frame the reach down starts.
+    busy = keep(_node(ed, FN_OR))
+    _connect(out(throwing), _pin(busy, "A"))
+    _connect(picking_up(ed, anim_out, keep), _pin(busy, "B"))
     mid_throw = keep(ed.add_branch_node())
-    _connect(out(throwing), _pin(mid_throw, "Condition"))
+    _connect(out(busy), _pin(mid_throw, "Condition"))
     for e in taken:
         _connect(e, _pin(mid_throw, "execute"))
 

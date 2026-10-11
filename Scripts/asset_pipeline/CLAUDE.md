@@ -446,7 +446,7 @@ wear it:
   **G4 retargeted them** (`retarget_to_uefn.py`, after `build_gas_bridge.py`): the
   mannequin's two ready poses, punch and six flinches, read off `SKM_Manny_Simple`
   through `RTG_UEFN_from_Mannequin`, into `/Game/Sourced/Characters/Anims/UEFN_Player`,
-  and Quaternius's crouch, crawl, kneel and throw, read off the packs' own rigs (one
+  and Quaternius's crouch, crawl, kneel, throw and pick-up, read off the packs' own rigs (one
   retarget, not two), into `/Game/Sourced/Quaternius/UAL/UEFN_Player`. The target rig is
   `IK_UEFN_Mannequin_Source`; the retargeter is the plain one (`plain_retarget.py`: in
   place, the target's pose aligned chain to chain) and every copy has its root motion

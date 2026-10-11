@@ -30,7 +30,7 @@ for _name in [m for m in sys.modules if m.startswith("asset_pipeline")]:
 
 from asset_pipeline.plain_retarget import build_plain_retargeter    # noqa: E402
 from asset_pipeline.quaternius_paths import (                       # noqa: E402
-    CROUCH_IDLE, CROUCH_WALK, PRONE_CRAWL, SEARCH_KNEEL, THROW, UAL_PACKS,
+    CROUCH_IDLE, CROUCH_WALK, PICKUP, PRONE_CRAWL, SEARCH_KNEEL, THROW, UAL_PACKS,
     pack_dir, ual_anim_dir, ual_clip, ual_retargeter_path)
 from asset_pipeline.retarget_paths import IK_MANNEQUIN, MANNEQUIN_MESH   # noqa: E402
 from asset_pipeline.retarget_rig import build_ik_rig                # noqa: E402
@@ -41,7 +41,7 @@ from asset_pipeline.ual_retarget import _batch, _fresh, build_ual_rig   # noqa: 
 
 EAL = unreal.EditorAssetLibrary
 MANNEQUIN = "Mannequin"
-USED = (CROUCH_IDLE, CROUCH_WALK, PRONE_CRAWL, SEARCH_KNEEL, THROW)
+USED = (CROUCH_IDLE, CROUCH_WALK, PRONE_CRAWL, SEARCH_KNEEL, THROW, PICKUP)
 
 
 def _log(msg):

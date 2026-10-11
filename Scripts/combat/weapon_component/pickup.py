@@ -23,6 +23,10 @@ weapon slot of its kind, anything else to the bag), but for one case: a blade
 taken back out of what it was thrown into (the item is Lodged), with empty
 hands, goes to the hand (_author_to_hand).
 
+The reach down for it is the skin's pick-up clip (pickup_clip.py), played
+by the owner off the ask, and on the other players' copies at the server's
+word, told here after a take that went through (Fx_PickUpClip).
+
 What goes into the inventory is TakeItem (task A2): the item asked for, or,
 where that one was placed in the level, a fresh one of its class spawned
 where it lay, the level's destroyed (_author_fresh_item). The engine tells
@@ -37,7 +41,9 @@ from combat.paths import ITEM_CLASS_PATH
 from combat.slot_tuning import HAND, HAND_FROM_VAR, HAS_ROOM_VAR, SLOT_VAR, UNPLACED, WEAPON_KIND_VAR
 from combat.weapon_component.common import _prop
 from combat.item_world import author_out_of_world
+from combat.fx_vars import PICKUP_CLIP
 from combat.strike_vars import ITEM_PARAM, SERVER_TAKE, TAKE_PARAMS, TAKE_REACH_CM
+from combat.weapon_component import fx
 from combat.weapon_component.shot import _author_alive
 from combat.weapon_component.slot_nodes import op, valid
 from uebp import net
@@ -100,6 +106,10 @@ def _author_take_item(ed, target, exec_in):
     """E on an item, where the keys are: ask the server to take the interact
     target, if it is an item and this copy has room for one.
 
+    The ask plays the pick-up clip at once (pickup_clip.py): in single
+    player the ask is the take, and on a client the server's answer is a
+    frame or more away, which the reach down covers.
+
     Returns (asked, idle, not_mine): the exec pins an ask leaves by, the ones
     a full bag leaves by, and the one a target that is no item leaves by.
     """
@@ -123,12 +133,15 @@ def _author_take_item(ed, target, exec_in):
     ask = keep(_node(ed, SERVER_TAKE))
     _connect(best, _pin(ask, ITEM_PARAM))
     _connect(then(room), _pin(ask, "execute"))
+    g = _G(ed)
+    reach = fx.predict(g, PICKUP_CLIP, [then(ask)])
     ed.add_comment_to_nodes(
         "An interact target that is an item is asked for, once, after the "
         f"search, while this copy has room ({SERVER_TAKE}, pickup.py). The take "
-        "is the server's; with authority (single player) the event is the take.",
-        made)
-    return (then(ask),), (else_(room),), out(cast, "CastFailed")
+        "is the server's; with authority (single player) the event is the take. "
+        "The reach down for it is played here, at once (pickup_clip.py).",
+        made + g.made)
+    return (reach,), (else_(room),), out(cast, "CastFailed")
 
 
 def author_take_event(ed):
@@ -170,7 +183,10 @@ def author_take_event(ed):
     # in hand stays there.
     flow = g.iput(item, SLOT_VAR, str(UNPLACED), [then(add)])
     taken, hand_nodes = _author_to_hand(ed, item, flow)
-    g.put(WV.NeedsRefresh, "true", taken)
+    done = g.put(WV.NeedsRefresh, "true", taken)
+    # The reach down, on the other players' copies of the taker (the owner
+    # played it off the ask: pickup_clip.py).
+    fx.tell(g, PICKUP_CLIP, [done])
     ed.add_comment_to_nodes(
         f"{SERVER_TAKE} (pickup.py): the owning client's E on an item. Refused "
         "unless the item is there and Dropped, the taker alive and within "
@@ -180,7 +196,8 @@ def author_take_event(ed):
         "whatever it was left in, into Inventory UNPLACED (the slot sync puts a "
         "weapon in a free weapon slot of its kind, anything else in the bag, or "
         "in empty hands when the bag is full). A blade taken back out of what it "
-        "was thrown into (Lodged) with empty hands goes to the hand instead.",
+        "was thrown into (Lodged) with empty hands goes to the hand instead. "
+        "Everyone else is told of the take: their copies play the reach down.",
         g.made + hand_nodes)
 
 

@@ -10,19 +10,31 @@ inventory without switching to it is verify/weapon_inputs.py's.
 What the take puts in the inventory is TakeItem (task A2): the item asked
 for, or, where it was placed in the level, a fresh one of its class, the
 level's destroyed.
+
+The reach down for it (weapon_component/pickup_clip.py): the skin's pick-up
+clip, played once into the upper-body slot by Fx_PickUpClip, which the owner
+calls off the ask and the server tells the others of after the take; and the
+two pose plays that would cut it short ask for it first.
 """
 
 from combat import item_vars as IV
+from combat.anim_blueprint import AIM_SLOT
+from combat.fx_vars import PICKUP_CLIP, fx_event
+from combat.pickup_tuning import PICKUP_CLIP_START_S
+from combat.skin import player_skin
 from combat.slot_tuning import HAND, HAND_FROM_VAR, HAS_ROOM_VAR, SLOT_VAR, WEAPON_KIND_VAR
 from combat.strike_vars import ITEM_PARAM, SERVER_TAKE, TAKE_REACH_CM
 from combat.verify.common import (
     BEL, before_marks, by_pins, check, graph, in_pins, num_pin, past_marks, pin_value)
-from combat.verify.fixtures import wc, wg
+from combat.verify.anchor import event_nodes
+from combat.verify.fixtures import w, wc, wg
+from combat.verify.fx import calls, in_fx, predicts
 from combat.verify.interact import _exec_from, _reads, _sources, _then, _title
 from combat.verify.punch import _feeds
 from combat.verify.shot import _calls_of
 from combat.weapon_component import vars as WV
 from combat.weapon_component.interact import INTERACT_TARGET_VAR
+from combat.weapon_component.pickup_clip import PICKUP_ANIM_VAR
 
 
 def _target_as_item(node, pin):
@@ -215,6 +227,68 @@ def check_lodged_to_hand():
           ", ".join(_title(n) for n in froms))
 
 
+def _reads_clip(node):
+    return any(_title(f) == f"Get {PICKUP_ANIM_VAR}"
+               for f in _feeds(BEL.find_input_pin(node, "Asset")))
+
+
+def is_pickup_play(node):
+    """The play of the pick-up's clip: a play (it has a rate) whose Asset is
+    PickUpAnim. The keep-alive's and the equip's IsPlayingSlotAnimation read
+    it through an Asset pin too, and are not plays."""
+    return "InPlayRate" in in_pins(node) and _reads_clip(node)
+
+
+def check_pickup_clip():
+    """The reach down: the skin's pick-up clip, played by the owner off the
+    ask and by the others at the server's word, and kept in the slot."""
+    skin = player_skin()
+    anim = w.get_editor_property(str(PICKUP_ANIM_VAR))
+    check("the pick-up's clip is the worn skin's (none on a skin without one)",
+          (anim.get_path_name().split(".")[0] if anim else None) == skin.pickup,
+          f"{anim} for {skin.pickup}")
+    plays = [n for n in by_pins(wg, "Asset", "SlotNodeName", "InPlayRate") if _reads_clip(n)]
+    fx_plays = in_fx(PICKUP_CLIP, plays)
+    check(f"...played once, in {fx_event(PICKUP_CLIP)}, into {AIM_SLOT}, upper body "
+          f"only, at its own rate, from {PICKUP_CLIP_START_S:g} s in",
+          len(plays) == 1 and fx_plays == plays
+          and pin_value(plays[0], "SlotNodeName") == AIM_SLOT
+          and num_pin(plays[0], "InPlayRate") in (None, 1.0)
+          and num_pin(plays[0], "LoopCount") in (None, 1.0)
+          and num_pin(plays[0], "InTimeToStartMontageAt") == PICKUP_CLIP_START_S,
+          f"{len(plays)} play(s), {len(fx_plays)} in the cosmetic")
+    if len(plays) == 1:
+        gates = _exec_from(plays[0])
+        check("...only where there is a clip (a Branch on IsValid of it)",
+              len(gates) == 1 and gates[0][1] == "then" and _title(gates[0][0]) == "Branch"
+              and any(_title(f) == f"Get {PICKUP_ANIM_VAR}"
+                      for f in _feeds(BEL.find_input_pin(gates[0][0], "Condition"))),
+              str([_title(n) for n, _pin in gates]))
+    mine = predicts(PICKUP_CLIP)
+    asks = [n for n in _calls_of(SERVER_TAKE) if _target_as_item(n, ITEM_PARAM)]
+    check(f"the owner plays it off the ask: {fx_event(PICKUP_CLIP)} right after the "
+          f"call of {SERVER_TAKE} (in single player, the frame the item goes)",
+          len(mine) == 1 and len(asks) == 1
+          and _exec_from(mine[0]) == [(asks[0], "then")],
+          f"{len(mine)} own play(s), {len(asks)} ask(s)")
+    told = calls(PICKUP_CLIP)
+    refreshes = [n for n, _pin in _exec_from(told[0])] if len(told) == 1 else []
+    check(f"the server tells the others after the take: once, under {SERVER_TAKE}, "
+          f"after {WV.NeedsRefresh} is raised",
+          len(told) == 1 and [_title(n) for n in refreshes] == [f"Set {WV.NeedsRefresh}"]
+          and told[0] in event_nodes(SERVER_TAKE), str([_title(n) for n in refreshes]))
+    readers = [n for n in by_pins(wg, "Asset", "SlotNodeName")
+               if "InPlayRate" not in in_pins(n) and _reads_clip(n)]
+    branches = [n for n in wg if _title(n) == "Branch"]
+    guarded = [r for r in readers if any(
+        r in _feeds(BEL.find_input_pin(b, "Condition")) for b in branches)]
+    check("the keep-alive and the equip ask whether the clip is in the slot before "
+          "they put a pose there (a montage just started reads as a quiet slot)",
+          len(readers) == 2 and guarded == readers,
+          f"{len(readers)} reader(s), {len(guarded)} behind a Branch")
+
+
 def run():
     check_pickup_takes_once()
     check_lodged_to_hand()
+    check_pickup_clip()

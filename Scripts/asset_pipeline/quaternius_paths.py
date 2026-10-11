@@ -122,6 +122,10 @@ PRONE_CRAWL = ("UAL1", "Swim_Fwd_Loop")
 SEARCH_KNEEL = ("UAL1", "Fixing_Kneeling")
 # Throwing what is in hand (combat/weapon_component/throw_windup.py).
 THROW = ("UAL2", "OverhandThrow")
+# Picking an item up off the ground (combat/weapon_component/pickup_clip.py):
+# the harvest bends down and reaches the right hand to the floor, 2.5 s, in
+# place. UAL1's PickUp_Table reaches a table, waist high, and is no use here.
+PICKUP = ("UAL2", "Farm_Harvest")
 # The clip the hands are calibrated on (palm_twist): hands at rest.
 PALM_CALIBRATION = ("UAL1", "Idle_Loop")
 

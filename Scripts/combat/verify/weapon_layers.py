@@ -86,14 +86,15 @@ def check_clips_in_place(skin):
     over: a pose held in one holds the player still (hold_pose.in_place)."""
     mesh = load(skin.mesh)
     clips = [load(p) for p in (
-        skin.aim_rifle, skin.aim_pistol, skin.punch, skin.throw,
+        skin.aim_rifle, skin.aim_pistol, skin.punch, skin.throw, skin.pickup,
         HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, HOLD_TORCH_ANIM_PATH,
         WARD_TORCH_ANIM_PATH, THROW_READY_ANIM_PATH, KNIFE_ANIM_PATH) if p]
     clips += list(hit_reactions(mesh))
     moving = [c.get_name() if c else "missing" for c in clips
               if c is None or c.get_editor_property(ROOT_MOTION)]
     check(f"none of the {len(clips)} clips played into a slot (the ready and hold poses, "
-          "the punch, the slash, the throw, the flinches) has root motion: with one out, "
+          "the punch, the slash, the throw, the pick-up, the flinches) has root motion: "
+          "with one out, "
           "the player can still walk", not moving, str(moving))
 
 

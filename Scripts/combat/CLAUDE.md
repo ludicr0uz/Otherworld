@@ -295,7 +295,7 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
   is a deprecated field Python calls protected).
 - **A clip belongs to one skeleton**, so the layers' clips are copies on
   `SK_UEFN_Mannequin` (`asset_pipeline/retarget_to_uefn.py`: the two ready poses and
-  the six flinches off the mannequin, the crouch, crawl, kneel and throw off
+  the six flinches off the mannequin, the crouch, crawl, kneel, throw and pick-up off
   Quaternius's own rig; `asset_pipeline/import_lyra.py`: the punch, Lyra's
   `MM_Pistol_Melee`, since C1; `SKIN_GAS` names them), and the poses the build keys (the hold
   poses, the shotgun's, the throw's) are keyed on that skeleton from them and
@@ -306,6 +306,16 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
   and a hold pose is a looping montage: with the knife or the axe out the player could
   not walk. The mannequin's punch has it on too (150 cm forward), so until G3 a punch
   carried the player forward; its copy here is in place, flag off.
+- **Picking an item up plays a reach down to the ground** (`weapon_component/pickup_clip.py`,
+  `pickup_tuning.py`): Quaternius UAL2's `Farm_Harvest` (`PlayerSkin.pickup`; UAL1's
+  `PickUp_Table` reaches a table, waist high), into the upper-body slot the throw's clip
+  plays in, from 0.2 s in, so the right hand is on the ground half a second after the
+  press. The owner plays it off the ask (in single player the ask is the take), the
+  others' copies at the server's word after the take (`Fx_PickUpClip`, gate `others`).
+  The take raises `NeedsRefresh`, whose equip would put the hold pose back over the clip
+  on its first frame, and the keep-alive would too: both ask `picking_up()` first, as they
+  ask about the throw's clip. Checked by `verify/pickup.check_pickup_clip`, played in
+  `probes/probe_pickup_clip.py` (the hand drops 37 cm, with the knife held).
 - **The punch is Lyra's pistol melee** (C1; `asset_pipeline/lyra_paths.PUNCH`, a straight
   right: Lyra has no unarmed attack). Nothing about the strike changed: the blow is still
   timed, `COMBAT.punch_impact_s` (0.3 s) after the swing, not notified, with the same

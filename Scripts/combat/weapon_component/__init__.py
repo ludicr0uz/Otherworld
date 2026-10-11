@@ -128,6 +128,10 @@ _author_* fragment per concern, each in its own module:
               nearest AimPoint, the point the reticle rests on. KINDS lists
               what can be interacted with (today: an item, which is picked
               up, and a campfire, which heats the blade in hand)
+  pickup_clip the reach down for an item taken: the skin's pick-up clip into
+              the upper-body slot, played by the owner off the ask and by the
+              others at the server's word (Fx_PickUpClip), and picking_up(),
+              which the keep-alive and the equip ask before replacing it
   pickup      interact's item kind: the Dropped items it offers, and the ask
               for the one kept, Server_Take(Item), whose body is the take into
               the bag, detached from what it was left in (a body a thrown

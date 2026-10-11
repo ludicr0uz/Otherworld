@@ -14,7 +14,8 @@ weapon_layers.py) has to be on SK_UEFN_Mannequin.  This puts it there:
                       (gas_bridge_paths.CLIPS_FROM_MESH) into
                       /Game/Sourced/Characters/Anims/UEFN_Player as
                       A_UEFN_Player_<clip>
-    Quaternius's      the crouch, the crawl, the kneel and the throw
+    Quaternius's      the crouch, the crawl, the kneel, the throw and the
+                      pick-up
                       (quaternius_paths), read off the packs' own rig, not
                       off their mannequin copies (one retarget, not two),
                       into /Game/Sourced/Quaternius/UAL/UEFN_Player as
@@ -43,7 +44,8 @@ from asset_pipeline.gas_bridge_paths import (                        # noqa: E40
 )
 from asset_pipeline.plain_retarget import build_plain_retargeter     # noqa: E402
 from asset_pipeline.quaternius_paths import (                        # noqa: E402
-    CROUCH_IDLE, CROUCH_WALK, PRONE_CRAWL, SEARCH_KNEEL, THROW, ual_anim_dir, ual_clip,
+    CROUCH_IDLE, CROUCH_WALK, PICKUP, PRONE_CRAWL, SEARCH_KNEEL, THROW, ual_anim_dir,
+    ual_clip,
     ual_retargeter_path, ual_source_clip,
 )
 from asset_pipeline.retarget_paths import (                          # noqa: E402
@@ -55,7 +57,7 @@ from asset_pipeline.ual_retarget import _asset_data, _batch, _fresh, build_ual_r
 
 EAL = unreal.EditorAssetLibrary
 MANNEQUIN_CLIPS = AIM_SOURCES + (MELEE_SOURCE,) + HIT_SOURCES
-UAL_CLIPS = (CROUCH_IDLE, CROUCH_WALK, PRONE_CRAWL, SEARCH_KNEEL, THROW)
+UAL_CLIPS = (CROUCH_IDLE, CROUCH_WALK, PRONE_CRAWL, SEARCH_KNEEL, THROW, PICKUP)
 
 
 def _log(msg):

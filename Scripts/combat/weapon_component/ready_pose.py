@@ -9,6 +9,7 @@ from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.hit_reaction import HIT_REACT_PROBE, POSE_BACK_PROBE_PREFIX
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS
 from combat.weapon_component.look_vars import HandPose, HandRaise
+from combat.weapon_component.pickup_clip import picking_up
 from combat.weapon_component.throw_windup import THROW_ANIM_VAR
 from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_IS_PLAYING_SLOT, FN_IS_SLOT_ACTIVE, FN_PLAY_SLOT
 from uebp.nodes.math import FN_AND, FN_NEQ_BB, FN_NOT
@@ -96,6 +97,12 @@ def _author_ready_pose_keepalive(ed, exec_ins):
     _set(throwing, "SlotNodeName", AIM_SLOT)
     not_throwing = keep(_node(ed, FN_NOT))
     _connect(out(throwing), _pin(not_throwing, "A"))
+    # The pick-up's clip the same (pickup_clip.py).
+    not_picking = keep(_node(ed, FN_NOT))
+    _connect(picking_up(ed, anim_out, keep), _pin(not_picking, "A"))
+    calm = keep(_node(ed, FN_AND))
+    _connect(out(not_throwing), _pin(calm, "A"))
+    _connect(out(not_picking), _pin(calm, "B"))
     settled = keep(_node(ed, FN_NOT))
     _connect(out(flinching), _pin(settled, "A"))
 
@@ -107,7 +114,7 @@ def _author_ready_pose_keepalive(ed, exec_ins):
     _connect(out(settled), _pin(quiet, "B"))
     undisturbed = keep(_node(ed, FN_AND))
     _connect(out(quiet), _pin(undisturbed, "A"))
-    _connect(out(not_throwing), _pin(undisturbed, "B"))
+    _connect(out(calm), _pin(undisturbed, "B"))
     needed = keep(_node(ed, FN_AND))
     _connect(out(ready), _pin(needed, "A"))
     _connect(out(undisturbed), _pin(needed, "B"))

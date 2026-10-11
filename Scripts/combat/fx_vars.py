@@ -51,6 +51,7 @@ PUNCH = "Punch"               # the punch's clip and one of SwingSounds
 SLASH = "Slash"               # the knife's
 THROW = "Throw"               # the air the thrown item cuts (Start, Sharp)
 THROW_CLIP = "ThrowClip"      # the overhand throw's clip, from the ready pose
+PICKUP_CLIP = "PickUpClip"    # the reach down to the ground for an item taken
 
 # --- at a point in the world: what a blow or a pellet did where it landed ---
 PELLET_HIT = "PelletHit"      # blood (Blood) or chips at (Location, Normal), sized Scale
@@ -84,6 +85,7 @@ COSMETICS = {
     SLASH: ((), UNPREDICTED),
     THROW: (THROW_FX_PARAMS, UNPREDICTED),
     THROW_CLIP: ((), OTHERS),
+    PICKUP_CLIP: ((), OTHERS),
     PUNCH_HIT: (SOUND_AT_PARAMS, SCREEN),
     BLADE_HIT: (SOUND_AT_PARAMS, SCREEN),
     CHOP: (POINT_PARAMS, SCREEN),

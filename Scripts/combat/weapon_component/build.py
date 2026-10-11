@@ -45,6 +45,7 @@ from combat.strike_vars import TABLE as STRIKE_TABLE
 from combat.weapon_component.holds import author_set_holds, replicate_holds
 from combat.weapon_component.knife import KNIFE
 from combat.weapon_component.pickup import author_take_event
+from combat.weapon_component.pickup_clip import author_pickup_fx
 from combat.weapon_component.punch import PUNCH, author_strike_event, author_strike_fx
 from combat.weapon_component.throw import author_throw_event
 from combat.weapon_component.loot_take import author_loot_take
@@ -137,6 +138,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     author_strike_fx(ed, PUNCH)
     author_strike_fx(ed, KNIFE)
     author_throw_fx(ed)
+    author_pickup_fx(ed)
     author_throw_strike_fx(ed)
     author_chop_fx(ed)
     author_shot_events(ed)
@@ -192,6 +194,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         **({WV.ThrowAnim: _must_load(player_skin().throw),
             WV.ThrowReadyAnim: _must_load(THROW_READY_ANIM_PATH)}
            if player_skin().throw else {}),
+        **({WV.PickUpAnim: _must_load(player_skin().pickup)}
+           if player_skin().pickup else {}),
         WV.ThrowArcClass: arc_class,
     })
     # The component replicates (its look, to the other players): a class

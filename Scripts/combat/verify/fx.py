@@ -142,9 +142,9 @@ def check_pairs():
                   f"authority Branch's false arm, and {cast} is told at least once",
                   len(mine) == 1 and arms == ["else"] and len(told) >= 1,
                   f"{len(mine)} prediction(s) on {arms}, {len(told)} tell(s)")
-        elif name == FX.THROW_CLIP:
-            check(f"...the thrower plays {name} itself in both modes (the wind-up), and "
-                  f"{cast} is told once", len(mine) == 1 and len(told) == 1,
+        elif name in (FX.THROW_CLIP, FX.PICKUP_CLIP):
+            check(f"...the owner plays {name} itself in both modes (the wind-up, the "
+                  f"ask), and {cast} is told once", len(mine) == 1 and len(told) == 1,
                   f"{len(mine)} own, {len(told)} tell(s)")
         else:
             check(f"...nobody predicts {name}: {fx} is called by its Multicast alone, "

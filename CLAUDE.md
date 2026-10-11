@@ -3,8 +3,22 @@
 An Unreal Engine **5.8** project on macOS, driven entirely by **Unreal Python** automation.
 The game is authored by those scripts; the C++ in `Source/` is small (a runtime module with
 the player's predicted movement states, and an editor module of helpers for the scripts) and
-must be compiled before the editor opens (`Source/CLAUDE.md`). `systemDesign.md` holds the detailed
-architecture.
+must be compiled before the editor opens (`Source/CLAUDE.md`).
+
+## Where things are written down
+
+Four kinds of document, each with one job. Put a fact where a reader will need it, and
+nowhere else; a second copy goes stale.
+
+| document | holds | read when |
+|---|---|---|
+| this file | what every change needs: the hard rules, the code layout, how to run and verify a script, the gotchas that bite in any package; and the table below, which says where each system's notes are | always (it is loaded in every session) |
+| `Scripts/<package>/CLAUDE.md` (and `Source/CLAUDE.md`) | what a change inside that system needs: its design rules, its files, its traps, its verifiers and probes. A package's `docs/*.md` are its topic notes, read only for the topic in hand; its `docs/history/` file is what each feature built, measured and proved, moved there word for word | before changing anything in that package |
+| `systemDesign.md` | the high-level design: what the game is today, system by system (section 0, kept current), how the pipelines fit together, and the long-term architecture; the detail that a small change does not need | a change that spans systems, or the long view |
+| `serversupportsysdesign.md` and the other root `*.md` plans | the strategy and the plan for one long piece of work | working on that piece |
+
+A task that changes what the game does updates `systemDesign.md` section 0 and the owning
+package's `CLAUDE.md`; it adds to this file only a rule that applies in every package.
 
 ## Hard rules
 
@@ -46,6 +60,7 @@ architecture.
    | survival: GAS, debuffs, on-hit effects and bleeding, forage, the campfire | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
    | level generator, navmesh, trees and grass | `generate_forest_level.py` | `Scripts/forest_generator/CLAUDE.md` |
 | day and night: world config, sun, moon, sky | `build_`/`verify_day_night.py` | `Scripts/world/CLAUDE.md` |
+| the title level: the stage the game opens on with no forest loaded (`Lvl_Title`, `GameDefaultMap`), its camera, lights and floor; the figure on it, the player's character in the saved profile's garments (`graphics_menu/title_figure.py`); New Game opening the forest, save and exit coming back | `build_`/`verify_title_level.py`, `probes/probe_title_figure.py` | `Scripts/title/__init__.py`, `Scripts/graphics_menu/CLAUDE.md` ("One menu") |
 | corpse loot: loot tables, the roll, the loot window | `build_survival.py` (tables), `probe_corpse_loot.py` | `Scripts/loot/CLAUDE.md` |
 | item icons: each item's inventory icon, rendered from its 3D model; the I panel's portrait of the character | `build_item_icons.py` (run outside the editor) | `Scripts/item_icons/CLAUDE.md` |
 | generated bodies: describing one, the rig check, the import that normalises it, swapping the player onto it | `asset_pipeline/fetch_monsters.py`, `rig_compat.py`, `swap_player_body.py` | `Scripts/asset_pipeline/CLAUDE.md` |
@@ -288,11 +303,10 @@ editor.
 
 ## Current state
 
-The whole of it, system by system, is `docs/current_state.md` (the player, the wanderers,
-corpse loot, the HUD and menu, clothing, item icons, sound, wind, the maps, day and night,
-save and exit, death, the known gaps). In a line: a third-person survival shooter in a
-generated forest, single player or as a client of a dedicated server from one code path;
-the player moves by Epic's motion matching, and zombies and wendigos hunt them.
+In a line: a third-person survival shooter in a generated forest, single player or as a
+client of a dedicated server from one code path; the player moves by Epic's motion
+matching, and zombies and wendigos hunt them. System by system, with the package that owns
+each: `systemDesign.md`, section 0.
 
 ## Gotchas learned the hard way
 

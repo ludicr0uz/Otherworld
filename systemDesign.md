@@ -1,7 +1,99 @@
 # Otherworld — System Design
 
-Detailed reference for the Otherworld Unreal Engine 5.8 project. `CLAUDE.md` is the
-token-cheap summary; read this file only when you need the details.
+The high-level design of the Otherworld Unreal Engine 5.8 project: what the game is, how
+its systems fit together, and where the architecture is going. It is the document to read
+for a change that spans systems or for the long view; a small change inside one system
+needs only that system's `CLAUDE.md` (the root `CLAUDE.md`, "Where things are written
+down", says which document holds what). Section 0 is kept current by the task that
+changes what the game does; the numbered sections after it are the design of each
+pipeline and are revised when the design changes.
+
+---
+
+## 0. The game today, system by system
+
+A third-person survival shooter in a generated forest, single player or as a client of a
+dedicated server from one code path, chosen on the title menu. The player moves by Epic's
+motion matching; zombies and wendigos hunt them. Each paragraph names the package whose
+`CLAUDE.md` holds the rules and the files.
+
+**The player** (`Scripts/combat/CLAUDE.md`; the body: `Scripts/asset_pipeline/CLAUDE.md`).
+A Meshy-generated adventurer (`SKM_Adventurer03`, one setting in `asset_pipeline/player_body.py`)
+issued a shotgun, pistol, knife, axe, matches and a stick; the SMG, assault rifle and sniper
+are found as drops (Fab models; the shotgun and pistol are Quaternius CC0). Movement is the
+Game Animation Sample's motion matching on a hidden UEFN mannequin, nothing hand-animated;
+the sprint, prone, aim-walk, slide and stamina are the C++ movement component's, predicted
+on the owning client and decided by the server (`Source/CLAUDE.md`). The player jogs at
+4 m/s and sprints at 6 (forwards only), aims over the shoulder or down a gun's sights, holds
+breath down the sights, reloads, eats, blocks, punches, stabs with the knife, chops with the
+axe (every third blow on a tree leaves wood), lights a campfire with matches and wood,
+lights the stick at a fire and holds it out as a torch, heats a blade at a fire (cauterises a
+bleed, double damage to a wendigo for 20 s), crouches, goes prone, slides, mantles the
+sample's traversal blocks, throws whatever is in hand (a thrown knife or axe wounds, stays
+in the body or a tree, and is taken back with E), and interacts with the nearest thing in
+reach. Items lying near the player glimmer. Each gun has its own accuracy cloud, recoil and
+sway, steadied by stance and the aim; a headshot draws an X round the reticle. Bodies are
+hit only where their fitted physics bodies are.
+
+**The inventory** (`Scripts/combat/CLAUDE.md`, "The slots"; the panel:
+`Scripts/graphics_menu/CLAUDE.md`, `Scripts/clothing/CLAUDE.md`). The hand, four weapon
+slots (primary, secondary, pistol, melee; 1-4) and a ten-slot backpack (5-9, Q cycles it).
+I opens the panel: keys or mouse bring an item to hand, a right click uses it (a garment is
+worn, a gun goes to a weapon slot), drag moves items between slots, and a drop outside the
+panel sets the item down. A pick-up goes to a free weapon slot of its kind, else the bag,
+else empty hands.
+
+**The wanderers** (`Scripts/npc/CLAUDE.md`). Ten zombies and wendigos on Behavior Trees:
+patrol until they notice the player, then chase and melee, sidestepping between swings. A
+burning campfire draws patrolling zombies within 200 m. A wendigo hunts before it chases:
+roars, comes in tree to tree round the player, charges from 10 m, charges at once if the
+player runs 30 m or shoots it; fire held out keeps it circling and eventually drives it off
+for a while; its blow has a 33% chance of a 3-minute bleed. A killed wanderer is replaced
+10 s later, 75-100 m away, and leaves a ragdoll corpse that can be looted (`Scripts/loot/CLAUDE.md`:
+loot tables, Tab kneels and opens the loot window).
+
+**The HUD and the one menu** (`Scripts/graphics_menu/CLAUDE.md`). UMG screens on an `AHUD`:
+the five bars (HP, stamina, hunger, thirst, temperature), kill counters, an FPS readout,
+the inventory grid, the menu, the death menu and the settings page, all keyboard and mouse.
+The game opens on a title level of its own (`Lvl_Title`, `Scripts/title`: a lit stage with
+the player's character in the saved profile's garments); M opens the same menu in play. Its
+rows: Single Player (New Game / Continue Game opens `Lvl_Forest_1000m`), Multiplayer (a
+server address and Join Server), Controls (rebinding, difficulty EASY/MEDIUM/SURVIVOR),
+Debug, Dev All Guns, the GUN / MONSTER / PLAYER / SOUND / WORLD / GRAPHICS SETTINGS tabs
+(live tuning, each saved to a tracked CSV the matching build reads), and Exit Game on the
+title or Save and Exit in play (a 15 s countdown, cancelled by a hit, a move or the
+trigger; saves stats, inventory and worn garments, not the location; death deletes the
+profile). Pausing is single player's alone; as a client of a server the same screens are
+overlays over a running world. Every screen carries Ellivian Inc.'s confidentiality
+watermark.
+
+**Clothing** (`Scripts/clothing/CLAUDE.md`). Eight garments, one slot each, shown as icons
+bottom right; the jacket, pants and boots are drawn on the body (to everyone on a server),
+the rest are not. **Item icons** (`Scripts/item_icons/CLAUDE.md`) are studio renders of each
+item's own model, made outside the editor by `build_item_icons.py`.
+
+**Sound** (`Scripts/Sound/CLAUDE.md`). Every sound is a recording chosen by ear; one
+package with a table per area (weapons, monsters, items, world) and one build after any
+change. The forest has day and night beds faded by the clock.
+
+**The world** (`Scripts/world/CLAUDE.md`, `Scripts/forest_generator/CLAUDE.md`). Two
+generated maps, `Lvl_Forest_200m` (the editor's startup map) and `Lvl_Forest_1000m` (what a
+packaged game plays). A clock turns the sun and moon; day and night are 4 minutes each for
+now, the night moonlit under the real stars, and a level starts at a random hour. At night
+the player's temperature falls; a campfire warms them. Grass and trees sway in a wind the
+graphics tab tunes.
+
+**Death** (`Scripts/combat/docs/health.md`, `Scripts/net/CLAUDE.md`). Nothing a dead body
+could do runs. In single player death ends the game: the world pauses on the death menu and
+the profile is deleted. As a client of a server the player's gear goes onto the body, which
+anyone can loot, and the server respawns them 10 s later at a random PlayerStart. Players
+can hurt players; a player kill is counted apart from monster kills.
+
+**Known gaps.** A low temperature does nothing yet. Traversal has nothing to climb (no
+traversable block is placed in either map) and is unproven as a client of a server. The
+guns' ready poses and the weapon layers' clips are retargeted from Lyra, Mixamo and
+Quaternius, none played by hand. Each package's `CLAUDE.md` lists the feel checks that
+still need a play session.
 
 ---
 
@@ -10,7 +102,7 @@ token-cheap summary; read this file only when you need the details.
 ```
 Otherworld/
 ├── Otherworld.uproject        # UE 5.8; plugins below
-├── CLAUDE.md / GEMINI.md      # agent rules (GEMINI.md = original, for Antigravity)
+├── CLAUDE.md                  # agent rules; "Where things are written down" lists the documents
 ├── systemDesign.md            # this file
 ├── Config/                    # *.ini
 ├── Content/                   # game assets (binary)
@@ -22,20 +114,24 @@ Enabled plugins: `ModelingToolsEditorMode` (editor-only), `GameplayStateTree`,
 `PythonScriptPlugin`, `EditorScriptingUtilities`, `ProceduralMeshComponent`,
 `PCG`, `PCGGeometryScriptInterop`.
 
-One C++ module exists, `Source/Otherworld`, empty so far (`Source/CLAUDE.md`); the game
-itself is Blueprint + Python. It started from the
+The C++ in `Source/` is small and deliberate: the `Otherworld` runtime module (the player's
+predicted movement, the hit history, the weapon and health components' native parents) and
+the editor-only `OtherworldEditor` module of helpers the builders need (`Source/CLAUDE.md`);
+the game itself is Blueprint authored from Python. It started from the
 Third Person template (`Content/ThirdPerson`, `Content/Characters/Mannequins`,
 `Content/Input`, `Content/LevelPrototyping`), and "largely untouched" turns out to be
 measurable: of those 171 files, **168 are byte-identical to the UE 5.8.3 install** and three
 are patched in place by builders — `ABP_Unarmed`, `BP_ThirdPersonCharacter` and
 `BP_ThirdPersonGameMode`.
 
-That is why the repository is code only. Nothing under `Content/` is committed except
-`Content/Python`: the stock files are restored by copying them out of the engine, and
-everything else is written by a script in `Scripts/`. `Scripts/forest_generator/asset_sources.py`
-is the table of which is which, `Scripts/sync_assets.py` is the tool that acts on it, and
-`assets/` (git-ignored) holds downloads and generator scratch. Verified 2026-09-27 by
-deleting the four stock directories and rebuilding: 356/356 weapons, 60/60 HUD, 148/148 level.
+That is why the scripts are the source. `Content/` is committed as a Git LFS snapshot so a
+clone opens without a rebuild, but every asset in it is either stock engine content or
+written by a script in `Scripts/`, and a rebuilt asset is committed like any other change
+(the rules: root `CLAUDE.md`, "`Content/` is a Git LFS snapshot").
+`Scripts/forest_generator/asset_sources.py` is the table of which is which,
+`Scripts/sync_assets.py` the tool that acts on it, and `assets/` (git-ignored) holds
+downloads and generator scratch. Verified 2026-09-27 by deleting the four stock directories
+and rebuilding: 356/356 weapons, 60/60 HUD, 148/148 level.
 
 ### Content layout that matters
 
@@ -905,7 +1001,11 @@ every frame and `APlayerController` ticks through a pause.
 
 ---
 
-## 7. Status (as of 2026-09-27)
+## 7. Status snapshot (2026-09-27; historical)
+
+A record of where the project stood on that date, kept for the measurements and the
+reasoning. What the game is today is section 0; each package's `CLAUDE.md` and its
+`docs/history/` file hold what was built and proved since.
 
 - Git: branch `night-mode`, working tree clean, head `e5745e9 night mode initial`
   (adds `lighting.py`, the generator rewrite, the regenerated night scripts and a `.gitignore`).

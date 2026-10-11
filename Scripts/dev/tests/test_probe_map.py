@@ -97,7 +97,7 @@ class VerifiersFor(unittest.TestCase):
 
     def test_probes_docs_and_dev_map_to_none(self):
         self.assertEqual(probe_map.verifiers_for(
-            ["Scripts/probes/probe_x.py", "docs/current_state.md", "Scripts/dev/uepy.py",
+            ["Scripts/probes/probe_x.py", "docs/headless_runs.md", "Scripts/dev/uepy.py",
              "CLAUDE.md", "Scripts/dev/tests/test_x.py"]), [])
 
     def test_a_verifier_maps_to_itself_and_levels_to_their_own(self):

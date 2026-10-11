@@ -19,7 +19,7 @@ from devteam.accounting import (
     token_usage,
 )
 from devteam.session import (
-    build_cmd, build_fix_prompt, build_limit_resumed_prompt, build_prompt,
+    DEFAULT_MODEL, build_cmd, build_fix_prompt, build_limit_resumed_prompt, build_prompt,
     build_resumed_prompt, build_uncommitted_prompt, run_session, session_env,
 )
 from devteam.tasks import Task, tick
@@ -255,8 +255,8 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         paused("start")
         prompt = build_prompt(task, n, total, progress,
                               gate.table(baseline) if baseline else None, args.commit)
-    common = dict(model=task.model or args.model, effort=task.effort or args.effort,
-                  budget=args.budget)
+    common = dict(model=task.model or args.model or DEFAULT_MODEL,
+                  effort=task.effort or args.effort, budget=args.budget)
     earlier = list(parked.get("reports") or []) if parked else []
     head0, tree0 = git_head(ROOT), tree_fingerprint()
     if parked is None:

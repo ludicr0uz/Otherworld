@@ -21,7 +21,9 @@ A task file is a Markdown list. Every top-level item is one task; indented or
 following lines up to the next item belong to it, so a task can run to several
 paragraphs. Headings and text before the first item are ignored. A line
 ``effort: <level>`` or ``model: <name>`` under an item sets that task's
-session effort or model, overriding --effort / --model. A task with neither
+session effort or model, overriding --effort / --model. Every session runs on
+Claude Opus 5.5 unless one of those says otherwise (devteam/session.py
+DEFAULT_MODEL); effort is Claude Code's own default. A task with neither
 an effort: hint nor --effort is sized first (devteam/triage.py: one Haiku call
 for the queue), which runs the small, obvious ones at low effort:
 
@@ -171,6 +173,7 @@ from devteam import (                                               # noqa: E402
     probe_record, scope,
 )
 from devteam.accounting import git_head                             # noqa: E402
+from devteam.session import DEFAULT_MODEL                           # noqa: E402
 from devteam.tasks import Task, parse_tasks, requeue, tick          # noqa: E402
 from devteam.trace import Tee, clock                                # noqa: E402
 from devteam.triage import triage                                   # noqa: E402
@@ -200,7 +203,8 @@ def parse_args():
                    help="continue after a failed task instead of stopping")
     p.add_argument("--permission-mode", default="auto",
                    help="auto (default), acceptEdits, bypassPermissions, ...")
-    p.add_argument("--model", help="model for every task (default: claude's own)")
+    p.add_argument("--model", default=DEFAULT_MODEL,
+                   help=f"model for every task (default: {DEFAULT_MODEL})")
     p.add_argument("--effort", help="effort level for every task (skips triage)")
     p.add_argument("--no-triage", dest="triage", action="store_false",
                    help="don't size the queue first (devteam/triage.py): every "

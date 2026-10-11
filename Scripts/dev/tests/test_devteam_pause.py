@@ -427,6 +427,15 @@ class RunOneTest(unittest.TestCase):
         self.assertEqual((len(self.sessions), len(self.sweeps)), (1, 2))
         self.assertEqual(reports, ["report 1"])
 
+    def test_a_session_runs_on_the_pinned_model_when_no_one_chose_one(self):
+        # Args.model is None here, as it is in a pause record written before the
+        # default existed: the session still gets the pinned model, not the
+        # one in ~/.claude/settings.json.
+        self.run_one()
+        cmd = self.sessions[0]
+        self.assertEqual(cmd[cmd.index("--model") + 1], work.DEFAULT_MODEL)
+        self.assertEqual(work.DEFAULT_MODEL, "claude-opus-5-5")
+
     def test_a_pause_during_the_baseline_sweep_starts_no_session(self):
         self.pause_in = ("sweep", 1)
         with self.assertRaises(pause.Paused) as caught:

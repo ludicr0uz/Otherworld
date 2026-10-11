@@ -127,7 +127,7 @@ class LoopTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp)
         self.path = os.path.join(self.tmp, "tasks.md")
         self.cli = load_cli()
-        self.ran = []
+        self.ran, self.models = [], []
 
     def write(self, text, mode="w"):
         with open(self.path, mode) as fh:
@@ -138,6 +138,7 @@ class LoopTest(unittest.TestCase):
         does to the task file while it works. Returns (exit code, output)."""
         def run_one(task, n, total, *rest):
             self.ran.append((n, total, task.text))
+            self.models.append(rest[0].model)   # rest[0] is the parsed args
             self.pauser = rest[-1]          # what a typed 'stop' would set
             if task.text in during:
                 during[task.text]()
@@ -154,6 +155,17 @@ class LoopTest(unittest.TestCase):
                 contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as stop:
             self.cli.main()
         return stop.exception.code, out.getvalue()
+
+    def test_every_task_runs_on_opus_unless_told_otherwise(self):
+        self.write("- [ ] a\n")
+        self.run_cli({})
+        self.assertEqual(self.models, [self.cli.DEFAULT_MODEL])
+        self.assertEqual(self.cli.DEFAULT_MODEL, "claude-opus-5-5")
+
+    def test_the_model_flag_overrides_the_pinned_one(self):
+        self.write("- [ ] a\n")
+        self.run_cli({}, "--model", "sonnet")
+        self.assertEqual(self.models, ["sonnet"])
 
     def test_a_task_added_during_the_last_task_is_run(self):
         self.write("- [ ] a\n")

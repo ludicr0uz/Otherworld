@@ -12,6 +12,10 @@ from devteam.pause import interrupt
 
 FAIL_MARK = "FAILED:"
 FAB_MARK = "FAB-REQUIRED:"
+# Every task's session runs on this model unless --model or a task's
+# ``model:`` hint says otherwise. Pinned, not left to ~/.claude/settings.json:
+# the runs of 10 Oct 2026 switched model mid-queue when that file changed.
+DEFAULT_MODEL = "claude-opus-5-5"
 
 PROMPT = """\
 You are one member of an automated dev team working through a queue of tasks, \

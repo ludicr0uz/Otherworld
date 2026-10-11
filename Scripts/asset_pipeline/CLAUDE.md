@@ -352,6 +352,13 @@ by the plain retargeter (`RTG_UEFN_Player_from_XBot`), in place, root motion off
 - **What the game plays is the weapons build's bake of them** (`combat/melee_clips.py`;
   `Scripts/combat/CLAUDE.md`, "The melee clips"), so after a re-import run
   `build_weapons_and_combat.py`.
+- **`PLAYER_CLIPS` is read off `player_clips.csv`** (a row per role: pack, clip, and a
+  swing's strike; `player_clips.py`, no `unreal`). One role onto another download is
+  `python3 Scripts/dev/swap_clip.py <role> <fbx>` (H3; `Scripts/combat/CLAUDE.md`, "The
+  melee clips"): `mixamo_player.one_player_clip` imports and retargets that clip alone
+  beside the others, with the retargeter on disk, where the whole step wipes the folder
+  and rebuilds the retargeter. An FBX from outside the cache lands in
+  `assets/cache/mixamo/Player`, the pack `("Player", "Player")`, absent until then.
 - **`import_mixamo.py` purges its own package as it loads**, so another script cannot
   import it as a module (the import dies on a `KeyError` for its own name): share a step
   as a function of one of its modules, as `mixamo_player.import_player_set` is.

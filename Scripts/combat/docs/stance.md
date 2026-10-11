@@ -143,7 +143,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   adventurer, into `/Game/Sourced/Quaternius/UAL/Adventurer01`). `PlayerSkin` names four (the fourth is `search_kneel`, below):
   `crouch_idle` (`Crouch_Idle_Loop`), `crouch_walk` (`Crouch_Fwd_Loop`) and `prone_crawl`. The
   Quaternius packs have no crawl: on the player (C5) it is Mixamo's `zombie crawl` from the Scary
-  Zombie Pack (`mixamo_paths.PLAYER_CLIPS["prone_crawl"]`, retargeted by `import_mixamo_player.py`;
+  Zombie Pack (`mixamo_paths.PLAYER_CLIPS["prone_crawl"]`, the `prone_crawl` row of `player_clips.csv`: `Scripts/dev/swap_clip.py` tries another; retargeted by `import_mixamo_player.py`;
   its hips bob about 7 cm, so the verifier allows `CRAWL_BOB_CM`), and lying still is that clip held
   at 0.96 s (`PRONE_REST_S`, hips mid-bob). The older skins still use `Swim_Fwd_Loop`.
 - **Where:** between the locomotion state machine and both its readers (the aim slot and the

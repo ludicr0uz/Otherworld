@@ -60,6 +60,11 @@ Editor-side, in pipeline order:
     mixamo_player.py            the player's melee set (PLAYER_CLIPS) onto SK_XBot and
                                 from there onto the player's skeleton, in place
     import_mixamo_player.py     entry point: that step of import_mixamo.py alone
+    player_clips.py             the table of the player's Mixamo clips (player_clips.csv:
+                                a row per role, and a swing's strike), the one-row edit
+                                and the strike read off a hand's path; no ``unreal``
+    player_clip_swap.py         the editor's half of Scripts/dev/swap_clip.py: one role
+                                onto another clip, only what is baked from it rebuilt
     import_quaternius.py        entry point: Quaternius zips -> UAL clips on the
                                 adventurer, gun/survival props, the zombie
     quaternius_paths.py         constants: packs, asset paths, which clips/models play

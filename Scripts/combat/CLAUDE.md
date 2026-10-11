@@ -383,7 +383,7 @@ The knife's and the axe's ready pose and swing are Mixamo's clips, not poses key
 Python: `Knife Idle` and `Stabbing` (two single downloads), and the Pro Melee Axe Pack's
 `standing idle` and `standing melee attack downward`. `asset_pipeline/import_mixamo.py`
 (its last step; `import_mixamo_player.py` runs that step alone) imports the four named in
-`mixamo_paths.PLAYER_CLIPS` onto `SK_XBot` and retargets them onto the player's skeleton
+`mixamo_paths.PLAYER_CLIPS` (the rows of `player_clips.csv`) onto `SK_XBot` and retargets them onto the player's skeleton
 into `/Game/Sourced/Mixamo/UEFN_Player`; the weapons build's `melee_clips.py` bakes each
 into the game's own asset (`A_HoldKnife`, `A_KnifeSlash`, `A_HoldAxe`, `A_AxeSwing`), and
 `verify/melee_clips.py` checks each bake against Mixamo's frame for frame.
@@ -391,8 +391,8 @@ into the game's own asset (`A_HoldKnife`, `A_KnifeSlash`, `A_HoldAxe`, `A_AxeSwi
 - **A bake changes two things.** The right hand's fingers are the pistol pose's on every
   frame (Mixamo's hand is posed for a prop the game does not have, and the items are seated
   in the pistol's fist), and a swing starts `COMBAT.knife_impact_s` before the moment its
-  clip strikes (`MeleeClip.hit_s`, read off the hand's path: 0.97 s into the stab, 0.85 s
-  into the chop), since the blow is timed and not notified. The wind-up before that is not
+  clip strikes (`MeleeClip.hit_s`, the row's `hit_s`, read off the hand's path: 0.97 s
+  into the stab, 0.85 s into the chop), since the blow is timed and not notified. The wind-up before that is not
   played; the recovery is, to the clip's end, unless the next swing cuts it short.
 - **The grip rotation is the pistol hand's** (`knife.py`, `axe.py`:
   `_grip_rotation(skin.aim_pistol)`), not one solved against the ready pose: that solve
@@ -403,8 +403,42 @@ into the game's own asset (`A_HoldKnife`, `A_KnifeSlash`, `A_HoldAxe`, `A_AxeSwi
   else the strike's own. Not by `Held`: another client's copy of a player has `HandPose`
   (`look.py`, off the replicated `LookPose`) and may not have the item.
   `probe_net_fx.py` has client 2 see the axe's clip and the knife's on client 1's copy.
-- **A new melee item's clips** are two rows of `PLAYER_CLIPS`, two of `MELEE_CLIPS`, and
-  a `by_pose` pair on the `KNIFE` Strike.
+- **A new melee item's clips** are two rows of `player_clips.csv` (and of
+  `player_clips.ROLES`), two of `MELEE_CLIPS`, and a `by_pose` pair on the `KNIFE` Strike.
+- **Trying another clip in a role is one command** (H3), a few seconds in an open editor:
+
+  ```bash
+  python3 Scripts/dev/swap_clip.py --list                      # the roles and their clips
+  python3 Scripts/dev/swap_clip.py axe_swing <fbx> --dry-run   # what it would do
+  python3 Scripts/dev/swap_clip.py axe_swing <fbx>             # do it
+  python3 Scripts/dev/uepy.py --verify-for                     # the melee verifier
+  python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_metahuman_look.py
+  ```
+
+  The roles are the rows of `asset_pipeline/player_clips.csv` (`role,pack,clip,hit_s`):
+  `knife_ready`, `knife_swing`, `axe_ready`, `axe_swing`, `prone_crawl`; another name is
+  refused with that list. The FBX is a Mixamo download ("With Skin", as every clip here):
+  one in a pack's folder under `assets/cache/mixamo` is used where it is, one from anywhere
+  else is copied to `assets/cache/mixamo/Player`. The editor's half
+  (`asset_pipeline/player_clip_swap.py`) imports and retargets that clip alone, rewrites the
+  row, and rebuilds only what is baked from it (`player_clips.ROLES`): a swing's own asset;
+  a ready pose's asset and its item's build step (the grip is solved in it); for the crawl
+  the `body` and `anim_patches` steps. The diff of a swap is the row, the baked asset and
+  the two new clips.
+  - **It prints the strike it read** for a swing (`player_clips.strike_s`: the first frame
+    after the hand's fastest forward frame that it reaches at under a quarter of that
+    speed; 0.97 s on the stab, 0.83 s on the chop, which was read by eye as 0.85) and then
+    the melee verifier's lines for that bake. A candidate that is not a chop fails the
+    axe's "is a chop" line: that is the verifier's rule to change if a side swing is
+    chosen, not the command's. `--hit-s S` gives the strike instead.
+  - **Swapping back is the command it prints** on the `back` line: the old FBX and, for a
+    swing, the old strike. A clip already imported is kept as it is (`--reimport`: the FBX
+    itself changed), so swapping back rewrites the baked asset alone, to the same bytes.
+  - **The clips a role left stay on disk**, source and copy, so going round three
+    candidates imports each once. `swap_clip.py --prune` deletes the ones no row names
+    (the creatures' pack keeps all of its sources); do it before committing.
+  - **A new crawl has its own rest frame**: `stance_clips.PRONE_REST_S` (0.96 s, hips
+    mid-bob) was read off the zombie crawl.
 - **The stick is not a melee item** (it is not `Melee`; the fire key does nothing with it),
   so it has no swing, and its torch poses are still `hold_pose.py`'s.
 - **The clips are on the sample's skeleton alone.** With `GAS_LOCOMOTION` off, or the

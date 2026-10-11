@@ -25,7 +25,9 @@ OUT = os.path.join(DEV, "symbols.txt")
 PY = re.compile(r"^(?:async\s+)?(?:def|class)\s+\w+|^[A-Z][A-Z0-9_]*\s*=")
 CPP_EXT = (".h", ".hpp", ".cpp")
 COMMON = {"main", "probe", "probe_server", "probe_client",
-          "WRITABLE", "LEVEL", "RUNS_ON", "SYSTEMS", "run"}  # one per file: noise
+          "WRITABLE", "LEVEL", "RUNS_ON", "SYSTEMS", "run",
+          # a module's own short name for an engine library (BEL = unreal....)
+          "BEL", "PIN", "EAL"}  # one per file: noise
 MACRO = re.compile(r"^\s*(UCLASS|UFUNCTION)\b")
 
 

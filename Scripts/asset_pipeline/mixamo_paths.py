@@ -16,6 +16,7 @@ the bones arrive as ``Hips``, ``Spine``, ``LeftHandIndex1``...
 import os
 import re
 
+from asset_pipeline import player_clips
 from asset_pipeline.gas_bridge_paths import PLAYER_FAMILY
 
 # ─── Host side: the zips, kept in the git-ignored cache ─────────────────────
@@ -122,19 +123,23 @@ RATE_SCALE_RANGE = (0.5, 2.0)
 # the one skeleton.
 PLAYER_PACKS = (("Pro Melee Axe Pack", "MeleeAxe"),
                 ("Knife", "Knife"),
-                ("Scary Zombie Pack", "Scary"))
+                ("Scary Zombie Pack", "Scary"),
+                # Where Scripts/dev/swap_clip.py copies an FBX handed to it
+                # from outside the cache; absent until it has.
+                ("Player", "Player"))
 
-# {role: (pack's short name, clip stem)}.  A new clip in a role is an edit
-# here, a re-run of import_mixamo.py and the weapons build.
-PLAYER_CLIPS = {
-    "knife_ready": ("Knife", "KnifeIdle"),
-    "knife_swing": ("Knife", "Stabbing"),
-    "axe_ready": ("MeleeAxe", "StandingIdle"),
-    "axe_swing": ("MeleeAxe", "StandingMeleeAttackDownward"),
-    # The prone crawl (C5): the Scary pack's face-down crawl, the one clip of
-    # it the player wears (the creatures' packs are imported as before).
-    "prone_crawl": ("Scary", "ZombieCrawl"),
-}
+# {role: (pack's short name, clip stem)}, off player_clips.csv: a row per
+# role, and with it the moment a swing strikes.  A new clip in a role is
+# Scripts/dev/swap_clip.py <role> <fbx>, which rewrites the row, imports and
+# retargets that one clip and rebuilds what is baked from it.
+_ROWS = player_clips.read_rows()
+PLAYER_CLIPS = {r.role: (r.pack, r.clip) for r in _ROWS}
+PLAYER_HIT_S = {r.role: r.hit_s for r in _ROWS}
+
+
+def player_copy(short, stem):
+    """A clip of a player's pack on the player's skeleton, in a role or not."""
+    return mixamo_clip(PLAYER_FAMILY, short, stem)
 
 
 def player_clip(role):

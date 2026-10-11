@@ -23,7 +23,7 @@ from asset_pipeline.mixamo_import import _import, extract_packs
 from asset_pipeline.mixamo_paths import (
     IK_XBOT, PLAYER_CLIPS, PLAYER_PACKS, SOURCE_PREFIX, XBOT_MESH, XBOT_SKELETON, clip_stem,
     mixamo_anim_dir,
-    mixamo_prefix, mixamo_retargeter_path, pack_dir, player_clip, source_clip,
+    mixamo_prefix, mixamo_retargeter_path, pack_dir, player_clip, player_copy, source_clip,
 )
 from asset_pipeline.mixamo_retarget import _asset_data
 from asset_pipeline.plain_retarget import build_plain_retargeter
@@ -46,7 +46,8 @@ def _fbx_of(folder, stem):
 def import_player_clips(skeleton):
     """Each clip of PLAYER_CLIPS -> A_Mx_<Pack>_<Clip> on SK_XBot.  Returns
     {role: AnimSequence}."""
-    folders = extract_packs(PLAYER_PACKS)
+    used = {short for short, _ in PLAYER_CLIPS.values()}
+    folders = extract_packs([p for p in PLAYER_PACKS if p[1] in used])
     out = {}
     for role, (short, stem) in PLAYER_CLIPS.items():
         path = source_clip(short, stem)
@@ -67,27 +68,13 @@ def retarget_player_clips(source_rig, clips):
         if not EAL.does_asset_exist(need):
             raise RuntimeError(f"{need} is not here: run Scripts/asset_pipeline/"
                                "build_gas_bridge.py first")
-    mesh = _load(PLAYER_MESH_GAS)
     # The fingers: Mixamo's table has the chains the rigs share.
     chains = sorted(set(CHAINS_MIXAMO) & set(CHAINS_MANNEQUIN))
     rtg = build_plain_retargeter(source_rig, _load(IK_UEFN),
                                  mixamo_retargeter_path(PLAYER_FAMILY), chains)
     out_dir = mixamo_anim_dir(PLAYER_FAMILY)
     _fresh(out_dir)
-    inputs = unreal.IKRetargetBatchOperationInputs()
-    inputs.set_editor_property("assets_to_retarget",
-                               [_asset_data(c) for c in clips.values()])
-    inputs.set_editor_property("source_mesh", _load(XBOT_MESH))
-    inputs.set_editor_property("target_mesh", mesh)
-    inputs.set_editor_property("ik_retarget_asset", rtg)
-    inputs.set_editor_property("include_referenced_assets", False)
-    inputs.set_editor_property("search", SOURCE_PREFIX)
-    inputs.set_editor_property("replace", "")
-    inputs.set_editor_property("prefix", mixamo_prefix(PLAYER_FAMILY))
-    inputs.set_editor_property("target_path", out_dir)
-    inputs.set_editor_property("use_source_path", False)
-    inputs.set_editor_property("overwrite_existing_files", True)
-    created = unreal.IKRetargetBatchOperation.run_batch_retarget(inputs)
+    created = _batch(rtg, list(clips.values()))
     if len(created) != len(clips):
         raise RuntimeError(f"retargeted {len(created)} of {len(clips)} of the "
                            "player's Mixamo clips")
@@ -96,6 +83,55 @@ def retarget_player_clips(source_rig, clips):
     EAL.save_directory(out_dir, only_if_is_dirty=False)
     _log(f"the player's melee set: {len(created)} clips -> {out_dir}")
     return created
+
+
+def _batch(rtg, clips):
+    inputs = unreal.IKRetargetBatchOperationInputs()
+    inputs.set_editor_property("assets_to_retarget", [_asset_data(c) for c in clips])
+    inputs.set_editor_property("source_mesh", _load(XBOT_MESH))
+    inputs.set_editor_property("target_mesh", _load(PLAYER_MESH_GAS))
+    inputs.set_editor_property("ik_retarget_asset", rtg)
+    inputs.set_editor_property("include_referenced_assets", False)
+    inputs.set_editor_property("search", SOURCE_PREFIX)
+    inputs.set_editor_property("replace", "")
+    inputs.set_editor_property("prefix", mixamo_prefix(PLAYER_FAMILY))
+    inputs.set_editor_property("target_path", mixamo_anim_dir(PLAYER_FAMILY))
+    inputs.set_editor_property("use_source_path", False)
+    inputs.set_editor_property("overwrite_existing_files", True)
+    return unreal.IKRetargetBatchOperation.run_batch_retarget(inputs)
+
+
+def one_player_clip(short, stem, reimport=False):
+    """One clip of a player's pack alone, for a swap (player_clip_swap.py):
+    imported onto SK_XBot and retargeted onto the player's skeleton beside
+    the others, which are not touched; the retargeter is the one on disk.
+    A copy already there is kept as it is unless ``reimport``, so swapping
+    back to a clip rewrites nothing of it.  Returns (the copy, what was
+    made: a tuple of "imported", "retargeted")."""
+    made = []
+    src_path, path = source_clip(short, stem), player_copy(short, stem)
+    if reimport or not EAL.does_asset_exist(src_path):
+        folder = extract_packs([p for p in PLAYER_PACKS if p[1] == short])[short]
+        skeleton = _load(XBOT_SKELETON)
+        imported = _import(_fbx_of(folder, stem), pack_dir(short),
+                           src_path.rsplit("/", 1)[1], skeleton=skeleton)
+        clip = next((a for a in imported if isinstance(a, unreal.AnimSequence)), None)
+        if clip is None or clip.get_editor_property("skeleton") != skeleton:
+            raise RuntimeError(f"{src_path}: not imported as a clip on {skeleton.get_name()} "
+                               "(is the FBX a Mixamo download, with its skin?)")
+        made.append("imported")
+    if made or not EAL.does_asset_exist(path):
+        rtg_path = mixamo_retargeter_path(PLAYER_FAMILY)
+        if not EAL.does_asset_exist(rtg_path):
+            raise RuntimeError(f"{rtg_path} is not here: run Scripts/asset_pipeline/"
+                               "import_mixamo_player.py once")
+        if len(_batch(_load(rtg_path), [_load(src_path)])) != 1:
+            raise RuntimeError(f"{src_path} was not retargeted onto the player's skeleton")
+        _load(path).set_editor_property("enable_root_motion", False)
+        EAL.save_asset(path, only_if_is_dirty=False)
+        made.append("retargeted")
+    _log(f"the player's {short}_{stem}: {', '.join(made) or 'already here'}")
+    return _load(path), tuple(made)
 
 
 def check_player_clips(clips, check):

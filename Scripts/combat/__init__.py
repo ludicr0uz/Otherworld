@@ -148,6 +148,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     knife's and the axe's ready pose and swing, baked from
                     Mixamo's clips (the right fist closed, a swing cut to
                     strike at the blow's time); the MELEE_CLIPS table
+                    (which clip and when it strikes: asset_pipeline/
+                    player_clips.csv, Scripts/dev/swap_clip.py)
   hold_pose         A_HoldItem / A_HoldTorch / A_WardTorch: food carried at
                     the waist, the stick carried as a torch and held out,
                     keyed off the idle

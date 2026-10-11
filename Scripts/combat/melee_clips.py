@@ -21,7 +21,8 @@ each into the game's own asset, frame for frame, with two changes:
                leaves the index straight, the index is another pose's:
                hold_pose.closed_fist.)
     the cut    a swing starts ``COMBAT.knife_impact_s`` before the moment its
-               clip lands (MeleeClip.hit_s, read off the hand's path), so the
+               clip lands (MeleeClip.hit_s, read off the hand's path:
+               asset_pipeline/player_clips.py), so the
                blow, which is timed and not notified (weapon_component/
                punch.py), falls where the clip strikes. The wind-up before
                that is not played; the recovery after it is, to the clip's
@@ -37,9 +38,9 @@ import dataclasses
 
 import unreal
 
-from asset_pipeline.mixamo_paths import player_clip
+from asset_pipeline.mixamo_paths import PLAYER_HIT_S, player_clip
 from asset_pipeline.rig_util import mesh_ref_pose
-from combat.hold_pose import _below, _copy_of, _shown, closed_fist
+from combat.hold_pose import _below, _copy_of, closed_fist
 from combat.log import _log
 from combat.paths import (
     AXE_ANIM_PATH, HOLD_AXE_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, KNIFE_ANIM_PATH,
@@ -65,13 +66,15 @@ class MeleeClip:
         return 0.0 if self.hit_s is None else self.hit_s - COMBAT.knife_impact_s
 
 
-# hit_s: the knife's hand is at the end of its thrust 0.97 s in (it leaves
-# the hip at 0.7 and is 73 cm out by 1.0); the axe's is coming down past the
-# chest 0.85 s in (overhead at 0.7, at the waist by 0.9).
+# hit_s is the role's cell of asset_pipeline/player_clips.csv, beside the
+# clip it was read off (player_clips.strike_s; Scripts/dev/swap_clip.py
+# prints it): the knife's hand is at the end of its thrust 0.97 s in (it
+# leaves the hip at 0.7 and is 73 cm out by 1.0); the axe's is coming down
+# past the chest 0.85 s in (overhead at 0.7, at the waist by 0.9).
 KNIFE_READY = MeleeClip(HOLD_KNIFE_ANIM_PATH, "knife_ready")
-KNIFE_SWING = MeleeClip(KNIFE_ANIM_PATH, "knife_swing", 0.97)
+KNIFE_SWING = MeleeClip(KNIFE_ANIM_PATH, "knife_swing", PLAYER_HIT_S["knife_swing"])
 AXE_READY = MeleeClip(HOLD_AXE_ANIM_PATH, "axe_ready")
-AXE_SWING = MeleeClip(AXE_ANIM_PATH, "axe_swing", 0.85)
+AXE_SWING = MeleeClip(AXE_ANIM_PATH, "axe_swing", PLAYER_HIT_S["axe_swing"])
 MELEE_CLIPS = (KNIFE_READY, KNIFE_SWING, AXE_READY, AXE_SWING)
 
 
@@ -135,8 +138,9 @@ def _key(ctrl, track, xfs):
         raise RuntimeError(f"could not key {track}")
 
 
-def build_melee_clips(skin):
-    """Bake every row of MELEE_CLIPS for ``skin``'s body; returns
+def build_melee_clips(skin, roles=None):
+    """Bake every row of MELEE_CLIPS for ``skin``'s body, or the rows of
+    ``roles`` alone (a swap of one clip rewrites one asset); returns
     {path: clip}."""
     mesh = _assets().load_asset(skin.mesh)
     if mesh is None:
@@ -145,4 +149,5 @@ def build_melee_clips(skin):
     fist = closed_fist(skin, mesh, ref)
     hand = skin.pose_bones["hand_r"]
     fingers = {b for b in ref if _below(ref, b, hand)}
-    return {row.path: _bake(skin, row, fist, fingers) for row in MELEE_CLIPS}
+    return {row.path: _bake(skin, row, fist, fingers) for row in MELEE_CLIPS
+            if roles is None or row.role in roles}

@@ -3964,6 +3964,17 @@ dev/devteam/probe_record.py:36: update
 dev/devteam/probe_record.py:58: as_rows
 dev/devteam/probe_record.py:70: describe
 dev/devteam/probe_record.py:82: listing
+dev/devteam/scope.py:21: ALL
+dev/devteam/scope.py:24: IRRELEVANT
+dev/devteam/scope.py:31: WHOLE
+dev/devteam/scope.py:37: WEAPONS
+dev/devteam/scope.py:38: LEVELS
+dev/devteam/scope.py:40: CONTENT
+dev/devteam/scope.py:57: suites_for
+dev/devteam/scope.py:80: snapshot
+dev/devteam/scope.py:100: changed
+dev/devteam/scope.py:105: relevant
+dev/devteam/scope.py:110: _git
 dev/devteam/session.py:13: FAIL_MARK
 dev/devteam/session.py:14: FAB_MARK
 dev/devteam/session.py:16: PROMPT

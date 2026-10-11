@@ -58,29 +58,29 @@ class NarrowedComparison(unittest.TestCase):
         self.assertIn("| probe:probe_a | 3/3 | missing |", gate.table(sweep_rows(SET), sweep_rows()))
 
 
+FILES = {"Scripts/combat/axe.py": "a1"}
+
+
 class CacheKey(unittest.TestCase):
     def test_the_key_takes_the_probe_set(self):
-        state = ("abc", "")
-        self.assertNotEqual(baseline_cache.key(state), baseline_cache.key(state, LABELS))
-        self.assertEqual(baseline_cache.key(state, LABELS), baseline_cache.key(state, LABELS[::-1]))
-        self.assertNotEqual(baseline_cache.key(state, LABELS[:1]), baseline_cache.key(state, LABELS))
+        self.assertNotEqual(baseline_cache.key(FILES), baseline_cache.key(FILES, LABELS))
+        self.assertEqual(baseline_cache.key(FILES, LABELS), baseline_cache.key(FILES, LABELS[::-1]))
+        self.assertNotEqual(baseline_cache.key(FILES, LABELS[:1]), baseline_cache.key(FILES, LABELS))
 
     def test_a_baseline_of_one_set_is_not_reused_under_another(self):
         with tempfile.TemporaryDirectory() as root:
-            baseline_cache.save(root, ("abc", ""), sweep_rows(SET), LABELS)
-            self.assertIsNone(baseline_cache.load(root, ("abc", "")))
-            self.assertIsNone(baseline_cache.load(root, ("abc", ""), LABELS[:1]))
-            self.assertEqual(baseline_cache.load(root, ("abc", ""), LABELS), sweep_rows(SET))
+            baseline_cache.save(root, FILES, sweep_rows(SET), LABELS)
+            self.assertIsNone(baseline_cache.load(root, FILES))
+            self.assertIsNone(baseline_cache.load(root, FILES, LABELS[:1]))
+            self.assertEqual(baseline_cache.exact(root, FILES, LABELS), sweep_rows(SET))
 
-    def test_a_cache_written_before_the_set_was_in_the_key_misses(self):
-        import hashlib
+    def test_a_cache_written_before_the_snapshot_was_kept_misses(self):
         import json
-        old = hashlib.sha1(b"abc\0\0").hexdigest()          # key(state) as it was
         with tempfile.TemporaryDirectory() as root:
             os.makedirs(os.path.dirname(baseline_cache.path(root)))
             with open(baseline_cache.path(root), "w") as fh:
-                json.dump({"key": old, "rows": sweep_rows(SET)}, fh)
-            self.assertIsNone(baseline_cache.load(root, ("abc", "")))
+                json.dump({"key": "old", "rows": sweep_rows(SET)}, fh)
+            self.assertIsNone(baseline_cache.load(root, FILES))
 
 
 class Pieces(unittest.TestCase):
@@ -139,6 +139,8 @@ class GatedRun(unittest.TestCase):
                 mock.patch.multiple(final.work, sweep=sweep, tree_state=state,
                                     close_editors=lambda: True, ROOT=self.tmp), \
                 mock.patch.object(final, "git_head", lambda root: f"c{self.commit}"), \
+                mock.patch.object(final.scope, "snapshot",
+                                  lambda root: {"Source/c.cpp": f"c{self.commit}"}), \
                 mock.patch.object(final.probe_gate, "run_probes", run_probes), \
                 mock.patch.object(self.cli.sets, "resolve", lambda name: dict(SET)), \
                 mock.patch.object(self.cli.limits, "wait", lambda *a, **k: None), \

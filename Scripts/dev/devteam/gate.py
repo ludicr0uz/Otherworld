@@ -30,11 +30,12 @@ def sweep_targets(root):
     return [p for p in tops + levels if os.path.basename(p) not in EXCLUDE]
 
 
-def run_sweep(root, log_path, serve_dir=None):
+def run_sweep(root, log_path, serve_dir=None, suites=None):
     """Run the suite cold, or, given ``serve_dir``, in that warm serve editor
-    (the before-sweep; the after-sweep stays cold). Returns {label: result dict}, or None if the sweep
+    (the before-sweep; the after-sweep stays cold); ``suites`` (labels) keeps
+    only those of it. Returns {label: result dict}, or None if the sweep
     itself broke (no JSON came back); its output is appended to log_path."""
-    targets = sweep_targets(root)
+    targets = [t for t in sweep_targets(root) if suites is None or os.path.basename(t) in suites]
     fd, json_path = tempfile.mkstemp(prefix="devteam-sweep-", suffix=".json")
     os.close(fd)
     cmd = [sys.executable, os.path.join(root, "Scripts", "dev", "uepy.py"),

@@ -17,7 +17,7 @@ for this tree); otherwise the latest recorded result of each probe
 import os
 import time
 
-from devteam import baseline_cache, gate, probe_gate, probe_record, work
+from devteam import baseline_cache, gate, probe_gate, probe_record, scope, work
 from devteam.accounting import git_head
 from devteam.trace import shown, step
 
@@ -72,14 +72,15 @@ class Finale:
         both = union(self.task_set, self.final_set)
         ran = probe_gate.labels(both)
         self.head, self.state = git_head(work.ROOT), work.tree_state()
-        rows = baseline_cache.load(work.ROOT, self.state, ran)
+        self.files = scope.snapshot(work.ROOT)
+        rows = baseline_cache.exact(work.ROOT, self.files, ran)
         if rows:
             step("gate: the run's baseline from the cache (tree unchanged)")
         elif self.check:
             step(f"gate: sweeping the run's baseline -- the verifiers and {len(ran)} probe(s) "
                  f"({self.name}); the final probes are compared with it")
             rows = work.sweep("run baseline", self.log, pauser, both, warm=True)
-            baseline_cache.save(work.ROOT, self.state, rows, ran)
+            baseline_cache.save(work.ROOT, self.files, rows, ran)
         else:
             labels = probe_gate.labels(self.final_set)
             record = probe_record.load(work.ROOT)
@@ -137,5 +138,5 @@ class Finale:
         if last:
             # The next run's first baseline, if it starts from this tree.
             both = probe_gate.labels(union(self.task_set, self.final_set))
-            baseline_cache.save(work.ROOT, state, {**last, **rows}, both)
+            baseline_cache.save(work.ROOT, scope.snapshot(work.ROOT), {**last, **rows}, both)
         return not problems

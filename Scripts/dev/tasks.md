@@ -1243,7 +1243,7 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       changes the attach offset by exactly that row. Design goal: tune the last centimetre
       of a handle from inside the game. Big picture: item H2 of 3. effort: medium
 
-- [ ] U0. Unit tests for what the probes checked by arithmetic. The probes cost 21 hours
+- [x] U0. Unit tests for what the probes checked by arithmetic. The probes cost 21 hours
       over 8-10 Oct and found three defects; two of the three were plain Python wrong
       (a per-hectare forage count rounding to zero on the 50 m level; a tuning product).
       Pin that ground with tests under Scripts/dev/tests, no engine launch, two files:
@@ -1268,7 +1268,7 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       in 28 seconds at pre-commit, not in a 3-minute launch at night.
       effort: low
 
-- [ ] H3. One command to swap a player clip. A new Mixamo clip today means dropping the FBX
+- [x] H3. One command to swap a player clip. A new Mixamo clip today means dropping the FBX
       in the cache, adding a row, running the whole player import, then the weapons build.
       Provide a single dev command that takes the role being replaced (knife or axe ready or
       swing, prone crawl) and an FBX, and does the rest: registers it, imports and retargets
@@ -1281,6 +1281,26 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       Design goal: choosing between three candidate swings takes minutes, not an afternoon.
       Big picture: item H3 of 3, closing the "which clip" loop the animation library opens.
       effort: medium
+
+
+- [x] Set Debug to be disabled by default in the main menu
+
+- [ ] Update the ADS animation to right away go into the ADS mode rather than gliding the camera zooming in gradually. Once the camera is in ADS mode, the gun should get quickly raised from the bottom right area into the ADS marker such that it looks natural. 
+
+- [ ] Moving or shooting during save an exit should cancel the save and exit process
+
+- [ ] Right click in inventory to use (for equippable items that is equip - guns into an available slot if available, if not replace primary slot, clothes to equip. If a clothing article is already equipped for that slot, quipt the new one from inventory in its place. I, left hand to bring to hands. The use button should be available when in the inventory screen.
+
+- [ ] Picking up an item from the floor should play a pick up item animation from the floor. 
+
+- [ ] In the menu screen, don't load the game yet. Just show the menu and render the current character in the gear that is saved for him. If no character is saved, show the basic character with no gear. 
+
+- [ ] Add Axe and Knife to the loot table for monsters. 15% change to drop either of the time. 
+
+- [ ] Increase the glimemer distance for items by 30%. Delay the initial glimmer of the item by 5 seconds. 
+
+- [ ] In the inventory mode, the front facing image of the character should represent the current equiptment. 
+
 
 - [ ] I2. Enhanced Input, every remaining key. From I1: one `IA_*` per action in `combat/input_assets.py` (aim, sights, reload, interact, throw, block, slots 1-9, sprint, crouch, prone, slide, jump, menu, inventory, loot, hold breath, use), each bound to a Blueprint-implementable event on the character or the weapon component base, each fragment's poll replaced by its event. Then delete: the SaveGame key push, `_post_physics_tick` and the TG_PostPhysics hack in `uebp/graph.py`, and the `WasInputKeyJustPressed` path from `uebp/nodes` (so `check_node_catalog.py` fails on a new poll). Rebinding on the settings page edits the mapping context. Proof: `probes/sets.py` `FULL`. Done when no builder names `WasInputKeyJustPressed`. effort: high
 

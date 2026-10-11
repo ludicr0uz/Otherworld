@@ -1,3 +1,4 @@
+import itertools
 import json
 import os
 import shutil
@@ -391,7 +392,7 @@ class RunOneTest(unittest.TestCase):
             return True, f"report {len(self.sessions)}", {
                 "session_id": "sid", "total_cost_usd": 1.0, "duration_ms": 1000}
 
-        def run_sweep(root, log_path, serve_dir=None):
+        def run_sweep(root, log_path, serve_dir=None, suites=None):
             self.sweeps.append(1)
             if self.pause_in == ("sweep", len(self.sweeps)):
                 self.pauser.requested = True
@@ -403,8 +404,12 @@ class RunOneTest(unittest.TestCase):
                                    (work, "tree_state", lambda: ("h", "")),
                                    (work, "tree_fingerprint", lambda: "f"),
                                    (work, "step", lambda *a, **k: None),
-                                   (work.baseline_cache, "load", lambda root, state, probes=(): None),
-                                   (work.baseline_cache, "save", lambda root, state, rows, probes=(): None),
+                                   (work.baseline_cache, "load", lambda root, files, probes=(): None),
+                                   (work.baseline_cache, "save", lambda root, files, rows, probes=(): None),
+                                   # Every snapshot differs, by a path every suite feels:
+                                   # the after-sweep is whole, as before scoping.
+                                   (work.scope, "snapshot",
+                                    lambda root, c=itertools.count(): {"Source/x.cpp": str(next(c))}),
                                    (work, "print", lambda *a, **k: None)):
             patcher = mock.patch.object(target, name, fake, create=True)
             patcher.start()

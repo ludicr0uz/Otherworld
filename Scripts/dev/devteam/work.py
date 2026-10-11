@@ -12,7 +12,7 @@ import hashlib
 import os
 import time
 
-from devteam import baseline_cache, fab, gate, limits, pause, probe_gate, probe_record
+from devteam import baseline_cache, fab, gate, limits, pause, probe_gate, probe_record, scope
 from devteam.trace import shown, step
 from devteam.accounting import (
     describe_time, describe_tokens, git, git_head, merge_results, tag_commit,
@@ -63,10 +63,12 @@ def tree_fingerprint():
     return digest.hexdigest()
 
 
-def _sweep_and_probes(log_path, probe_set, serve_dir=None):
-    step(f"verifiers: {len(gate.sweep_targets(ROOT))} suite(s), "
+def _sweep_and_probes(log_path, probe_set, serve_dir=None, suites=None):
+    targets = [t for t in gate.sweep_targets(ROOT)
+               if suites is None or os.path.basename(t) in suites]
+    step(f"verifiers: {len(targets)} suite(s), "
          f"{'the warm editor' if serve_dir else 'one cold boot'}")
-    rows = gate.run_sweep(ROOT, log_path, serve_dir)
+    rows = gate.run_sweep(ROOT, log_path, serve_dir, suites)
     if rows is not None and probe_set:
         rows.update(probes(probe_set, log_path))
     return rows
@@ -80,9 +82,11 @@ def probes(probe_set, log_path):
     return rows
 
 
-def sweep(label, log_path, pauser=None, probe_set=None, warm=False, timings=None):
-    """One verifier sweep, then the probe set if there is one. A pause typed
-    meanwhile is heard, and acted on by the caller once the sweep is back."""
+def sweep(label, log_path, pauser=None, probe_set=None, warm=False, timings=None,
+          suites=None):
+    """One verifier sweep (every suite, or ``suites`` alone), then the probe
+    set if there is one. A pause typed meanwhile is heard, and acted on by the
+    caller once the sweep is back."""
     started = time.time()
     serve = SERVE_DIR if warm else None
     step(f"gate: {label} sweep starting"
@@ -90,11 +94,13 @@ def sweep(label, log_path, pauser=None, probe_set=None, warm=False, timings=None
          + f"  (log: {shown(log_path, ROOT)})")
     if pauser:
         with pauser.watching():
-            rows = _sweep_and_probes(log_path, probe_set, serve)
+            rows = _sweep_and_probes(log_path, probe_set, serve, suites)
     else:
-        rows = _sweep_and_probes(log_path, probe_set, serve)
+        rows = _sweep_and_probes(log_path, probe_set, serve, suites)
     if timings is not None:
-        timings[label] = f"{time.time() - started:.0f}s" + (" (warm)" if warm else " (cold)")
+        timings[label] = (f"{time.time() - started:.0f}s ({'warm' if warm else 'cold'}"
+                          + (f", {len(suites)} of {len(gate.sweep_targets(ROOT))} suites"
+                             if suites is not None else "") + ")")
     if rows is None:
         print(f"    gate: {label} sweep failed to run ({time.time() - started:.0f}s)")
     else:
@@ -103,6 +109,69 @@ def sweep(label, log_path, pauser=None, probe_set=None, warm=False, timings=None
               + (f"failing: {', '.join(bad)}" if bad else "all passing")
               + f" ({time.time() - started:.0f}s)")
     return rows
+
+
+def _reaches(changed):
+    """What changed paths reach: (the paths a suite reads, the suites, a line)."""
+    paths = [p for p in changed if scope.suites_for([p]) != set()]
+    suites = scope.suites_for(paths)
+    total = len(gate.sweep_targets(ROOT))
+    if not paths:
+        line = (f"{len(changed)} changed path(s) reach no verifier" if changed
+                else "tree unchanged")
+    elif suites is None:
+        line = f"{len(paths)} changed path(s) reach every suite"
+    else:
+        line = (f"{len(paths)} changed path(s) reach {len(suites)} of {total} suite(s): "
+                + ", ".join(sorted(suites)))
+    return paths, suites, line
+
+
+def _cached_baseline(files, ran, probe_set, log_path, pauser, timings, full=False):
+    """The baseline from the on-disk cache: as it is when nothing a suite reads
+    changed since; swept for the suites the changed paths reach and carried
+    forward for the rest; None (the whole sweep) when the cache misses, the
+    changes reach every suite, a probe set is in play, or ``full``
+    (--check-baseline) asks for it."""
+    if full:
+        return None
+    hit = baseline_cache.load(ROOT, files, ran)
+    if hit is None:
+        return None
+    rows, changed = hit
+    paths, suites, line = _reaches(changed)
+    if not paths:
+        step(f"gate: baseline from the cache ({line})")
+        timings["baseline"] = "cached"
+        return rows
+    if suites is None or probe_set:
+        step(f"gate: {line}; sweeping the whole baseline")
+        return None
+    step(f"gate: {line}; the rest of the baseline from the cache")
+    swept = sweep("baseline", log_path, pauser, None, warm=True, timings=timings,
+                  suites=suites)
+    if swept is None:
+        return None
+    return {**{l: r for l, r in rows.items() if l not in suites}, **swept}
+
+
+def _after_sweep(label, baseline, files, probe_set, log_path, pauser, timings, full=False):
+    """The after-sweep, scoped to the suites the task's changes reach, the
+    rest carried from the baseline. The whole sweep when the baseline was not
+    snapshotted (a resumed task), a probe set is in play, ``full``
+    (--check-baseline) asks for it, or the changes reach every suite."""
+    suites = None
+    if files is not None and baseline and not probe_set and not full:
+        paths, suites, line = _reaches(scope.changed(files, scope.snapshot(ROOT)))
+        if not paths:
+            step(f"gate: {label}: {line}; the baseline stands")
+            timings[label] = "skipped"
+            return dict(baseline)
+        step(f"gate: {label}: {line}" + ("" if suites is None else "; the rest from the baseline"))
+    swept = sweep(label, log_path, pauser, probe_set, timings=timings, suites=suites)
+    if swept is None or suites is None:
+        return swept
+    return {**{l: r for l, r in baseline.items() if l not in suites}, **swept}
 
 
 def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
@@ -118,8 +187,10 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     env = session_env(os.environ, SERVE_DIR)
     ask = dict(interactive=args.interactive)
     baseline = parked.get("baseline") if parked else None
+    files = None                            # the tree the baseline was swept on
     probes = getattr(args, "probe_set", None)
     ran = probe_gate.labels(probes)         # what an after-sweep is asked for
+    full = getattr(args, "check_baseline", False)
 
     def paused(stage, result=None, reports=None):
         if pauser and pauser.requested:
@@ -172,17 +243,14 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         if blocked:
             return False, [blocked], {}, None, None
         if args.gate:
-            state = tree_state()
+            state, files = tree_state(), scope.snapshot(ROOT)
             baseline = cache.get(state)
             if baseline is None:
-                baseline = baseline_cache.load(ROOT, state, ran)
-                if baseline:
-                    step("gate: baseline from the cache (tree unchanged)")
-                    timings["baseline"] = "cached"
+                baseline = _cached_baseline(files, ran, probes, sweep_log, pauser, timings, full)
             if baseline is None:
                 baseline = sweep("baseline", sweep_log, pauser, probes, warm=True,
                                  timings=timings)
-                baseline_cache.save(ROOT, state, baseline, ran)
+            baseline_cache.save(ROOT, files, baseline, ran)
         limits.wait(meter, pauser)
         paused("start")
         prompt = build_prompt(task, n, total, progress,
@@ -218,7 +286,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     if not (ok and args.gate):
         return ok, reports, result, gate_table, None
     close_editors()
-    after = sweep("after", sweep_log, pauser, probes, timings=timings)
+    after = _after_sweep("after", baseline, files, probes, sweep_log, pauser, timings, full)
     paused("gate", result, reports)
     problems = gate.regressions(baseline, after, gate.load_known(), ran)
     attempts = 0
@@ -240,7 +308,8 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         paused("session", result, reports)
         if not ok:
             break
-        after = sweep("after fix", sweep_log, pauser, probes, timings=timings)
+        after = _after_sweep("after fix", baseline, files, probes, sweep_log, pauser,
+                             timings, full)
         paused("gate", result, reports)
         problems = gate.regressions(baseline, after, gate.load_known(), ran)
     gate_table = gate.table(baseline, after, timings, ran)

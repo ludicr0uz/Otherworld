@@ -72,7 +72,7 @@ change the verifiers and the unit tests can see whole needs no probe, and a \
 change to docs, probes or Scripts/dev needs no launch at all.
 
 Verifiers: never run a `verify_*.py` by hand or the full suite (a verifier is \
-85 s cold; the gate runs all nine around your session, and sessions that ran \
+85 s cold; the gate runs the suites your change reaches around your session, and sessions that ran \
 them anyway spent 4 minutes a task on it). After a rebuild run `uepy.py \
 --verify-for` (no paths: your `git diff`), which runs only the verifiers your \
 change maps to, warm, and says "none" for a change to probes, docs or \

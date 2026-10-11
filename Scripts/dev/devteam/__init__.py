@@ -31,4 +31,6 @@ Unit-tested in Scripts/dev/tests (everything but the process launching).
                 baseline sweep of its own; ``dev-team probes`` lists it
   trace  Timestamped progress lines for the slow steps, and the run.log that
          keeps everything the terminal showed
+
+  scope  What a change can move in the verifier sweep, and the tree snapshot that says what changed
 """

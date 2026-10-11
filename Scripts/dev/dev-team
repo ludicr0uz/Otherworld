@@ -50,11 +50,23 @@ Saved/uepy/devteam, later calls reuse it, and nothing it does reaches an
 editor the user reopens meanwhile. dev-team stops it before each sweep, before
 asking for a Fab asset, and at the end of the run.
 
-**The gate.** Before each task dev-team runs every verifier suite once, cold,
-and puts the numbers in the prompt; after the session it runs them again. A
-suite that newly fails -- or fails more checks than before -- sends the
-session back (``--resume``) with the failures, up to --fix-attempts times,
-then fails the task. --no-gate skips both sweeps.
+**The gate.** Before each task dev-team sweeps the verifier suites and puts
+the numbers in the prompt; after the session it sweeps them again. A suite
+that newly fails -- or fails more checks than before -- sends the session
+back (``--resume``) with the failures, up to --fix-attempts times, then fails
+the task. --no-gate skips both sweeps.
+
+**What a sweep runs.** A suite reads built content and the Python it imports,
+so each sweep is scoped to what changed (devteam/scope.py): the baseline is
+the cached one (Saved/DevTeam/baseline_cache.json, a snapshot of every file
+and its hash) when nothing a suite reads moved since -- a commit of docs,
+Scripts/dev, probes or the task file is the same tree to the gate -- else the
+suites the changed paths reach are swept and the rest carried forward; the
+after-sweep likewise runs only the suites the task's diff reaches, and none
+when it reaches none. A path every suite may feel (uebp, the verify helpers,
+Source/, Config/) or one no rule knows means the whole sweep: unknown is never
+skipped. A cached baseline older than a day is not used, and --check-baseline
+runs every suite both times, so a carried-forward row lives one night at most.
 
 **Probes are opt-in.** A run sweeps no probe unless asked: over three days
 (8-10 Oct 2026) the probes cost 21 hours of launches and found three defects,
@@ -157,6 +169,7 @@ sys.path.insert(1, os.path.dirname(HERE))        # Scripts/: asset_pipeline
 
 from devteam import (                                               # noqa: E402
     baseline_cache, fab, fast, final, limits, nightly, pause, probe_gate, probe_record,
+    scope,
 )
 from devteam.accounting import git_head                             # noqa: E402
 from devteam.tasks import Task, parse_tasks, requeue, tick          # noqa: E402
@@ -210,9 +223,10 @@ def parse_args():
                    help="the long form of --probes: the set swept once after the last "
                         "task, against each probe's recorded result (default none)")
     p.add_argument("--check-baseline", action="store_true",
-                   help="with probes: sweep the verifiers and the probes before the first "
-                        "task too (about twenty minutes) and judge the final probes "
-                        "against that sweep, not the record")
+                   help="sweep every suite before and after each task, ignoring the "
+                        "baseline cache and the change's reach; with probes, sweep them "
+                        "before the first task too (about twenty minutes) and judge the "
+                        "final probes against that sweep, not the record")
     p.add_argument("--fix-attempts", type=int, default=1, metavar="N",
                    help="times a session is sent back to fix a gate regression (default 1)")
     p.add_argument("--dry-run", action="store_true",
@@ -412,7 +426,8 @@ def run(args, task_file, todo, triage_cost, run_dir, progress, meter, pauser):
         if ok and swept:
             # The next task's baseline, as long as nothing changes in between.
             cache[tree_state()] = swept
-            baseline_cache.save(ROOT, tree_state(), swept, probe_gate.labels(args.probe_set))
+            baseline_cache.save(ROOT, scope.snapshot(ROOT), swept,
+                                probe_gate.labels(args.probe_set))
             if finale:
                 finale.seen(tree_state(), swept)
         if not ok and not args.keep_going:

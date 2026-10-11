@@ -92,7 +92,7 @@ updates the bullet here.
   Orion, the Pleiades, the Pole Star), small dots beside the moon (`Scripts/world/star_map.py`). A level starts at a random time of day. At night the player's temperature falls
   slowly (0.1 a second; `Scripts/world/night_cold.py`); beside a campfire it rises (1 a second).
 - **Save and exit:** the menu's last row (exit game on the title, which quits to the desktop; save and exit in play) saves the character's stats, inventory and worn garments, but not its
-  location, after 15 s, then returns to the main menu. The character stands still meanwhile. A hit calls it off. The next game loads
+  location, after 15 s, then returns to the main menu. The character stands still meanwhile. A hit, a move key or the trigger calls it off. The next game loads
   the profile, and death deletes it (`Scripts/graphics_menu/CLAUDE.md`). As a client of a server the same row runs the
   same 15 s countdown and then leaves the server for the title, saving nothing yet (M35).
 - **Death:** once the player or a wanderer is dead (or at 0 HP), nothing it could do runs: the

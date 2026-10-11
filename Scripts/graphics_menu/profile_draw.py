@@ -2,7 +2,7 @@
 
 While the countdown runs, BannerCount reads "SAVING AND EXITING IN  12"
 (whole seconds rounded up, so it never reads 0 while waiting); for
-EXIT_CALLED_OFF_SHOWN_S after a hit calls it off, BannerOff says why. The
+EXIT_CALLED_OFF_SHOWN_S after a hit, a move or the trigger calls it off, BannerOff says why. The
 countdown is the weapon component's (combat/weapon_component/save_exit.py);
 this only reads its variables, off the owning pawn. The panel's "save and
 exit" row is a static label in WBP_PauseMenu.
@@ -75,6 +75,6 @@ def author_exit_banner(ed, in_execs):
     tails = show_if(ed, called_off, out(recent), [idle])
     ed.add_comment_to_nodes(
         "Save and exit: the countdown while it runs, and for "
-        f"{EXIT_CALLED_OFF_SHOWN_S:.0f} s after a hit calls it off, why it stopped.",
+        f"{EXIT_CALLED_OFF_SHOWN_S:.0f} s after a hit, a move or the trigger calls it off, why it stopped.",
         made)
     return [counting, *tails, out(cast, "CastFailed")]

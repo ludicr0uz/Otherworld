@@ -237,10 +237,10 @@ def _author_wc_tick(ed, tick):
     # --- the trigger and the action keys: the local player's (local.py) -------
     local, remote = _author_local_only(ed, pose_exits)
     # The guard and the use key are told to the server as they change (holds.py).
-    flight_exits = _author_actions(
+    flight_exits, tap = _author_actions(
         ed, pc_out, owner_out, held, armed_out, key_pins, muzzle, pressed, both,
         _author_holds_report(ed, (local,)))
-    _author_upkeep(ed, tuple(flight_exits) + (remote,))
+    _author_upkeep(ed, tuple(flight_exits) + (remote,), tap)
 
 
 def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
@@ -438,16 +438,17 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
     # --- a probe's hand on the I panel's take-off and wear asks (wear.py) ---
     flight_exits = _author_wear_asks(ed, flight_exits)
 
-    return flight_exits
+    return flight_exits, tap
 
 
-def _author_upkeep(ed, flight_exits):
+def _author_upkeep(ed, flight_exits, tap):
     """What follows from state on every copy: a blow that is due and a thrown
     item's flight (the server's), the slots served (the server) or pictured
     (a client), placed and recorded, then the equip, if anything asked for
     one."""
-    # --- save and exit's countdown (save_exit.py) ----------------------------
-    flight_exits = _author_save_exit(ed, flight_exits)
+    # --- save and exit's countdown (save_exit.py): the trigger's tap, the
+    # one read of the stamp, calls it off.
+    flight_exits = _author_save_exit(ed, flight_exits, tap)
 
     # --- the blows that are due, and what is in the air (punch.py, knife.py,
     # throw_flight.py): pending only where a Server event made them so, and

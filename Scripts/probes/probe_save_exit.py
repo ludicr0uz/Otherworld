@@ -1,5 +1,5 @@
-"""Save and exit: the character stands still while it counts down, a hit
-calls it off and frees it, running out saves the profile and
+"""Save and exit: the character stands still while it counts down, a hit, a
+move key or the trigger calls it off and frees it, running out saves the profile and
 reopens the level, the reopened game loads it, a saved inventory unlike the
 issued one replaces it, and dying deletes it.
 
@@ -8,7 +8,11 @@ the character's: combat/weapon_component/save_exit.py) rather than pressing
 X (a probe has no keyboard), with ExitAt a fraction of a second away rather
 than 15 s -- -nullrhi game time crawls. The key and the 15 s are the
 verifier's to check. A hit is a write of LastDamageTime, which is what a
-wanderer's swing stamps (npc/melee.py).
+wanderer's swing stamps (npc/melee.py). A move key is the pawn's
+AddMovementInput, which is what the move action feeds it (the pawn takes it
+with its movement disabled; the movement component consumes it before it
+looks at the mode), and the trigger is FireForced, the probes' stand-in for
+the fire key.
 
 Any profile already on disk is set aside first and put back at the end.
 """
@@ -43,7 +47,7 @@ WRITABLE = [(WEAPON_COMP_BP_PATH, EXIT_PENDING_VAR), (WEAPON_COMP_BP_PATH, EXIT_
             (WEAPON_COMP_BP_PATH, EXIT_STARTED_VAR),
             (HEALTH_BP_PATH, HV.Health), (HEALTH_BP_PATH, LAST_DAMAGE_VAR),
             (SURVIVAL_BP_PATH, UV.Hunger), (PLAYER_STATE_BP_PATH, KILL_COUNT_VAR),
-            (WEAPON_COMP_BP_PATH, WV.EquippedIndex)]
+            (WEAPON_COMP_BP_PATH, WV.EquippedIndex), (WEAPON_COMP_BP_PATH, WV.FireForced)]
 # ...and every field of the crafted profile the load is tested with.
 PROFILE_FIELDS = ("Health", "Stamina", "Hunger", "Thirst", "Temperature", "Kills",
                   "EquippedIndex", "ItemClasses", "ItemLoaded", "ItemReserve", "ItemSlot")
@@ -125,6 +129,36 @@ def _run(p):
             not p.get(wc, EXIT_PENDING_VAR) and p.get(wc, EXIT_CALLED_OFF_VAR) > 0.0,
             f"pending {p.get(wc, EXIT_PENDING_VAR)}, "
             f"called off at {p.get(wc, EXIT_CALLED_OFF_VAR):.2f}")
+    p.check("...and nothing is saved", not _saved())
+
+    # --- a move key calls it off too ---------------------------------------------
+    _start_exit(p, wc, 100.0)
+    yield 0.1
+    p.check("frozen again for the move test",
+            moves.movement_mode == unreal.MovementMode.MOVE_NONE, str(moves.movement_mode))
+    pawn.add_movement_input(unreal.Vector(1.0, 0.0, 0.0), 1.0, False)
+    yield 0.2
+    p.check("a move key during the countdown calls the exit off",
+            not p.get(wc, EXIT_PENDING_VAR)
+            and moves.movement_mode == unreal.MovementMode.MOVE_WALKING,
+            f"pending {p.get(wc, EXIT_PENDING_VAR)}, {moves.movement_mode}")
+    yield 0.2
+    p.check("...and the countdown stays off once the key is up",
+            not p.get(wc, EXIT_PENDING_VAR), str(p.get(wc, EXIT_PENDING_VAR)))
+
+    # --- and so does the trigger ---------------------------------------------------
+    _start_exit(p, wc, 100.0)
+    yield 0.1
+    p.check("frozen again for the trigger test",
+            moves.movement_mode == unreal.MovementMode.MOVE_NONE, str(moves.movement_mode))
+    p.set(wc, WV.FireForced, True)
+    yield 0.1
+    p.set(wc, WV.FireForced, False)
+    yield 0.2
+    p.check("the trigger during the countdown calls the exit off",
+            not p.get(wc, EXIT_PENDING_VAR)
+            and moves.movement_mode == unreal.MovementMode.MOVE_WALKING,
+            f"pending {p.get(wc, EXIT_PENDING_VAR)}, {moves.movement_mode}")
     p.check("...and nothing is saved", not _saved())
 
     # --- running out saves and leaves ---------------------------------------

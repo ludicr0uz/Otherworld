@@ -146,6 +146,35 @@ def check_ask_save_exit():
     check("a hit after the start calls it off (LastDamageTime > ExitStartedAt)",
           len(hits) == 1 and {_title(f) for f in _feeders(hits[0], "B")}
           == {f"Get {AC.EXIT_STARTED_VAR}"}, str(len(hits)))
+    # The Branch the hit compare feeds, through its ORs: a hit, a move key
+    # (the pawn's last movement input has a length) or the trigger's tap.
+    def leaves(n):
+        if _title(n) == "OR Boolean":
+            return [l for pin in ("A", "B") for f in _feeders(n, pin) for l in leaves(f)]
+        return [n]
+    branches = [b for n in hits for p in BEL.list_output_pins(n)
+                for q in PIN.list_connected_pins(p) for o in [PIN.get_owning_node(q)]
+                for p2 in BEL.list_output_pins(o) for q2 in PIN.list_connected_pins(p2)
+                for o2 in [PIN.get_owning_node(q2)]
+                for b in ([o2] if "Condition" in in_pins(o2) else
+                          [PIN.get_owning_node(q3) for p3 in BEL.list_output_pins(o2)
+                           for q3 in PIN.list_connected_pins(p3)])
+                if "Condition" in in_pins(b)]
+    tips = [l for b in branches for c in _feeders(b, "Condition") for l in leaves(c)]
+    moved = [l for l in tips if _title(l) == "float > float"
+             and [_title(f) for f in _feeders(l, "A")] == ["Vector Length"]
+             and [_title(g) for f in _feeders(l, "A") for g in _feeders(f, "A")]
+             == ["GetLastMovementInputVector"]]
+    tapped = [l for l in tips if _title(l) == "Equal (Float)"
+              and {_title(f) for f in _feeders(l, "A") + _feeders(l, "B")}
+              == {"Get FirePressedAt", "GetTimeSeconds"}]
+    check("a move key calls it off too (the pawn's last movement input has a length), "
+          "and so does the trigger (FirePressedAt this frame, or FireForced): OR'd with "
+          "the hit into one Branch",
+          len(branches) == 1 and len(moved) == 1 and len(tapped) == 1
+          and sorted(_title(l) for l in tips)
+          == ["Equal (Float)", "Get FireForced", "float > float", "float > float"],
+          f"{len(branches)} Branch; {[_title(l) for l in tips]}")
     stops = [n for n in wg if "DisableMovement" in _title(n).replace(" ", "")]
     waits = [b for n in stops for b in _feeders(n, "execute")
              if f"Get {AC.EXIT_AT_VAR}" in {_title(g) for c in _feeders(b, "Condition")

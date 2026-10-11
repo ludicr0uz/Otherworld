@@ -293,7 +293,7 @@ sync:
 - **The character can't move during the countdown.** Every Tick it waits, the pawn's
   `CharacterMovement` gets `DisableMovement` (keyed off `ExitPending`, not the ask, so the
   probe's variable writes freeze it too). Looking around still works.
-- **A hit calls it off**, and `SetMovementMode(Walking)` frees the pawn. A wanderer's swing stamps
+- **A hit, a move key or the trigger calls it off**, and `SetMovementMode(Walking)` frees the pawn. A move key is the pawn's last movement input (it still reaches the pawn with its movement disabled), the trigger is the trigger's tap (`trigger.py`, FireForced too). A wanderer's swing stamps
   the player's `BP_HealthComponent.LastDamageTime` (`npc/melee.py`), and the countdown stops when
   that passes `ExitStartedAt`. The starvation
   drain lowers Health without stamping it, so it is not a hit. A death calls it off too
@@ -309,7 +309,7 @@ sync:
 - **Death deletes the slot,** what was worn with the bag. `Health <= 0` on Tick, once (`ProfileForgotten`). Tick, not
   DrawHUD: the death pause comes after a 2.2 s settle, and a `-nullrhi` probe never draws.
 - **Probe:** `uepy.py --game --probe Scripts/probes/probe_save_exit.py`. It covers the freeze, a
-  hit calling the exit off and freeing the pawn, the save, the reload and restore, a crafted inventory replacing the
+  hit, a move key and the trigger calling the exit off and freeing the pawn, the save, the reload and restore, a crafted inventory replacing the
   issued one, and the delete on death. It sets aside any real profile on disk and puts it back.
 - **Still needs a play session:** taking the row by hand and the 15 s at real speed (the probe
   writes the countdown's variables), and how the banner reads.

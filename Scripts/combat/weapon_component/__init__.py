@@ -202,6 +202,9 @@ _author_* fragment per concern, each in its own module:
               panel's ask), served with authority, takes one off into the bag,
               or into the hand or bag slot a drag dropped it on (TakeOffTo);
               a probe's TakeOffForced and WearForced
+  starter_worn  what a player starts out wearing: BeginPlay, with authority,
+              spawns StarterPantsClass (build_clothing.py fills it) into
+              Worn[its slot], hidden, and draws it
   wear_drag   WearRequest (the I panel's drag onto the worn grid), served
               with authority: a slot's garment is worn from wherever it is
               carried

@@ -18,6 +18,7 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 |---|---|
 | the garments (`/Game/Clothing/BP_<Garment>`), their stand-in models and materials | this package (`specs.py`, `items.py`) |
 | what a garment lies on the ground as: its stand-in cubes, or, with a `WornMesh`, that mesh ("On the ground" below) | `ground_model.py` (checks: `verify/garments.py`; in a game: `probes/probe_clothing_ground.py`) |
+| the pants a player starts in ("The starting pants" below) | `starter.py` (the class, onto the weapon component), `combat/weapon_component/starter_worn.py` (BeginPlay wears it); checks: `verify/starter.py`, `combat/verify/wear.py`, `wear_draw.py`; in a game: `probes/probe_starter_pants.py` |
 | the test garments on `Lvl_Forest_200m` | this package (`placement.py`) |
 | the garments found in the forest: jackets, pants and boots on every generated level | this package (`scatter.py` where, `scatter_level.py` into the level; checks: `verify/scattered.py`, `dev/tests/test_clothing_scatter.py`) |
 | the mesh a garment is drawn as, worn: `Garment.worn` (the body component it fills, the skeletal mesh, from `metahuman_paths.CLOTHING`), written onto the item as `WornPart` and `WornMesh`. Jacket, Pants and Boots have one | `specs.py`, `items.py`; the variables `combat/item_vars.py` |
@@ -49,7 +50,8 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   inventory `Slot` UNPLACED (`combat/slot_tuning.py`), so taken off it finds a bag slot. Wearing
   one into a filled slot puts the old one back in the bag (there is room: the new one just
   left it). The press is spent (`TriggerSpent`) as eating spends it.
-- **`Worn` starts empty and the first wear into a slot grows it** (`Array_Set`, size to fit).
+- **`Worn` starts with the pants in it** (below), as long as their slot; a wear into a
+  later slot grows it (`Array_Set`, size to fit).
   Every read of it is behind `IsValidIndex`, then `IsValid`.
 - **Taking one off is the I panel's**: Up/Down and Enter (or a click) raise the HUD's
   `WearTakeOffRequested`; its Tick calls the weapon component's `AskTakeOff`
@@ -88,6 +90,27 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   regenerated level loses them as it loses the test row.
   **A probe that wants the test row asks for `OW_TestClothing`,** not for the garments
   in the world: there are others now.
+
+## The starting pants
+
+- **A fresh player wears the pants** from the first frame, on the title's stage and in
+  play: the weapon component's BeginPlay, with authority, after the loadout, spawns
+  `StarterPantsClass` straight into `Worn[pants]` (hidden, not `Dropped`, `UNPLACED`)
+  and draws it (`DrawWorn`). It never passes through the bag or the hand, and from there
+  it is a worn garment like any other: taken off in the I panel, sent to the clients in
+  the record, kept by a saved profile.
+- **`build_clothing.py` fills the class** (`starter.py` `install_starter`, as
+  `build_survival.py` fills the campfire's): the component is built before `BP_Pants`
+  is. Its own build keeps what it finds (`_kept_class`); with none the player starts
+  bare, and nothing fails.
+- **A profile saved with the pants off stays that way:** the load calls `ViewWorn` with
+  none for the slot, which takes the starting pair off again. A profile saved before
+  the slot existed in it (a shorter `WornClasses`) says nothing about the slot, and the
+  starting pair stays on.
+- **A probe's player starts bare** (`probes/starter_bare.py`): the probes were written
+  against nothing worn, so a launch empties the class in memory before its level opens,
+  unless every probe in it declares `STARTER_WORN = True` (`probe_starter_pants.py`,
+  `probe_title_figure.py`).
 
 ## On the ground
 

@@ -41,7 +41,7 @@ from combat.torch_tuning import NEAR_FIRE_VAR, STICK_CLASS_VAR, WARD_CARRY_VAR, 
 from combat.tuning import COMBAT, POLLED_BINDS
 from combat.use_tuning import USE_PRESSED_VAR, USE_WAS_VAR, USING_VAR
 from combat.wear_tuning import (
-    NOT_CLOTHING, TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_ITEM_VAR, WEAR_REQUEST_VAR, WORN_VAR,
+    NOT_CLOTHING, STARTER_PANTS_CLASS_VAR, TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_ITEM_VAR, WEAR_REQUEST_VAR, WORN_VAR,
 )
 
 _ITEM = obj(ITEM_CLASS_PATH)
@@ -291,6 +291,9 @@ KnifeClass = Var("KnifeClass", cls(ITEM_CLASS_PATH))
 AxeClass = Var("AxeClass", cls(ITEM_CLASS_PATH))
 MatchesClass = Var(MATCHES_CLASS_VAR, cls(ITEM_CLASS_PATH))
 StickClass = Var(STICK_CLASS_VAR, cls(ITEM_CLASS_PATH))
+# The pants a player starts in (starter_worn.py): left None here,
+# build_clothing.py fills it in (clothing/starter.py).
+StarterPantsClass = Var(STARTER_PANTS_CLASS_VAR, cls(ITEM_CLASS_PATH))
 # BP_BulletImpact, and what a strike of the matches spawns (light.py): that
 # one is left None here, build_survival.py fills it in.
 ImpactClass = Var("ImpactClass", cls("/Script/Engine.Actor"))
@@ -383,7 +386,8 @@ STATE = (
     DropItem, TakeOffSlot, TakeOffTo, WearRequest, WearSlot, OwnerDead, FireForced,
     FirePressedAt,
     SprintForced, AimForced, AimHeld, DebugMode, HitBone, HitPoint, ShotgunClass, PistolClass,
-    KnifeClass, AxeClass, MatchesClass, StickClass, ImpactClass, CampfireClass, PunchAnim,
+    KnifeClass, AxeClass, MatchesClass, StickClass, StarterPantsClass,
+    ImpactClass, CampfireClass, PunchAnim,
     PunchQueued, PunchPending, NextPunchTime, PunchDueTime, BlowDamage, KnifeAnim, AxeAnim,
     AxePose, KnifeQueued, KnifePending, NextKnifeTime, KnifeDueTime, InteractTarget,
     InteractGap, InteractForced, CrouchForced, ThrowAiming, ThrowKeyForced, ThrowClickForced,

@@ -85,6 +85,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # Re-declaring a variable empties it, and this one is build_survival.py's
     # to fill: what an earlier build was given is put back below.
     campfire_class = _kept_class(bp, WV.CampfireClass)
+    pants_class = _kept_class(bp, WV.StarterPantsClass)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     native.retire_events(ed)
     native.reparent(bp, ed)
@@ -187,6 +188,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         WV.ImpactClass: BEL.generated_class(impact_bp),
         WV.WoodClass: BEL.generated_class(wood_bp),
         WV.CampfireClass: campfire_class,
+        WV.StarterPantsClass: pants_class,
         WV.PunchAnim: _must_load(player_skin().punch),
         WV.KnifeAnim: knife_clip,
         **axe_clip_defaults(),

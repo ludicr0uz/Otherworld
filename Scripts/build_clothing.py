@@ -17,6 +17,8 @@ to it (Scripts/clothing/__init__.py is the map). Checked by verify_clothing.py.
 and lays one of each 3 m in front of Lvl_Forest_200m's PlayerStart, then
 scatters jackets, pants and boots through every generated level, about one a
 hectare (tag OW_Clothing; removed and placed again from the same seed).
+BP_Pants is also written onto the weapon component as what a player starts
+out wearing (clothing/starter.py).
 """
 
 import os
@@ -31,12 +33,14 @@ import unreal                                                     # noqa: E402
 
 from combat.log import _log                                       # noqa: E402
 from clothing.items import build_garments                         # noqa: E402
+from clothing.starter import install_starter                     # noqa: E402
 from clothing.placement import TEST_LEVEL, place_test_clothing    # noqa: E402
 from clothing.scatter_level import place_scattered_clothing, scatter_levels  # noqa: E402
 
 
 def main():
     built = build_garments()
+    install_starter()
     world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
     was_open = world.get_path_name().split(".")[0] if world else None
     if unreal.EditorAssetLibrary.does_asset_exist(TEST_LEVEL):

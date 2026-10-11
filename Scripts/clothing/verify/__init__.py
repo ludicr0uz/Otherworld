@@ -7,6 +7,7 @@ run() is self-contained.
   test_items  the test garments laid in front of the 200 m map's PlayerStart
   scattered   the jackets, pants and boots scattered through each generated
               level: the count, the kinds, Dropped, off the trunks
+  starter     the pants a player starts in: the weapon component's class
 """
 
-SECTIONS = ("garments", "test_items", "scattered")
+SECTIONS = ("garments", "test_items", "scattered", "starter")

@@ -6,8 +6,9 @@ Tick, on the title (GameStarted false), once (TitleDressed): when the pawn's
 parts cast and the weapon component is up (its Inventory holds the issued
 loadout), the profile, if there is one, is loaded and each saved worn class
 worn again through ViewWorn (profile_read._author_rewear), which draws it on
-the body. With no profile the figure stands as it spawned: the basic
-character, bare. Nothing else of the profile is read here: the stats and
+the body. With no profile the figure stands as it spawned: a fresh
+character, in the pants its weapon component's BeginPlay wears
+(combat/weapon_component/starter_worn.py). Nothing else of the profile is read here: the stats and
 the items are the play level's (save_exit._author_load_once), once New Game
 has opened it.
 
@@ -97,8 +98,8 @@ def author_title_figure(ed, in_execs):
     ed.add_comment_to_nodes(
         f"The figure on the title: once ({TITLE_DRESSED_VAR}), with the weapon "
         f"component up, the saved profile ({PROFILE_SLOT!r}), if there is one, "
-        f"dresses the character through ViewWorn, slot by slot. No profile: the "
-        f"basic character, bare. Then, once ({TITLE_STOWED_VAR}), when the issued "
+        f"dresses the character through ViewWorn, slot by slot. No profile: a "
+        f"fresh character, in its starting pants. Then, once ({TITLE_STOWED_VAR}), when the issued "
         f"gun has reached the hand, it is stowed ({ASK_MOVE} hand -> primary): the "
         f"figure holds nothing. Its stats and items are loaded in play, not here.",
         made)

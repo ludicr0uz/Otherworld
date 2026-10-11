@@ -17,6 +17,7 @@ from combat.light_tuning import MATCHES_CLASS_VAR
 from combat.torch_tuning import STICK_CLASS_VAR
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS
 from combat.weapon_component.sights import _author_camera_after_boom
+from combat.weapon_component.starter_worn import author_starter_worn
 from uebp.nodes.actor import (
     FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_ATTACH, FN_DETACH, FN_GET_COMP, FN_GET_OWNER,
     FN_GET_TRANSFORM, FN_PLAY_SLOT, FN_SET_ACTOR_LOC,
@@ -378,17 +379,20 @@ def _author_wc_begin_play(ed, begin):
         _set(slot, SLOT_VAR, STARTER_SLOTS[i])
         _connect(then(add), _pin(slot, "execute"))
         prev = then(slot)
+    prev = author_starter_worn(ed, spawn_at, prev, made)
 
     dirty = keep(ed.add_set_member_variable_node(WV.NeedsRefresh))
     _set(dirty, WV.NeedsRefresh, True)
-    _connect(prev, _pin(dirty, "execute"))
+    for e in prev:
+        _connect(e, _pin(dirty, "execute"))
     _connect(out(owns, "Remote"), _pin(dirty, "execute"))
 
     ed.add_comment_to_nodes(
         "With authority (the server, and single player; a client's are a picture of "
         "the server's record, view.py): the player starts carrying the shotgun, the pistol, the knife, the "
         "axe, the matches and a stick, each given its slot: the shotgun in "
-        "hand, the pistol and the knife in theirs, the rest in the bag. "
+        "hand, the pistol and the knife in theirs, the rest in the bag, and "
+        "wearing the pants (starter_worn.py). "
         "They are spawned here rather "
         "than placed in the level so that a generated map needs no weapon "
         "actors in it -- nothing in Scripts/generated_levels knows weapons "

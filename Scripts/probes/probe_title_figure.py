@@ -10,9 +10,10 @@ level (Scripts/title; GameDefaultMap).
                       world standalone, not paused (nothing on the stage to
                       pause), time running; the view is the stage's camera
   the figure          the player's character, on the stage in front of it,
-                      with the MetaHuman body; with no profile, bare: the
-                      three drawable parts (Torso, Legs, Feet) show nothing;
-                      and it holds nothing: the issued gun is stowed
+                      with the MetaHuman body; with no profile, as a fresh
+                      character starts: in the pants (the jeans on Legs),
+                      Torso and Feet showing nothing; and it holds nothing:
+                      the issued gun is stowed
   the saved gear      a profile wearing the jacket, the pants and the boots
                       written and the title reopened: the figure stands in
                       them (the hoodie, the jeans, the shoes drawn on it)
@@ -20,10 +21,12 @@ level (Scripts/title; GameDefaultMap).
                       title's level gone
 
 The profile on disk is set aside first and put back at the end.
+STARTER_WORN keeps the starting pants for this launch (probes/starter_bare.py).
 """
 
 SYSTEMS = ('title', 'clothing', 'menu')
 LEVEL = "/Game/Maps/Lvl_Title"
+STARTER_WORN = True
 
 import os
 import shutil
@@ -44,6 +47,7 @@ from title import paths as P
 
 WRITABLE = list(T.WRITABLE) + [(PROFILE_BP_PATH, WORN_CLASSES_FIELD)]
 WORN = ("Jacket", "Pants", "Boots")
+FRESH = ("Pants",)     # what a character with no profile starts in
 NEAR_CM = 150.0
 PLAY_LEVEL_NAME = P.PLAY_LEVEL.rsplit("/", 1)[1]
 LOAD_WAIT = 60.0
@@ -144,11 +148,12 @@ def _run(p):
             f"{flat:.0f} cm from the start, z {here.z:.0f}")
 
     yield from T.wait(lambda: _dressed(p))
-    bare = [d for d in WORN if not drawn(part(me, d), d)]
-    p.check("with no profile saved, the figure is the basic character: nothing drawn "
-            "on its torso, legs or feet",
-            bool(p.get(hud, TITLE_DRESSED_VAR)) and sorted(bare) == sorted(WORN),
-            f"dressed {p.get(hud, TITLE_DRESSED_VAR)}, bare {bare}")
+    yield from T.wait(lambda: drawn(part(me, FRESH[0]), FRESH[0]), 5.0)
+    on = [d for d in WORN if drawn(part(me, d), d)]
+    p.check("with no profile saved, the figure is a fresh character: in the pants it "
+            "starts in (the jeans drawn on its legs), its torso and feet bare",
+            bool(p.get(hud, TITLE_DRESSED_VAR)) and sorted(on) == sorted(FRESH),
+            f"dressed {p.get(hud, TITLE_DRESSED_VAR)}, drawn {on}")
     yield from T.wait(lambda: _empty_handed(p), 5.0)
     p.check("...and holds nothing: the issued gun is stowed in its slot (Held is None, "
             "the loadout still carried)",

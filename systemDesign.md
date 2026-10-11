@@ -69,7 +69,8 @@ watermark.
 
 **Clothing** (`Scripts/clothing/CLAUDE.md`). Eight garments, one slot each, shown as icons
 bottom right; the jacket, pants and boots are drawn on the body (to everyone on a server),
-the rest are not. **Item icons** (`Scripts/item_icons/CLAUDE.md`) are studio renders of each
+the rest are not. A fresh player starts in the pants, worn, on the title and in play.
+**Item icons** (`Scripts/item_icons/CLAUDE.md`) are studio renders of each
 item's own model, made outside the editor by `build_item_icons.py`.
 
 **Sound** (`Scripts/Sound/CLAUDE.md`). Every sound is a recording chosen by ear; one

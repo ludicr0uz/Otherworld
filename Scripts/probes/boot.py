@@ -57,7 +57,7 @@ from graphics_menu.profile_consts import PROFILE_SLOT
 from graphics_menu.tune_keep_consts import TUNE_SAVE_SLOTS
 from title.paths import TITLE_LEVEL, TITLE_LEVEL_NAME
 
-from probes import bots, kept_slots
+from probes import bots, kept_slots, starter_bare
 
 # The developer's saves a run is kept clear of (kept_slots.py): the tuning
 # tabs' slots, and the profile, which the level reads back onto the player as
@@ -300,6 +300,7 @@ def start():
     if where.role in (STANDALONE, SERVER):
         for slots, suffix in KEPT:
             kept_slots.set_aside(_save_dir(), slots, suffix)
+    _state["bare"] = starter_bare.bare(paths)
     loaded = load_probes(paths, where)
     runs = []
     for ledger, fn, _writable, own_timeout in loaded:
@@ -337,6 +338,10 @@ def _prepare(map_path):
     before anything is compiled.
     """
     setup_errors = make_writable(_state["writable"]) if _state["writable"] else []
+    # The player starts with nothing worn, unless every probe of the launch
+    # is one of the starting garment (starter_bare.py).
+    if _state.get("bare"):
+        setup_errors += starter_bare.strip(_state["keep"])
     # Every probe run audits the inventory's record: a change to what a player
     # carries that nothing marked is an INVENTORY-RECORD-STALE line, which
     # fails the run (Scripts/combat/dirty.py, uepylib/game.py).

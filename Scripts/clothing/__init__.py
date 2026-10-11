@@ -13,6 +13,8 @@ clothing.verify. Design and traps: CLAUDE.md here.
               material
   ground_model  the mesh a garment with a WornMesh lies as: one skeletal
               mesh component in its reference pose, laid flat and centred
+  starter     the pants as what a player starts in: the weapon component's
+              StarterPantsClass, worn by its BeginPlay
   placement   the test garments in a row 3 m in front of Lvl_Forest_200m's
               PlayerStart (tag OW_TestClothing, idempotent)
   scatter     where the garments found in the forest go: jackets, pants and

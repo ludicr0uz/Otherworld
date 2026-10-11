@@ -23,6 +23,9 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py
   `WRITABLE = [(bp_path, var)]`. `probes/boot.py` makes it Instance Editable and recompiles, in
   memory for that run only, before the level loads. Nothing on disk changes and no builder
   re-run is needed.
+- **A probe's player wears nothing at the start,** though the game's does (the starting
+  pants): the launch empties that class in memory unless every probe in it declares
+  `STARTER_WORN = True` (`probes/starter_bare.py`).
 - **A network probe** (`uepy.py --net`) is the same file run in every process, the server and
   each client. `Scripts/probes/probe_net_join.py` is the model; `probes/net.py` has the rules.
   - **Where it runs:** `RUNS_ON = ("server", "client")`, or `"client 1"` for that client alone.

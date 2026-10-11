@@ -82,13 +82,15 @@ link under it, names its part there.
   loadout, `DoesSaveGameExist` on the profile's slot, `LoadGameFromSlot`, and each saved
   `WornClasses` entry worn again through `ViewWorn` (`profile_read._author_rewear`, the
   same loop the load in play runs), which draws the hoodie, the jeans and the shoes on
-  the MetaHuman. No profile: the basic character, bare. Dressed or bare, the issued
+  the MetaHuman. No profile: a fresh character, in the pants it starts in (the weapon
+  component's own BeginPlay wears them: `Scripts/clothing/CLAUDE.md`, "The starting
+  pants"). Either way, the issued
   gun is then stowed, once (`TitleStowed`), when something is held (`AskMove` from the
   hand to the primary slot, the HUD's second `AskMove`; the gun reaches the hand a frame
   or more after the loadout is issued, and a move asked sooner finds the hand empty):
   the figure holds nothing. Nothing else of the profile is read on the
-  title. `probe_title_figure.py` (`uepy.py --game --title`) is the whole path: bare and
-  empty-handed, then dressed from a written profile, then New Game.
+  title. `probe_title_figure.py` (`uepy.py --game --title`) is the whole path: in the
+  starting pants and empty-handed, then dressed from a written profile, then New Game.
 - **The first row** (`START_ACTION`) lowers `MenuOpen` in play (`resume`); on the title it
   opens the Single Player page (below: "The two modes"), whose row calls
   `OpenLevel(title/paths.PLAY_LEVEL)`, the 1 km forest, and nothing else

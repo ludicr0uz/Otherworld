@@ -11,7 +11,7 @@ from combat.verify.fixtures import wc, wg
 from combat.verify.record import _upstream
 from combat.record_vars import VIEW_WORN
 from combat.verify.wear import _chain, _feeders, _title
-from combat.wear_tuning import DRAW_WORN, WORN_VAR
+from combat.wear_tuning import DRAW_WORN, STARTER_PANTS_CLASS_VAR, WORN_VAR
 from combat.weapon_component.wear_draw import (
     ITEM_PARAM, ON_PARAM, TICK_ALWAYS, TICK_OPTION_VAR,
 )
@@ -33,9 +33,22 @@ def _view_calls(calls):
     return made, ended
 
 
+def _starter_calls(calls):
+    """BeginPlay's (starter_worn.py): on for the garment spawned from
+    StarterPantsClass."""
+    return [n for n in calls for f in _feeders(n, ITEM_PARAM)
+            if "SpawnTransform" in in_pins(f)
+            and f"Get {STARTER_PANTS_CLASS_VAR}" in [_title(c) for c in _feeders(f, "Class")]]
+
+
 def check_draw_calls():
     every = [n for n in wg if _title(n).replace(" ", "") == DRAW_WORN
              and ON_PARAM in in_pins(n)]
+    starter = _starter_calls(every)
+    check(f"BeginPlay draws the pants a player starts in ({STARTER_PANTS_CLASS_VAR}, "
+          f"starter_worn.py): one {DRAW_WORN} on, for the garment it spawned",
+          [_on(n) for n in starter] == [True], f"{len(starter)} calls")
+    every = [n for n in every if n not in starter]
     made, ended = _view_calls(every)
     check(f"a client's view draws what it was sent ({VIEW_WORN}): {DRAW_WORN} on for the "
           "garment it spawned, off for one of another class and for one past the "

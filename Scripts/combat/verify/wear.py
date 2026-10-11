@@ -132,11 +132,12 @@ def check_wear():
                              "Set EquippedIndex", "Set NeedsRefresh"]), str(titles))
     sets = [n for n in wg if "bSizeToFit" in in_pins(n)
             and any(_title(f) == f"Get {WORN_VAR}" for f in _feeders(n, "TargetArray"))]
-    check(f"{WORN_VAR} is written six times (the wear, the dragged wear, the take-off, "
-          "the drag out of the inventory, and a client's picture of a worn slot and of "
-          "an empty one), the wears' and the picture's grown to fit",
-          len(sets) == 6 and sorted(pin_value(n, "bSizeToFit") or "false" for n in sets)
-          == ["false", "false", "true", "true", "true", "true"],
+    check(f"{WORN_VAR} is written seven times (the wear, the dragged wear, the take-off, "
+          "the drag out of the inventory, a client's picture of a worn slot and of "
+          "an empty one, and BeginPlay's starting pants), the wears', the picture's "
+          "and the starting pants' grown to fit",
+          len(sets) == 7 and sorted(pin_value(n, "bSizeToFit") or "false" for n in sets)
+          == ["false", "false", "true", "true", "true", "true", "true"],
           str([pin_value(n, "bSizeToFit") for n in sets]))
 
 

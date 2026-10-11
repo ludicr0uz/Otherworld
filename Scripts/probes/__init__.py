@@ -31,6 +31,9 @@ Scripts/net/CLAUDE.md has the conventions and the traps.
               launch share one boot, and a --game launch opens the level again between
               them (boot.py), so each gets the level fresh; a --net launch does not
   kept_slots  the tuning tabs' save slots, set aside for a run and put back
+  starter_bare  a probe's player starts with nothing worn: the starting pants are
+              emptied for the launch unless every probe of it declares
+              STARTER_WORN = True
   net         a network run: which process this is (Where), RUNS_ON, the shared board
   bots        the load test's bots (uepy.py --net --bots N): the server's stand-ins for
               players, spawned once its level is up and driven from the ticker

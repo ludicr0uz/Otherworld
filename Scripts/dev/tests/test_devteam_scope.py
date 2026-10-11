@@ -120,7 +120,6 @@ class ScopedGate(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.meter = mock.Mock()
-        self.meter.decide.return_value = (False, "test")
 
     def run_one(self, *snapshots, args=None):
         self.snapshots = list(snapshots)

@@ -33,7 +33,7 @@ SERVE_DIR = os.path.join(ROOT, "Saved", "uepy", "devteam")
 # What a pause keeps of the run's options, for the resumed half of the task.
 KEPT_ARGS = ("commit", "gate", "permission_mode", "fix_attempts", "budget",
              "model", "effort")
-TASK_FIELDS = ("text", "line", "effort", "model", "triage", "fast", "fab")
+TASK_FIELDS = ("text", "line", "effort", "model", "triage", "fab")
 
 
 def close_editors():
@@ -255,11 +255,8 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         paused("start")
         prompt = build_prompt(task, n, total, progress,
                               gate.table(baseline) if baseline else None, args.commit)
-        # Decided once: the task's follow-ups keep the speed its session began at.
-        task.fast, why = meter.decide(time.time())
-        print(f"    fast mode {'on' if task.fast else 'off'} -- {why}")
     common = dict(model=task.model or args.model, effort=task.effort or args.effort,
-                  budget=args.budget, fast=task.fast)
+                  budget=args.budget)
     earlier = list(parked.get("reports") or []) if parked else []
     head0, tree0 = git_head(ROOT), tree_fingerprint()
     if parked is None:
@@ -342,8 +339,7 @@ def write_up(task, n, ok, args, before, reports, result, gate_table, run_dir, pr
                 f"Session: {result.get('session_id', '?')}{commits}\n"
                 f"Time: {took}\nTokens: {tokens}\n"
                 f"Effort: {task.effort or args.effort or 'default'}"
-                + (f" (triage: {task.triage})" if task.triage else "")
-                + (", fast mode" if task.fast else "") + "\n\n"
+                + (f" (triage: {task.triage})" if task.triage else "") + "\n\n"
                 + (f"### Verifier gate\n\n{gate_table}\n\n" if gate_table else "")
                 + f"### Report\n\n{report or '(no report)'}\n")
     return status, cost

@@ -240,16 +240,13 @@ def build_uncommitted_prompt():
 
 
 def build_cmd(prompt, permission_mode, name=None, model=None, effort=None,
-              budget=None, resume=None, fast=False):
+              budget=None, resume=None):
     # --strict-mcp-config with no --mcp-config: no MCP servers at all. The
     # claude.ai connectors (Docs, Drive) add tools to every turn and no task
     # here uses them; ENABLE_CLAUDEAI_MCP_SERVERS=false in session_env() too.
-    # A headless session runs in fast mode only when its --settings say so
-    # (devteam/fast.py decides).
-    settings = dict(SETTINGS, fastMode=True) if fast else SETTINGS
     cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--permission-mode", permission_mode, "--strict-mcp-config",
-           "--settings", json.dumps(settings)]
+           "--settings", json.dumps(SETTINGS)]
     if resume:
         cmd += ["--resume", resume]
     elif name:
@@ -309,18 +306,6 @@ def note(text):
     return text if len(text) <= 200 else text[:197] + "..."
 
 
-def fast_note(event):
-    """What a session's init event says about fast mode, or "" when there is
-    nothing to say: it was not asked for, which is what an unopted headless
-    session reports."""
-    state, why = event.get("fast_mode_state"), event.get("fast_mode_disabled_reason")
-    if state == "on":
-        return "fast mode on"
-    if why and why != "sdk_opt_in_required":
-        return f"fast mode {state or 'off'}: {why}"
-    return ""
-
-
 def run_session(cmd, root, log_path, env, on_limits=None, pauser=None):
     """Run one session, narrating it. Returns (ok, report, result event).
     ``on_limits`` is handed each rate_limit_info the session streams. A
@@ -341,9 +326,7 @@ def run_session(cmd, root, log_path, env, on_limits=None, pauser=None):
             return
         if event.get("type") == "system" and event.get("subtype") == "init":
             seen["session_id"] = event.get("session_id")
-            note_fast = fast_note(event)
-            print(f"    session {event.get('session_id')}"
-                  + (f"  ({note_fast})" if note_fast else ""))
+            print(f"    session {event.get('session_id')}")
         elif event.get("type") == "rate_limit_event":
             if on_limits:
                 on_limits(event.get("rate_limit_info"))

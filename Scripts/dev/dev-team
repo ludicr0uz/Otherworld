@@ -111,12 +111,6 @@ to allow less. Any action that would prompt is denied, not waited on. No MCP
 servers are loaded (--strict-mcp-config): no task uses them, and their tools
 would be re-read on every turn.
 
-**Fast mode.** A task runs in fast mode (the same Opus, faster output) while
-the five-hour session limit is under half used, going by the last reading a
-session streamed (devteam/fast.py). --fast on / --fast off override the rule.
-Fast mode is billed to usage credits, not to the plan; where it cannot run,
-the session runs at standard speed and its ``session`` line says why.
-
 **Session limit.** When the five-hour limit is at 95% or more by the last
 reading, dev-team sleeps until it resets before starting a session -- at the
 start of a run too, if the newest transcript says the window is already spent.
@@ -173,7 +167,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(1, os.path.dirname(HERE))        # Scripts/: asset_pipeline
 
 from devteam import (                                               # noqa: E402
-    awake, baseline_cache, fab, fast, final, limits, nightly, pause, probe_gate,
+    awake, baseline_cache, fab, final, limits, nightly, pause, probe_gate,
     probe_record, scope,
 )
 from devteam.accounting import git_head                             # noqa: E402
@@ -211,9 +205,6 @@ def parse_args():
     p.add_argument("--no-triage", dest="triage", action="store_false",
                    help="don't size the queue first (devteam/triage.py): every "
                         "task without an effort: hint runs at the default effort")
-    p.add_argument("--fast", choices=fast.MODES, default="auto",
-                   help="fast mode: auto (default: while the session limit is under "
-                        f"{fast.THRESHOLD:.0%}% used), on, or off")
     p.add_argument("--budget", type=float, metavar="USD", help="per-task spending cap")
     p.add_argument("--no-gate", dest="gate", action="store_false",
                    help="skip the verifier sweeps before and after each task")
@@ -354,14 +345,14 @@ def main():
     if len(args.tasks) == 2 and args.tasks[0] == "resume":
         with awake.hold():
             sys.exit(resume(args, args.tasks[1],
-                            fast.Meter(args.fast, fast.last_seen(LOG_ROOT)), pauser))
+                            limits.Meter(limits.last_seen(LOG_ROOT)), pauser))
     task_file, tasks = load_tasks(args)
     todo = [t for t in tasks if not t.done]
     if not todo:
         sys.exit("dev-team: nothing to do (no unticked tasks)")
     skipped = len(tasks) - len(todo)
     print(f"dev-team: {len(todo)} task(s)" + (f", {skipped} already done" if skipped else ""))
-    meter = fast.Meter(args.fast, fast.last_seen(LOG_ROOT))
+    meter = limits.Meter(limits.last_seen(LOG_ROOT))
     if not args.dry_run:
         limits.wait(meter, pauser)          # triage is the first call on the limit
     triage_cost = size(todo, args)

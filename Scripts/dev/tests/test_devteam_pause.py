@@ -415,7 +415,6 @@ class RunOneTest(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.meter = mock.Mock()
-        self.meter.decide.return_value = (False, "test")
 
     def run_one(self, parked=None):
         task = Task("Do it")

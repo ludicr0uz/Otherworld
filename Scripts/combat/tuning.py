@@ -340,7 +340,7 @@ class CombatConfig:
     # pulled back down, instead of springing exactly home between rounds.
     recoil_recovery_fraction: float = 0.70
     # How much each stance and aim steadies the kick, and how far it swings
-    # sideways, are per gun: GUN_ACCURACY in weapon_specs.py.
+    # sideways, are per gun: GUN_ACCURACY in gun_rows.py.
 
     # --- flinching (taking a hit and living) ---------------------------------
     # Anything that takes damage and survives plays a one-second stagger on its

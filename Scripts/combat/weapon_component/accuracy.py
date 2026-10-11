@@ -1,6 +1,6 @@
 """Accuracy, once a frame: how wide the held gun's cloud is and how hard it
 will kick, given the stance and the aim (the numbers are GUN_ACCURACY in
-weapon_specs.py, copied onto each weapon as variables).
+gun_rows.py, copied onto each weapon as variables).
 
     AimSpread     = Held.SpreadDegrees x aim(Spread) x stance(Spread)
     RecoilScale   = aim(Recoil) x stance(Recoil)
@@ -141,6 +141,6 @@ def _author_accuracy(ed, held, armed_out, exec_ins):
         "the sights), RecoilScale (what the kick is multiplied by) and "
         "ReticleSpread (the cloud as a fraction of the half screen, which the "
         "HUD draws). Each is the held gun's own number times its aim and "
-        "stance factors (GUN_ACCURACY in weapon_specs.py).",
+        "stance factors (GUN_ACCURACY in gun_rows.py).",
         made)
     return (then(put_reticle), flow)

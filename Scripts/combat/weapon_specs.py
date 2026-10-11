@@ -8,6 +8,7 @@ import unreal
 
 from combat.log import _log
 from combat import item_vars as IV
+from combat.gun_rows import gun_row
 from combat.gun_tuning import read_table
 from combat.grip import _grip_location, _grip_rotation
 from combat.paths import (
@@ -20,8 +21,6 @@ from Sound.sound_weapons import fire_sound, reload_sound
 from combat.shotgun_hold import support_point
 from combat.support_hand import support_at
 from item_icons.items import icon_name
-from combat.sway_tuning import SWAY_RATE, SWAY_RATE_COLUMN
-from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG
 from combat.weapon_models import (
     PISTOL_MODEL, PISTOL_MUZZLE, PISTOL_SIGHT, PISTOL_SIGHT_FRONT,
     PISTOL_SIGHT_REAR, RIFLE_MODEL, RIFLE_MUZZLE, RIFLE_SIGHT,
@@ -33,76 +32,9 @@ from combat.weapon_models import (
     shotgun_outline, smg_outline, sniper_outline,
 )
 from combat.tuning import (
-    COMBAT, GUN_LOOT_TABLE, PISTOL_FIRE_INTERVAL, PISTOL_MAGAZINE,
-    PISTOL_RELOAD_SECONDS, RIFLE_FIRE_INTERVAL, RIFLE_MAGAZINE,
-    RIFLE_RELOAD_SECONDS, RIFLE_RESERVE, SHOTGUN_FIRE_INTERVAL,
-    SHOTGUN_MAGAZINE, SHOTGUN_RELOAD_SECONDS, SHOTGUN_RESERVE,
-    SHOT_VOLUME_CM, SMG_FIRE_INTERVAL, SMG_MAGAZINE, SMG_RELOAD_SECONDS,
-    SMG_RESERVE, SNIPER_FIRE_INTERVAL, SNIPER_MAGAZINE, SNIPER_RELOAD_SECONDS,
-    SNIPER_RESERVE,
+    GUN_LOOT_TABLE, RIFLE_RESERVE, SHOTGUN_RESERVE, SMG_RESERVE, SNIPER_RESERVE,
 )
 
-
-# ─── Accuracy: where the shot goes, and what it does to the view ─────────────
-#
-# Two separate mechanics, every number per gun (the task that added them asked
-# for exactly that, so nothing here is a global in COMBAT):
-#
-# THE CLOUD decides where a shot lands. Each trigger pull draws ONE direction
-# inside a cone of AimSpread degrees around the reticle's line, and the round
-# (or the shotgun's whole pellet pattern) flies down it. AimSpread is written
-# every frame by weapon_component/accuracy.py:
-#
-#     spread x (sights ? 0 : shoulder ? spread_shoulder : 1)
-#            x (prone ? spread_prone : crouched ? spread_crouch : 1)
-#
-# so down the sights it is zero and the shot goes exactly where the reticle is.
-# The HUD sizes the reticle from the same number, so its gap is the cloud.
-# `pellet_spread` is not the cloud: it is the shotgun's pattern around wherever
-# the cloud put the shot, and zero on a single-round gun.
-#
-# RECOIL moves the view (and so the reticle) after the shot, never the shot:
-#
-#     up       = recoil     x scale
-#     sideways = +/- recoil_yaw x scale                (drawn once per shot)
-#     scale    = (sights ? recoil_sights : shoulder ? recoil_shoulder : 1)
-#              x (prone ? recoil_prone : crouched ? recoil_crouch : 1)
-#
-# recoil_yaw is a quarter of recoil on every gun (four times more climb than
-# swing); it is a column so a gun may break that, and the verifier asserts the
-# 4x for the five that exist. The orderings the verifier holds every row to:
-# prone < crouched < 1 for both mechanics, and shoulder < 1.
-#
-# `recoil` is degrees of muzzle climb per shot. The ordering is the point of
-# the numbers: the two heavy, slow weapons kick hardest (sniper 2.4, shotgun
-# 2.2), the assault rifle next (0.85), the SMG less (0.45) and the pistol least
-# (0.30). Read against the fire interval it is also a rate: the SMG's 0.45
-# every 0.09 s is five degrees a second against the rifle's six, so the rifle
-# is the one that walks off target under sustained fire.
-GUN_ACCURACY = {
-    #            cloud (deg) and its factors             pattern      recoil (deg) and its factors
-    "Shotgun": dict(spread=3.0, spread_shoulder=0.50, spread_crouch=0.75, spread_prone=0.55,
-                    pellet_spread=5.0,
-                    recoil=2.2, recoil_yaw=0.55, recoil_shoulder=0.80, recoil_sights=0.65,
-                    recoil_crouch=0.75, recoil_prone=0.50),
-    "Pistol":  dict(spread=1.6, spread_shoulder=0.45, spread_crouch=0.75, spread_prone=0.55,
-                    pellet_spread=0.0,
-                    recoil=0.30, recoil_yaw=0.075, recoil_shoulder=0.80, recoil_sights=0.65,
-                    recoil_crouch=0.80, recoil_prone=0.60),
-    "SMG":     dict(spread=2.6, spread_shoulder=0.50, spread_crouch=0.75, spread_prone=0.55,
-                    pellet_spread=0.0,
-                    recoil=0.45, recoil_yaw=0.1125, recoil_shoulder=0.80, recoil_sights=0.65,
-                    recoil_crouch=0.75, recoil_prone=0.50),
-    "Rifle":   dict(spread=2.0, spread_shoulder=0.40, spread_crouch=0.70, spread_prone=0.45,
-                    pellet_spread=0.0,
-                    recoil=0.85, recoil_yaw=0.2125, recoil_shoulder=0.75, recoil_sights=0.60,
-                    recoil_crouch=0.70, recoil_prone=0.45),
-    # A sniper fired from the hip is a guess; from the scope it is exact.
-    "Sniper":  dict(spread=3.0, spread_shoulder=0.35, spread_crouch=0.70, spread_prone=0.35,
-                    pellet_spread=0.0,
-                    recoil=2.4, recoil_yaw=0.6, recoil_shoulder=0.80, recoil_sights=0.60,
-                    recoil_crouch=0.70, recoil_prone=0.40),
-}
 
 # Each accuracy column and the BP_WeaponItem variable it becomes.
 ACCURACY_VARS = (
@@ -166,13 +98,12 @@ def _weapon_specs():
     `parts` are the model's measured outline: never built, but read by the
     grip solve and the sight checks exactly as a primitive gun's parts are.
 
-    Spread and recoil are columns too, but they live in GUN_ACCURACY above and
-    are merged into each row here, so the accuracy of all five reads as one
-    table.
-
-    Every number the GUN SETTINGS page can change is then overridden by its
-    cell in gun_tuning.csv, so the literals here are the defaults a missing
-    cell falls back to, and the CSV is what gets built.
+    Every number the GUN SETTINGS page can change is not a literal here: it
+    is the gun's row of gun_rows.py (GUN_DEFAULTS, and GUN_ACCURACY for the
+    spread and the recoil, so the accuracy of all five reads as one table),
+    overridden by its cell in gun_tuning.csv. gun_row() lays the one over
+    the other, in plain Python, so dev/tests/test_weapon_tuning.py holds
+    what is built to the CSV without an editor.
 
     `shot_volume` is how far the shot is heard, and it is read from
     SHOT_VOLUME_CM in tuning.py rather than written inline, because the five
@@ -188,42 +119,34 @@ def _weapon_specs():
     specs = (
         dict(path=SHOTGUN_BP_PATH, parts=shotgun_outline(), model=SHOTGUN_MODEL, muzzle=SHOTGUN_MUZZLE, sight=SHOTGUN_SIGHT,
              sight_rear=SHOTGUN_SIGHT_REAR, sight_front=SHOTGUN_SIGHT_FRONT,
-             display="Shotgun", automatic=False, damage=18.0, pellets=8, range=4000.0,
+             display="Shotgun", automatic=False,
              sound=fire_sound(SHOTGUN_BP_PATH), reload_sound=reload_sound(SHOTGUN_BP_PATH), aim=AIM_SHOTGUN,
              grip_rot=_grip_rotation(AIM_SHOTGUN), trigger_reach=SHOTGUN_TRIGGER_REACH_CM,
-             uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
-             interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS,
-             shot_volume=SHOT_VOLUME_CM["Shotgun"]),
+             uses_ammo=True, reserve=SHOTGUN_RESERVE),
         dict(path=PISTOL_BP_PATH, parts=pistol_outline(), model=PISTOL_MODEL, muzzle=PISTOL_MUZZLE, sight=PISTOL_SIGHT,
              sight_rear=PISTOL_SIGHT_REAR, sight_front=PISTOL_SIGHT_FRONT,
-             display="Pistol", automatic=False, damage=26.0, pellets=1, range=6000.0,
+             display="Pistol", automatic=False,
              sound=fire_sound(PISTOL_BP_PATH), reload_sound=reload_sound(PISTOL_BP_PATH), aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL), trigger_reach=PISTOL_REACH,
-             uses_ammo=True, magazine=PISTOL_MAGAZINE, reserve=0, infinite_reserve=True,
-             interval=PISTOL_FIRE_INTERVAL, reload_s=PISTOL_RELOAD_SECONDS,
-             shot_volume=SHOT_VOLUME_CM["Pistol"]),
+             uses_ammo=True, reserve=0, infinite_reserve=True),
         # 12 x 9 = 108 damage to kill, delivered in 0.81 s. The lowest damage
         # per round of the five and the highest per second, which is the whole
         # identity: it wins a fight it is already in and empties fast. The SMG11
         # is a machine pistol, so it is held in the pistol's ready pose.
         dict(path=SMG_BP_PATH, parts=smg_outline(), model=SMG_MODEL, muzzle=SMG_MUZZLE, sight=SMG_SIGHT,
              sight_rear=SMG_SIGHT_REAR, sight_front=SMG_SIGHT_FRONT,
-             display="SMG", automatic=True, damage=12.0, pellets=1, range=4500.0,
+             display="SMG", automatic=True,
              sound=fire_sound(SMG_BP_PATH), reload_sound=reload_sound(SMG_BP_PATH), aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL), trigger_reach=PISTOL_REACH,
-             uses_ammo=True, magazine=SMG_MAGAZINE, reserve=SMG_RESERVE,
-             interval=SMG_FIRE_INTERVAL, reload_s=SMG_RELOAD_SECONDS,
-             shot_volume=SHOT_VOLUME_CM["SMG"]),
+             uses_ammo=True, reserve=SMG_RESERVE),
         # Five rounds to a kill at 0.14 s apart, accurate to 90 m. The generalist,
         # and the one a player who finds it will simply keep.
         dict(path=RIFLE_BP_PATH, parts=rifle_outline(), model=RIFLE_MODEL, muzzle=RIFLE_MUZZLE, sight=RIFLE_SIGHT,
              sight_rear=RIFLE_SIGHT_REAR, sight_front=RIFLE_SIGHT_FRONT,
-             display="Rifle", automatic=True, damage=24.0, pellets=1, range=9000.0,
+             display="Rifle", automatic=True,
              sound=fire_sound(RIFLE_BP_PATH), reload_sound=reload_sound(RIFLE_BP_PATH), aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
-             uses_ammo=True, magazine=RIFLE_MAGAZINE, reserve=RIFLE_RESERVE,
-             interval=RIFLE_FIRE_INTERVAL, reload_s=RIFLE_RELOAD_SECONDS,
-             shot_volume=SHOT_VOLUME_CM["Rifle"]),
+             uses_ammo=True, reserve=RIFLE_RESERVE),
         # One shot, one kill: 120 against 100 HP, exact down the scope, and
         # 200 m of range -- further than anything in a 200 m forest is visible.
         # The cost is 1.6 s between shots, which against a pack of five that
@@ -231,23 +154,17 @@ def _weapon_specs():
         # being caught reloading.
         dict(path=SNIPER_BP_PATH, parts=sniper_outline(), model=SNIPER_MODEL, muzzle=SNIPER_MUZZLE, sight=SNIPER_SIGHT,
              sight_rear=SNIPER_SIGHT_REAR, sight_front=SNIPER_SIGHT_FRONT,
-             display="Sniper", automatic=False, damage=120.0, pellets=1, range=20000.0,
+             display="Sniper", automatic=False,
              sound=fire_sound(SNIPER_BP_PATH), reload_sound=reload_sound(SNIPER_BP_PATH), aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
-             ads_zoom=COMBAT.ads_zoom_scope, scoped=True,
-             uses_ammo=True, magazine=SNIPER_MAGAZINE, reserve=SNIPER_RESERVE,
-             interval=SNIPER_FIRE_INTERVAL, reload_s=SNIPER_RELOAD_SECONDS,
-             shot_volume=SHOT_VOLUME_CM["Sniper"]),
+             scoped=True,
+             uses_ammo=True, reserve=SNIPER_RESERVE),
     )
     # gun_tuning.csv last: what the in-game GUN SETTINGS page saved wins over
-    # every literal above (gun_tuning.py lists the columns it may hold).
+    # every default of gun_rows.py (gun_tuning.py lists the columns it may hold).
     tuned = read_table()
     for spec in specs:
-        spec.update(GUN_ACCURACY[spec["display"]])
-        spec.setdefault("ads_zoom", COMBAT.ads_zoom_irons)
-        spec.setdefault(THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG)
-        spec.setdefault(SWAY_RATE_COLUMN, SWAY_RATE)
-        spec.update(tuned.get(spec["display"], {}))
+        spec.update(gun_row(spec["display"], tuned))
         # Held in both hands is what the rifle ready pose does (the shotgun
         # is held in it too); the guard pose (body_pose.py) picks fists or
         # the gun across the body on it.

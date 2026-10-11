@@ -1,5 +1,5 @@
 """verify.accuracy -- the accuracy cloud and the stance/aim recoil factors
-(weapon_component/accuracy.py, GUN_ACCURACY in weapon_specs.py): the per-gun
+(weapon_component/accuracy.py, GUN_ACCURACY in gun_rows.py): the per-gun
 table, the variables it lands in, the per-frame AimSpread/RecoilScale/
 ReticleSpread, and the shot's one draw inside the cloud (firing.py).
 """
@@ -13,7 +13,8 @@ from combat.weapon_component.accuracy import (
 )
 from combat.weapon_component.firing import SHOT_DIRECTION_VAR
 from combat.weapon_component.stance import CROUCH, PRONE
-from combat.weapon_specs import ACCURACY_VARS, GUN_ACCURACY, _weapon_specs
+from combat.gun_rows import GUN_ACCURACY
+from combat.weapon_specs import ACCURACY_VARS, _weapon_specs
 
 
 def _title(n):

@@ -73,6 +73,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     (columns_of: a gun's, a melee weapon's), reading and writing it
   melee_tuning      the knife's and the axe's rows of that table: their
                     throw's arc and damage, defaults under the CSV's cells
+  gun_rows          the guns' tunable numbers as plain data (GUN_DEFAULTS,
+                    GUN_ACCURACY) and gun_row(): a gun's row as built, the CSV's
+                    cells over its defaults; no unreal, so the dev tests hold it
   weapon_specs      the five weapons: muzzles, icons, _weapon_specs()
   weapon_models     every gun's model: the SMG's, the rifle's and the sniper's Fab
                     ones (SMG11, AK 47, AS Val + scope), the shotgun's and the pistol's

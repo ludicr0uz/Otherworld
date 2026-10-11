@@ -234,7 +234,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - **Trap:** always scale `BaseSpeed`, never the live `MaxWalkSpeed`, which compounds to a
     standstill. The verifier walks the inputs to check.
 - **Accuracy: two separate mechanics, every number per gun** (`GUN_ACCURACY` in
-  `weapon_specs.py`, copied onto each weapon; `weapon_component/accuracy.py`):
+  `gun_rows.py`, copied onto each weapon; `weapon_component/accuracy.py`):
   - **The cloud** decides where a shot lands. Once a frame, behind an `IsValid(Held)` Branch:
     `AimSpread = SpreadDegrees × (sights ? 0 : shoulder ? SpreadShoulderScale : 1) ×
     (prone ? SpreadProneScale : crouched ? SpreadCrouchScale : 1)`. Down the sights it is

@@ -47,7 +47,7 @@ re-copied from UE 5.8.3 and rebuilt, and the suite came back 356/356 weapons,
 60/60 HUD and 148/148 level -- 564 checks, zero failures.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # ── Engine layout ────────────────────────────────────────────────────────────
 #
@@ -326,12 +326,20 @@ GENERATED = (
     AssetSource(
         dest="Content/Maps",
         kind="generated",
-        builders=("Scripts/generate_forest_level.py",),
+        builders=("Scripts/generate_forest_level.py", "Scripts/build_title_level.py"),
         note="Lvl_Forest_200m.umap (--size 200) and Lvl_Forest_1000m.umap "
              "(--size 1000), each with its World Partition sidecars. The "
              "forage (place_forage.py), the test garments (build_clothing.py) "
              "and the day/night cycle actor (build_day_night.py) are added to "
-             "them afterwards.",
+             "them afterwards. Lvl_Title.umap, the stage the game opens on "
+             "(build_title_level.py, Scripts/title).",
+    ),
+    AssetSource(
+        dest="Content/Title",
+        kind="generated",
+        builders=("Scripts/build_title_level.py",),
+        note="M_TitleFloor, the near-black matte the title level's floor is in "
+             "(title/paths.py has its colour).",
     ),
     AssetSource(
         dest="Content/World",

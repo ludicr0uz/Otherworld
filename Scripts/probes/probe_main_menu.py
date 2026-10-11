@@ -1,11 +1,11 @@
-"""The title is the menu over a paused world, and its rows are served there.
+"""The menu's rows are served on Tick, whether the world is paused or not.
 
-Event Tick does not run in a paused world, and every row of the menu is
-served on Tick (menu_main.py). BeginPlay makes the HUD tick while paused on
-its way to the title; a probe's game starts with -nomenu, which skips that,
-so the probe does by hand what BeginPlay does (pause, GameStarted false, the
-HUD tickable while paused) and takes rows by writing PauseClick, as a click
-would.
+Every row of the menu is served on Tick (menu_main.py), and Event Tick does
+not run in a paused world. The real title is a level of its own and is not
+paused (Scripts/title); this probe holds a title up by hand on its level under
+-nomenu (GameStarted false) and pauses the world itself, to show the HUD's
+tick flag is what serves a row under a pause, and takes rows by writing
+PauseClick, as a click would.
 
   paused, the HUD not ticking   a taken row is not served: the flag matters
   paused, ticking               the debug row flips debug mode; a tab opens;
@@ -13,12 +13,11 @@ would.
   the first row                 the Single Player page in the rows' place;
                                 nothing starts yet
   the second row                the Multiplayer page
-  the Single Player page's row  GameStarted, the menu shut and back on its
-                                rows, the world unpaused, and the HUD's paused
-                                tick given up; with the gun table touched (a
-                                kept save loaded at BeginPlay), which once
-                                ended Tick before the menu's rows
-  in play                       the same row shuts the menu and nothing else
+  the Single Player page's row  not taken here: it opens the play level
+                                (probe_title_figure.py takes it from the real
+                                title). A game in play is made by hand, as
+                                -nomenu makes one
+  in play                       the first row shuts the menu and nothing else
 
 Waits are on the wall clock or on a condition: game time stands still here.
 """
@@ -122,24 +121,23 @@ def probe(p):
             p.set(hud, MV.MenuPage, PAGE_TITLE)
             yield _after(0.2)
 
-    # --- the Single Player page's row starts the game ----------------------------
-    # The gun table touched, as a kept GUN SETTINGS save leaves it from BeginPlay.
-    p.set(hud, GUN_TAB.touched_var, True)
+    # --- the Single Player page's row opens the play level, so it is not taken
+    # here (probe_title_figure.py takes it, from the real title). A game in
+    # play is made by hand instead, as -nomenu makes one.
+    p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
+    p.set(hud, MV.MenuPage, PAGE_TITLE)
+    p.set(hud, "MenuOpen", False)
+    p.set(hud, C.GAME_STARTED_VAR, True)
+    unreal.GameplayStatics.set_game_paused(world, False)
     yield _after(0.3)
-    p.set(hud, CC.PAGE_CLICK_VAR, MC.SINGLE_START_ROW)
-    started = _after(5.0)
-    yield lambda: p.get(hud, C.GAME_STARTED_VAR) or started()
-    p.set(hud, CC.PAGE_CLICK_VAR, CC.NO_ROW)
-    p.check("the Single Player page's row starts the game, the gun table touched "
-            "(a kept save): the menu shut, back on its rows, and the world unpaused",
+    p.check("a game in play (GameStarted, as -nomenu sets it): the menu shut, on its "
+            "rows, the world unpaused",
             p.get(hud, C.GAME_STARTED_VAR) is True and p.get(hud, "MenuOpen") is False
             and p.get(hud, MV.MenuPage) == PAGE_TITLE
             and not unreal.GameplayStatics.is_game_paused(world),
             f"started {p.get(hud, C.GAME_STARTED_VAR)}, open {p.get(hud, 'MenuOpen')}, "
             f"page {p.get(hud, MV.MenuPage)}, "
             f"paused {unreal.GameplayStatics.is_game_paused(world)}")
-    p.check("...and the HUD gives its paused tick up, so the death screen's pause "
-            "still stops it", hud.get_tickable_when_paused() is False)
 
     # --- in play the same row is resume -------------------------------------------
     yield 0.1

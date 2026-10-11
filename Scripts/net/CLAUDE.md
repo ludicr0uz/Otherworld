@@ -393,9 +393,11 @@ page (`graphics_menu/mode_*.py`, its `CLAUDE.md` "The two modes"):
     it to mean "I am on a server"; the title's graph asks `GameStarted`.
   - **A dead address fails after 20 s** (the engine's connection timeout) as
     `ConnectionTimeout`, not `PendingConnectionFailure`.
-  - **A failure reloads `GameDefaultMap`**, the 1 km level, whatever level the process was
-    on. `uepy.py` names the run's level as the default map on every `--game` and `--net`
-    command line, so a probe returns to the level it knows.
+  - **A failure reloads `GameDefaultMap`**, the title level, whatever level the process
+    was on. `uepy.py` names the default map on every `--game` and `--net` command line: a
+    process in play (`-nomenu`) is told the run's level, so a probe returns to the level
+    it knows; a `--net` client, which has the game's own title, is told the title level,
+    where `probe_net_title.py` finds it after a leave.
 - M6 the title and the session: docs/history/multiplayer.md#m6
 
 Every task is tested in both modes: the verifier sweep and the `--game` probes are the
@@ -440,7 +442,8 @@ in which one process acts and the others watch.
   input, write the probe's forced variable with `WRITABLE`, as single-player probes do; it
   is written in that one process only.
 - **A probe that works the title** runs with `--title`: no `-nomenu`, and a net run's
-  clients start alone on the level (the probe joins through the menu). `probes/title.py`
+  clients start alone on the title level, `Lvl_Title` (the probe joins through the menu;
+  `docs/headless_runs.md#title`). `probes/title.py`
   has the steps. The world and the HUD are new after every travel: ask `p` again, never
   keep one. A join to a dead address logs `Network Failure`, which fails a `--net` run's
   report: that probe is a `--game --title` one.

@@ -86,9 +86,16 @@ class Probe(object):
     # ─── the game ───────────────────────────────────────────────────────────
 
     def world(self):
+        """The run's level's world; on --title, the title level's while the
+        process stands on it (probes/boot.py has the same rule)."""
+        import os
         import unreal
         name = self.map_path.rsplit("/", 1)[-1]
-        return unreal.find_object(None, f"{self.map_path}.{name}")
+        world = unreal.find_object(None, f"{self.map_path}.{name}")
+        if world is None and os.environ.get("UEPY_TITLE"):
+            from title.paths import TITLE_LEVEL, TITLE_LEVEL_NAME
+            world = unreal.find_object(None, f"{TITLE_LEVEL}.{TITLE_LEVEL_NAME}")
+        return world
 
     def pawn(self, index=0):
         import unreal

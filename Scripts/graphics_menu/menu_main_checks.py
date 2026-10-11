@@ -1,20 +1,18 @@
 """verify_graphics_menu.py's checks for the one menu (menu_main.py, and
-menu_screens.author_title): the title is the menu held open over a paused
-world, with the HUD ticking under it; its settings row opens the settings
-page in the rows' place, and its last row quits (on the title only). Its first two rows, the
-modes, are mode_checks.py's. The graph only: the rows served under a real pause are
-probes/probe_main_menu.py's.
+menu_screens.author_title): the title is the menu held open over a hidden
+HUD on the title level, unpaused (title_checks.py has the level test and the
+figure); its settings row opens the settings page in the rows' place, and its
+last row quits (on the title only). Its first two rows, the modes, are
+mode_checks.py's. The graph only: the rows served are probes/probe_main_menu.py's.
 """
 
 import unreal
 
 from graphics_menu import umg_consts as UC
-from graphics_menu.gfx_tune_consts import TUNER_COMPONENT
 from graphics_menu.pause_checks import (
     _feeds, _gates, _is_row_test, _pins, _sets, _sources, _value)
 from graphics_menu.profile_consts import EXIT_ACTION
 from graphics_menu.settings_rows import PAGE_SETTINGS
-from net.pause_checks import check_standalone_pause
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -50,12 +48,10 @@ def _check_title(check, nodes):
           f"{len(held)} held, behind {behind}")
 
     ticks = [n for n in nodes if TICK_PIN in _pins(n)]
-    on = [n for n in ticks if _flag(n, TICK_PIN) == "true"]
-    selves = sorted(str(_feeds(n, "self")) for n in on)
-    check("BeginPlay makes the HUD and its tuner tick while paused, before the "
-          "title's pause: the menu's rows are served on Tick",
-          selves == sorted(["[]", str([f"Get {TUNER_COMPONENT}"])]), str(selves))
-    check_standalone_pause(check, nodes, "the title")
+    pauses = [n for n in nodes if PAUSE_PIN in _pins(n) and _flag(n, PAUSE_PIN) == "true"]
+    check("the title is not a paused world: the HUD neither pauses nor ticks while "
+          "paused (the title level is a stage of its own: Scripts/title)",
+          not ticks and not pauses, f"{len(ticks)} tick flags, {len(pauses)} pauses")
 
 
 def _check_rows(check, nodes):

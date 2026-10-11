@@ -74,7 +74,6 @@ from graphics_menu.tune_keep import (                               # noqa: E402
 from net.state_consts import GAME_STATE_CLASS_PATH, PLAYER_STATE_CLASS_PATH  # noqa: E402
 from net.state_graph import (                                      # noqa: E402
     CONTROLLER_CLASS_PATH, game_state, owned_game_state, player_state_of)
-from net.pause import author_pause                                 # noqa: E402
 from net.game_instance import build_game_instance                  # noqa: E402
 from net.session_consts import GAME_INSTANCE_BP_PATH               # noqa: E402
 from graphics_menu.fps import author_fps, declare_fps_vars          # noqa: E402
@@ -128,7 +127,7 @@ from graphics_menu.cursor import (                                  # noqa: E402
     author_cursor_read, cursor_defaults, declare_cursor_vars)
 from graphics_menu.menu_nav import pause_row_taken                  # noqa: E402
 from graphics_menu.menu_main import (                               # noqa: E402
-    author_in_play, author_main_rows_tick, author_title_ticks)
+    author_in_play, author_main_rows_tick)
 from graphics_menu.mode_consts import (                             # noqa: E402
     ADDRESS_KEYS, AddressChars, AddressKeys)
 from graphics_menu import mode_consts                               # noqa: E402
@@ -163,10 +162,13 @@ from uebp.nodes.palette import (  # noqa: E402
     MACRO_FOR_EACH, NODE_BEGIN_PLAY, NODE_CAST_HEALTH,
     NODE_CAST_SETTINGS, NODE_DRAW_HUD, NODE_TICK)
 from uebp.nodes.system import (  # noqa: E402
-    FN_ALL_ACTORS, FN_COMMAND_LINE, FN_CONTAINS, FN_CREATE_SAVE, FN_DELAY,
-    FN_INT_TO_STR, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_TIME_SECONDS)
+    FN_ALL_ACTORS, FN_COMMAND_LINE, FN_CONTAINS, FN_CREATE_SAVE, FN_EQ_SS,
+    FN_INT_TO_STR, FN_LEVEL_NAME, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_TIME_SECONDS)
 from combat import health_vars as HV  # noqa: E402
 from graphics_menu import hud_vars as MV                          # noqa: E402
+from graphics_menu.title_figure import (                            # noqa: E402
+    author_title_figure, declare_title_vars, title_defaults)
+from title.paths import TITLE_LEVEL_NAME                           # noqa: E402
 from uebp.vars import declare, defaults                           # noqa: E402
 from combat import settings_vars as SV  # noqa: E402
 from combat.dirty import OTHER, mark_change_sites  # noqa: E402
@@ -212,8 +214,6 @@ HEALTH_CLASS_PATH = "/Game/Weapons/BP_HealthComponent.BP_HealthComponent_C"
 # its anim graph, so its reference-pose arms filled the screen from within.
 # A quarter second lets both settle; the wanderers are 75 m away and cannot
 # close that in the time.
-MENU_SETTLE_S = 0.25
-
 # The one way past the menu that is not a keypress. A headless -game run has
 # nobody to press Enter, so without this every automated run would sit on the
 # title screen forever and the whole harness would go quiet -- which is a worse
@@ -301,6 +301,7 @@ def _ensure_variables(ed, bp):
     declare_fps_vars(ed)
     declare_difficulty_vars(ed)
     declare_profile_vars(ed)
+    declare_title_vars(ed)
     declare_dev_guns_vars(ed)
     declare_loot_vars(ed)
     declare_wear_vars(ed)
@@ -514,10 +515,12 @@ def _author_begin_play(ed, begin_play):
     # The player's own preset, Custom row and tuning tables, over the defaults.
     loaded_tails = author_load_kept(ed, loaded_tails)
 
-    # --- open paused, on the menu -------------------------------------------
-    # Pausing is what makes the menu a menu. Without it the level is live
-    # behind the panel: ten wanderers spawn, start running at a player who
-    # cannot move, and are on top of them by the time the title is read.
+    # --- open on the menu, on the title level alone -------------------------
+    # The title is a level of its own (Scripts/title), a stage with the
+    # character on it and no forest: nothing there needs pausing, so nothing
+    # is. The forest opens in play: its HUD sets GameStarted at once, as
+    # -nomenu does, so New Game's OpenLevel and the death menu's restart both
+    # land in a game.
     # GetCommandLine is IMPURE -- it has an Exec pin -- so it has to sit in the
     # chain. Left hanging off it the compiler prunes the node and the Contains
     # below silently reads an empty string, which means the switch would never
@@ -529,31 +532,25 @@ def _author_begin_play(ed, begin_play):
     _set(skipping, "Substring", SKIP_MENU_SWITCH)
     wants_menu = _node(ed, FN_NOT)
     _connect(out(skipping), _pin(wants_menu, "A"))
+    where = _node(ed, FN_LEVEL_NAME)
+    _set(where, "bRemovePrefixString", True)
+    here = _node(ed, FN_EQ_SS)
+    _connect(out(where), _pin(here, "A"))
+    _set(here, "B", TITLE_LEVEL_NAME)
+    staged = _node(ed, FN_AND)
+    _connect(out(wants_menu), _pin(staged, "A"))
+    _connect(out(here), _pin(staged, "B"))
     shown = ed.add_branch_node()
-    _connect(out(wants_menu), _pin(shown, "Condition"))
+    _connect(out(staged), _pin(shown, "Condition"))
     # Only a standalone process has a title: a client of a server is already
     # in its game (mode_tick.py), and goes the way -nomenu does.
     on_title, as_client = author_mode_begin(ed, loaded_tails)
     for tail in on_title:
         _connect(tail, _pin(cmdline, "execute"))
-    _connect(then(cmdline), _pin(shown, "execute"))
+    _connect(_chain(where, then(cmdline)), _pin(shown, "execute"))
 
-    # Not paused on frame zero -- see MENU_SETTLE_S. And only if the player has
-    # not already pressed Enter inside that window: pausing after NEW GAME
-    # would freeze the game with no menu left to unpause it.
-    settle = _node(ed, FN_DELAY)
-    _set(settle, "Duration", MENU_SETTLE_S)
-    # The menu's rows are served on Tick, which a paused world stops.
-    _connect(author_title_ticks(ed, [then(shown)]), _pin(settle, "execute"))
-    started = ed.add_get_member_variable_node(GAME_STARTED_VAR)
-    still_on_menu = ed.add_branch_node()
-    _connect(out(started, GAME_STARTED_VAR), _pin(still_on_menu, "Condition"))
-    _connect(then(settle), _pin(still_on_menu, "execute"))
-    # In standalone only: as a client the title is an overlay (net/pause.py).
-    held = []
-    author_pause(ed, [else_(still_on_menu)], held)
-
-    # Straight into the game, for a run with nobody to press Enter.
+    # Straight into the game, for a run with nobody to press Enter, and on
+    # any level but the title's.
     skip = ed.add_set_member_variable_node(GAME_STARTED_VAR)
     _set(skip, GAME_STARTED_VAR, True)
     _connect(else_(shown), _pin(skip, "execute"))
@@ -561,17 +558,14 @@ def _author_begin_play(ed, begin_play):
         _connect(tail, _pin(skip, "execute"))
 
     ed.add_comment_to_nodes(
-        f"Open on the menu, paused {MENU_SETTLE_S}s in. {GAME_STARTED_VAR} "
-        f"defaults to false, so ReceiveDrawHUD holds the menu open over a "
-        f"hidden HUD until the player starts -- see author_title. Pausing "
-        f"is what makes it a menu rather than a picture: unpaused, ten "
-        f"wanderers are already running at a player who cannot move. The "
-        f"delay is because a world paused on frame zero never updates its "
-        f"camera or animates the player, so the view sits inside the "
-        f"reference-posed mesh. {SKIP_MENU_SWITCH} on the command line skips "
-        f"the menu, which is how the headless runs still test a game.",
-        [cmdline, skipping, wants_menu, shown, settle, started, still_on_menu,
-         skip] + held)
+        f"Open on the menu, on {TITLE_LEVEL_NAME} alone, unpaused: the title is "
+        f"a stage of its own with the character on it (Scripts/title), and the "
+        f"menu's New Game opens the play level. {GAME_STARTED_VAR} defaults to "
+        f"false, so ReceiveDrawHUD holds the menu open over a hidden HUD until "
+        f"then -- see author_title. On any other level, or with "
+        f"{SKIP_MENU_SWITCH} on the command line (how the headless runs still "
+        f"test a game), the game is in play at once.",
+        [cmdline, skipping, wants_menu, where, here, staged, shown, skip])
 
 
 # ─── Event Tick: input ───────────────────────────────────────────────────────
@@ -595,10 +589,12 @@ def _author_tick(ed, tick):
     looted = author_loot_tick(ed, pc_out, [*saved, *as_client])
     # The I panel (wear_tick.py): what the player wears, and a take-off.
     looted = author_wear_tick(ed, pc_out, looted)
-    # The title's Multiplayer row and page (mode_tick.py), then the menu's
-    # tuning tabs (tune_tick.py and its four siblings).
     # The graphics one also hands the picked preset to the tuner component.
-    tuned = author_tune_tick(ed, pc_out, author_mode_rows_tick(ed, pc_out, looted, [on_title]))
+    # The title's figure dressed (title_figure.py), then its Multiplayer row
+    # and page (mode_tick.py), then the menu's tuning tabs (tune_tick.py and
+    # its four siblings).
+    staged = author_title_figure(ed, [on_title])
+    tuned = author_tune_tick(ed, pc_out, author_mode_rows_tick(ed, pc_out, looted, staged))
     tuned = author_monster_tune_tick(ed, pc_out, tuned)
     tuned = author_world_tune_tick(ed, pc_out, tuned)
     tuned = author_gfx_tune_tick(ed, pc_out, tuned)
@@ -980,7 +976,11 @@ def build_hud_blueprint(rebuild=False):
         _assets().save_loaded_asset(bp)
         return bp
 
-    if authored:
+    # A rebuild wipes whatever is there, authored or not: a build that
+    # raised part-way leaves a graph with no Tick chain, and authoring over
+    # its leavings would keep them (nodes nothing wires to still run their
+    # own events).
+    if rebuild and ed.list_all_nodes():
         _log("wiping the existing graph")
         ed.remove_nodes(ed.list_all_nodes())
         tick = None
@@ -1014,7 +1014,7 @@ def build_hud_blueprint(rebuild=False):
                          MV.KeyPool: [_key(k) for k in KEY_POOL],
                          AddressKeys: [_key(k) for k, _c in ADDRESS_KEYS],
                          AddressChars: [c for _k, c in ADDRESS_KEYS],
-                         **difficulty_defaults(), **profile_defaults(),
+                         **difficulty_defaults(), **profile_defaults(), **title_defaults(),
                          **dev_guns_defaults(), **loot_defaults(), **wear_defaults(), **inv_defaults(),
                          **carry_defaults(),
                          **tune_defaults(), **monster_tune_defaults(),

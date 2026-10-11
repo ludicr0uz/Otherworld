@@ -13,7 +13,7 @@ sys.path.insert(0, _paths.DEV)
 import uepy  # noqa: E402
 
 from probes.net import LISTENING, Where, pick_probe  # noqa: E402
-from uepylib import net, net_plan, net_report  # noqa: E402
+from uepylib import game, net, net_plan, net_report  # noqa: E402
 from uepylib.net_report import ProcessReport  # noqa: E402
 
 JOINED = "LogNet: Join succeeded: a\n"
@@ -140,11 +140,15 @@ class PlanTest(unittest.TestCase):
             self.assertNotIn("-nomenu",
                              net_plan.command("ed", "p", process, 17777, level="/L"))
 
-    def test_a_left_server_returns_to_the_runs_level(self):
-        for process in self.plan:
-            self.assertIn(
-                "-ini:Engine:[/Script/EngineSettings.GameMapsSettings]:GameDefaultMap=/L",
-                net_plan.command("ed", "p", process, 17777, level="/L"))
+    def test_a_left_server_returns_a_client_to_the_title_level(self):
+        # The server (in play, -nomenu) is told the run's level; a client, which
+        # has the game's own title, the title level: where a probe that leaves
+        # the server finds it back on the title (probe_net_title.py).
+        key = "-ini:Engine:[/Script/EngineSettings.GameMapsSettings]:GameDefaultMap="
+        self.assertIn(key + "/L", net_plan.command("ed", "p", self.plan[0], 17777, level="/L"))
+        for process in self.plan[1:]:
+            self.assertIn(key + game.TITLE_LEVEL,
+                          net_plan.command("ed", "p", process, 17777, level="/L"))
 
     def test_title_starts_the_clients_alone(self):
         env = net_plan.environment({"UEPY_TITLE": "1"}, self.plan[1], "/run", 2, 17777,

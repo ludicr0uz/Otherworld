@@ -136,19 +136,28 @@ def render_args(windowed):
     return list(WINDOW_ARGS) if windowed else ["-nullrhi"]
 
 
+# The title level (Scripts/title/paths.py TITLE_LEVEL; a dev unit test holds
+# the two together): where a --title process starts, and where a failed join
+# or a left server returns it.
+TITLE_LEVEL = "/Game/Maps/Lvl_Title"
+
+
 def title_args(level, title=False):
     """How the process meets the title menu, and which level its title is.
 
-    -nomenu: the HUD opens on a paused title menu (build_graphics_menu.py,
-    SKIP_MENU_SWITCH). A run has nobody to press Enter, so without it the log
+    -nomenu: the HUD opens in play on any level (build_graphics_menu.py,
+    SKIP_MENU_SWITCH; without it only the title level shows the title). A
+    run has nobody to press Enter, so without it a run on the title level
     would be a title screen sitting still. ``title`` (``--title``) leaves it
-    out, for a probe that works the title itself.
+    out, for a probe that works the title itself, on the title level.
 
     A join that fails, or a server left, returns the process to the engine's
-    GameDefaultMap, which is the 1 km level: the run's own level is named
-    instead, so "back to the title" is back to the level under test.
+    GameDefaultMap. For a run in play that is the run's own level, so "back
+    to the title" is back to the level under test; for a --title run it is
+    the title level, where the process started.
     """
-    args = [f"-ini:Engine:[/Script/EngineSettings.GameMapsSettings]:GameDefaultMap={level}"]
+    back = TITLE_LEVEL if title else level
+    args = [f"-ini:Engine:[/Script/EngineSettings.GameMapsSettings]:GameDefaultMap={back}"]
     return args if title else ["-nomenu"] + args
 
 

@@ -90,6 +90,11 @@ Input, settings and state
                   as a client, save and exit's row and countdown too, ending
                   in a disconnect where single player saves
   mode_checks     the verifier's checks for those five, and the session's
+  title_figure    Tick, on the title: the figure (the player's character on
+                  the title level's stage, Scripts/title) dressed once from
+                  the saved profile's worn classes, through ViewWorn
+  title_checks    the verifier's checks for the title level in the HUD's
+                  graph: BeginPlay's level test, the figure's dressing
   menu_still      Tick: the controller ignores move input while the M panel
                   is open, so the arrows only work the menu
   cursor_consts   the mouse cursor in the menus: its buttons, variables, rules

@@ -21,6 +21,7 @@ The waits are on the wall clock: game time stands still on a paused title.
 """
 
 SYSTEMS = ('title', 'health')
+LEVEL = "/Game/Maps/Lvl_Title"
 
 import time
 

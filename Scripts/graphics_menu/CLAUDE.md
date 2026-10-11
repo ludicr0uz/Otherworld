@@ -61,22 +61,43 @@ link under it, names its part there.
 
 ## One menu: the title's and M's (`menu_main.py`, `menu_screens.author_title`)
 
-- **The title is the menu held open.** While `GameStarted` is false DrawHUD hides the HUD's
-  `Body` and the death menu, sets `MenuOpen` and goes on to the same fragment that draws
-  the menu in play (`author_pause_menu`). There is no title page: `WBP_MainMenu` holds only
-  the settings page and the legal notice, and goes up and down with the menu.
-- **The HUD ticks under the title's pause.** Every row is served on Tick, and Event Tick
-  does not run in a paused world, so BeginPlay calls `SetTickableWhenPaused(true)` on the
-  HUD (and on its tuner component, so a preset picked on the title is applied there) on
-  its way to the pause. The first row takes it back before it unpauses, so the death
-  screen's pause still stops Tick, as it always did.
+- **The title is the menu held open, on the title level.** `Lvl_Title` (`Scripts/title`,
+  `build_title_level.py`; `DefaultEngine.ini`'s `GameDefaultMap`) is a stage of its own
+  with no forest: a floor, two lights, fog, a fixed exposure, a PlayerStart and a
+  CameraActor player 0 takes as the level comes up. The GameMode spawns the player's
+  character there as anywhere, and that is the figure on the title. While `GameStarted`
+  is false DrawHUD hides the HUD's `Body` and the death menu, sets `MenuOpen` and goes
+  on to the same fragment that draws the menu in play (`author_pause_menu`). There is no
+  title page: `WBP_MainMenu` holds only the settings page and the legal notice, and goes
+  up and down with the menu.
+- **Only the title level shows the title.** BeginPlay tests `GetCurrentLevelName` against
+  `title/paths.TITLE_LEVEL_NAME` beside the `-nomenu` switch (`title_checks.py`): on any
+  other level, or with the switch, `GameStarted` is set at once, so the forest always
+  comes up in play. Nothing is paused on the title: the stage has nothing to pause, and
+  the character idles live (a paused world would freeze it in whatever pose its first
+  frames reached). The HUD neither pauses nor ticks while paused any more; the one
+  `SetGamePaused` left in its graph is the death menu's unpause before the restart.
+- **The figure is dressed from the profile** (`title_figure.py`, Tick's title arm, once:
+  `TitleDressed`): when the pawn's parts cast and the weapon component has issued the
+  loadout, `DoesSaveGameExist` on the profile's slot, `LoadGameFromSlot`, and each saved
+  `WornClasses` entry worn again through `ViewWorn` (`profile_read._author_rewear`, the
+  same loop the load in play runs), which draws the hoodie, the jeans and the shoes on
+  the MetaHuman. No profile: the basic character, bare. Dressed or bare, the issued
+  gun is then stowed, once (`TitleStowed`), when something is held (`AskMove` from the
+  hand to the primary slot, the HUD's second `AskMove`; the gun reaches the hand a frame
+  or more after the loadout is issued, and a move asked sooner finds the hand empty):
+  the figure holds nothing. Nothing else of the profile is read on the
+  title. `probe_title_figure.py` (`uepy.py --game --title`) is the whole path: bare and
+  empty-handed, then dressed from a written profile, then New Game.
 - **The first row** (`START_ACTION`) lowers `MenuOpen` in play (`resume`); on the title it
-  opens the Single Player page (below: "The two modes"), whose row sets `GameStarted`,
-  stops the paused tick and unpauses, last (`menu_main._author_new_game`). DrawHUD writes
-  that row's label every frame: `new game`, or `continue game` while the saved profile
-  exists (`mode_draw._author_single`: `DoesSaveGameExist` on the profile's slot, asked
-  every frame, because save and exit writes it and a death deletes it under a live HUD).
-  The row does the same either way: a started game loads the profile if there is one.
+  opens the Single Player page (below: "The two modes"), whose row calls
+  `OpenLevel(title/paths.PLAY_LEVEL)`, the 1 km forest, and nothing else
+  (`menu_main._author_new_game`): the title stands, its page up, until the level
+  replaces it, and the new level's HUD opens in play and loads the profile if there is
+  one (`save_exit._author_load_once`). DrawHUD writes that row's label every frame:
+  `new game`, or `continue game` while the saved profile exists
+  (`mode_draw._author_single`: `DoesSaveGameExist` on the profile's slot, asked every
+  frame, because save and exit writes it and a death deletes it under a live HUD).
 - **`settings`** sets `MenuPage` to the settings page and `MenuRow` to 0. The page
   (`WBP_MainMenu.SettingsPanel`, at `PAUSE_POS` like the menu) shows while `MenuPage` says
   so and the menu's `Panel` is collapsed; its BACK row sets `MenuPage` back. In play the
@@ -92,25 +113,26 @@ link under it, names its part there.
   `in game only` (`IN_GAME_ACTIONS`). The tuning tabs and debug work on the title.
 - **M is polled only in play** (a Branch on `GameStarted`, then the key): the title's menu
   has nothing under it to go back to.
-- **The pause is single player's.** BeginPlay's pause is `net.pause.author_pause`: a Branch
-  on IsStandalone in front of the one `SetGamePaused(true)`, so as a client of a server the
-  title is an overlay over a running world. Nothing else differs there: the HUD ticks
-  either way, `menu_still.py` holds the walk and `author_hold_fire` the fire press while
-  the menu is open (neither ever depended on the pause), and the two unpauses
-  (`author_unpause`: the first row's, the restart's) are plain calls, a no-op where nothing
-  paused. `menu_main_checks` checks the Branch; `probe_net_menu_overlay.py` (`uepy.py --net`)
-  is the client's half, with `--windowed` for the fire press, which DrawHUD holds.
-- **Probes:** `probe_main_menu.py` pauses the game itself and shows both halves: with the
-  HUD not ticking a taken row is not served, ticking it is; the first row starts the
-  game, and in play only shuts the menu. It never takes the last row on the title: that
-  is exit game, and would end the run (the verifier holds the quit to the title).
-  `probe_umg_screens.py` reads what the title shows.
+- **The pause is single player's, and death's alone now.** The death pause is
+  `net.pause.author_pause` (`combat/death.py`): a Branch on IsStandalone in front of its
+  `SetGamePaused(true)`. As a client of a server there is no title at all (below). The
+  HUD ticks either way, `menu_still.py` holds the walk and `author_hold_fire` the fire
+  press while the menu is open, and the restart's unpause (`author_unpause`) is a plain
+  call, a no-op where nothing paused. `probe_net_menu_overlay.py` (`uepy.py --net`) is
+  the client's half, with `--windowed` for the fire press, which DrawHUD holds.
+- **Probes:** `probe_main_menu.py` holds a title up by hand on its level under `-nomenu`,
+  pauses the game itself and shows both halves: with the HUD not ticking a taken row is
+  not served, ticking it is; the mode rows open their pages; in play the first row only
+  shuts the menu. It never takes the Single Player page's row (that opens the forest)
+  nor the last row on the title: that is exit game, and would end the run (the verifier
+  holds the quit to the title). `probe_umg_screens.py` reads what the title shows.
 - **A probe's game sees the real title only when asked:** `uepy.py --game` passes
-  `-nomenu`; `--title` leaves it off, and `probes/boot.py` then takes the title's pause
-  (0.25 s in) for the level being up. `probe_title_single.py` is the real BeginPlay path:
-  paused, the menu up, Single Player and New Game served, the game unpausing and playing.
+  `-nomenu`; `--title` leaves it off, on the title level (`LEVEL = "/Game/Maps/Lvl_Title"`
+  in the probe; `docs/headless_runs.md#title`). `probe_title_single.py` is the real
+  BeginPlay path: the menu up, Single Player and New Game served, the forest up and
+  playing; `probe_title_figure.py` the figure and its gear.
 - **Still needs a play session:** the keys themselves on the title, exit game from a real
-  session, and how the title reads with the paused level behind it.
+  session, and how the title reads with the figure behind it.
 
 ## The two modes (`mode_consts.py`, `mode_draw.py`, `mode_tick.py`, `wbp_modes.py`)
 
@@ -281,7 +303,7 @@ sync:
 - **The panel's `save and exit` row** closes it and asks for the 15 s countdown (`EXIT_SECONDS`,
   `combat/ask_consts.py`), drawn top centre (`profile_draw.py`). When the component says
   `ExitDue`, the HUD (once: `ExitLeaving`) puts the player's stats and inventory into a fresh
-  `/Game/UI/BP_Profile` (a `USaveGame`, slot `OtherworldProfile`) and reopens the current level,
+  `/Game/UI/BP_Profile` (a `USaveGame`, slot `OtherworldProfile`) and opens the title level,
   which opens on the main menu.
 - **Stored:** Health, Stamina, Hunger, Thirst, Temperature, the kill count, the equipped slot,
   and each carried item's class, `Loaded`, `Reserve` and `Slot` (`ITEM_FIELDS`: where it

@@ -1,3 +1,4 @@
+import os
 import unittest
 
 import _paths  # noqa: F401
@@ -85,10 +86,11 @@ class GameEnvTest(unittest.TestCase):
         game.game_env(base, "/Game/Maps/L", ["/a.py"], "/tmp/r.json", None)
         self.assertEqual(base, {})
 
-    def test_title_leaves_the_menu_up_and_names_the_runs_level(self):
+    def test_title_leaves_the_menu_up_and_names_the_title_level(self):
         ini = "-ini:Engine:[/Script/EngineSettings.GameMapsSettings]:GameDefaultMap=/Game/Maps/L"
+        back = ini.replace("/Game/Maps/L", game.TITLE_LEVEL)
         self.assertEqual(game.title_args("/Game/Maps/L"), ["-nomenu", ini])
-        self.assertEqual(game.title_args("/Game/Maps/L", title=True), [ini])
+        self.assertEqual(game.title_args("/Game/Maps/L", title=True), [back])
         self.assertNotIn("UEPY_TITLE", game.game_env({"UEPY_TITLE": "1"}, "/L", [], "/r", None))
         self.assertEqual(game.game_env({}, "/L", [], "/r", None, title=True)["UEPY_TITLE"], "1")
 
@@ -139,3 +141,16 @@ class VerdictsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TitleLevelTest(unittest.TestCase):
+    """The harness names the title level once more than Scripts/title does."""
+
+    def test_the_harness_names_the_same_title_level(self):
+        import ast
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        tree = ast.parse(open(os.path.join(root, "title", "paths.py")).read())
+        named = {n.targets[0].id: n.value.value for n in tree.body
+                 if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant)}
+        self.assertEqual(game.TITLE_LEVEL, named["TITLE_LEVEL"])
+        self.assertEqual(named["TITLE_LEVEL"].rsplit("/", 1)[1], named["TITLE_LEVEL_NAME"])

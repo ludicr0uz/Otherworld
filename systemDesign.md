@@ -56,7 +56,7 @@ loot tables, Tab kneels and opens the loot window).
 the five bars (HP, stamina, hunger, thirst, temperature), kill counters, an FPS readout,
 the inventory grid, the menu, the death menu and the settings page, all keyboard and mouse.
 The game opens on a title level of its own (`Lvl_Title`, `Scripts/title`: a lit stage with
-the player's character in the saved profile's garments); M opens the same menu in play. Its
+the player's character in the saved profile's garments, empty-handed); M opens the same menu in play. Its
 rows: Single Player (New Game / Continue Game opens `Lvl_Forest_1000m`), Multiplayer (a
 server address and Join Server), Controls (rebinding, difficulty EASY/MEDIUM/SURVIVOR),
 Debug, Dev All Guns, the GUN / MONSTER / PLAYER / SOUND / WORLD / GRAPHICS SETTINGS tabs

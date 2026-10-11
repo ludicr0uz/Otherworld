@@ -19,6 +19,7 @@ from graphics_menu import loot_consts as LC
 from graphics_menu import mode_consts as MC
 from graphics_menu import profile_consts as PC
 from graphics_menu import sound_tune_consts as SC
+from graphics_menu import title_figure as TF
 from graphics_menu import tune_keep_consts as KC
 from graphics_menu import umg_consts as UC
 from graphics_menu import wear_consts as WC
@@ -35,7 +36,7 @@ HUD_LEFT = ("GrassQualityApplied",)
 def hud_table():
     table = (MV.TABLE + MV.PANEL + MV.DIFFICULTY + MV.FPS + CC.TABLE + DC.TABLE
              + GC.GFX_TUNE_TABLE + IC.CARRY_TABLE + IC.DRAG_TABLE + LC.TABLE + MC.TABLE
-             + PC.HUD_TABLE + SC.SOUND_TUNE_TABLE + UC.SCREEN_TABLE + WC.TABLE
+             + PC.HUD_TABLE + SC.SOUND_TUNE_TABLE + TF.TABLE + UC.SCREEN_TABLE + WC.TABLE
              + WT.WORLD_TUNE_TABLE)
     for tab in TABS:
         table += tab_table(tab)

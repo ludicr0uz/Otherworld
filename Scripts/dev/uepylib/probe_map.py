@@ -42,6 +42,8 @@ RULES = (
     ("Scripts/clothing/", ("clothing", "inventory")),
     ("Scripts/Sound/", ("sound",)),
     ("Scripts/net/", ("net",)),
+    ("Scripts/title/", ("title",)),
+    ("Scripts/build_title_level.py", ("title",)),
     ("Scripts/probes/", ()),
 )
 
@@ -65,6 +67,7 @@ VERIFIER_RULES = (
     ("Scripts/Sound/", (WEAPONS,)),
     ("Scripts/npc/", ("verify_npc_blueprints.py",)),
     ("Scripts/graphics_menu/", ("verify_graphics_menu.py",)),
+    ("Scripts/title/", ("verify_title_level.py",)),
     ("Scripts/survival/", ("verify_survival.py",)),
     ("Scripts/world/", ("verify_day_night.py",)),
     ("Scripts/clothing/", ("verify_clothing.py",)),
@@ -72,6 +75,7 @@ VERIFIER_RULES = (
     ("Scripts/build_sound.py", (WEAPONS,)),
     ("Scripts/build_npc_blueprints.py", ("verify_npc_blueprints.py",)),
     ("Scripts/build_graphics_menu.py", ("verify_graphics_menu.py",)),
+    ("Scripts/build_title_level.py", ("verify_title_level.py",)),
     ("Scripts/build_survival.py", ("verify_survival.py",)),
     ("Scripts/build_day_night.py", ("verify_day_night.py",)),
     ("Scripts/build_clothing.py", ("verify_clothing.py",)),

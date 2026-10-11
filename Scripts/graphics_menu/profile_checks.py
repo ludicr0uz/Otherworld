@@ -11,6 +11,7 @@ from combat.wear_tuning import WORN_VAR
 from combat import ask_consts as AC
 from graphics_menu.ask_checks import asks, fed, feeders
 from graphics_menu.pause_checks import row_gates
+from title.paths import TITLE_LEVEL
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -78,15 +79,19 @@ def check_profile(check, bp, nodes):
     check(f"...the profile is saved once, to slot {PC.PROFILE_SLOT!r}", len(saves) == 1,
           str(len(saves)))
     opens = [n for n in nodes if "LevelName" in _pins(n) and "execute" in _pins(n)]
-    after_save = [n for n in opens for d in _feeders(n, "execute")
-                  if saves and saves[0] in _feeders(d, "execute")]
-    # The other two: the death menu's restart, and Join Server's (mode_tick.py).
-    check("...and then the current level reopens, onto the main menu",
-          len(opens) == 3 and len(after_save) == 1,
-          f"{len(opens)} OpenLevel, {len(after_save)} after the save")
-    # The fifth is the title's first row asking whether there is one to continue.
+    after_save = [n for n in opens if saves and saves[0] in _feeders(n, "execute")]
+    # The other three: the death menu's restart, Join Server's (mode_tick.py)
+    # and New Game's (menu_main.py).
+    check("...and then the title level opens (title/paths.TITLE_LEVEL), onto the main menu",
+          len(opens) == 4 and len(after_save) == 1
+          and _value(after_save[0], "LevelName") == TITLE_LEVEL,
+          f"{len(opens)} OpenLevel, {len(after_save)} after the save: "
+          f"{[_value(n, 'LevelName') for n in after_save]}")
+    # The fifth is the title's first row asking whether there is one to
+    # continue; the sixth and seventh the title figure's look and load
+    # (title_figure.py).
     check("the profile is looked for, and loaded, once a game starts",
-          len(_on_slot(nodes, "UserIndex")) == 5
+          len(_on_slot(nodes, "UserIndex")) == 7
           and any("Load" in _title(n) for n in _on_slot(nodes)),
           str([_title(n) for n in _on_slot(nodes)]))
     wipes = [n for n in _on_slot(nodes) if "Delete" in _title(n)]
@@ -118,5 +123,6 @@ def check_profile(check, bp, nodes):
     saved = [n for n in wears for loop in _feeders(n, "Class")
              if any(_title(w) == f"Get {PC.WORN_CLASSES_FIELD}" for w in _feeders(loop, "Array"))]
     check(f"the load wears each saved class again, slot by slot, through the weapon "
-          f"component's {VIEW_WORN} (hidden, in {WORN_VAR}, drawn on the body)",
-          len(wears) == 1 and len(saved) == 1, f"{len(wears)} call, {len(saved)} off the save")
+          f"component's {VIEW_WORN} (hidden, in {WORN_VAR}, drawn on the body); so does "
+          f"the title's figure (title_figure.py)",
+          len(wears) == 2 and len(saved) == 2, f"{len(wears)} calls, {len(saved)} off the save")

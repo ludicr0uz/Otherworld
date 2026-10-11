@@ -1,11 +1,11 @@
 """What the title probes share: working the real title menu (a run started
-with ``uepy.py --title``, which leaves -nomenu off), its two mode pages and
-the session behind them.
+with ``uepy.py --title``, which leaves -nomenu off, on the title level:
+Scripts/title), its two mode pages and the session behind them.
 
-The level is reopened by a join, a failed join and a leave, and each brings a
-new world and a new HUD: nothing here keeps one, every call asks ``p`` again.
-Waits are on the wall clock (a paused title's game time stands still), and
-each is bounded, so the check after it says what did not happen.
+The level is left by New Game and a join, and reopened by a failed join and
+a leave, and each brings a new world and a new HUD: nothing here keeps one,
+every call asks ``p`` again. Waits are on the wall clock, and each is
+bounded, so the check after it says what did not happen.
 
 A row is taken as a click takes it: PauseClick (the menu's own rows) or
 PageClick (a mode page's), which Tick serves. DrawHUD lowers both at the top
@@ -23,6 +23,7 @@ from graphics_menu import hud_vars as MV
 from graphics_menu import umg_consts as C
 from graphics_menu.profile_consts import PROFILE_SLOT
 from net import session_consts as S
+from title.paths import TITLE_LEVEL_NAME
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 # What a title probe writes: the menu's taken rows, and the address field.
@@ -58,11 +59,17 @@ def alone(p):
 
 
 def on_title(p):
-    """This process stands on the title: a standalone world, paused, its HUD's
-    game not started."""
+    """This process stands on the title: the title level (Scripts/title), a
+    standalone world, its HUD's game not started. Not paused: the title is
+    a stage of its own, with nothing on it to pause."""
     hud = p.world() and p.hud()
-    return bool(hud and p.get(hud, "UiHud") is not None and alone(p) and paused(p)
+    return bool(hud and p.get(hud, "UiHud") is not None and alone(p)
+                and level_name(p) == TITLE_LEVEL_NAME
                 and p.get(hud, C.GAME_STARTED_VAR) is False)
+
+
+def level_name(p):
+    return str(unreal.GameplayStatics.get_current_level_name(p.world(), True))
 
 
 def in_play(p):

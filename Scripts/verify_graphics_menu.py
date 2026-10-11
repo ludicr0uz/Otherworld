@@ -26,6 +26,7 @@ from graphics_menu.reticle_checks import (
     check_headshot_mark, check_reticle_sights, check_reticle_white, sights_gate)
 from graphics_menu import profile_consts as PC
 from graphics_menu.profile_checks import check_profile
+from graphics_menu.title_checks import check_title_level
 from graphics_menu.dev_guns_checks import check_dev_guns
 from graphics_menu import loot_consts as LC
 from graphics_menu import wear_consts as WEAR
@@ -246,23 +247,16 @@ def main():
     check_bar_flash(check, nodes)
 
     # --- the main menu ------------------------------------------------------
-    # The game must not be running behind the title screen: BeginPlay pauses,
-    # and only the menu unpauses. Two SetGamePaused calls with a literal true
-    # would mean something else pausing as well, which is worth knowing about.
+    # The title is a level of its own (Scripts/title), unpaused: nothing on
+    # its stage needs pausing. A SetGamePaused(true) here would be something
+    # else pausing, which is worth knowing about.
     paused = by_pins("bPaused")
     literals = [BEL.find_input_pin(n, "bPaused").get_pin_value() for n in paused]
-    check("exactly one SetGamePaused(true) -- the main menu's, at BeginPlay",
-          literals.count("true") == 1, str(literals))
-    # ...and not on frame zero: a world paused before its first tick never
-    # updates the camera, so the menu would be seen from inside the player.
-    delays = [n for n in by_pins("Duration", "execute")
-              if abs(float(BEL.find_input_pin(n, "Duration").get_pin_value() or 0)
-                     - G.MENU_SETTLE_S) < 1e-6]
-    check(f"the menu pause waits {G.MENU_SETTLE_S}s for the camera to settle",
-          len(delays) == 1, str(len(delays)))
-    # Two unpause: the menu's NEW GAME and the death menu's restart.
-    check("two SetGamePaused(false) -- starting a game and restarting one",
-          literals.count("false") == 2, str(literals))
+    check("no SetGamePaused(true): the title is a stage of its own, and nothing pauses it",
+          literals.count("true") == 0, str(literals))
+    # One unpause: the death menu's restart.
+    check("one SetGamePaused(false) -- restarting a game",
+          literals.count("false") == 1, str(literals))
 
     keys = {str(BEL.find_input_pin(n, "Key").get_pin_value())
             for n in by_pins("Key")}
@@ -463,9 +457,11 @@ def main():
     # and the Worn it lists (wear_draw.py).
     # Twenty-one: and a client's weapon component, asked for save and exit
     # (mode_tick.py).
+    # Twenty-four: and the three the title's figure casts to dress itself
+    # (title_figure.py, through player_parts.py).
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 21 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 24 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # The canvas's sized draws: a wanderer's fill from its health fraction,
@@ -571,10 +567,8 @@ def main():
           str(sorted({t for t in titles if "Level" in t})))
     # And it unpauses first: a level opened while the world is paused comes up
     # paused, with nothing left able to unpause it.
-    # Three SetGamePaused in the graph now: the main menu pauses at BeginPlay,
-    # NEW GAME unpauses, and the restart unpauses. What this check is about is
-    # the restart one, and the thing that identifies it is that it is the
-    # unpause sitting in front of an OpenLevel.
+    # The one SetGamePaused left in the graph is the restart's unpause, and
+    # the thing that identifies it is that it sits in front of an OpenLevel.
     unpauses = [n for n in by_pins("bPaused")
                 if BEL.find_input_pin(n, "bPaused").get_pin_value()
                 in ("false", "False")]
@@ -847,11 +841,12 @@ def main():
 
     # --- two pages, and getting between them
     # ...and the title's two mode pages (mode_checks.py): each opened by its
-    # row and left by its BACK, new game back onto the rows, and BeginPlay
-    # onto the Multiplayer page when a session ended.
+    # row and left by its BACK, and BeginPlay onto the Multiplayer page when
+    # a session ended. (New Game opens the play level and sets no page: the
+    # title stands until the level replaces it.)
     check("the menu has its own rows, a settings page and the two mode pages: "
-          "eight Sets between them",
-          sum(1 for t in titles if t == "Set MenuPage") == 8
+          "seven Sets between them",
+          sum(1 for t in titles if t == "Set MenuPage") == 7
           and any(t == "Get MenuPage" for t in titles),
           str(sorted({t for t in titles if "MenuPage" in t})))
     check("...and the caret is reset on every move between them",
@@ -876,6 +871,7 @@ def main():
     check_cursor(check, bp, nodes)
     check_pause_menu(check, bp, nodes)
     check_main_menu(check, nodes)
+    check_title_level(check, nodes, G.SKIP_MENU_SWITCH)
     check_escape(check, nodes)
     check_death_menu(check, nodes)
     check_modes(check, bp, nodes)

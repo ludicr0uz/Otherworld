@@ -12,7 +12,8 @@ One fragment, run every Tick after the grass sync, in this order:
   3. The panel's save-and-exit row taken, no exit running?  The weapon
      component is asked (AskSaveExit, ask.py), and the panel closes.
   4. The component's ExitDue, not yet left?  ExitLeaving, profile_write.py,
-     and the current level is reopened -- which opens on the main menu.
+     and the title level is opened (Scripts/title) -- which opens on the
+     main menu, the figure in what was just saved.
 
 The countdown itself is the character's, not the screen's: the weapon
 component runs it (combat/weapon_component/save_exit.py: the 15 s, standing
@@ -41,7 +42,8 @@ from graphics_menu.profile_read import author_read_profile
 from graphics_menu.profile_write import author_write_profile
 from uebp.nodes.array import FN_ARR_LEN
 from uebp.nodes.math import FN_AND, FN_GREATER_II, FN_LE_FF, FN_NOT
-from uebp.nodes.system import FN_DELETE_SAVE, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SAVE_EXISTS
+from uebp.nodes.system import FN_DELETE_SAVE, FN_OPEN_LEVEL, FN_SAVE_EXISTS
+from title.paths import TITLE_LEVEL
 from graphics_menu.umg_consts import GAME_STARTED_VAR
 from combat import health_vars as HV
 from graphics_menu import hud_vars as MV
@@ -172,12 +174,10 @@ def _author_leave(ed, parts, in_execs, made):
     flow = _setter(ed, EXIT_LEAVING_VAR, "true", [leave], made)
     written = author_write_profile(ed, flow[0], parts, made)
 
-    # The current map by name, so the exit reopens whatever level is loaded,
-    # and a reopened level opens on the main menu (GameStarted is false again).
-    where = _call(ed, FN_LEVEL_NAME, made, bRemovePrefixString="true")
-    flow = _chain(where, written)
-    reopen = _call(ed, FN_OPEN_LEVEL, made, LevelName=out(where))
-    _chain(reopen, flow)
+    # Back to the title level (Scripts/title), whose HUD opens on the menu
+    # (GameStarted is false again), the figure in what was just saved.
+    reopen = _call(ed, FN_OPEN_LEVEL, made, LevelName=TITLE_LEVEL)
+    _chain(reopen, written)
     return [stay]
 
 

@@ -14,7 +14,8 @@ class SymbolsTest(unittest.TestCase):
                              "stale: python3 Scripts/dev/symbols.py")
 
     def test_size(self):
-        self.assertLess(os.path.getsize(symbols.OUT), 400 * 1024)
+        # Raised from 400 KB on 11 Oct 2026 (the title level's package took it over).
+        self.assertLess(os.path.getsize(symbols.OUT), 448 * 1024)
 
 
 if __name__ == "__main__":

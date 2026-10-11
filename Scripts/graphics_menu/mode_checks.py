@@ -26,6 +26,7 @@ from net.input_checks import check_local_input
 from net.owner_checks import check_no_player_zero_pawn
 from net.random_checks import check_random_audit
 from net.state_checks import check_no_client_game_mode
+from title.paths import PLAY_LEVEL
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -165,20 +166,14 @@ def _check_single(check, nodes):
     starts = [n for n in _sets(nodes, UC.GAME_STARTED_VAR)
               if _value(n, UC.GAME_STARTED_VAR) == "true"
               and _page_gated(n, MC.SINGLE, MC.SINGLE_START_ROW)]
-    stops = [n for n in nodes if TICK_PIN in _pins(n)
-             and (_value(n, TICK_PIN) or "false") == "false"]
-    unpauses = [n for n in nodes if PAUSE_PIN in _pins(n)
-                and (_value(n, PAUSE_PIN) or "false") == "false"
-                and any(s in stops for s in _sources(n, "execute"))]
-    before = [_title(u) for n in starts for u in _since(
-        n, lambda g: _is_page_test(g, MC.SINGLE, MC.SINGLE_START_ROW))]
-    check("the Single Player page's row starts the game as the first row did: "
-          "the menu shut and back on its rows, GameStarted, the HUD no longer "
-          "ticking while paused, then the unpause, last",
-          len(starts) == len(stops) == len(unpauses) == 1
-          and starts[0] in _sources(stops[0], "execute")
-          and sorted(before) == ["Set MenuOpen", "Set MenuPage"],
-          f"{len(starts)} start, {len(stops)} stop, {len(unpauses)} unpause, {before}")
+    opens = [n for n in nodes if "LevelName" in _pins(n) and "execute" in _pins(n)
+             and _page_gated(n, MC.SINGLE, MC.SINGLE_START_ROW)]
+    check("the Single Player page's row opens the play level (title/paths.PLAY_LEVEL) "
+          "and starts nothing itself: the title stands until the level replaces it, "
+          "and that level's HUD opens in play",
+          len(opens) == 1 and _value(opens[0], "LevelName") == PLAY_LEVEL and not starts,
+          f"{len(opens)} OpenLevel ({[_value(n, 'LevelName') for n in opens]}), "
+          f"{len(starts)} GameStarted")
     says = [n for n in nodes if {"self", "InText"} <= _pins(n)
             and UC.CONTINUE_ROW_LABEL in _value(n, "InText")]
     asked = [c for n in says for g in _gates(n) for c in _sources(g, "Condition")

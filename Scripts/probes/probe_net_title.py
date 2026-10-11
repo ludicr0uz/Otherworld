@@ -99,7 +99,7 @@ def probe_client(p):
     yield from T.wait(lambda: T.on_title(p), 20.0)
     if not T.on_title(p):
         p.check("the client opens on the title (run with uepy.py --net --title)", False,
-                "no paused title: the client joined from the command line")
+                "no title: the client joined from the command line")
         return
     pid, gi, own = os.getpid(), T.session(p), T.address(p)
     profile = T.profile_file()
@@ -114,7 +114,7 @@ def probe_client(p):
 def _both_modes(p, gi, profile):
     hud = p.hud()
     yield _frames()
-    p.check("the client opens on the title: paused, alone, in no session",
+    p.check("the client opens on the title level: alone, in no session",
             T.on_title(p) and str(p.get(gi, S.JoinAddress)) == "")
     _shown(p, "the title's first two rows are Single Player and Multiplayer",
            lambda: [T.row_text(p, C.PAUSE_ROWS, i) for i in (C.PAUSE_START_ROW, MULTI_ROW)],
@@ -184,7 +184,7 @@ def _both_modes(p, gi, profile):
             moves.movement_mode == unreal.MovementMode.MOVE_NONE, str(moves.movement_mode))
     yield from T.wait(lambda: T.on_title(p), AC.EXIT_SECONDS + TRAVEL_S)
     left, waited = T.on_title(p), time.time() - asked
-    p.check("the countdown over, the client is back on the title: alone, paused, "
+    p.check("the countdown over, the client is back on the title level: alone, "
             "a new HUD, and not before the countdown ran",
             left and p.hud() != hud and waited >= AC.EXIT_SECONDS - 1.5,
             f"on the title {left}, after {waited:.1f} s")

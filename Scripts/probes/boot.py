@@ -55,6 +55,7 @@ import unreal
 from combat.record_vars import SlotForced
 from graphics_menu.profile_consts import PROFILE_SLOT
 from graphics_menu.tune_keep_consts import TUNE_SAVE_SLOTS
+from title.paths import TITLE_LEVEL, TITLE_LEVEL_NAME
 
 from probes import bots, kept_slots
 
@@ -84,8 +85,13 @@ def _log(text):
 
 
 def _world(map_path):
+    """The run's level's world, or, on --title, the title level's: where a
+    client stands before its probe joins, and after a leave."""
     name = map_path.rsplit("/", 1)[-1]
-    return unreal.find_object(None, f"{map_path}.{name}")
+    world = unreal.find_object(None, f"{map_path}.{name}")
+    if world is None and TITLE:
+        world = unreal.find_object(None, f"{TITLE_LEVEL}.{TITLE_LEVEL_NAME}")
+    return world
 
 
 def _game_time(map_path):
@@ -245,8 +251,9 @@ def _tick(_delta):
             return
         if _state["phase"] == "await server":
             if where.posted(SERVER, LISTENING):
-                # On the title the client starts alone, and its probe joins.
-                _open(map_path if TITLE else where.address)
+                # On the title the client starts alone, on the title level,
+                # and its probe joins.
+                _open(TITLE_LEVEL if TITLE else where.address)
             elif time.time() - _state["since"] > limit:
                 _finish([f"the server never listened within {limit:.0f} s"])
             return

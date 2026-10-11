@@ -86,10 +86,13 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py
 ## `--title`
 
 - **`--title`** (with `--game` or `--net`) keeps the title menu: no `-nomenu`, so the game
-  opens paused on it and a probe works it (`Scripts/probes/title.py`). With `--net` each
-  client starts alone on the level and its probe joins through the Multiplayer page
-  (`probe_net_title.py`). Every `--game` and `--net` process is told the run's level is
-  `GameDefaultMap`, which is where a failed join or a left server returns it.
+  opens on it and a probe works it (`Scripts/probes/title.py`). The title is the title
+  level's alone (`Lvl_Title`, `Scripts/title`; unpaused, the character on its stage), so a
+  `--game --title` probe declares `LEVEL = "/Game/Maps/Lvl_Title"`, and with `--net` each
+  client starts alone on the title level and its probe joins through the Multiplayer page
+  (`probe_net_title.py`); `p.world()` is the title level's while a process stands on it.
+  A process in play is told the run's level is `GameDefaultMap`, a `--title` one the
+  title level: where a failed join or a left server returns it.
 
 <a id="net"></a>
 ## `--net`: the report, lag, bots, files, memory

@@ -208,7 +208,7 @@ def parse_args():
                     help="with --game or --net: render (each client) into a "
                          "window instead of -nullrhi")
     ap.add_argument("--title", action="store_true",
-                    help="with --game or --net: keep the title menu (no -nomenu), "
+                    help="with --game or --net: keep the title menu (no -nomenu; the title level's alone), "
                          "for a probe that works it; with --net each client "
                          "starts alone on the level and the probe joins")
     ap.add_argument("--map", help="level for --game and --net (default: Lvl_Probe_50m for a probe, "

@@ -33,4 +33,6 @@ Unit-tested in Scripts/dev/tests (everything but the process launching).
          keeps everything the terminal showed
 
   scope  What a change can move in the verifier sweep, and the tree snapshot that says what changed
+
+  awake  Keep the Mac awake for the length of a run
 """

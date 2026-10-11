@@ -1231,7 +1231,7 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       Design goal: a handle that sits 2 cm off is fixed by whoever sees it, with no engineer.
       Big picture: item H1 of 3 (H1-H3), hand placement and clip swaps. effort: medium
 
-- [ ] H2. Grip nudges as a tuning table, so a number is a restart and not a build. From H1
+- [x] H2. Grip nudges as a tuning table, so a number is a restart and not a build. From H1
       and D1 (follow D1's table pattern). Add a table of per-item position and rotation
       nudges, all zero by default, applied on top of whatever H1 gives, so a rebuild or a
       new ready pose keeps the nudge. Every machine reads the same rows so the server,
@@ -1242,6 +1242,31 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       nothing. Cover the table's parse and write-back with tests and add a probe that a row
       changes the attach offset by exactly that row. Design goal: tune the last centimetre
       of a handle from inside the game. Big picture: item H2 of 3. effort: medium
+
+- [ ] U0. Unit tests for what the probes checked by arithmetic. The probes cost 21 hours
+      over 8-10 Oct and found three defects; two of the three were plain Python wrong
+      (a per-hectare forage count rounding to zero on the 50 m level; a tuning product).
+      Pin that ground with tests under Scripts/dev/tests, no engine launch, two files:
+      (1) test_weapon_tuning.py: for every row of combat/gun_tuning.csv, the number the
+      builders bake equals the row -- melee_tuning.throw_damage and melee_specs against
+      the Knife and Axe rows, weapon_specs._weapon_specs against each gun's row for every
+      TUNE_STATS column, and a head hit's worth is the row's throw damage times
+      COMBAT.head_multiplier, which is greater than one; a row under its stat's minimum,
+      a missing column and a weapon with no row each fail or fall back the way
+      gun_tuning.read_table says. (2) test_placement.py: survival/forage_placement's
+      forage_counts gives at least one mushroom and one canteen on the 50 m probe level
+      (50 m by 50 m, 0.25 ha) as on the 200 m one; scatter_forage keeps every item
+      TRUNK_CLEAR_CM from a trunk, inside the margin, and off the start; and the zombie
+      and clothing placements (world/level_placement.py, clothing/scatter.py) hold the
+      same three rules on both sizes -- follow test_clothing_scatter.py's fake forest.
+      Any module that needs `unreal` to import gets its table or rule moved into a
+      plain-Python helper first, as grip_nudges.py is; do not stub the engine. Done when
+      the tests pass, each failure message names the weapon or item and the rule, and
+      a deliberate edit (a zero forage count, a halved throw damage) fails exactly one
+      named test. No probe, no verifier, no builder: Scripts/dev changes only, plus any
+      helper split out. Design goal: a wrong number in a CSV or a placement rule fails
+      in 28 seconds at pre-commit, not in a 3-minute launch at night.
+      effort: low
 
 - [ ] H3. One command to swap a player clip. A new Mixamo clip today means dropping the FBX
       in the cache, adding a row, running the whole player import, then the weapons build.

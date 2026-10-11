@@ -43,39 +43,33 @@ saying so in one line: do not kill or restart the editor yourself. A script \
 reported as failed that way took down two editors in a row. uepy.py \
 prints a summary per script (UEPY_OUTPUT=summary: verifier counts, failed \
 checks, traceback tails, plus the path of the full log); pass --full to see \
-everything. To check behaviour in the running game, write a probe and \
-run it with `uepy.py --game --probe FILE` (Scripts/probes/__init__.py).
+everything.
 
 Run every command in the foreground: never run_in_background, and do not \
 start a run to poll for later. This headless session is never told when a \
 background command finishes, so a session that waits for one ends with its \
 work unverified and uncommitted. Give a long run a timeout instead (up to \
-600000 ms), and put several probes in one launch (`--probe A --probe B`) \
-rather than one launch each: the level is opened again between probes, so \
-one probe's leavings never decide the next one's verdict. A long --game or \
---net run can instead be detached: `uepy.py --net --clients 2 --detach \
---probe P` prints a run directory and returns at once, so read or edit \
-meanwhile, then `uepy.py --wait <run dir> --timeout 900` prints the usual \
-report (and fails on timeout); `--status` lists runs. One detached run at a \
-time.
+600000 ms). A long --game or --net run can instead be detached: `uepy.py \
+--game --detach --probe P` prints a run directory and returns at once, so \
+read or edit meanwhile, then `uepy.py --wait <run dir> --timeout 900` prints \
+the usual report (and fails on timeout); `--status` lists runs. One detached \
+run at a time.
 
-Probes: run `uepy.py --probes-for` once, and only when the change is complete: \
-the code written and the content it needs rebuilt, as you mean to commit it. \
-A rebuild or an edit after the run voids its verdicts, so do not start it \
-early to overlap with the work. It runs the probes your `git diff` can \
-affect (one --game and one --net launch; `--dry-run` lists them; pass paths \
-when your diff is wider than your change, say a file you regenerated), never \
-a hand-picked set unless it lists nothing. It detaches itself and prints a \
-run directory at once; its launches take 5-14 minutes (measured), so write \
-the docs and the commit message meanwhile, then `uepy.py --wait <run dir> \
---timeout 900` prints every probe's verdict in one table, with the probe's \
-last recorded verdict, time and commit beside it (Saved/DevTeam/probe_status.json, \
-kept by dev-team and by every --probes-for; `Scripts/dev/dev-team probes \
-[NAME]` lists it). Read that table, not the launches' reports. A probe that \
-was failing on record at this commit before your change is skipped as not \
-yours (--all-probes runs it anyway); a failure the table does not mark that \
-way is yours to fix, and a probe never recorded is new ground. Rerun only a \
-probe that failed on your change.
+Probes: do not run the existing probes (no `--probes-for`, no probe set, no \
+re-run of a probe you did not change). Measured over three days, they cost \
+21 hours of launches and found three defects, and nearly every failure was a \
+probe's own staging, a shared launch or a headless window, not the change. \
+They are swept nightly, apart from dev-team; a failure there is read against \
+the record (`Scripts/dev/dev-team probes [NAME]` lists each probe's last \
+result, time and commit). The one probe run a task makes is its own: when \
+your change is behaviour in the running game that no verifier or unit test \
+can see (a thing happening in play, a number from a running world, anything \
+crossing the network), write a new probe for it in Scripts/probes (or extend \
+the one that covers that system), run it alone with `uepy.py --game --probe \
+FILE` (`--net --clients 2` for the networked kind), and make it pass before \
+you commit; a probe that fails on its own staging is fixed, not loosened. A \
+change the verifiers and the unit tests can see whole needs no probe, and a \
+change to docs, probes or Scripts/dev needs no launch at all.
 
 Verifiers: never run a `verify_*.py` by hand or the full suite (a verifier is \
 85 s cold; the gate runs all nine around your session, and sessions that ran \
@@ -84,11 +78,13 @@ them anyway spent 4 minutes a task on it). After a rebuild run `uepy.py \
 change maps to, warm, and says "none" for a change to probes, docs or \
 Scripts/dev: then there is nothing to verify, and no reason to run it again \
 after editing those. The dev unit tests run in the pre-commit hook when \
-Scripts/dev changed: do not run them yourself. Dev-team's gate runs the \
-verifiers before and after you, and a smoke set of probes once the run's last \
-task is done (after each task too, when the run asks for it); a probe that \
-newly fails counts against the run, or the task. End when your change is \
-proven by its own probe.
+Scripts/dev changed: do not run them yourself, but add to them: a rule, a \
+table, a parser or a sum that can be checked in plain Python gets a unit test \
+in Scripts/dev/tests, which costs seconds for ever. Dev-team's gate runs the \
+verifiers before and after you (and a probe set too, only when the run asks \
+for it); a verifier that newly fails fails the task. End when your change is \
+proven: by the verifiers and the unit tests, and by its own probe when it \
+needed one.
 
 {gate}
 

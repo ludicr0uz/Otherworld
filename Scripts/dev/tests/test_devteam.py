@@ -353,7 +353,8 @@ class SessionTest(unittest.TestCase):
     def test_prompt_forbids_background_runs(self):
         prompt = build_prompt(Task("Do X"), 1, 1, "/p", "| t |", True)
         self.assertIn("never run_in_background", prompt)
-        self.assertIn("--probe A --probe B", prompt)
+        self.assertIn("Give a long run a timeout instead", prompt)
+        self.assertIn("--detach --probe P", prompt)
 
     def test_follow_up_prompts(self):
         from devteam.session import build_limit_resumed_prompt, build_uncommitted_prompt
@@ -634,17 +635,22 @@ class KnownFailuresTest(unittest.TestCase):
         self.assertIn("known_failures.md", build_prompt(task, 1, 1, "/p", None, False))
 
     def test_prompt_names_the_scoped_forms_with_their_costs(self):
-        # The probes and the verifiers a change needs, by tool rather than by
-        # hand: each rule travels with the minutes it is meant to save.
+        # The verifiers a change needs, by tool rather than by hand, and the
+        # probes opted out: each rule travels with the minutes it is meant to save.
         prompt = build_prompt(mock.Mock(text="t"), 1, 1, "/p", "| t |", False)
-        self.assertIn("uepy.py --probes-for` once, and only when the change is complete", prompt)
-        self.assertIn("A rebuild or an edit after the run voids its verdicts", prompt)
-        self.assertIn("last recorded verdict, time and commit beside it", prompt)
+        self.assertIn("do not run the existing probes (no `--probes-for`, no probe set", prompt)
+        self.assertIn("21 hours of launches and found three defects", prompt)
+        self.assertIn("swept nightly, apart from dev-team", prompt)
         self.assertIn("dev-team probes", prompt)
-        self.assertIn("--all-probes", prompt)
+        self.assertIn("write a new probe for it in Scripts/probes", prompt)
+        self.assertIn("run it alone with `uepy.py --game --probe", prompt)
+        self.assertIn("make it pass before you commit", prompt)
+        self.assertIn("fixed, not loosened", prompt)
         self.assertIn("--wait <run dir>", prompt)
-        self.assertIn("5-14 minutes", prompt)
         self.assertIn("uepy.py --verify-for", prompt)
         self.assertIn("85 s", prompt)
         self.assertIn("pre-commit hook", prompt)
-        self.assertIn("opened again between probes", prompt)
+        self.assertIn("gets a unit test", prompt)
+        self.assertIn("only when the run asks", prompt)
+        self.assertNotIn("--all-probes", prompt)
+        self.assertNotIn("proven by its own probe.", prompt)

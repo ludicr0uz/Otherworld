@@ -18,10 +18,15 @@ architecture.
        instead. The one exception is a Fab asset (see "Fab assets" below).
        It reads the task file again after each task, so an item added to `tasks.md` during a
        run is run in that run, and a waiting one ticked or deleted there is not.
-     - The gate also runs a probe set beside the verifiers (`Scripts/probes/sets.py`: `SMOKE`
-       by default, `--gate-probes FULL|none`): `probe:<name>` rows in the baseline table, a probe
-       that newly fails fails the task. A probe that fails in its batch is re-run alone and the
-       solo verdict stands (`devteam/probe_gate.py`).
+     - Probes are opt-in for a run (`--probes [SET]` sweeps one after the last task;
+       `--gate-probes SET` beside the verifiers after every task; `Scripts/probes/sets.py`):
+       measured 8-10 Oct 2026, they cost 21 hours of launches for three defects found, while
+       the verifiers found more in minutes. A session writes and runs a probe only for a
+       change no verifier or unit test can see. The existing probes are swept nightly, apart
+       from dev-team: `dev-team probes run [SET]` (FULL unless named; `devteam/nightly.py`),
+       which writes the record (`dev-team probes` lists it) and a report under
+       `Saved/DevTeam/probes-<stamp>/`. A probe that fails in its batch is re-run alone and
+       the solo verdict stands (`devteam/probe_gate.py`).
      - Their unit tests: `python3 -m unittest discover -s Scripts/dev/tests`. Run them after
        changing anything in `Scripts/dev` or `Scripts/probes`.
    - `Scripts/probes/` holds probes: checks that run inside a headless game (see below).
@@ -276,7 +281,7 @@ editor.
    the changed paths map to (`uepylib/probe_map.py`), and names none for a change to probes,
    docs or `Scripts/dev`. A verifier is 85 s cold, so never run one that reads nothing you
    wrote; dev-team's gate runs the whole suite around a session anyway. `--probes-for` is the
-   same rule for probes.
+   same rule for probes, for the nightly sweep's triage: a task runs no existing probe (above).
 4. **For a guard, zero errors proves nothing.** A gate that never opens logs the same as one that
    works. Probe the positive case too, with a probe in `Scripts/probes` (below).
 5. **Batch several scripts into one `uepy.py` call.**

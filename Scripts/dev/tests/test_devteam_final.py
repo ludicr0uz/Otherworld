@@ -163,7 +163,7 @@ class GatedRun(unittest.TestCase):
         return self.run_cli(*flags, **how)
 
     def test_no_probe_rows_per_task_and_one_final_section(self):
-        code, out, progress = self.run_cli("--check-baseline")
+        code, out, progress = self.run_cli("--probes", "--check-baseline")
         self.assertEqual(code, 0)
         self.assertIn("probes per task: none; final probes: SMOKE, against a baseline sweep", out)
         self.assertRegex(out, r"\d\d:\d\d:\d\d  gate: sweeping the run's baseline -- "
@@ -181,8 +181,8 @@ class GatedRun(unittest.TestCase):
         self.assertEqual(self.sweeps, [("run baseline", LABELS)])
         self.assertEqual(self.probe_runs, [LABELS])
 
-    def test_by_default_the_record_is_the_before_and_no_baseline_is_swept(self):
-        code, out, progress = self.run_cli()
+    def test_with_probes_the_record_is_the_before_and_no_baseline_is_swept(self):
+        code, out, progress = self.run_cli("--probes")
         self.assertEqual(code, 0)
         self.assertIn("against each probe's recorded result (--check-baseline sweeps one", out)
         self.assertIn("gate: no baseline sweep (--check-baseline runs one); the final probes "
@@ -199,7 +199,7 @@ class GatedRun(unittest.TestCase):
         self.assertEqual(sorted(record), ["probe_a", "probe_net_b"])
         self.assertEqual((record["probe_a"]["head"], record["probe_a"]["ok"],
                           record["probe_a"]["passed"]), ("c2", True, 3))
-        code, out, progress = self.again()
+        code, out, progress = self.again("--probes")
         self.assertEqual(code, 0)
         self.assertIn("compared with the recorded results of 2 of 2 probe(s), from "
                       f"{record['probe_a']['when']} at commit c2", out)
@@ -207,8 +207,8 @@ class GatedRun(unittest.TestCase):
         self.assertEqual(self.sweeps, [])
 
     def test_a_final_regression_fails_the_run_and_no_task(self):
-        self.run_cli()                                  # puts the probes on record
-        code, out, progress = self.again(failing=("probe:probe_net_b",))
+        self.run_cli("--probes")                        # puts the probes on record
+        code, out, progress = self.again("--probes", failing=("probe:probe_net_b",))
         self.assertEqual(code, 1)
         self.assertEqual(progress.count(": done"), 1)
         self.assertIn(final.HEADING + ": FAILED", progress)
@@ -219,14 +219,14 @@ class GatedRun(unittest.TestCase):
         self.assertFalse(probe_record.load(self.tmp)["probe_net_b"]["ok"])
 
     def test_a_failing_probe_with_no_record_is_reported_as_new(self):
-        code, _out, progress = self.run_cli(failing=("probe:probe_net_b",))
+        code, _out, progress = self.run_cli("--probes", failing=("probe:probe_net_b",))
         self.assertEqual(code, 1)
         self.assertIn("- probe:probe_net_b: 3/4 FAILED (new)", progress)
 
     def test_the_next_run_s_baseline_is_cached_under_both_sets(self):
-        self.run_cli()
+        self.run_cli("--probes")
         self.sweeps.clear()
-        _code, out, _progress = self.again("--check-baseline", moved=False)
+        _code, out, _progress = self.again("--probes", "--check-baseline", moved=False)
         self.assertEqual(self.sweeps, [])               # the first baseline: from the cache
         self.assertIn("the run's baseline from the cache (tree unchanged)", out)
         self.assertEqual(len(self.probe_runs), 2)
@@ -245,7 +245,7 @@ class GatedRun(unittest.TestCase):
         self.assertIs(sys.stdout, sys.__stdout__)       # put back
 
     def test_dev_team_probes_lists_the_record(self):
-        self.run_cli(failing=("probe:probe_net_b",))
+        self.run_cli("--probes", failing=("probe:probe_net_b",))
         out = io.StringIO()
         with mock.patch.multiple(self.cli, ROOT=self.tmp), \
                 mock.patch.object(sys, "argv", ["dev-team", "probes"]), \
@@ -269,7 +269,7 @@ class GatedRun(unittest.TestCase):
         self.assertEqual(stop.exception.code, 1)
 
     def test_gate_probes_on_every_task_need_no_second_sweep(self):
-        code, _out, progress = self.run_cli("--gate-probes", "SMOKE")
+        code, _out, progress = self.run_cli("--probes", "--gate-probes", "SMOKE")
         self.assertEqual(code, 0)
         self.assertEqual(self.probe_runs, [])           # the last after-sweep held them
         self.assertIn("the last task's after-sweep", progress)
@@ -280,8 +280,29 @@ class GatedRun(unittest.TestCase):
         self.assertNotIn(final.HEADING, progress)
         self.assertEqual(self.sweeps, [])
 
+    def test_by_default_no_probe_runs_at_all(self):
+        # Opt-in: measured 8-10 Oct 2026, 21 hours of launches for three defects.
+        code, out, progress = self.run_cli()
+        self.assertEqual(code, 0)
+        self.assertIn("gate: the verifiers round each task; no probes (--probes [SET]", out)
+        self.assertNotIn("final probes:", out)
+        self.assertNotIn(final.HEADING, progress)
+        self.assertNotIn("probe:", progress)
+        self.assertEqual(self.sweeps, [])
+        self.assertEqual(self.probe_runs, [])
+        self.assertEqual(progress.count(": done"), 2)
+        self.assertEqual(probe_record.load(self.tmp), {})
+
+    def test_probes_flag_names_a_set(self):
+        _code, out, progress = self.run_cli("--probes", "FULL")
+        self.assertIn("probes per task: none; final probes: FULL, against", out)
+        self.assertIn(final.HEADING, progress)
+        self.assertEqual(self.probe_runs, [LABELS])
+        _code, out, _progress = self.again("--probes")
+        self.assertIn("final probes: SMOKE, against", out)
+
     def test_an_unchanged_tree_is_not_swept(self):
-        code, _out, progress = self.run_cli(commits=False)
+        code, _out, progress = self.run_cli("--probes", commits=False)
         self.assertEqual(code, 0)
         self.assertIn(final.HEADING + ": not run", progress)
         self.assertIn("Commits: none (still c0)", progress)

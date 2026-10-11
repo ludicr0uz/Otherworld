@@ -13,7 +13,9 @@ sessions are pointed at in case an earlier task matters to them.
     Scripts/dev/dev-team --no-commit               # leave changes uncommitted
     Scripts/dev/dev-team --dry-run                 # show what would run
     Scripts/dev/dev-team resume paused/<name>      # carry on a paused task
+    Scripts/dev/dev-team --probes [SET]            # sweep the probes after the last task too
     Scripts/dev/dev-team probes [NAME]             # the latest result of each probe
+    Scripts/dev/dev-team probes run [SET]          # a probe sweep on its own (nightly)
 
 A task file is a Markdown list. Every top-level item is one task; indented or
 following lines up to the next item belong to it, so a task can run to several
@@ -52,25 +54,34 @@ asking for a Fab asset, and at the end of the run.
 and puts the numbers in the prompt; after the session it runs them again. A
 suite that newly fails -- or fails more checks than before -- sends the
 session back (``--resume``) with the failures, up to --fix-attempts times,
-then fails the task. --no-gate skips both sweeps. Beside the verifiers the
-gate can run a named probe set (Scripts/probes/sets.py), batched per boot:
-none by default, SMOKE (one --game launch, one --net --clients 2 launch) or
-FULL (--gate-probes); each probe is a ``probe:<name>`` row in the table and a
-probe that newly fails fails the task like a verifier.
+then fails the task. --no-gate skips both sweeps.
 
-**The final probes.** The probes are swept once a run instead (--final-probes,
-SMOKE by default; devteam/final.py), after the last task. A probe that newly
+**Probes are opt-in.** A run sweeps no probe unless asked: over three days
+(8-10 Oct 2026) the probes cost 21 hours of launches and found three defects,
+while the verifiers found more in a few minutes a task. A session still writes
+a probe when its change is behaviour in the running game that no verifier or
+unit test can see, runs that one probe alone, and makes it pass. The existing
+probes are swept apart, nightly: ``dev-team probes run [SET]`` (FULL unless
+named; devteam/nightly.py) runs the set, writes the record and a report under
+Saved/DevTeam/probes-<stamp>/, and exits 1 when a probe newly fails.
+
+**Probes in a run, when asked.** --probes [SET] sweeps a set once, after the
+run's last task (SMOKE unless named; devteam/final.py). A probe that newly
 fails is written to progress.md under "Final probes" with the run's commit
 range and makes the run exit non-zero, but fails no task. A run that was
-paused, interrupted or stopped skips it.
+paused, interrupted or stopped skips it. --gate-probes SET runs a set beside
+the verifiers after every task instead (Scripts/probes/sets.py: SMOKE is one
+--game launch and one --net --clients 2 launch, FULL every probe), each probe
+a ``probe:<name>`` row in the table, and a probe that newly fails fails the
+task like a verifier.
 
 **The probe record.** "Newly" is judged against Saved/DevTeam/probe_status.json:
 the latest result of every probe dev-team has run, with the time and the
 commit (``dev-team probes`` lists it; ``dev-team probes net`` the names
 holding "net"). Every probe launch updates it. --check-baseline sweeps the
-verifiers and the probes before the first task instead, about twenty minutes,
-and judges the final probes against that; a baseline the cache holds for an
-unchanged tree is used either way.
+verifiers and the run's probes before the first task instead, about twenty
+minutes, and judges the final probes against that; a baseline the cache holds
+for an unchanged tree is used either way.
 
 **What is happening.** Each slow step -- a sweep, a probe launch, a session
 starting -- is printed with the clock time it began. Everything printed goes
@@ -145,7 +156,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(1, os.path.dirname(HERE))        # Scripts/: asset_pipeline
 
 from devteam import (                                               # noqa: E402
-    baseline_cache, fab, fast, final, limits, pause, probe_gate, probe_record,
+    baseline_cache, fab, fast, final, limits, nightly, pause, probe_gate, probe_record,
 )
 from devteam.accounting import git_head                             # noqa: E402
 from devteam.tasks import Task, parse_tasks, requeue, tick          # noqa: E402
@@ -188,16 +199,20 @@ def parse_args():
     p.add_argument("--budget", type=float, metavar="USD", help="per-task spending cap")
     p.add_argument("--no-gate", dest="gate", action="store_false",
                    help="skip the verifier sweeps before and after each task")
+    p.add_argument("--probes", nargs="?", const="SMOKE", metavar="SET",
+                   help="run probes too: sweep SET once after the run's last task "
+                        "(SMOKE unless named; Scripts/probes/sets.py). Off by default: "
+                        "the probes are swept nightly by 'dev-team probes run'")
     p.add_argument("--gate-probes", default="none", metavar="SET",
                    help="probe set the gate runs beside the verifiers, after every task: "
-                        "none (default), SMOKE or FULL (Scripts/probes/sets.py)")
-    p.add_argument("--final-probes", default="SMOKE", metavar="SET",
-                   help="probe set swept once, after the run's last task, against each "
-                        "probe's recorded result: SMOKE (default), FULL or none")
+                        "none (default), SMOKE or FULL")
+    p.add_argument("--final-probes", default="none", metavar="SET",
+                   help="the long form of --probes: the set swept once after the last "
+                        "task, against each probe's recorded result (default none)")
     p.add_argument("--check-baseline", action="store_true",
-                   help="sweep the verifiers and the probes before the first task too "
-                        "(about twenty minutes) and judge the final probes against that "
-                        "sweep, not the record")
+                   help="with probes: sweep the verifiers and the probes before the first "
+                        "task too (about twenty minutes) and judge the final probes "
+                        "against that sweep, not the record")
     p.add_argument("--fix-attempts", type=int, default=1, metavar="N",
                    help="times a session is sent back to fix a gate regression (default 1)")
     p.add_argument("--dry-run", action="store_true",
@@ -267,7 +282,10 @@ def reread(task_file, pending, attempted, args, n):
 
 
 def probe_sets(args):
-    """Resolve --gate-probes and --final-probes onto args (None: no probes)."""
+    """Resolve --probes, --gate-probes and --final-probes onto args (None: no
+    probes, the default: a run sweeps none unless asked)."""
+    if args.probes:
+        args.final_probes = args.probes
     for attr, name in (("probe_set", args.gate_probes), ("final_set", args.final_probes)):
         setattr(args, attr, None)
         if args.gate and name.lower() != "none":
@@ -277,6 +295,9 @@ def probe_sets(args):
                 sys.exit(f"dev-team: {err}")
     if not args.gate:
         return "  gate: off"
+    if not args.probe_set and not args.final_set:
+        return ("  gate: the verifiers round each task; no probes (--probes [SET] sweeps "
+                "them after the last task; 'dev-team probes run' sweeps them on their own)")
     return (f"  gate: the verifiers round each task; probes per task: {args.gate_probes}; "
             f"final probes: {args.final_probes}, against "
             + ("a baseline sweep before the first task" if args.check_baseline
@@ -300,6 +321,8 @@ def list_probes(pattern=None):
 
 def main():
     args = parse_args()
+    if args.tasks[:2] == ["probes", "run"] and len(args.tasks) <= 3:
+        sys.exit(nightly.run(args.tasks[2] if len(args.tasks) == 3 else nightly.DEFAULT_SET))
     if args.tasks and args.tasks[0] == "probes" and len(args.tasks) <= 2:
         sys.exit(list_probes(args.tasks[1] if len(args.tasks) == 2 else None))
     gate_line = probe_sets(args)

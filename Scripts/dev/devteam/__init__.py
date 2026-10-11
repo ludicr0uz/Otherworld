@@ -22,7 +22,10 @@ Unit-tested in Scripts/dev/tests (everything but the process launching).
   baseline_cache  The before-sweep's result kept on disk, so it survives across dev-team runs
   probe_gate      The probe half of the gate: a named probe set (Scripts/probes/sets.py), run beside the verifier sweep
 
-  final  The run's one probe sweep: a probe set run after the last task, not after each
+  final  The run's one probe sweep, when a run asks for probes (--probes): a
+         probe set run after the last task, not after each
+  nightly  A probe sweep on its own, apart from any run: ``dev-team probes run
+           [SET]`` (FULL unless named), the nightly's command
   probe_record  The latest result of every probe (time, commit, pass/fail), kept
                 across runs: the final sweep's "before" when the run has no
                 baseline sweep of its own; ``dev-team probes`` lists it

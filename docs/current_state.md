@@ -24,10 +24,10 @@ updates the bullet here.
   it for a moment (`graphics_menu/hit_marker.py`, `combat/weapon_component/headshot.py`).
   Down the sights the view runs along the gun's own sight line (the front sight's tip is the
   centre of the screen, in any pose), so there the reticle is drawn only in debug mode; the
-  hip and the shoulder aim keep it. Bringing the sights up is one motion from the key: the camera
-  travels from where it is onto the sights, zooming as it goes, and the view stays on the
-  target while the gun rises into it
-  (`combat/weapon_component/seat.py`). Down any gun's sights the player's own head is
+  hip and the shoulder aim keep it. Bringing the sights up is a cut, not a glide: on the key
+  the camera is at once in the sights' view, at the head and zoomed, and the gun rises into
+  it from below and to the right onto the crosshair while the view stays on the target
+  (`combat/weapon_component/seat.py`, `sights.py`). Down any gun's sights the player's own head is
   hidden, so it never stands in the sight picture (`combat/weapon_component/head_hide.py`).
   The aim sways slowly, sights and shot together
   (`combat/sway_tuning.py`; steadier crouched and prone; how fast is each gun's `sway_rate` on the

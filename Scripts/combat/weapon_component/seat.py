@@ -2,18 +2,23 @@
 far it has turned onto the gun's sight line. sights.py places the camera by
 what this writes.
 
-    SightSeat   = FInterpTo(SightSeat, SightAiming ? 1 : 0, dt, ads_interp_speed)
+    SightSeat   = SightAiming ? 1
+                  : FInterpTo(SightSeat, SightAiming ? 1 : 0, dt, ads_interp_speed)
     up          = no sight line
                   OR Normal(sight line) . Forward(control rotation) > cos(10 deg)
     SightSeated = SightAiming AND (SightSeated OR up)
     SightLook   = FInterpTo(SightLook, SightSeated ? 1 : 0, dt, ads_interp_speed)
 
-One motion, from the key: SightSeat starts on the sights key and carries the
-camera from wherever it is (the boom's end, zoomed by the shoulder aim or
-not) to the gun's eye point, and ads.py's zoom goes to the weapon's own on the
-same key at the same speed. The camera used to wait on the boom, zooming as
-the shoulder aim does, until the gun was up, and travel only then: two moves,
-with a stop between them.
+At once, from the key: SightSeat is 1 on the frame the sights key goes down,
+and ads.py's zoom is the weapon's own on the same frame, so the camera is in
+the sights' view (at the head, sights.py's anchor, zoomed) before the gun has
+moved, and the gun is what is seen to move: it rises from below and to the
+right of the view onto the crosshair. Letting go eases home, as it always
+has: a cut back to the boom from a scope would be a jolt, and the carry and
+SightBlend read the seat on its way down (SEAT_HOLD). The camera used to
+ease to the eye point over a fifth of a second, zooming as it went, and the
+raise was half hidden behind the travel; before that it waited on the boom
+until the gun was up, and travelled only then.
 
 Why the turn still waits for the gun: a gun is carried lowered (carry.py), and
 the sights key raises it with the ready pose's blend. Its sight line starts
@@ -43,7 +48,7 @@ from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR, SIGHT_SEAT_COS
 from combat.tuning import COMBAT
 from uebp.nodes.math import (
     FN_AND, FN_BOOL_TO_FLOAT, FN_DOT_VV, FN_FORWARD, FN_GREATER_FF, FN_INTERP_FF, FN_NORMAL,
-    FN_NOT, FN_OR)
+    FN_NOT, FN_OR, FN_SELECT_FF)
 from combat.weapon_component import vars as WV
 
 
@@ -79,8 +84,9 @@ def _author_sight_seat(ed, tick, keep, line_out, has_line_out, boom_rot_out,
     _connect(gate2(FN_AND, out(wanted, WV.SightAiming), stay), _pin(seated, SEATED_VAR))
     _connect(exec_in, _pin(seated, "execute"))
 
-    def eased(var, toward, after):
-        """var = FInterpTo(var, toward ? 1 : 0, dt, ads_interp_speed)."""
+    def eased(var, toward, after, snap_up=False):
+        """var = FInterpTo(var, toward ? 1 : 0, dt, ads_interp_speed); with
+        snap_up, 1 at once while toward is true (the ease is the way down)."""
         as_float = keep(_node(ed, FN_BOOL_TO_FLOAT))
         _connect(toward, _pin(as_float, "InBool"))
         have = keep(ed.add_get_member_variable_node(var))
@@ -89,13 +95,24 @@ def _author_sight_seat(ed, tick, keep, line_out, has_line_out, boom_rot_out,
         _connect(out(as_float), _pin(step, "Target"))
         _connect(out(tick, "DeltaSeconds"), _pin(step, "DeltaTime"))
         _set(step, "InterpSpeed", COMBAT.ads_interp_speed)
+        value = out(step)
+        if snap_up:
+            # The literal 1 is on B, the pin a Kismet node lets hold one, so
+            # the pick is NOT toward: the ease when the key is up.
+            easing = keep(_node(ed, FN_NOT))
+            _connect(toward, _pin(easing, "A"))
+            pick = keep(_node(ed, FN_SELECT_FF))
+            _connect(value, _pin(pick, "A"))
+            _set(pick, "B", 1.0)
+            _connect(out(easing), _pin(pick, "bPickA"))
+            value = out(pick)
         put = keep(ed.add_set_member_variable_node(var))
-        _connect(out(step), _pin(put, var))
+        _connect(value, _pin(put, var))
         _connect(after, _pin(put, "execute"))
         return put
 
-    # The travel starts on the key; the turn waits for the latch.
-    seat = eased(SEAT_VAR, out(wanted, WV.SightAiming), then(seated))
+    # The camera is on the sights from the key; the turn waits for the latch.
+    seat = eased(SEAT_VAR, out(wanted, WV.SightAiming), then(seated), snap_up=True)
     look = eased(LOOK_VAR, _loose_pin(seated, "Output_Get", is_input=False), then(seat))
     return (then(look),
             _loose_pin(seat, "Output_Get", is_input=False),

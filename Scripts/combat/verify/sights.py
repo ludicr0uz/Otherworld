@@ -1,6 +1,7 @@
 """verify.sights -- the two ways of aiming (shoulder and down the sights), each
-weapon's eye point and sight line, and the camera that travels from the boom
-to the one and turns onto the other.
+weapon's eye point and sight line, and the camera that stands in the sights'
+view from the key and turns onto the sight line once the gun is up. The seat
+itself (SightSeat, SightSeated, SightLook) is verify.seat.
 """
 
 import unreal
@@ -12,9 +13,10 @@ from combat.paths import (
 )
 from combat.seat_tuning import (
     HAS_SIGHTS_VAR, LOOK_VAR, NEAR_CLIP_CM, SEAT_HOLD, SEAT_VAR, SEATED_VAR,
-    SIGHT_SEAT_COS, SIGHT_SEAT_DEG, SIGHTS_FORCED_VAR,
+    SIGHTS_FORCED_VAR,
 )
 from combat.tuning import BIND_VARS, COMBAT, SIGHTS_KEY
+from combat.weapon_component.head_hide import head_bone
 from combat.weapon_component.sights import SCOPE_HIDE_BLEND, SIGHT_LINE_MIN_CM
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import char, w, wg
@@ -241,20 +243,39 @@ def check_sight_camera():
     fed = [_feeds(BEL.find_input_pin(n, "NewLocation")) for n in moves]
     sight = [f for f in fed if any("SightOffset" in out_pins(n) for n in f)]
     mixes = [n for f in sight for n in f if {"A", "B", "Alpha"} <= in_pins(n)]
-    check(f"...one between the boom's end and the held weapon's SightOffset, by "
-          f"{SEAT_VAR}",
-          len(sight) == 1 and len(mixes) == 1
-          and f"Set {SEAT_VAR}" in {
-              _title(n) for n in _feeds(BEL.find_input_pin(mixes[0], "Alpha"))},
-          str(len(sight)))
+    # The outer lerp is the seat's (the boom's end to the sights' view); the
+    # inner is the look's, between the head bone and the eye point.
+    def alpha_of(n):
+        return {_title(m) for m in _feeds(BEL.find_input_pin(n, "Alpha"))}
+    outer = [n for n in mixes if f"Set {SEAT_VAR}" in alpha_of(n)
+             and f"Set {LOOK_VAR}" not in alpha_of(n)]
+    inner = [n for n in mixes if f"Set {LOOK_VAR}" in alpha_of(n)
+             and f"Set {SEAT_VAR}" not in alpha_of(n)]
+    check(f"...one from the boom's end, by {SEAT_VAR}, to the sights' view",
+          len(sight) == 1 and len(mixes) == 2 and len(outer) == 1
+          and len(inner) == 1
+          and inner[0] in _feeds(BEL.find_input_pin(outer[0], "B")),
+          f"{len(sight)} sight writes, {len(mixes)} lerps, {len(outer)} by the seat, "
+          f"{len(inner)} by the look")
     sockets = [n for n in wg if "InSocketName" in in_pins(n)]
     at = [n for n in sockets if "location" in _title(n).lower()]
+    boom = [n for n in at if pin_value(n, "InSocketName") == SPRING_ARM_SOCKET]
     check(f"...both measured from the boom's {SPRING_ARM_SOCKET} socket",
-          len(at) == 1 and pin_value(at[0], "InSocketName") == SPRING_ARM_SOCKET
-          and all(at[0] in f for f in fed),
+          len(boom) == 1 and all(boom[0] in f for f in fed),
           str([pin_value(n, "InSocketName") for n in sockets]))
+    head = [n for n in at if pin_value(n, "InSocketName") == head_bone()]
+    check(f"...and the sights' view is the head bone ({head_bone()}, off "
+          f"OwnerMesh: where the camera stands from the key while the gun "
+          f"rises) to the held weapon's SightOffset, by {LOOK_VAR}: the camera "
+          f"settles onto the gun's eye point as it turns onto its line",
+          len(at) == 2 and len(head) == 1 and len(inner) == 1
+          and head[0] in _feeds(BEL.find_input_pin(inner[0], "A"))
+          and any("SightOffset" in out_pins(n)
+                  for n in _feeds(BEL.find_input_pin(inner[0], "B")))
+          and "Get OwnerMesh" in {
+              _title(n) for n in _feeds(BEL.find_input_pin(head[0], "self"))},
+          str([pin_value(n, "InSocketName") for n in at]))
     check_sight_look(sockets, moves)
-    check_sight_seat()
 
     hides = [n for n in wg if "bNewHidden" in in_pins(n)]
     tucked = [n for n in hides if PIN.list_connected_pins(BEL.find_input_pin(n, "bNewHidden"))]
@@ -379,91 +400,6 @@ def check_sight_look(sockets, moves):
                      for q in PIN.list_connected_pins(BEL.find_then_pin(n)))]
     check("...each straight after the camera is placed, in the same frame",
           len(placed) == 2, str(len(placed)))
-
-
-def check_sight_seat():
-    """One motion from the key (weapon_component/seat.py): SightSeat, which
-    places the camera, eases toward the sights key itself. SightSeated latches
-    on the gun's sight line coming near the view, and SightLook, which turns
-    the camera onto that line, eases toward the latch."""
-    def writes(var):
-        sets = [n for n in wg if _title(n) == f"Set {var}"]
-        wired = [n for n in sets
-                 if PIN.list_connected_pins(BEL.find_input_pin(n, var))]
-        return sets, wired
-
-    latches, wired = writes(SEATED_VAR)
-    check(f"{SEATED_VAR} is written twice by the living Tick: armed, and false "
-          f"with empty hands",
-          len(latches) == 2 and len(wired) == 1
-          and all(pin_value(n, SEATED_VAR) == "false"
-                  for n in latches if n not in wired),
-          f"{len(latches)} writes, {len(wired)} wired")
-    fed = _feeds(BEL.find_input_pin(wired[0], SEATED_VAR)) if wired else set()
-    names = {_title(n) for n in fed}
-    check("...armed, it is the sights held AND (already seated OR the gun up): "
-          "a latch, so a reload with the sights up keeps the camera on the gun",
-          {"Get SightAiming", f"Get {SEATED_VAR}"} <= names, str(sorted(names)))
-    near = [n for n in fed
-            if abs((num_pin(n, "B") or 0.0) - SIGHT_SEAT_COS) < 1e-5
-            and "A" in in_pins(n) and len(in_pins(n)) == 2]
-    behind = ({_title(n) for n in _feeds(BEL.find_input_pin(near[0], "A"))}
-              if near else set())
-    check(f"...the gun is up when its sight line is within {SIGHT_SEAT_DEG:g} deg "
-          f"of the view: the line's direction dotted with the boom's (the "
-          f"control rotation's) forward, against cos",
-          len(near) == 1 and "Get SightAim" in behind and "Get SightOffset" in behind
-          and any("dot" in t.lower() for t in behind)
-          and any("InSocketName" in in_pins(n)
-                  for n in _feeds(BEL.find_input_pin(near[0], "A"))),
-          str(sorted(behind)))
-    gates = [n for n in fed
-             if abs((num_pin(n, "B") or 0.0) - SIGHT_LINE_MIN_CM) < 1e-9
-             and "A" in in_pins(n) and len(in_pins(n)) == 2]
-    check("...and an item with no sight line is seated at once: there is no "
-          "line to wait for", len(gates) == 1, str(len(gates)))
-
-    seats, wired = writes(SEAT_VAR)
-    check(f"{SEAT_VAR} is written twice by the living Tick: armed, and zero "
-          f"with empty hands",
-          len(seats) == 2 and len(wired) == 1
-          and all((num_pin(n, SEAT_VAR) or 0.0) == 0.0
-                  for n in seats if n not in wired),
-          f"{len(seats)} writes, {len(wired)} wired")
-    fed = _feeds(BEL.find_input_pin(wired[0], SEAT_VAR)) if wired else set()
-    names = {_title(n) for n in fed}
-    eases = [n for n in fed if {"Current", "Target", "InterpSpeed"} <= in_pins(n)]
-    check(f"...eased toward the sights key (SightAiming) by an FInterpTo at "
-          f"the zoom's speed ({COMBAT.ads_interp_speed:g}): the camera leaves "
-          f"for the gun on the key, in one motion with the zoom, and does not "
-          f"wait for {SEATED_VAR}",
-          len(eases) == 1 and {f"Get {SEAT_VAR}", "Get SightAiming"} <= names
-          and not {f"Set {SEATED_VAR}", f"Get {SEATED_VAR}"} & names
-          and abs((num_pin(eases[0], "InterpSpeed") or 0.0)
-                  - COMBAT.ads_interp_speed) < 1e-9,
-          str(sorted(names)))
-
-    looks, wired = writes(LOOK_VAR)
-    check(f"{LOOK_VAR} is written twice by the living Tick: armed, and zero "
-          f"with empty hands",
-          len(looks) == 2 and len(wired) == 1
-          and all((num_pin(n, LOOK_VAR) or 0.0) == 0.0
-                  for n in looks if n not in wired),
-          f"{len(looks)} writes, {len(wired)} wired")
-    fed = _feeds(BEL.find_input_pin(wired[0], LOOK_VAR)) if wired else set()
-    names = {_title(n) for n in fed}
-    eases = [n for n in fed if {"Current", "Target", "InterpSpeed"} <= in_pins(n)]
-    check(f"...eased toward {SEATED_VAR} at the same speed: the view turns onto "
-          f"the gun's sight line only once the gun is up",
-          len(eases) == 1 and {f"Get {LOOK_VAR}", f"Set {SEATED_VAR}"} <= names
-          and abs((num_pin(eases[0], "InterpSpeed") or 0.0)
-                  - COMBAT.ads_interp_speed) < 1e-9,
-          str(sorted(names)))
-    got = (w.get_editor_property(SEATED_VAR), w.get_editor_property(SEAT_VAR),
-           w.get_editor_property(LOOK_VAR))
-    check("...and all three start clear: the camera begins on the boom",
-          got[0] is False and all(isinstance(g, float) and g == 0.0
-                                  for g in got[1:]), repr(got))
 
 
 def run():

@@ -6,7 +6,7 @@ build_graphics_menu.py, which calls _author_reticle from DrawHUD.
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
-from combat.seat_tuning import RETICLE_HIDE_SEAT, SEAT_VAR
+from combat.seat_tuning import LOOK_VAR, RETICLE_HIDE_LOOK
 from graphics_menu.hit_marker import _author_headshot_mark
 from graphics_menu.scope import _author_scope, _author_scope_gate
 from uebp.nodes.actor import FN_DRAW_RECT, FN_GET_COMP, FN_GET_OWNING_PAWN
@@ -78,9 +78,11 @@ def _author_reticle(ed, in_execs):
     Down the sights the crosshair is not drawn either: the camera looks along
     the gun's own sight line (combat sights.py), so the front sight's tip is
     the middle of the view and the crosshair only covered it. It goes once
-    the camera is nearly on the sights (SightSeat past RETICLE_HIDE_SEAT), so
-    the sights come up to meet it, and stays in debug mode (DebugOn), where
-    it shows that the two agree. The hip and the shoulder aim keep it.
+    the camera has nearly turned onto the sight line (SightLook past
+    RETICLE_HIDE_LOOK), which is only once the gun is up: the camera is in
+    the sights' view from the key (SightSeat is 1 at once), and the crosshair
+    is the mark the gun rises to. It stays in debug mode (DebugOn), where it
+    shows that the two agree. The hip and the shoulder aim keep it.
     """
     made = []
 
@@ -188,11 +190,11 @@ def _author_reticle(ed, in_execs):
 
     # Down the sights, outside debug mode, the gun's own sights are the
     # reticle. Under `armed`, so the component is valid.
-    seat = keep(ed.add_get_member_variable_node(SEAT_VAR, WEAPON_COMP_CLASS_PATH))
-    _connect(as_weapon, _pin(seat, "self"))
+    look = keep(ed.add_get_member_variable_node(LOOK_VAR, WEAPON_COMP_CLASS_PATH))
+    _connect(as_weapon, _pin(look, "self"))
     on_sights = keep(_node(ed, FN_GREATER_FF))
-    _connect(out(seat, SEAT_VAR), _pin(on_sights, "A"))
-    _set(on_sights, "B", RETICLE_HIDE_SEAT)
+    _connect(out(look, LOOK_VAR), _pin(on_sights, "A"))
+    _set(on_sights, "B", RETICLE_HIDE_LOOK)
     debug = keep(ed.add_get_member_variable_node(MV.DebugOn))
     plain = keep(_node(ed, FN_NOT))
     _connect(out(debug, MV.DebugOn), _pin(plain, "A"))
@@ -220,8 +222,10 @@ def _author_reticle(ed, in_execs):
         "screen, so this is where the shot goes. Always white. The ticks stand off by the "
         "held gun's accuracy cloud (ReticleSpread x half the width), so the "
         "gap is where the shot can land: wide at the hip, closed down the "
-        "sights. With the camera on the gun's sights (SightSeat past "
-        f"{RETICLE_HIDE_SEAT:g}) it is drawn only in debug mode: the front "
+        "sights. With the camera turned onto the gun's sight line (SightLook "
+        f"past {RETICLE_HIDE_LOOK:g}, so only once the gun is up: the camera "
+        "is in the sights' view from the key and the gun rises to the "
+        "crosshair) it is drawn only in debug mode: the front "
         "sight is the middle of the view there.",
         made)
 

@@ -167,28 +167,42 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
 
 
 def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
-    """Move the camera's FOV toward TargetFOV, and slow the mouse with it.
+    """Move the camera's FOV to TargetFOV, and slow the mouse with it.
 
-        CurrentFOV = FInterpTo(CurrentFOV, TargetFOV, dt, COMBAT.ads_interp_speed)
+        CurrentFOV = SightAiming ? TargetFOV
+                     : FInterpTo(CurrentFOV, TargetFOV, dt, COMBAT.ads_interp_speed)
         Camera.SetFieldOfView(CurrentFOV)
 
-    Interpolated rather than snapped, and CurrentFOV is a stored variable
-    because FInterpTo's input is its own previous output. Recomputing the
-    target every frame and lerping toward it also means letting go of the
-    button unzooms by the same curve with no second code path.
+    Down the sights the zoom is the weapon's own on the frame the key goes
+    down: the camera is in the sights' view at once (seat.py's SightSeat is
+    1 on the same frame) and the gun rises into it. Everything else is
+    interpolated: the shoulder aim's zoom in, and letting either key go,
+    which unzooms by the FInterpTo's curve with no second code path.
+    CurrentFOV is a stored variable because FInterpTo's input is its own
+    previous output.
 
     Returns (the exec pin to carry on from, the CurrentFOV setter).
     """
     # --- move the camera toward it ------------------------------------------
     have = keep(ed.add_get_member_variable_node(WV.CurrentFOV))
     want = keep(ed.add_get_member_variable_node(WV.TargetFOV))
+    want_out = out(want, WV.TargetFOV)
     step = keep(_node(ed, FN_INTERP_FF))
     _connect(out(have, WV.CurrentFOV), _pin(step, "Current"))
-    _connect(out(want, WV.TargetFOV), _pin(step, "Target"))
+    _connect(want_out, _pin(step, "Target"))
     _connect(out(tick, "DeltaSeconds"), _pin(step, "DeltaTime"))
     _set(step, "InterpSpeed", COMBAT.ads_interp_speed)
+    # Down the sights, the target itself. SightAiming was written this frame
+    # by _author_aim_state, which runs just before this.
+    sights = keep(ed.add_get_member_variable_node(WV.SightAiming))
+    easing = keep(_node(ed, FN_NOT))
+    _connect(out(sights, WV.SightAiming), _pin(easing, "A"))
+    pick = keep(_node(ed, FN_SELECT_FF))
+    _connect(out(step), _pin(pick, "A"))
+    _connect(want_out, _pin(pick, "B"))
+    _connect(out(easing), _pin(pick, "bPickA"))
     moved = keep(ed.add_set_member_variable_node(WV.CurrentFOV))
-    _connect(out(step), _pin(moved, WV.CurrentFOV))
+    _connect(out(pick), _pin(moved, WV.CurrentFOV))
     for tail in exec_ins:
         _connect(tail, _pin(moved, "execute"))
 
@@ -325,8 +339,10 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,
         f"{AIM_KEY} aims over the shoulder at {COMBAT.shoulder_zoom:g}x; "
         f"{SIGHTS_KEY} aims down the sights at the weapon's own AdsZoom "
         f"({COMBAT.ads_zoom_irons:g}x irons, {COMBAT.ads_zoom_scope:g}x on the sniper's "
-        f"scope) and sights.py moves the camera onto the gun. Interpolated at "
-        f"{COMBAT.ads_interp_speed:g} so it arrives in about "
+        f"scope) and sights.py puts the camera in the sights' view: at once, "
+        f"the zoom with it, and the gun rises into the view. The shoulder's "
+        f"zoom, and letting go, are interpolated at "
+        f"{COMBAT.ads_interp_speed:g}, about "
         f"a fifth of a second. Refused while sprinting -- the fire gate already "
         f"is -- and with empty hands, which is also what keeps the AdsZoom "
         f"getter off a null Held. Aiming is either key; SightAiming only the "

@@ -1,7 +1,8 @@
-"""Bringing the sights up from a lowered gun: one motion from the key, the
-camera travelling from the boom to the eye point and zooming as it goes, with
-the view on the target all the way; it does not ride the gun's line up from
-the hip.
+"""Bringing the sights up from a lowered gun: at once from the key, the
+camera in the sights' view (at the head, zoomed to the weapon's own) on the
+frame the key goes down, and the gun rising into that view from below and to
+the right onto the crosshair; it does not ride the gun's line up from the
+hip, and nothing glides.
 
 SightsForced stands in for the sights key (no key can be injected into a
 headless game), so the whole path runs as it does for a player: the aim state,
@@ -11,12 +12,12 @@ the carry raising the gun, SightBlend, the seat and the look
 Per gun (the shotgun, level and looking down; the pistol; the sniper):
   - carried, the gun's sight line is far off the view (what a camera riding it
     would have looked along);
-  - sights held: every frame until the camera is on the sights, the camera
-    looks where the control rotation does, within VIEW_DEG;
-  - it is one motion: SightSeat rises on every frame from the key (the camera
-    is well on its way before the gun is up), the camera only ever gets
-    nearer to where it ends up, and the zoom goes with it, frame for frame,
-    to the weapon's own (the sniper's 4x: no stop at the shoulder's);
+  - the frame the sights key goes down: SightSeat is 1 and the zoom is the
+    weapon's own (the sniper's 4x: no stop at the shoulder's), the camera is
+    at the head bone, and the gun's front sight is below and to the right of
+    the middle of the view;
+  - every frame until the camera is on the sights, the camera looks where the
+    control rotation does, within VIEW_DEG, and SightSeat stays 1;
   - the turn onto the sight line (SightLook) waits for SightSeated, and
     SightSeated is not set before the gun's line is within SIGHT_SEAT_DEG of
     the view;
@@ -77,9 +78,10 @@ VIEW_DEG = 4.0          # the camera against the control rotation, all the way
 BOOM_CM = 0.5           # the camera is on the boom's end
 EYE_CM = 0.5            # ...or at the eye point
 FRONT_DEG = 0.1         # the front sight on the middle of the view
-SEAT_AT_LATCH = 0.5     # the camera is this far to the gun before the gun is up
-BACK_CM = 0.5           # the camera never backs away from where it ends up
-ZOOM_LAG = 0.05         # the zoom's progress against SightSeat, any frame
+HEAD_CM = 1.0           # on the key, the camera stands at the head bone
+HEAD_BONES = ("head", "Head")   # the skins' head bones (combat/skin.py); a game
+                                # cannot resolve the skin, so the mesh is asked
+ZOOM_AT_ONCE = 0.01     # on the key, the zoom is the weapon's own (BaseFOV / CurrentFOV)
 WALL_WAIT_S = 25.0      # a headless game's clock is slow: bound waits by the wall
 SHOTS = bool(os.environ.get("OW_RAISE_SHOTS"))
 
@@ -130,11 +132,7 @@ class _Watch(object):
         self.eye, self.front = (unreal.Vector(*v) for v in sights)
         self.view = 0.0
         self.look_early = 0.0       # SightLook before SightSeated
-        self.seat_at_latch = None   # SightSeat when it latched
-        self.stalls = 0             # frames SightSeat did not rise, short of 1
-        self.seat = p.get(wc, SEAT_VAR)
-        self.zoom_lag = 0.0         # the zoom's progress against SightSeat
-        self.path = []              # the camera, in the world
+        self.seat_low = None        # the least SightSeat while the key was held
         self.seated_at = None       # the gun's line off the view when it latched
         self.held_up = True         # never Lowered with the camera still on it
         self.n = 0
@@ -152,23 +150,35 @@ class _Watch(object):
     def off_boom(self):
         return self.cam.get_editor_property("relative_location").length()
 
+    def off_head(self):
+        """The camera's distance from the head bone (cm)."""
+        mesh = self.p.get(self.wc, "OwnerMesh")
+        bone = next(b for b in HEAD_BONES if mesh.does_socket_exist(b))
+        head = mesh.get_socket_location(bone)
+        return (self.cam.get_world_location() - head).length()
+
+    def zoom_now(self):
+        return self.p.get(self.wc, "BaseFOV") / self.p.get(self.wc, "CurrentFOV")
+
+    def front_in_view(self):
+        """The front sight's tip in the camera's view: (right, up) in degrees
+        off the middle. Below and to the right is (positive, negative)."""
+        xf = self.p.get(self.wc, "Held").get_actor_transform()
+        to = ML.transform_location(xf, self.front) - self.cam.get_world_location()
+        local = ML.inverse_transform_direction(self.cam.get_world_transform(), to)
+        return (math.degrees(math.atan2(local.y, local.x)),
+                math.degrees(math.atan2(local.z, local.x)))
+
     def sample(self):
         p, wc = self.p, self.wc
         seated, seat = p.get(wc, SEATED_VAR), p.get(wc, SEAT_VAR)
         self.view = max(self.view, _angle(self.cam.get_forward_vector(), self.aim()))
         if not seated:
             self.look_early = max(self.look_early, p.get(wc, LOOK_VAR))
-        if 0.0 < seat <= self.seat and seat < 0.999:
-            self.stalls += 1
-        self.seat = seat
-        self.path.append(self.cam.get_world_location())
         if p.get(wc, "SightAiming"):
-            base, zoom = p.get(wc, "BaseFOV"), p.get(wc, "AimZoom")
-            went = (base - p.get(wc, "CurrentFOV")) / (base - base / zoom)
-            self.zoom_lag = max(self.zoom_lag, abs(went - seat))
+            self.seat_low = seat if self.seat_low is None else min(self.seat_low, seat)
         if seated and self.seated_at is None:
             self.seated_at = self.line_off()
-            self.seat_at_latch = seat
             self.t_seated = GS.get_time_seconds(p.world()) - self.t0
         if seat > SEAT_HOLD and p.get(wc, LOWERED_VAR):
             self.held_up = False
@@ -176,20 +186,6 @@ class _Watch(object):
 
     def took(self):
         return GS.get_time_seconds(self.p.world()) - self.t0
-
-    def backed(self):
-        """The furthest the camera ever moved away from where it ended up,
-        between two frames (cm)."""
-        far = [(q - self.path[-1]).length() for q in self.path]
-        return max([b - a for a, b in zip(far, far[1:])] + [0.0])
-
-    def off_line(self):
-        """The furthest the camera strayed from the straight line between
-        where it started and where it ended up (cm)."""
-        a, b = self.path[0], self.path[-1]
-        along = (b - a).normal()
-        return max(((q - a) - along * (q - a).dot(along)).length()
-                   for q in self.path)
 
 
 def _case(p, wc, cam, bag, cls, label, key, pitch, first):
@@ -217,6 +213,22 @@ def _case(p, wc, cam, bag, cls, label, key, pitch, first):
 
     # --- the sights key goes down ----------------------------------------------
     p.set(wc, SIGHTS_FORCED_VAR, True)
+    yield       # one tick: the Tick has read the key once
+    watch.sample()
+    zoom = held().get_editor_property("AdsZoom")
+    seat0, at_head, zoom0 = p.get(wc, SEAT_VAR), watch.off_head(), watch.zoom_now()
+    right0, up0 = watch.front_in_view()
+    p.check(f"{label}: the frame the sights key goes down, the camera is in the "
+            f"sights' view at once: {SEAT_VAR} 1, zoomed to the weapon's own "
+            f"{zoom:g}x, standing at the head bone (within {HEAD_CM:g} cm)",
+            p.get(wc, "SightAiming") and seat0 > 0.9999
+            and abs(zoom0 - zoom) < ZOOM_AT_ONCE and at_head < HEAD_CM,
+            f"{SEAT_VAR} {seat0:.4f}, {zoom0:.3f}x, {at_head:.2f} cm from the head")
+    p.check(f"{label}: ...and the gun is still down, its front sight below and "
+            f"to the right of the middle of the view, to rise into it",
+            not p.get(wc, SEATED_VAR) and up0 < 0.0 and right0 > 0.0,
+            f"the front sight {right0:.1f} deg right, {up0:.1f} deg up, "
+            f"{SEATED_VAR} {p.get(wc, SEATED_VAR)}")
 
     def up():
         watch.sample()
@@ -234,25 +246,12 @@ def _case(p, wc, cam, bag, cls, label, key, pitch, first):
             watch.n > 5 and watch.view < VIEW_DEG,
             f"worst {watch.view:.2f} deg over {watch.n} frames "
             f"(the gun came up from {carried:.1f} deg off)")
-    p.check(f"{label}: ...in one motion from the key: {SEAT_VAR} rises on every "
-            f"frame, and is past {SEAT_AT_LATCH:g} before the gun is up",
-            watch.stalls == 0 and (watch.seat_at_latch or 0.0) > SEAT_AT_LATCH,
-            f"{watch.stalls} frames without a rise, {SEAT_VAR} "
-            f"{watch.seat_at_latch} when {SEATED_VAR} latched")
-    p.check(f"{label}: ...the camera only ever nearer to where it ends up "
-            f"(never {BACK_CM:g} cm back in a frame)",
-            watch.backed() < BACK_CM,
-            f"worst {watch.backed():.3f} cm back; {watch.off_line():.1f} cm at most "
-            f"off the straight line, over {(watch.path[-1] - watch.path[0]).length():.0f} cm")
-    p.check(f"{label}: ...and the zoom goes with it to the weapon's own "
-            f"{held().get_editor_property('AdsZoom'):g}x, frame for frame (its "
-            f"progress within {ZOOM_LAG:g} of {SEAT_VAR})",
-            watch.zoom_lag < ZOOM_LAG
-            and abs(p.get(wc, "AimZoom") - held().get_editor_property("AdsZoom")) < 1e-6
-            and abs(p.get(wc, "BaseFOV") / p.get(wc, "CurrentFOV")
-                    - held().get_editor_property("AdsZoom")) < 0.01,
-            f"worst {watch.zoom_lag:.4f} apart, "
-            f"{p.get(wc, 'BaseFOV') / p.get(wc, 'CurrentFOV'):.3f}x at the end")
+    p.check(f"{label}: ...{SEAT_VAR} stays 1 the whole time the key is held, "
+            f"and the zoom stays the weapon's own: nothing glides",
+            (watch.seat_low or 0.0) > 0.9999
+            and abs(p.get(wc, "AimZoom") - zoom) < 1e-6
+            and abs(watch.zoom_now() - zoom) < ZOOM_AT_ONCE,
+            f"least {SEAT_VAR} {watch.seat_low}, {watch.zoom_now():.3f}x at the end")
     p.check(f"{label}: ...the turn onto the sight line ({LOOK_VAR}) waits until "
             f"the gun is up",
             watch.look_early == 0.0,

@@ -31,13 +31,14 @@ _author_* fragment per concern, each in its own module:
               (the sights key aims only while it is not Using); the zoom, the
               scope's look slowdown, and the aim-walk flag handed to the
               movement component
-  seat        down the sights: SightSeat (how far the camera has gone onto
-              the gun, from the key: one motion), SightSeated (the gun is up)
+  seat        down the sights: SightSeat (the camera on the sights: 1 at once
+              on the key, eased home off it), SightSeated (the gun is up)
               and SightLook (how far the camera has turned onto its line,
               from then), so the view stays on the target while the gun rises
-  sights      down the sights: ease the camera (by SightSeat) from the boom to
-              Held's SightOffset and turn it (by SightLook) onto Held's sight
-              line (towards SightAim); hide a scoped weapon behind its glass
+  sights      down the sights: put the camera (by SightSeat) at the head bone,
+              settling (by SightLook) onto Held's SightOffset as it turns onto
+              Held's sight line (towards SightAim); hide a scoped weapon behind
+              its glass
   head_hide   down the sights: the player's own head bone is hidden past
               SightSeat HEAD_HIDE_SEAT, whatever gun is held, and shown again
               off them (the eye point is inside or beside the head)

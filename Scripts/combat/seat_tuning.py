@@ -13,8 +13,11 @@ import math
 # ready pose's own blend; a camera that took the gun's line through that
 # raise looked down at the hand and then swung up onto the target. Looking
 # where the player looks until the gun is nearly there, it keeps the target
-# in the middle and the sights rise to it. The camera's travel does not wait:
-# it leaves for the eye point on the key (weapon_component/seat.py).
+# in the middle and the sights rise to it. The camera does not wait at all:
+# on the key it is at once at the eye, zoomed (SightSeat 1, the weapon's
+# zoom), standing at the head bone (the anchor, sights.py) while the gun
+# rises into the view from below and to the right, and it settles the last
+# few centimetres onto the gun's own eye point as it turns (SightLook).
 # Wide enough that the turn starts while the gun is still settling (what it
 # takes from the gun is this angle times a look that has only begun), narrow
 # enough that a lowered gun is never inside it.
@@ -24,8 +27,8 @@ SIGHT_SEAT_COS = math.cos(math.radians(SIGHT_SEAT_DEG))
 # BP_WeaponComponent's variables. SightSeated is the latch: the sights key is
 # down and the gun has come up since it went down. It stays set until the key
 # is let go, so a reload with the sights up keeps the camera on the gun.
-# SightSeat is how far the camera has travelled from the boom to the sights,
-# eased toward the sights key (SightAiming): one motion, from the key.
+# SightSeat is how far the camera has gone from the boom to the sights: 1 on
+# the frame the sights key goes down (SightAiming), eased home on letting go.
 # SightLook is how far it has turned from the control rotation onto the gun's
 # sight line, eased toward the latch.
 SEATED_VAR = "SightSeated"
@@ -47,16 +50,20 @@ HAS_SIGHTS_VAR = "HasSights"
 # home off a gun on its way down would dip with it.
 SEAT_HOLD = 0.02
 
-# The HUD's crosshair is not drawn past this much seat, outside debug mode:
-# the gun's own sights are on the middle of the view by then.
-RETICLE_HIDE_SEAT = 0.9
+# The HUD's crosshair is not drawn past this much look (SightLook: the
+# camera's turn onto the gun's sight line), outside debug mode: the gun's own
+# sights are on the middle of the view by then. The look, not the seat: the
+# seat is 1 from the key, while the gun is still at the hip, and the
+# crosshair is the mark the gun rises to.
+RETICLE_HIDE_LOOK = 0.9
 
 # The player's own head is hidden past this much seat (head_hide.py). The eye
 # point of a gun at the shoulder is inside or beside the head, which then
-# stands in the sight picture. The camera comes at the gun from behind, over
-# the shoulder, so until the last of the travel the head is simply the back of
-# the body's head, in front of the camera where it always is; it goes just
-# before the camera reaches it, so the body is not seen headless from behind.
+# stands in the sight picture, and the camera stands in the head bone from
+# the key. The seat snaps to 1 on the key and eases home on letting go, so
+# this is the point on the way home where the head is drawn again: the camera
+# comes off the gun backwards, over the shoulder, and the head comes back
+# just after it has left, so the body is not seen headless from behind.
 HEAD_HIDE_SEAT = 0.8
 
 # The camera's near plane (cm): nothing nearer the eye is drawn, and what

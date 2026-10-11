@@ -7,7 +7,7 @@ verifier, which is over its size budget.
 import unreal
 
 from combat.headshot_tuning import HEADSHOT_MARK_SECONDS, HEADSHOT_TIME_VAR
-from combat.seat_tuning import RETICLE_HIDE_SEAT, SEAT_VAR
+from combat.seat_tuning import LOOK_VAR, RETICLE_HIDE_LOOK
 from graphics_menu import hit_marker as M
 from graphics_menu import reticle as R
 
@@ -51,9 +51,9 @@ def _feeds(pin):
 
 def sights_gate(nodes):
     """The Branch that leaves the crosshair out: the one whose condition
-    reads the weapon component's SightSeat. None if there is not exactly one."""
+    reads the weapon component's SightLook. None if there is not exactly one."""
     gates = [n for n in nodes if {"execute", "Condition"} <= _pins(n)
-             and f"Get {SEAT_VAR}" in {
+             and f"Get {LOOK_VAR}" in {
                  _title(m) for m in _feeds(BEL.find_input_pin(n, "Condition"))}]
     return gates[0] if len(gates) == 1 else None
 
@@ -69,12 +69,13 @@ def check_reticle_sights(check, bp, nodes):
         return
     fed = _feeds(BEL.find_input_pin(gate, "Condition"))
     names = {_title(n) for n in fed}
-    past = [n for n in fed if _num(n, "B") == RETICLE_HIDE_SEAT
-            and f"Get {SEAT_VAR}" in {_title(m)
+    past = [n for n in fed if _num(n, "B") == RETICLE_HIDE_LOOK
+            and f"Get {LOOK_VAR}" in {_title(m)
                                       for m in _feeds(BEL.find_input_pin(n, "A"))}]
-    check(f"down the sights ({SEAT_VAR} past {RETICLE_HIDE_SEAT:g}: the camera "
-          f"nearly on them) the crosshair is not drawn; the gun's own sights "
-          f"are on the middle of the view",
+    check(f"down the sights ({LOOK_VAR} past {RETICLE_HIDE_LOOK:g}: the camera "
+          f"nearly turned onto them, which is only once the gun is up) the "
+          f"crosshair is not drawn; the gun's own sights are on the middle of "
+          f"the view",
           len(past) == 1, str(sorted(names)))
     check("...except in debug mode, where it is drawn over them",
           "Get DebugOn" in names and any("NOT" in t.upper() for t in names),

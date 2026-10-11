@@ -9,7 +9,7 @@ from combat.verify.fixtures import titles, w, wc_cdo, wg
 from combat.verify.throw import is_throw_play
 from combat.verify.knife import is_melee_play
 from combat.verify.common import (
-    BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, out_pins, titled,
+    BEL, PIN, by_pins, cdo, check, in_pins, load, out_pins, titled,
 )
 
 
@@ -67,9 +67,32 @@ def check_aiming_down_sights():
                      == "Set TargetFOV"]
     check("...fed from two writes of TargetFOV: aiming, and not aiming",
           len(target_writes) == 2, str(len(target_writes)))
-    check("the zoom is interpolated, not snapped",
+    check("the zoom out, and the shoulder's in, are interpolated",
           bool(titled(wg, "FInterp To")) or bool(titled(wg, "FInterpTo")),
           "FInterpTo")
+    # Down the sights the FOV is the target on the frame of the key: a
+    # SelectFloat into the CurrentFOV write, TargetFOV on its B, the
+    # interpolation picked only on NOT SightAiming.
+    fov_sets = [x for x in wg if str(BEL.get_node_title(x)).replace("\n", " ")
+                == "Set CurrentFOV"]
+    picks = [PIN.get_owning_node(q) for x in fov_sets
+             for q in PIN.list_connected_pins(BEL.find_input_pin(x, "CurrentFOV"))]
+    snap = [n for n in picks if {"A", "B", "bPickA"} <= in_pins(n)]
+
+    def one_hop(n, pin):
+        return {str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
+                for q in PIN.list_connected_pins(BEL.find_input_pin(n, pin))}
+    check("...and down the sights it is the weapon's own at once: CurrentFOV "
+          "is TargetFOV while SightAiming, the FInterpTo only otherwise, so "
+          "the view is in the sights on the frame of the key",
+          len(snap) == 1
+          and one_hop(snap[0], "B") == {"Get TargetFOV"}
+          and any("interp" in t.lower() for t in one_hop(snap[0], "A"))
+          and all("not" in t.lower() for t in one_hop(snap[0], "bPickA"))
+          and any("Get SightAiming" in one_hop(m, "A")
+                  for q in PIN.list_connected_pins(BEL.find_input_pin(snap[0], "bPickA"))
+                  for m in [PIN.get_owning_node(q)]),
+          f"{len(fov_sets)} writes of CurrentFOV, {len(snap)} fed by a select")
     base_reads = [x for x in wg if "FieldOfView" in out_pins(x)]
     check("BaseFOV is cached off the camera, not written down as a literal",
           bool(base_reads), str(len(base_reads)))

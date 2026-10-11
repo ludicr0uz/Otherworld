@@ -1285,11 +1285,18 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 
 - [x] Set Debug to be disabled by default in the main menu
 
-- [ ] Update the ADS animation to right away go into the ADS mode rather than gliding the camera zooming in gradually. Once the camera is in ADS mode, the gun should get quickly raised from the bottom right area into the ADS marker such that it looks natural. 
+- [x] Update the ADS animation to right away go into the ADS mode rather than gliding the camera zooming in gradually. Once the camera is in ADS mode, the gun should get quickly raised from the bottom right area into the ADS marker such that it looks natural. 
 
-- [ ] Moving or shooting during save an exit should cancel the save and exit process
+- [x] Moving or shooting during save an exit should cancel the save and exit process
 
-- [ ] Right click in inventory to use (for equippable items that is equip - guns into an available slot if available, if not replace primary slot, clothes to equip. If a clothing article is already equipped for that slot, quipt the new one from inventory in its place. I, left hand to bring to hands. The use button should be available when in the inventory screen.
+- [x] Right click in inventory to use (for equippable items that is equip - guns into an available slot if available, if not replace primary slot, clothes to equip. If a clothing article is already equipped for that slot, quipt the new one from inventory in its place. I, left hand to bring to hands. The use button should be available when in the inventory screen.
+
+- [ ] ADS animation slightly jittery after ADS zooms in. Implement the following ADS sequence (Center of screen firmly stays on reticle the whole time):
+            -Camera very briefly starts zooming in, in a smooth motion (like it did before - just not as long)
+            -snap to ADS view and gun raising animation
+            -brief animation of gun gets raised (as it is now) into the reticle so that the crossairs of the gun firmly match the reticle target (as they do now - that works great). Just need to make sure the camera does not jitter here and the gun gets raised into the reticle. 
+            -Coming of ADS works great now, there is a brief zoom out phase which works well. (Essentially we will want something similar on the zoom in phase only inverse)
+            -Implement camera zoom in / zoom out speed, zoom in duration, gun raise animation duration to be configurable per gun in the guns settings menus. Default should be the same for all.
 
 - [ ] Picking up an item from the floor should play a pick up item animation from the floor. 
 

@@ -3872,6 +3872,9 @@ dev/devteam/accounting.py:38: merge_results
 dev/devteam/accounting.py:58: describe_tokens
 dev/devteam/accounting.py:64: describe_time
 dev/devteam/accounting.py:70: tag_commit
+dev/devteam/awake.py:20: TOOL
+dev/devteam/awake.py:23: start
+dev/devteam/awake.py:38: hold
 dev/devteam/baseline_cache.py:22: PATH_PARTS
 dev/devteam/baseline_cache.py:23: MAX_AGE_S
 dev/devteam/baseline_cache.py:26: path

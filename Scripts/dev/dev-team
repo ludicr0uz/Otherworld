@@ -50,6 +50,11 @@ Saved/uepy/devteam, later calls reuse it, and nothing it does reaches an
 editor the user reopens meanwhile. dev-team stops it before each sweep, before
 asking for a Fab asset, and at the end of the run.
 
+**Sleep.** A run, a resume and a nightly probe sweep each hold the Mac awake
+(devteam/awake.py: ``caffeinate -i`` on dev-team's own pid), so an unattended
+run is not slowed to one model turn per maintenance wake. A closed lid still
+sleeps the machine unless it is on power with an external display.
+
 **The gate.** Before each task dev-team sweeps the verifier suites and puts
 the numbers in the prompt; after the session it sweeps them again. A suite
 that newly fails -- or fails more checks than before -- sends the session
@@ -168,8 +173,8 @@ sys.path.insert(0, HERE)
 sys.path.insert(1, os.path.dirname(HERE))        # Scripts/: asset_pipeline
 
 from devteam import (                                               # noqa: E402
-    baseline_cache, fab, fast, final, limits, nightly, pause, probe_gate, probe_record,
-    scope,
+    awake, baseline_cache, fab, fast, final, limits, nightly, pause, probe_gate,
+    probe_record, scope,
 )
 from devteam.accounting import git_head                             # noqa: E402
 from devteam.tasks import Task, parse_tasks, requeue, tick          # noqa: E402
@@ -336,7 +341,9 @@ def list_probes(pattern=None):
 def main():
     args = parse_args()
     if args.tasks[:2] == ["probes", "run"] and len(args.tasks) <= 3:
-        sys.exit(nightly.run(args.tasks[2] if len(args.tasks) == 3 else nightly.DEFAULT_SET))
+        with awake.hold():
+            sys.exit(nightly.run(args.tasks[2] if len(args.tasks) == 3
+                                 else nightly.DEFAULT_SET))
     if args.tasks and args.tasks[0] == "probes" and len(args.tasks) <= 2:
         sys.exit(list_probes(args.tasks[1] if len(args.tasks) == 2 else None))
     gate_line = probe_sets(args)
@@ -345,8 +352,9 @@ def main():
     # 'pause' is typed at the same terminal (devteam/pause.py).
     pauser = pause.Pauser(sys.stdin, enabled=args.interactive)
     if len(args.tasks) == 2 and args.tasks[0] == "resume":
-        sys.exit(resume(args, args.tasks[1],
-                        fast.Meter(args.fast, fast.last_seen(LOG_ROOT)), pauser))
+        with awake.hold():
+            sys.exit(resume(args, args.tasks[1],
+                            fast.Meter(args.fast, fast.last_seen(LOG_ROOT)), pauser))
     task_file, tasks = load_tasks(args)
     todo = [t for t in tasks if not t.done]
     if not todo:
@@ -370,7 +378,7 @@ def main():
     with open(progress, "w") as f:
         f.write(f"# dev-team run {stamp}\n")
     print(f"dev-team: run {stamp} -- logs in {os.path.relpath(run_dir, ROOT)}")
-    with Tee(os.path.join(run_dir, "run.log")):
+    with Tee(os.path.join(run_dir, "run.log")), awake.hold():
         code = run(args, task_file, todo, triage_cost, run_dir, progress, meter, pauser)
     sys.exit(code)
 

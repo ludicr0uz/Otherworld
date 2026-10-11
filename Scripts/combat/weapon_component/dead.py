@@ -55,7 +55,8 @@ OWNER_DEAD_VAR = WV.OwnerDead   # this Tick found its owner dead and did nothing
 # What a dead owner is no longer doing. Others read these: the wanderers'
 # swing reads Blocking, the HUD's reticle the aim, a wendigo FireWard, the
 # HUD's banner the save-and-exit countdown (save_exit.py): a death calls it off.
-LET_GO_VARS = ("Aiming", "SightAiming", SEATED_VAR, "Sprinting", "Blocking",
+LET_GO_VARS = ("Aiming", "SightAiming", "SightSnapped", "SightPending", SEATED_VAR,
+               "Sprinting", "Blocking",
                FIRE_WARD_VAR, EXIT_PENDING_VAR)
 
 

@@ -62,10 +62,12 @@ def check_carry_state():
               f"{len(armed)} armed, {len(plain)} plain")
         return
     node, fed = armed[0]
-    want = {"Sprinting", "Aiming", "Blocking", RAISE_FORCED_VAR, "Melee", "Consumable",
-            BURNS_VAR, "NextFireTime", STANCE_VAR, SEAT_VAR}
-    check("armed, it is made of Sprinting, Aiming, Blocking, Stance, Held's Melee, "
-          "Consumable and Burns, and Held's NextFireTime against the clock",
+    want = {"Sprinting", "Aiming", "SightPending", "Blocking", RAISE_FORCED_VAR, "Melee",
+            "Consumable", BURNS_VAR, "NextFireTime", STANCE_VAR, SEAT_VAR}
+    check("armed, it is made of Sprinting, Aiming (not during the sights key's "
+          "zoom-in: SightPending, so the gun is raised with the cut to the sights), "
+          "Blocking, Stance, Held's Melee, Consumable and Burns, and Held's "
+          "NextFireTime against the clock",
           want <= _reads(fed)
           and any("GetTimeSeconds" in str(BEL.get_node_title(n)).replace(" ", "")
                   for n in fed),

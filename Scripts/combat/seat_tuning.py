@@ -13,11 +13,13 @@ import math
 # ready pose's own blend; a camera that took the gun's line through that
 # raise looked down at the hand and then swung up onto the target. Looking
 # where the player looks until the gun is nearly there, it keeps the target
-# in the middle and the sights rise to it. The camera does not wait at all:
-# on the key it is at once at the eye, zoomed (SightSeat 1, the weapon's
-# zoom), standing at the head bone (the anchor, sights.py) while the gun
-# rises into the view from below and to the right, and it settles the last
-# few centimetres onto the gun's own eye point as it turns (SightLook).
+# in the middle and the sights rise to it. The camera does not wait for the
+# gun: with the cut (SightSnapped, the gun's AdsZoomInSeconds after the key,
+# the zoom easing in meanwhile) it is at once in the sights' view, zoomed
+# (SightSeat 1, the weapon's zoom), standing at the anchor (the head bone in
+# the owner's frame, held from the cut; sights.py) while the gun rises into
+# the view from below and to the right, and it settles the last few
+# centimetres onto the gun's own eye point as it turns (SightLook).
 # Wide enough that the turn starts while the gun is still settling (what it
 # takes from the gun is this angle times a look that has only begun), narrow
 # enough that a lowered gun is never inside it.
@@ -28,7 +30,7 @@ SIGHT_SEAT_COS = math.cos(math.radians(SIGHT_SEAT_DEG))
 # down and the gun has come up since it went down. It stays set until the key
 # is let go, so a reload with the sights up keeps the camera on the gun.
 # SightSeat is how far the camera has gone from the boom to the sights: 1 on
-# the frame the sights key goes down (SightAiming), eased home on letting go.
+# the frame of the cut (SightSnapped, ads.py), eased home on letting go.
 # SightLook is how far it has turned from the control rotation onto the gun's
 # sight line, eased toward the latch.
 SEATED_VAR = "SightSeated"

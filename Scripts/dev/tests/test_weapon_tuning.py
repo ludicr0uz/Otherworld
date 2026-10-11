@@ -92,6 +92,22 @@ class Guns(unittest.TestCase):
                 self.assertEqual(set(R.gun_row(gun, tuned={})), set(T.GUN_COLUMNS),
                                  f"{gun}: gun_rows' defaults against GUN_COLUMNS")
 
+    def test_the_sights_timing_defaults_the_same_on_every_gun(self):
+        # The zoom's speed, the zoom-in's length and the raise's (ads.py,
+        # seat.py) are per gun on the GUN SETTINGS tab, and every gun starts
+        # on COMBAT's one number for each.
+        want = {"ads_zoom_speed": COMBAT.ads_interp_speed,
+                "ads_zoom_in_s": COMBAT.ads_zoom_in_s,
+                "ads_raise_s": COMBAT.ads_raise_s}
+        for col in want:
+            self.assertIn(col, T.GUN_COLUMNS, f"{col}: a gun's column")
+            self.assertNotIn(col, T.MELEE_COLUMNS, f"{col}: not a melee weapon's")
+        for gun in GUNS:
+            with self.subTest(gun=gun):
+                row = R.gun_row(gun, tuned={})
+                self.assertEqual({c: row[c] for c in want}, want,
+                                 f"{gun}: its sights timing defaults are COMBAT's")
+
     def test_weapon_specs_builds_from_gun_row(self):
         # weapon_specs imports unreal, so it is read, not run: its rows hold
         # no tunable number of their own, only gun_row()'s.

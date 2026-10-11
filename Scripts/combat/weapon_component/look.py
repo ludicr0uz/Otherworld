@@ -50,7 +50,8 @@ from combat.skin import player_skin
 from combat.tuning import COMBAT
 from combat.weapon_component import vars as WV
 from combat.weapon_component.look_vars import (
-    HIP, LOOK_PARAMS, REPLICATED, SERVER_SET_LOOK, SHOULDER, SIGHTS, HandPose, LookAim,
+    HIP, LOOK_PARAMS, REPLICATED, SERVER_SET_LOOK, SHOULDER, SIGHTS, HandPose, HandRaise,
+    LookAim,
     LookLowered, LookPose, SentAim, SentLowered, SentPose)
 from combat.weapon_component.sight_pitch import _anim_class_path, _anim_instance
 from combat.weapon_component.stance import STANCE_VAR
@@ -97,10 +98,13 @@ def _author_hand_pose(ed, exec_in):
     held = g.get(WV.Held)
     armed, empty = g.branch(out(g.call(FN_IS_VALID, Object=held)), [local])
     took = g.put(HandPose, g.iget(held, IV.AimPose), [armed])
+    took = g.put(HandRaise, g.iget(held, IV.AdsRaiseSeconds), [took])
     none = g.put(HandPose, None, [empty])
     ed.add_comment_to_nodes(
         "HandPose (look.py): the pose the hand's item is held in, off Held "
-        "where the keys are. Read behind IsValid: empty hands have none.", g.made)
+        "where the keys are, and HandRaise, how long it blends in (the gun's "
+        "AdsRaiseSeconds: its raise into the sights). Read behind IsValid: "
+        "empty hands have none.", g.made)
     return (took, none, remote)
 
 

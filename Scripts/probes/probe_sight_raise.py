@@ -1,8 +1,10 @@
-"""Bringing the sights up from a lowered gun: at once from the key, the
-camera in the sights' view (at the head, zoomed to the weapon's own) on the
-frame the key goes down, and the gun rising into that view from below and to
-the right onto the crosshair; it does not ride the gun's line up from the
-hip, and nothing glides.
+"""Bringing the sights up from a lowered gun: a glimpse of the zoom easing
+in on the boom for the gun's AdsZoomInSeconds, then the cut (SightSnapped):
+the camera in the sights' view (at the anchor, zoomed to the weapon's own)
+on that frame, and the gun raised from that frame into the view from below
+and to the right onto the crosshair, the camera standing still meanwhile; it
+does not ride the gun's line up from the hip, and nothing glides after the
+cut.
 
 SightsForced stands in for the sights key (no key can be injected into a
 headless game), so the whole path runs as it does for a player: the aim state,
@@ -12,10 +14,18 @@ the carry raising the gun, SightBlend, the seat and the look
 Per gun (the shotgun, level and looking down; the pistol; the sniper):
   - carried, the gun's sight line is far off the view (what a camera riding it
     would have looked along);
-  - the frame the sights key goes down: SightSeat is 1 and the zoom is the
-    weapon's own (the sniper's 4x: no stop at the shoulder's), the camera is
-    at the head bone, and the gun's front sight is below and to the right of
-    the middle of the view;
+  - the frame the sights key goes down: the camera is still on the boom
+    (SightSeat 0), the zoom has started easing toward the weapon's own, and
+    the gun is still lowered (SightPending);
+  - the frame of the cut, once SightHeld is past the gun's AdsZoomInSeconds
+    (the pistol's is written longer on its live item, LONG_ZOOM_IN, which the
+    cut then waits for: the column is the gun's own): SightSeat is 1 and the
+    zoom is the weapon's own (the sniper's 4x: no stop at the shoulder's),
+    the camera is at the head bone, the gun's front sight is below and to the
+    right of the middle of the view, and the gun is no longer lowered;
+  - from the cut until the gun latches, the camera stands still in the
+    owner's frame (under STEADY_CM a frame) while the head bone leans in with
+    the ready pose (reported);
   - every frame until the camera is on the sights, the camera looks where the
     control rotation does, within VIEW_DEG, and SightSeat stays 1;
   - the turn onto the sight line (SightLook) waits for SightSeated, and
@@ -50,7 +60,7 @@ import unreal
 from combat.carry_tuning import LOWERED_VAR
 from combat.game_state import DEBUG_MODE_VAR
 from net.state_consts import GAME_STATE_BP_PATH
-from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
+from combat.paths import ITEM_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import (
     LOOK_VAR, SEAT_HOLD, SEAT_VAR, SEATED_VAR, SIGHT_SEAT_DEG, SIGHTS_FORCED_VAR,
 )
@@ -61,16 +71,19 @@ from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
-            (GAME_STATE_BP_PATH, DEBUG_MODE_VAR)] + [
+            (GAME_STATE_BP_PATH, DEBUG_MODE_VAR),
+            (ITEM_BP_PATH, "AdsZoomInSeconds")] + [
     (WEAPON_COMP_BP_PATH, v) for v in
     (WV.EquippedIndex, WV.NeedsRefresh, SIGHTS_FORCED_VAR)]
 ML = unreal.MathLibrary
 GS = unreal.GameplayStatics
-# (class, label, the view's pitch when the key goes down)
-CASES = (("BP_Shotgun_C", "Shotgun", "SHOTGUN", 0.0),
-         ("BP_Shotgun_C", "Shotgun, looking -25", "SHOTGUN", -25.0),
-         ("BP_Pistol_C", "Pistol", "PISTOL", 0.0),
-         ("BP_SniperRifle_C", "Sniper", "SNIPER", 0.0))
+# (class, label, the view's pitch when the key goes down, the zoom-in written
+# on the live item for the case, or None for the gun's own)
+LONG_ZOOM_IN = 0.3      # the pistol's case: the cut waits for the item's own number
+CASES = (("BP_Shotgun_C", "Shotgun", "SHOTGUN", 0.0, None),
+         ("BP_Shotgun_C", "Shotgun, looking -25", "SHOTGUN", -25.0, None),
+         ("BP_Pistol_C", "Pistol", "PISTOL", 0.0, LONG_ZOOM_IN),
+         ("BP_SniperRifle_C", "Sniper", "SNIPER", 0.0, None))
 
 SETTLE_S = 0.6          # the equip, the gun coming down
 LOWERED_DEG = 25.0      # carried, the sight line is at least this far off the view
@@ -81,7 +94,9 @@ FRONT_DEG = 0.1         # the front sight on the middle of the view
 HEAD_CM = 1.0           # on the key, the camera stands at the head bone
 HEAD_BONES = ("head", "Head")   # the skins' head bones (combat/skin.py); a game
                                 # cannot resolve the skin, so the mesh is asked
-ZOOM_AT_ONCE = 0.01     # on the key, the zoom is the weapon's own (BaseFOV / CurrentFOV)
+ZOOM_AT_ONCE = 0.01     # at the cut, the zoom is the weapon's own (BaseFOV / CurrentFOV)
+STEADY_CM = 0.01        # from the cut to the latch, the camera's move per frame in the
+                        # owner's frame: it stands at the anchor
 WALL_WAIT_S = 25.0      # a headless game's clock is slow: bound waits by the wall
 SHOTS = bool(os.environ.get("OW_RAISE_SHOTS"))
 
@@ -135,6 +150,10 @@ class _Watch(object):
         self.seat_low = None        # the least SightSeat while the key was held
         self.seated_at = None       # the gun's line off the view when it latched
         self.held_up = True         # never Lowered with the camera still on it
+        self.drift = 0.0            # the camera's largest move per frame, in the
+                                    # owner's frame, from the cut to the latch
+        self.head_drift = 0.0       # ...and the head bone's over the same frames
+        self.cam_was = self.head_was = None
         self.n = 0
         self.t0 = GS.get_time_seconds(p.world())
         self.t_seated = None
@@ -150,12 +169,18 @@ class _Watch(object):
     def off_boom(self):
         return self.cam.get_editor_property("relative_location").length()
 
-    def off_head(self):
-        """The camera's distance from the head bone (cm)."""
+    def head(self):
         mesh = self.p.get(self.wc, "OwnerMesh")
         bone = next(b for b in HEAD_BONES if mesh.does_socket_exist(b))
-        head = mesh.get_socket_location(bone)
-        return (self.cam.get_world_location() - head).length()
+        return mesh.get_socket_location(bone)
+
+    def off_head(self):
+        """The camera's distance from the head bone (cm)."""
+        return (self.cam.get_world_location() - self.head()).length()
+
+    def local(self, at):
+        """A world point in the owner's frame."""
+        return ML.inverse_transform_location(self.p.pawn().get_actor_transform(), at)
 
     def zoom_now(self):
         return self.p.get(self.wc, "BaseFOV") / self.p.get(self.wc, "CurrentFOV")
@@ -175,8 +200,14 @@ class _Watch(object):
         self.view = max(self.view, _angle(self.cam.get_forward_vector(), self.aim()))
         if not seated:
             self.look_early = max(self.look_early, p.get(wc, LOOK_VAR))
-        if p.get(wc, "SightAiming"):
+        if p.get(wc, "SightSnapped"):
             self.seat_low = seat if self.seat_low is None else min(self.seat_low, seat)
+        if p.get(wc, "SightSnapped") and not seated:
+            cam, head = self.local(self.cam.get_world_location()), self.local(self.head())
+            if self.cam_was is not None:
+                self.drift = max(self.drift, (cam - self.cam_was).length())
+                self.head_drift = max(self.head_drift, (head - self.head_was).length())
+            self.cam_was, self.head_was = cam, head
         if seated and self.seated_at is None:
             self.seated_at = self.line_off()
             self.t_seated = GS.get_time_seconds(p.world()) - self.t0
@@ -188,13 +219,24 @@ class _Watch(object):
         return GS.get_time_seconds(self.p.world()) - self.t0
 
 
-def _case(p, wc, cam, bag, cls, label, key, pitch, first):
+def _case(p, wc, cam, bag, cls, label, key, pitch, zoom_in, first):
     sights = (getattr(M, f"{key}_SIGHT"), getattr(M, f"{key}_SIGHT_FRONT"))
     p.set(wc, "EquippedIndex", bag.index(cls))
     p.set(wc, "NeedsRefresh", True)
     held = lambda: p.get(wc, "Held")
     yield _until(lambda: held() is not None and held().get_class().get_name() == cls)
     _look(p, pitch)
+    own_zoom_in = held().get_editor_property("AdsZoomInSeconds")
+    if zoom_in is not None:
+        p.set(held(), "AdsZoomInSeconds", zoom_in)
+    try:
+        yield from _raise(p, wc, cam, held, sights, label, first)
+    finally:
+        if zoom_in is not None and held() is not None:
+            p.set(held(), "AdsZoomInSeconds", own_zoom_in)
+
+
+def _raise(p, wc, cam, held, sights, label, first):
     # Lowered first (a game's first 1.5 s count as just after a shot), then
     # the ready pose's blend out.
     yield _until(lambda: p.get(wc, LOWERED_VAR) and p.get(wc, SEAT_VAR) == 0.0)
@@ -211,24 +253,58 @@ def _case(p, wc, cam, bag, cls, label, key, pitch, first):
     if SHOTS and first:
         yield from _shot(p, False, f"{label}, carried: the crosshair")
 
-    # --- the sights key goes down ----------------------------------------------
+    # --- the sights key goes down: the zoom-in, on the boom ----------------------
+    zoom = held().get_editor_property("AdsZoom")
+    zoom_in = held().get_editor_property("AdsZoomInSeconds")
     p.set(wc, SIGHTS_FORCED_VAR, True)
     yield       # one tick: the Tick has read the key once
     watch.sample()
-    zoom = held().get_editor_property("AdsZoom")
-    seat0, at_head, zoom0 = p.get(wc, SEAT_VAR), watch.off_head(), watch.zoom_now()
+    seat0, zoom0, held0 = p.get(wc, SEAT_VAR), watch.zoom_now(), p.get(wc, "SightHeld")
+    p.check(f"{label}: the frame the sights key goes down, the camera is still on "
+            f"the boom ({SEAT_VAR} 0) and the zoom has started easing in toward the "
+            f"weapon's own {zoom:g}x: not there yet, the key's zoom-in is "
+            f"{zoom_in:g} s",
+            p.get(wc, "SightAiming") and not p.get(wc, "SightSnapped")
+            and seat0 == 0.0 and watch.off_boom() < BOOM_CM
+            and 1.0 < zoom0 < zoom - ZOOM_AT_ONCE and 0.0 < held0 < zoom_in,
+            f"{SEAT_VAR} {seat0:.4f}, {zoom0:.3f}x, camera {watch.off_boom():.2f} cm "
+            f"off the boom, SightHeld {held0:.4f}")
+    p.check(f"{label}: ...and the gun is kept lowered through the zoom-in "
+            f"(SightPending), to be raised with the cut",
+            p.get(wc, "SightPending") and p.get(wc, LOWERED_VAR),
+            f"SightPending {p.get(wc, 'SightPending')}, {LOWERED_VAR} "
+            f"{p.get(wc, LOWERED_VAR)}")
+
+    # --- the cut -------------------------------------------------------------------
+    held_before = [held0]
+
+    def cut():
+        if p.get(wc, "SightSnapped"):
+            return True
+        held_before[0] = p.get(wc, "SightHeld")
+        watch.sample()
+        return False
+    yield _until(cut)
+    watch.sample()
+    seat1, at_head, zoom1 = p.get(wc, SEAT_VAR), watch.off_head(), watch.zoom_now()
+    held1 = p.get(wc, "SightHeld")
     right0, up0 = watch.front_in_view()
-    p.check(f"{label}: the frame the sights key goes down, the camera is in the "
-            f"sights' view at once: {SEAT_VAR} 1, zoomed to the weapon's own "
-            f"{zoom:g}x, standing at the head bone (within {HEAD_CM:g} cm)",
-            p.get(wc, "SightAiming") and seat0 > 0.9999
-            and abs(zoom0 - zoom) < ZOOM_AT_ONCE and at_head < HEAD_CM,
-            f"{SEAT_VAR} {seat0:.4f}, {zoom0:.3f}x, {at_head:.2f} cm from the head")
+    p.check(f"{label}: the cut comes on the first frame the key has been held "
+            f"{zoom_in:g} s (the item's own AdsZoomInSeconds)",
+            p.get(wc, "SightSnapped") and held1 >= zoom_in and held_before[0] < zoom_in,
+            f"SightHeld {held1:.4f} at the cut, {held_before[0]:.4f} the frame before")
+    p.check(f"{label}: ...and on that frame the camera is in the sights' view at "
+            f"once: {SEAT_VAR} 1, zoomed to the weapon's own {zoom:g}x, standing at "
+            f"the head bone (within {HEAD_CM:g} cm)",
+            seat1 > 0.9999 and abs(zoom1 - zoom) < ZOOM_AT_ONCE and at_head < HEAD_CM,
+            f"{SEAT_VAR} {seat1:.4f}, {zoom1:.3f}x, {at_head:.2f} cm from the head")
     p.check(f"{label}: ...and the gun is still down, its front sight below and "
-            f"to the right of the middle of the view, to rise into it",
-            not p.get(wc, SEATED_VAR) and up0 < 0.0 and right0 > 0.0,
+            f"to the right of the middle of the view, raised from this frame "
+            f"(no longer {LOWERED_VAR}) to rise into it",
+            not p.get(wc, SEATED_VAR) and up0 < 0.0 and right0 > 0.0
+            and not p.get(wc, LOWERED_VAR) and not p.get(wc, "SightPending"),
             f"the front sight {right0:.1f} deg right, {up0:.1f} deg up, "
-            f"{SEATED_VAR} {p.get(wc, SEATED_VAR)}")
+            f"{SEATED_VAR} {p.get(wc, SEATED_VAR)}, {LOWERED_VAR} {p.get(wc, LOWERED_VAR)}")
 
     def up():
         watch.sample()
@@ -246,12 +322,18 @@ def _case(p, wc, cam, bag, cls, label, key, pitch, first):
             watch.n > 5 and watch.view < VIEW_DEG,
             f"worst {watch.view:.2f} deg over {watch.n} frames "
             f"(the gun came up from {carried:.1f} deg off)")
-    p.check(f"{label}: ...{SEAT_VAR} stays 1 the whole time the key is held, "
+    p.check(f"{label}: ...{SEAT_VAR} stays 1 the whole time from the cut, "
             f"and the zoom stays the weapon's own: nothing glides",
             (watch.seat_low or 0.0) > 0.9999
             and abs(p.get(wc, "AimZoom") - zoom) < 1e-6
             and abs(watch.zoom_now() - zoom) < ZOOM_AT_ONCE,
             f"least {SEAT_VAR} {watch.seat_low}, {watch.zoom_now():.3f}x at the end")
+    p.check(f"{label}: ...and from the cut to the latch the camera stands still "
+            f"in the owner's frame (under {STEADY_CM:g} cm a frame): the anchor is "
+            f"held, so the head's lean into the ready pose does not carry it",
+            watch.cam_was is not None and watch.drift < STEADY_CM,
+            f"camera {watch.drift:.4f} cm a frame at most, the head bone "
+            f"{watch.head_drift:.3f} cm")
     p.check(f"{label}: ...the turn onto the sight line ({LOOK_VAR}) waits until "
             f"the gun is up",
             watch.look_early == 0.0,
@@ -319,6 +401,6 @@ def _run(p):
     wanted = {c[0] for c in CASES}
     p.check("the shotgun, the pistol and the sniper are in the bag",
             wanted <= set(bag), str(bag))
-    for i, (cls, label, key, pitch) in enumerate(CASES):
+    for i, (cls, label, key, pitch, zoom_in) in enumerate(CASES):
         if cls in bag:
-            yield from _case(p, wc, cam, bag, cls, label, key, pitch, i == 0)
+            yield from _case(p, wc, cam, bag, cls, label, key, pitch, zoom_in, i == 0)

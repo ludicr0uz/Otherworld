@@ -44,6 +44,12 @@ def _feeds(pin, limit=250):
     return seen
 
 
+def _ran_by(node):
+    """The nodes whose exec output runs this one."""
+    pin = BEL.find_input_pin(node, "execute")
+    return [PIN.get_owning_node(q) for q in PIN.list_connected_pins(pin)] if pin else []
+
+
 def _part_box(part):
     """(min, max) corners of a part in weapon space, ignoring small tilts.
 
@@ -219,13 +225,15 @@ def check_eye_points():
 
 def check_sight_camera():
     blend_writes = [n for n in wg if _title(n) == "Set SightBlend"]
-    check("SightBlend is written once, eased toward SightAiming",
+    check("SightBlend is written once, eased toward the cut (SightSnapped)",
           len(blend_writes) == 1, str(len(blend_writes)))
     if blend_writes:
         up = {_title(n) for n in _feeds(BEL.find_input_pin(blend_writes[0],
                                                            "SightBlend"))}
-        check("...by an FInterpTo off the SightAiming flag, at the zoom's speed",
-              "Get SightAiming" in up and "Get SightBlend" in up
+        check("...by an FInterpTo off the SightSnapped flag, at the gun's AdsSpeed: "
+              "the body's pitch starts with the cut, as the raise does",
+              "Get SightSnapped" in up and "Get SightBlend" in up
+              and "Get AdsSpeed" in up and "Get SightAiming" not in up
               and any("FInterp" in t.replace(" ", "") for t in up),
               str(sorted(up)))
         held = [n for n in _feeds(BEL.find_input_pin(blend_writes[0], "SightBlend"))
@@ -264,17 +272,38 @@ def check_sight_camera():
           len(boom) == 1 and all(boom[0] in f for f in fed),
           str([pin_value(n, "InSocketName") for n in sockets]))
     head = [n for n in at if pin_value(n, "InSocketName") == head_bone()]
-    check(f"...and the sights' view is the head bone ({head_bone()}, off "
-          f"OwnerMesh: where the camera stands from the key while the gun "
-          f"rises) to the held weapon's SightOffset, by {LOOK_VAR}: the camera "
-          f"settles onto the gun's eye point as it turns onto its line",
-          len(at) == 2 and len(head) == 1 and len(inner) == 1
-          and head[0] in _feeds(BEL.find_input_pin(inner[0], "A"))
+    stands = [n for n in wg if _title(n) == "Set SightAnchor"]
+    taken = ({_title(n) for n in _feeds(BEL.find_input_pin(stands[0], "SightAnchor"))}
+             if stands else set())
+    gates = [g for n in stands for g in _ran_by(n) if _title(g) == "Branch"]
+    held_off = ({_title(n) for n in _feeds(BEL.find_input_pin(gates[0], "Condition"))}
+                if gates else set())
+    check(f"...and the sights' view is the anchor (SightAnchor: the head bone, "
+          f"{head_bone()}, off OwnerMesh, in the owner's frame) to the held "
+          f"weapon's SightOffset, by {LOOK_VAR}: where the camera stands from the "
+          f"cut while the gun rises, settling onto the gun's eye point as it "
+          f"turns onto its line",
+          len(at) == 2 and len(head) == 1 and len(inner) == 1 and len(stands) == 1
+          and head[0] in _feeds(BEL.find_input_pin(stands[0], "SightAnchor"))
+          and "Get SightAnchor" in {
+              _title(n) for n in _feeds(BEL.find_input_pin(inner[0], "A"))}
+          and any("transformlocation" == t.replace(" ", "").lower()
+                  for t in {_title(n) for n in
+                            _feeds(BEL.find_input_pin(inner[0], "A"))})
           and any("SightOffset" in out_pins(n)
                   for n in _feeds(BEL.find_input_pin(inner[0], "B")))
           and "Get OwnerMesh" in {
               _title(n) for n in _feeds(BEL.find_input_pin(head[0], "self"))},
           str([pin_value(n, "InSocketName") for n in at]))
+    check("...taken (InverseTransformLocation off the owner's transform) only "
+          "while the view is off the sights, a Branch on NOT SightSnapped, and "
+          "held from the cut: the head leans into the ready pose as the gun "
+          "rises, and a camera on the live bone bobbed with it",
+          len(gates) == 1 and "Get SightSnapped" in held_off
+          and any("not" in t.lower() for t in held_off)
+          and any("inversetransformlocation" == t.replace(" ", "").lower()
+                  for t in taken),
+          f"gate {sorted(held_off)}, taken {sorted(taken)}")
     check_sight_look(sockets, moves)
 
     hides = [n for n in wg if "bNewHidden" in in_pins(n)]

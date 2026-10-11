@@ -28,11 +28,14 @@ _author_* fragment per concern, each in its own module:
   cauterize   use's hot-blade kind: a press with a Hot item in hand takes
               the bleed off the player, by the tag its spec grants
   ads         the two aim keys (shoulder, sights) -> Aiming/SightAiming/AimZoom
-              (the sights key aims only while it is not Using); the zoom, the
-              scope's look slowdown, and the aim-walk flag handed to the
-              movement component
+              (the sights key aims only while it is not Using); the zoom (eased
+              at the gun's AdsZoomSpeed, landed with the cut), the cut to the
+              sights after the gun's AdsZoomInSeconds (SightHeld, SightSnapped,
+              SightPending: the gun kept lowered until the cut), the scope's
+              look slowdown, and the aim-walk flag handed to the movement
+              component
   seat        down the sights: SightSeat (the camera on the sights: 1 at once
-              on the key, eased home off it), SightSeated (the gun is up)
+              from the cut, eased home off it), SightSeated (the gun is up)
               and SightLook (how far the camera has turned onto its line,
               from then), so the view stays on the target while the gun rises
   sights      down the sights: put the camera (by SightSeat) at the head bone,

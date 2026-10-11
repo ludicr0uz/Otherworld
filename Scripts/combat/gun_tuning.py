@@ -38,6 +38,14 @@ TUNE_STATS = (
     ("reload_s", "ReloadSeconds", "reload (s)", 0.1, 0.0, float),
     ("magazine", "MagazineSize", "magazine", 1.0, 1.0, int),
     ("ads_zoom", "AdsZoom", "sights zoom", 0.1, 1.0, float),
+    # Bringing the sights up (weapon_component/ads.py, seat.py): how fast the
+    # zoom eases in and out (FInterpTo's speed), how long it eases in before
+    # the view cuts to the sights, and how long the gun takes to rise into
+    # them (the ready pose's blend in). The defaults are COMBAT's (tuning.py),
+    # the same on every gun.
+    ("ads_zoom_speed", "AdsZoomSpeed", "sights zoom speed", 1.0, 1.0, float),
+    ("ads_zoom_in_s", "AdsZoomInSeconds", "sights zoom-in (s)", 0.01, 0.0, float),
+    ("ads_raise_s", "AdsRaiseSeconds", "sights raise (s)", 0.05, 0.0, float),
     ("shot_volume", "ShotVolume", "heard at (cm)", 250.0, 0.0, float),
     ("spread", "SpreadDegrees", "spread (deg)", 0.1, 0.0, float),
     ("spread_shoulder", "SpreadShoulderScale", "spread x shoulder", 0.05, 0.0, float),

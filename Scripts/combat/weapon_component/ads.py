@@ -15,8 +15,8 @@ from combat.weapon_component.common import _prop
 from uebp.nodes.actor import (
     FN_GET_COMP, FN_IS_KEY_DOWN, FN_SET_FOV, FN_SET_PITCH_SCALE, FN_SET_YAW_SCALE)
 from uebp.nodes.math import (
-    FN_AND, FN_CLAMP, FN_DIV_FF, FN_INTERP_FF, FN_LERP, FN_MUL_FF, FN_NOT, FN_OR,
-    FN_SELECT_FF, FN_SUB_FF)
+    FN_ADD_FF, FN_AND, FN_CLAMP, FN_DIV_FF, FN_GE_FF, FN_INTERP_FF, FN_LERP, FN_MUL_FF,
+    FN_NOT, FN_OR, FN_SELECT_FF, FN_SUB_FF)
 from uebp.nodes.move import FN_SET_AIM_WALK
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
@@ -26,7 +26,7 @@ from combat.weapon_component import vars as WV
 AIM_FORCED_VAR = WV.AimForced
 
 
-def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
+def _author_aim_state(ed, tick, pc_out, held, armed_out, key_pins, sights_key,
                       exec_ins, keep):
     """Read the two aim keys into the aim state and the FOV to zoom to.
 
@@ -38,9 +38,11 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
             SightAiming = sights AND Held.HasSights
             AimZoom     = SightAiming ? Held.AdsZoom : COMBAT.shoulder_zoom
             TargetFOV   = BaseFOV / AimZoom
+            SightHeld, SightSnapped, SightPending, AdsSpeed   (_author_sight_snap)
         else:
             SightAiming = false
             TargetFOV   = BaseFOV
+            SightHeld, SightSnapped, SightPending = 0, false, false
 
     Holding both keys is aiming down the sights: the sights are the stronger
     of the two, and letting go of them drops back to the shoulder.
@@ -50,11 +52,13 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
     and its stand-in are polled once, by use.py, which hands the pin in
     (``sights_key``).
 
-    The weapon's own zoom starts on the sights key, as the camera's travel
-    onto the gun does (seat.py's SightSeat, eased at the same speed), so the
-    two are one motion: the scope's 4x, and the glass that fades in on it,
-    arrive with the camera. The sights key never stops at the shoulder's zoom
-    on the way.
+    The weapon's own zoom starts on the sights key: TargetFOV is the
+    weapon's from the key's frame, and the zoom eases toward it for the
+    gun's AdsZoomInSeconds, then the view cuts to the sights (SightSnapped,
+    _author_sight_snap: the zoom lands, seat.py puts the camera in the
+    sights' view, the gun is raised into it). The scope's 4x, and the glass
+    that fades in on it, arrive with the cut. The sights key never stops at
+    the shoulder's zoom on the way.
 
     Not while sprinting, because the fire gate already refuses to shoot while
     sprinting: a zoom that stayed on through a sprint would be aiming a weapon
@@ -163,6 +167,9 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
     want_in = keep(ed.add_set_member_variable_node(WV.TargetFOV))
     _connect(out(narrow), _pin(want_in, WV.TargetFOV))
     _connect(then(chosen), _pin(want_in, "execute"))
+    snapped = _author_sight_snap(
+        ed, tick, held, _loose_pin(sight_on, "Output_Get", is_input=False), shoulder,
+        then(want_in), keep)
 
     # False arm: not aiming at all, so not down the sights either.
     sight_off = keep(ed.add_set_member_variable_node(WV.SightAiming))
@@ -171,22 +178,114 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
     want_out = keep(ed.add_set_member_variable_node(WV.TargetFOV))
     _connect(base_out, _pin(want_out, WV.TargetFOV))
     _connect(then(sight_off), _pin(want_out, "execute"))
+    unsnapped = _author_sight_unsnap(ed, then(want_out), keep)
 
-    return ((then(want_in), then(want_out)), out(still))
+    return ((snapped, unsnapped), out(still))
+
+
+def _author_sight_snap(ed, tick, held, sight_on, shoulder, exec_in, keep):
+    """Aiming, Held valid: how long the sights key has been down, and whether
+    the view has cut to the sights yet.
+
+        SightHeld    = SightAiming ? SightHeld + dt : 0
+        SightSnapped = SightAiming AND SightHeld >= Held.AdsZoomInSeconds
+        SightPending = SightAiming AND NOT SightSnapped AND NOT shoulder
+        AdsSpeed     = Held.AdsZoomSpeed
+
+    Bringing the sights up is two parts. For the gun's AdsZoomInSeconds after
+    the key the camera stays on the boom and the zoom eases in (a glimpse of
+    the zoom starting, as the old glide did, only shorter); then the view
+    cuts to the sights (SightSnapped): the zoom lands on the weapon's own
+    (_author_zoom), seat.py puts the camera in the sights' view, and the gun
+    is raised into it (carry.py reads SightPending: the gun is kept lowered
+    through the zoom-in, so the raise begins with the cut). A zoom-in of 0 is
+    the cut on the key's frame: SightHeld is dt there, which is past 0.
+
+    SightPending is not the zoom-in with the shoulder key held as well: that
+    gun is already up on the shoulder key, and a carry that lowered it for a
+    tenth of a second would twitch.
+
+    AdsSpeed is the gun's AdsZoomSpeed, read here where Held is valid, and
+    kept on letting go (as AimZoom is): the ease out, with empty hands too,
+    is at the speed of the gun that was aimed.
+
+    Returns the exec pin to carry on from.
+    """
+    have = keep(ed.add_get_member_variable_node(WV.SightHeld))
+    longer = keep(_node(ed, FN_ADD_FF))
+    _connect(out(have, WV.SightHeld), _pin(longer, "A"))
+    _connect(out(tick, "DeltaSeconds"), _pin(longer, "B"))
+    # The literal 0 is on B, the pin a Kismet node lets hold one.
+    pick = keep(_node(ed, FN_SELECT_FF))
+    _connect(out(longer), _pin(pick, "A"))
+    _set(pick, "B", 0.0)
+    _connect(sight_on, _pin(pick, "bPickA"))
+    held_for = keep(ed.add_set_member_variable_node(WV.SightHeld))
+    _connect(out(pick), _pin(held_for, WV.SightHeld))
+    _connect(exec_in, _pin(held_for, "execute"))
+
+    wait, wait_n = _prop(ed, IV.AdsZoomInSeconds, held)
+    keep(wait_n)
+    past = keep(_node(ed, FN_GE_FF))
+    _connect(_loose_pin(held_for, "Output_Get", is_input=False), _pin(past, "A"))
+    _connect(wait, _pin(past, "B"))
+    cut = keep(_node(ed, FN_AND))
+    _connect(sight_on, _pin(cut, "A"))
+    _connect(out(past), _pin(cut, "B"))
+    snapped = keep(ed.add_set_member_variable_node(WV.SightSnapped))
+    _connect(out(cut), _pin(snapped, WV.SightSnapped))
+    _connect(then(held_for), _pin(snapped, "execute"))
+
+    not_yet = keep(_node(ed, FN_NOT))
+    _connect(_loose_pin(snapped, "Output_Get", is_input=False), _pin(not_yet, "A"))
+    before = keep(_node(ed, FN_AND))
+    _connect(sight_on, _pin(before, "A"))
+    _connect(out(not_yet), _pin(before, "B"))
+    no_shoulder = keep(_node(ed, FN_NOT))
+    _connect(shoulder, _pin(no_shoulder, "A"))
+    lowered_still = keep(_node(ed, FN_AND))
+    _connect(out(before), _pin(lowered_still, "A"))
+    _connect(out(no_shoulder), _pin(lowered_still, "B"))
+    pending = keep(ed.add_set_member_variable_node(WV.SightPending))
+    _connect(out(lowered_still), _pin(pending, WV.SightPending))
+    _connect(then(snapped), _pin(pending, "execute"))
+
+    rate, rate_n = _prop(ed, IV.AdsZoomSpeed, held)
+    keep(rate_n)
+    speed = keep(ed.add_set_member_variable_node(WV.AdsSpeed))
+    _connect(rate, _pin(speed, WV.AdsSpeed))
+    _connect(then(pending), _pin(speed, "execute"))
+    return then(speed)
+
+
+def _author_sight_unsnap(ed, exec_in, keep):
+    """Not aiming: the key has not been held, the view is not on the sights
+    and nothing is pending. AdsSpeed is left as it was (see _author_sight_snap).
+    Returns the exec pin to carry on from."""
+    flow = exec_in
+    for var, value in ((WV.SightHeld, 0.0), (WV.SightSnapped, False),
+                       (WV.SightPending, False)):
+        put = keep(ed.add_set_member_variable_node(var))
+        _set(put, var, value)
+        _connect(flow, _pin(put, "execute"))
+        flow = then(put)
+    return flow
 
 
 def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
     """Move the camera's FOV to TargetFOV, and slow the mouse with it.
 
-        CurrentFOV = SightAiming ? TargetFOV
-                     : FInterpTo(CurrentFOV, TargetFOV, dt, COMBAT.ads_interp_speed)
+        CurrentFOV = SightSnapped ? TargetFOV
+                     : FInterpTo(CurrentFOV, TargetFOV, dt, AdsSpeed)
         Camera.SetFieldOfView(CurrentFOV)
 
-    Down the sights the zoom is the weapon's own on the frame the key goes
-    down: the camera is in the sights' view at once (seat.py's SightSeat is
-    1 on the same frame) and the gun rises into it. Everything else is
-    interpolated: the shoulder aim's zoom in, and letting either key go,
-    which unzooms by the FInterpTo's curve with no second code path.
+    Down the sights the zoom eases toward the weapon's own for the gun's
+    AdsZoomInSeconds after the key (TargetFOV is the weapon's from the key's
+    frame), then lands on it with the cut to the sights (SightSnapped:
+    seat.py's SightSeat is 1 on the same frame) and the gun rises into the
+    view. Everything else is interpolated at the gun's AdsSpeed: the
+    shoulder aim's zoom in, and letting either key go, which unzooms by the
+    FInterpTo's curve with no second code path, the zoom-in's inverse.
     CurrentFOV is a stored variable because FInterpTo's input is its own
     previous output.
 
@@ -200,12 +299,13 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
     _connect(out(have, WV.CurrentFOV), _pin(step, "Current"))
     _connect(want_out, _pin(step, "Target"))
     _connect(out(tick, "DeltaSeconds"), _pin(step, "DeltaTime"))
-    _set(step, "InterpSpeed", COMBAT.ads_interp_speed)
-    # Down the sights, the target itself. SightAiming was written this frame
-    # by _author_aim_state, which runs just before this.
-    sights = keep(ed.add_get_member_variable_node(WV.SightAiming))
+    rate = keep(ed.add_get_member_variable_node(WV.AdsSpeed))
+    _connect(out(rate, WV.AdsSpeed), _pin(step, "InterpSpeed"))
+    # Once the view has cut to the sights, the target itself. SightSnapped
+    # was written this frame by _author_aim_state, which runs just before.
+    sights = keep(ed.add_get_member_variable_node(WV.SightSnapped))
     easing = keep(_node(ed, FN_NOT))
-    _connect(out(sights, WV.SightAiming), _pin(easing, "A"))
+    _connect(out(sights, WV.SightSnapped), _pin(easing, "A"))
     pick = keep(_node(ed, FN_SELECT_FF))
     _connect(out(step), _pin(pick, "A"))
     _connect(want_out, _pin(pick, "B"))
@@ -339,7 +439,7 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,
         made.append(n)
         return n
 
-    aimed, still = _author_aim_state(ed, pc_out, held, armed_out, key_pins,
+    aimed, still = _author_aim_state(ed, tick, pc_out, held, armed_out, key_pins,
                                      sights_key, exec_ins, keep)
     flow, moved = _author_zoom(ed, tick, pc_out, owner_out, aimed, keep)
     exits = _author_aim_slowdown(ed, owner_out, flow, keep)
@@ -348,11 +448,14 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,
         f"{AIM_KEY} aims over the shoulder at {COMBAT.shoulder_zoom:g}x; "
         f"{SIGHTS_KEY} aims down the sights at the weapon's own AdsZoom "
         f"({COMBAT.ads_zoom_irons:g}x irons, {COMBAT.ads_zoom_scope:g}x on the sniper's "
-        f"scope) and sights.py puts the camera in the sights' view: at once, "
-        f"the zoom with it, and the gun rises into the view. The shoulder's "
-        f"zoom, and letting go, are interpolated at "
-        f"{COMBAT.ads_interp_speed:g}, about "
-        f"a fifth of a second. Refused while sprinting -- the fire gate already "
+        f"scope): the zoom eases in for the gun's AdsZoomInSeconds (every gun's "
+        f"{COMBAT.ads_zoom_in_s:g} s), then the view cuts to the sights "
+        f"(SightSnapped: the zoom lands, sights.py puts the camera in the "
+        f"sights' view) and the gun is raised into it (SightPending keeps it "
+        f"lowered until the cut, unless the shoulder key holds it up). The "
+        f"shoulder's zoom, and letting go, are interpolated at the gun's "
+        f"AdsZoomSpeed (AdsSpeed; every gun's {COMBAT.ads_interp_speed:g}, about "
+        f"a fifth of a second). Refused while sprinting -- the fire gate already "
         f"is -- and with empty hands, which is also what keeps the AdsZoom "
         f"getter off a null Held. Aiming is either key; SightAiming only the "
         f"second, and never with food in hand. The shot's cloud narrows with "

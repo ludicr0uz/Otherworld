@@ -16,12 +16,16 @@ right, and SightSeat eases it home off the gun rather than cutting.
 Where the camera is while the gun rises: the gun's eye point rides the gun,
 and a gun is carried at the hip, so a camera put on the eye point from the
 key would ride up with it and the world would swing while the gun stood
-still in the view. It stands instead at the head bone (OwnerMesh's, the one
-head_hide.py hides: the anchor), looking where the player looks, and the gun
-is what moves: up from below and to the right of the view onto the crosshair.
-Once the gun is up (SightSeated) the camera settles from the anchor onto the
-eye point with its turn onto the sight line (SightLook), a few centimetres
-over the same fifth of a second.
+still in the view. It stands instead at the anchor (SightAnchor): the head
+bone (OwnerMesh's, the one head_hide.py hides) in the owner's frame, taken
+every frame the view is not on the sights and held from the cut. Held, not
+read live: the ready pose leans the head in to the sights, and a camera on
+the live bone was carried a few centimetres with that lean while the gun
+rose, a bob under the raise. From the anchor it looks where the player
+looks, and the gun is what moves: up from below and to the right of the view
+onto the crosshair. Once the gun is up (SightSeated) the camera settles from
+the anchor onto the eye point with its turn onto the sight line (SightLook),
+a few centimetres over the same fifth of a second.
 
 Why the camera takes the gun's sight line and not the control rotation: the
 eye and the front sight's tip are two points of the gun, so a view from one
@@ -43,7 +47,6 @@ boom's rotation; the look is weighted by whether the line has any length.
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.nodes import CAMERA_CLASS_PATH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET
 from combat.seat_tuning import SEAT_HOLD, SEAT_VAR, SIGHT_SEAT_DEG
-from combat.tuning import COMBAT
 from combat.weapon_component.body_parts import author_parts_no_see
 from combat.weapon_component.common import _prop
 from combat.weapon_component.head_hide import head_bone
@@ -52,8 +55,8 @@ from uebp.nodes.actor import (
     FN_ADD_TICK_PREREQ, FN_COMP_SET_WORLD_LOC, FN_COMP_SET_WORLD_ROT, FN_GET_COMP,
     FN_GET_TRANSFORM, FN_SET_HIDDEN, FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC, FN_SOCKET_ROT)
 from uebp.nodes.math import (
-    FN_AND, FN_BOOL_TO_FLOAT, FN_GREATER_FF, FN_INTERP_FF, FN_MUL_FF, FN_OR, FN_RLERP,
-    FN_ROT_FROM_X, FN_SUB_VV, FN_TRANSFORM_LOC, FN_VLERP, FN_VSIZE)
+    FN_AND, FN_BOOL_TO_FLOAT, FN_GREATER_FF, FN_INTERP_FF, FN_INV_XFORM_LOC, FN_MUL_FF,
+    FN_NOT, FN_OR, FN_RLERP, FN_ROT_FROM_X, FN_SUB_VV, FN_TRANSFORM_LOC, FN_VLERP, FN_VSIZE)
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
@@ -151,12 +154,16 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     """Put the camera in the sights' view from the key, and ease it home.
 
         SightBlend = FInterpTo(SightBlend,
-                               SightAiming OR SightSeat > SEAT_HOLD ? 1 : 0,
-                               dt, ads_interp_speed)
+                               SightSnapped OR SightSeat > SEAT_HOLD ? 1 : 0,
+                               dt, AdsSpeed)
         shoulder   = CameraBoom.GetSocketLocation(SpringEndpoint)
         if IsValid(Held):
             eye    = TransformLocation(Held.GetTransform(), Held.SightOffset)
-            anchor = OwnerMesh.GetSocketLocation(head bone)
+            if NOT SightSnapped:
+                SightAnchor = InverseTransformLocation(
+                                  Owner.GetTransform(),
+                                  OwnerMesh.GetSocketLocation(head bone))
+            anchor = TransformLocation(Owner.GetTransform(), SightAnchor)
             SightSeat, SightSeated, SightLook = ...       (seat.py)
             Camera.SetWorldLocation(VLerp(shoulder, VLerp(anchor, eye, SightLook),
                                           SightSeat))
@@ -168,16 +175,18 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
             Camera.SetWorldRotation(boom's)
 
     SightBlend is the body's share of the sights (the pitch, the sway, the
-    steady hand): it starts on the key and lasts until the camera has left
-    the gun. SightSeat is 1 from the key (seat.py): the camera is at the
-    anchor, the head bone, on the frame the key goes down, and ads.py has the
-    weapon's own zoom on the same frame, so the sniper's glass (which fades
-    on the zoom) is closed round the view at once. SightLook is the camera's
-    turn onto the sight line, and starts only when the gun is up: until then
-    the view keeps looking where the player is looking, from the head, and
-    the gun rises into it from the hip; as it turns, the camera also settles
-    the few centimetres from the anchor onto the gun's own eye point. Letting
-    go, SightSeat eases home at the zoom's speed.
+    steady hand): it starts with the cut, as the gun's raise does, and lasts
+    until the camera has left the gun. SightSeat is 1 from the cut (seat.py:
+    SightSnapped, the gun's AdsZoomInSeconds after the key, during which the
+    camera stays on the boom and the zoom eases in): the camera is at the
+    anchor on that frame, and ads.py lands the weapon's own zoom on the same
+    frame, so the sniper's glass (which fades on the zoom) is closed round
+    the view with the cut. SightLook is the camera's turn onto the sight
+    line, and starts only when the gun is up: until then the view keeps
+    looking where the player is looking, from the anchor, and the gun rises
+    into it from the hip; as it turns, the camera also settles the few
+    centimetres from the anchor onto the gun's own eye point. Letting go,
+    SightSeat eases home at the gun's AdsSpeed.
 
     Written every frame, both ways. At SightSeat and SightLook 0 the write
     puts the camera
@@ -204,13 +213,13 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     # The body holds the aim until the camera has left the gun (last frame's
     # SightSeat): letting go, a view still easing home would otherwise follow
     # the gun as the upper body's pitch came off it.
-    wanted = keep(ed.add_get_member_variable_node(WV.SightAiming))
+    wanted = keep(ed.add_get_member_variable_node(WV.SightSnapped))
     seat_was = keep(ed.add_get_member_variable_node(SEAT_VAR))
     on_gun = keep(_node(ed, FN_GREATER_FF))
     _connect(out(seat_was, SEAT_VAR), _pin(on_gun, "A"))
     _set(on_gun, "B", SEAT_HOLD)
     either = keep(_node(ed, FN_OR))
-    _connect(out(wanted, WV.SightAiming), _pin(either, "A"))
+    _connect(out(wanted, WV.SightSnapped), _pin(either, "A"))
     _connect(out(on_gun), _pin(either, "B"))
     as_float = keep(_node(ed, FN_BOOL_TO_FLOAT))
     _connect(out(either), _pin(as_float, "InBool"))
@@ -219,7 +228,8 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     _connect(out(have, WV.SightBlend), _pin(step, "Current"))
     _connect(out(as_float), _pin(step, "Target"))
     _connect(out(tick, "DeltaSeconds"), _pin(step, "DeltaTime"))
-    _set(step, "InterpSpeed", COMBAT.ads_interp_speed)
+    rate = keep(ed.add_get_member_variable_node(WV.AdsSpeed))
+    _connect(out(rate, WV.AdsSpeed), _pin(step, "InterpSpeed"))
     blend = keep(ed.add_set_member_variable_node(WV.SightBlend))
     _connect(out(step), _pin(blend, WV.SightBlend))
     for e in exec_ins:
@@ -253,16 +263,36 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     _connect(out(xform), _pin(eye, "T"))
     _connect(off_pin, _pin(eye, "Location"))
     line_out, has_line_out = _author_sight_line(ed, keep, held, xform, out(eye))
+    # Where the camera stands while the gun rises: the head bone in the
+    # owner's frame, taken while the view is not on the sights and held from
+    # the cut, so the head's lean into the ready pose does not carry the
+    # camera. The turn onto the sight line carries it the rest of the way,
+    # onto the eye point.
+    snapped = keep(ed.add_get_member_variable_node(WV.SightSnapped))
+    off_sights = keep(_node(ed, FN_NOT))
+    _connect(out(snapped, WV.SightSnapped), _pin(off_sights, "A"))
+    taking = keep(ed.add_branch_node())
+    _connect(out(off_sights), _pin(taking, "Condition"))
+    _connect(then(armed), _pin(taking, "execute"))
+    frame = keep(_node(ed, FN_GET_TRANSFORM))
+    _connect(owner_out, _pin(frame, "self"))
+    body_now = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
+    head = keep(_node(ed, FN_SOCKET_LOC))
+    _connect(out(body_now, WV.OwnerMesh), _pin(head, "self"))
+    _set(head, "InSocketName", head_bone())
+    local = keep(_node(ed, FN_INV_XFORM_LOC))
+    _connect(out(frame), _pin(local, "T"))
+    _connect(out(head), _pin(local, "Location"))
+    stand = keep(ed.add_set_member_variable_node(WV.SightAnchor))
+    _connect(out(local), _pin(stand, WV.SightAnchor))
+    _connect(then(taking), _pin(stand, "execute"))
     seated, seat_out, look_out = _author_sight_seat(
         ed, tick, keep, line_out, has_line_out, boom_rot_out,
-        then(armed))
-    # Where the camera stands while the gun rises: the head bone, which does
-    # not move with the gun. The turn onto the sight line carries it the
-    # rest of the way, onto the eye point.
-    body_now = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
-    anchor = keep(_node(ed, FN_SOCKET_LOC))
-    _connect(out(body_now, WV.OwnerMesh), _pin(anchor, "self"))
-    _set(anchor, "InSocketName", head_bone())
+        (then(stand), else_(taking)))
+    kept = keep(ed.add_get_member_variable_node(WV.SightAnchor))
+    anchor = keep(_node(ed, FN_TRANSFORM_LOC))
+    _connect(out(frame), _pin(anchor, "T"))
+    _connect(out(kept, WV.SightAnchor), _pin(anchor, "Location"))
     perch = keep(_node(ed, FN_VLERP))
     _connect(out(anchor), _pin(perch, "A"))
     _connect(out(eye), _pin(perch, "B"))
@@ -323,8 +353,11 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     shown_tail = author_parts_no_see(ed, keep, then(shown), no_see=False)
 
     ed.add_comment_to_nodes(
-        "Down the sights: on the key the camera is at once (SightSeat 1) in "
-        f"the sights' view, standing at the head bone ({head_bone()}) and "
+        "Down the sights: with the cut (SightSnapped, the gun's AdsZoomInSeconds "
+        "after the key, the zoom easing in meanwhile) the camera is at once "
+        f"(SightSeat 1) in the sights' view, standing at the anchor (the head "
+        f"bone, {head_bone()}, in the owner's frame, held from the cut so the "
+        "head's lean does not carry it) and "
         "looking where the player looks, while the gun rises into the view "
         "from the hip. It turns (SightLook) from the boom's rotation onto the "
         "weapon's sight line (the eye towards SightAim, the front sight's "
@@ -333,7 +366,7 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
         "turns. The turn waits until the gun is up (SightSeated: the "
         f"sight line within {SIGHT_SEAT_DEG:g} deg of the view), so the view "
         "stays on the target while the gun rises to it. Letting go, the seat "
-        f"eases home at the zoom's own {COMBAT.ads_interp_speed:g}. Written every frame "
+        "eases home at the gun's own AdsZoomSpeed (AdsSpeed). Written every frame "
         "both ways, so at SightSeat and SightLook 0 it is "
         "exactly where and as the boom holds it and there is no restore "
         "path; with empty hands it goes straight home. A scoped "

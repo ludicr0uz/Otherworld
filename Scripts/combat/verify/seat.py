@@ -1,5 +1,6 @@
 """verify.seat -- the sight camera's seat (weapon_component/seat.py): SightSeat 1
-at once while the sights key is held and eased home off it, SightSeated latching
+at once from the cut to the sights (SightSnapped) and eased home off it at the
+gun's AdsSpeed, SightSeated latching
 on the gun's line coming near the view, SightLook eased toward the latch, and
 all three clear with empty hands. Split out of verify.sights, which was over
 its size budget.
@@ -8,7 +9,6 @@ its size budget.
 from combat.seat_tuning import (
     LOOK_VAR, SEAT_VAR, SEATED_VAR, SIGHT_SEAT_COS, SIGHT_SEAT_DEG,
 )
-from combat.tuning import COMBAT
 from combat.weapon_component.sights import SIGHT_LINE_MIN_CM
 from combat.verify.fixtures import w, wg
 from combat.verify.sights import _feeds, _title
@@ -16,15 +16,20 @@ from combat.verify.common import BEL, PIN, check, in_pins, num_pin, pin_value
 
 
 def check_sight_seat():
-    """At once from the key (weapon_component/seat.py): SightSeat, which
-    places the camera, is 1 while the sights key is held and eases home off
-    it. SightSeated latches on the gun's sight line coming near the view, and
-    SightLook, which turns the camera onto that line, eases toward the latch."""
+    """At once from the cut (weapon_component/seat.py): SightSeat, which
+    places the camera, is 1 while the view is cut to the sights (SightSnapped,
+    ads.py) and eases home off it at the gun's AdsSpeed. SightSeated latches
+    on the gun's sight line coming near the view, and SightLook, which turns
+    the camera onto that line, eases toward the latch."""
     def writes(var):
         sets = [n for n in wg if _title(n) == f"Set {var}"]
         wired = [n for n in sets
                  if PIN.list_connected_pins(BEL.find_input_pin(n, var))]
         return sets, wired
+
+    def speed_of(ease):
+        """What feeds the FInterpTo's InterpSpeed: the gun's AdsSpeed, not a literal."""
+        return {_title(n) for n in _feeds(BEL.find_input_pin(ease, "InterpSpeed"))}
 
     latches, wired = writes(SEATED_VAR)
     check(f"{SEATED_VAR} is written twice by the living Tick: armed, and false "
@@ -35,9 +40,11 @@ def check_sight_seat():
           f"{len(latches)} writes, {len(wired)} wired")
     fed = _feeds(BEL.find_input_pin(wired[0], SEATED_VAR)) if wired else set()
     names = {_title(n) for n in fed}
-    check("...armed, it is the sights held AND (already seated OR the gun up): "
-          "a latch, so a reload with the sights up keeps the camera on the gun",
-          {"Get SightAiming", f"Get {SEATED_VAR}"} <= names, str(sorted(names)))
+    check("...armed, it is the view cut to the sights (SightSnapped) AND (already "
+          "seated OR the gun up): a latch, so a reload with the sights up keeps the "
+          "camera on the gun; not the key itself, which has the zoom-in first",
+          {"Get SightSnapped", f"Get {SEATED_VAR}"} <= names
+          and "Get SightAiming" not in names, str(sorted(names)))
     near = [n for n in fed
             if abs((num_pin(n, "B") or 0.0) - SIGHT_SEAT_COS) < 1e-5
             and "A" in in_pins(n) and len(in_pins(n)) == 2]
@@ -67,28 +74,26 @@ def check_sight_seat():
     fed = _feeds(BEL.find_input_pin(wired[0], SEAT_VAR)) if wired else set()
     names = {_title(n) for n in fed}
     eases = [n for n in fed if {"Current", "Target", "InterpSpeed"} <= in_pins(n)]
-    check(f"...eased home off the sights key (SightAiming) by an FInterpTo at "
-          f"the zoom's speed ({COMBAT.ads_interp_speed:g}), and not waiting "
-          f"for {SEATED_VAR}",
-          len(eases) == 1 and {f"Get {SEAT_VAR}", "Get SightAiming"} <= names
+    check(f"...eased home off the cut (SightSnapped) by an FInterpTo at the "
+          f"gun's AdsSpeed (the zoom's speed, a GUN SETTINGS column), and not "
+          f"waiting for {SEATED_VAR}",
+          len(eases) == 1 and {f"Get {SEAT_VAR}", "Get SightSnapped"} <= names
           and not {f"Set {SEATED_VAR}", f"Get {SEATED_VAR}"} & names
-          and abs((num_pin(eases[0], "InterpSpeed") or 0.0)
-                  - COMBAT.ads_interp_speed) < 1e-9,
-          str(sorted(names)))
-    # The frame the key goes down, the seat is 1: a SelectFloat straight
-    # into the Set, the literal 1 on B, picking the ease only while the key
-    # is up (NOT SightAiming on bPickA).
+          and speed_of(eases[0]) == {"Get AdsSpeed"},
+          f"{sorted(names)}, speed {sorted(speed_of(eases[0])) if eases else '-'}")
+    # The frame of the cut, the seat is 1: a SelectFloat straight into the
+    # Set, the literal 1 on B, picking the ease only while the view is off
+    # the sights (NOT SightSnapped on bPickA).
     picks = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
         BEL.find_input_pin(wired[0], SEAT_VAR))] if wired else []
     snap = [n for n in picks if {"A", "B", "bPickA"} <= in_pins(n)
             and abs((num_pin(n, "B") or 0.0) - 1.0) < 1e-9]
     picked = ([_title(n) for n in _feeds(BEL.find_input_pin(snap[0], "bPickA"))]
               if snap else [])
-    check("...and 1 at once while the key is held: a SelectFloat into the "
-          "write, its B 1, the ease picked only on NOT SightAiming, so the "
-          "camera is in the sights' view on the frame of the key and the gun "
-          "rises into it",
-          len(snap) == 1 and "Get SightAiming" in picked
+    check("...and 1 at once from the cut: a SelectFloat into the write, its B "
+          "1, the ease picked only on NOT SightSnapped, so the camera is in the "
+          "sights' view on the frame the zoom-in ends and the gun rises into it",
+          len(snap) == 1 and "Get SightSnapped" in picked
           and any("not" in t.lower() for t in picked)
           and eases[0] in _feeds(BEL.find_input_pin(snap[0], "A")) if eases else False,
           f"{len(snap)} snaps, picked by {sorted(picked)}")
@@ -103,11 +108,10 @@ def check_sight_seat():
     fed = _feeds(BEL.find_input_pin(wired[0], LOOK_VAR)) if wired else set()
     names = {_title(n) for n in fed}
     eases = [n for n in fed if {"Current", "Target", "InterpSpeed"} <= in_pins(n)]
-    check(f"...eased toward {SEATED_VAR} at the same speed: the view turns onto "
-          f"the gun's sight line only once the gun is up",
+    check(f"...eased toward {SEATED_VAR} at the same speed (AdsSpeed): the view "
+          f"turns onto the gun's sight line only once the gun is up",
           len(eases) == 1 and {f"Get {LOOK_VAR}", f"Set {SEATED_VAR}"} <= names
-          and abs((num_pin(eases[0], "InterpSpeed") or 0.0)
-                  - COMBAT.ads_interp_speed) < 1e-9,
+          and speed_of(eases[0]) == {"Get AdsSpeed"},
           str(sorted(names)))
     got = (w.get_editor_property(SEATED_VAR), w.get_editor_property(SEAT_VAR),
            w.get_editor_property(LOOK_VAR))

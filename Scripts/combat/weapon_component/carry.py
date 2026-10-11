@@ -132,7 +132,10 @@ def _author_carry(ed, held, armed_out, exec_ins):
     gun = negate(held_up)
 
     # --- is anything holding it up? -------------------------------------------
-    hands = gate2(FN_OR, get(WV.Aiming), get(WV.Blocking))
+    # An aim key, but not the sights key during its zoom-in (SightPending,
+    # ads.py): the gun is raised with the cut to the sights, into the view.
+    hands = gate2(FN_AND, get(WV.Aiming), negate(get(WV.SightPending)))
+    hands = gate2(FN_OR, hands, get(WV.Blocking))
     hands = gate2(FN_OR, hands, get(RAISE_FORCED_VAR))
     # ...or the camera, still on the gun's sights (seat.py). Literal on B.
     on_gun = keep(_node(ed, FN_GREATER_FF))
@@ -168,7 +171,8 @@ def _author_carry(ed, held, armed_out, exec_ins):
 
     ed.add_comment_to_nodes(
         f"The carry. {LOWERED_VAR} is whether the ready pose is off: sprinting, "
-        "or a gun (not Melee, not Consumable, not the stick; not while prone) that no aim key, "
+        "or a gun (not Melee, not Consumable, not the stick; not while prone) that no aim key "
+        "(the sights key only from its cut: not while SightPending), "
         f"guard, shot or reload is holding up, and that the sight camera has "
         f"left (SightSeat under {SEAT_HOLD:g}). A shot or a reload holds it up until "
         f"{CARRY_RAISE_HOLD_S:g} s after NextFireTime. Lowered, the locomotion "

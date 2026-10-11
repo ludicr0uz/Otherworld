@@ -70,9 +70,9 @@ def check_aiming_down_sights():
     check("the zoom out, and the shoulder's in, are interpolated",
           bool(titled(wg, "FInterp To")) or bool(titled(wg, "FInterpTo")),
           "FInterpTo")
-    # Down the sights the FOV is the target on the frame of the key: a
-    # SelectFloat into the CurrentFOV write, TargetFOV on its B, the
-    # interpolation picked only on NOT SightAiming.
+    # From the cut the FOV is the target: a SelectFloat into the CurrentFOV
+    # write, TargetFOV on its B, the interpolation picked only on NOT
+    # SightSnapped (the zoom-in before the cut eases, as letting go does).
     fov_sets = [x for x in wg if str(BEL.get_node_title(x)).replace("\n", " ")
                 == "Set CurrentFOV"]
     picks = [PIN.get_owning_node(q) for x in fov_sets
@@ -82,23 +82,121 @@ def check_aiming_down_sights():
     def one_hop(n, pin):
         return {str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
                 for q in PIN.list_connected_pins(BEL.find_input_pin(n, pin))}
-    check("...and down the sights it is the weapon's own at once: CurrentFOV "
-          "is TargetFOV while SightAiming, the FInterpTo only otherwise, so "
-          "the view is in the sights on the frame of the key",
+    check("...and from the cut to the sights it is the weapon's own at once: "
+          "CurrentFOV is TargetFOV while SightSnapped, the FInterpTo only "
+          "otherwise, so the zoom eases in for the gun's zoom-in and then lands "
+          "with the view in the sights",
           len(snap) == 1
           and one_hop(snap[0], "B") == {"Get TargetFOV"}
           and any("interp" in t.lower() for t in one_hop(snap[0], "A"))
           and all("not" in t.lower() for t in one_hop(snap[0], "bPickA"))
-          and any("Get SightAiming" in one_hop(m, "A")
+          and any("Get SightSnapped" in one_hop(m, "A")
                   for q in PIN.list_connected_pins(BEL.find_input_pin(snap[0], "bPickA"))
                   for m in [PIN.get_owning_node(q)]),
           f"{len(fov_sets)} writes of CurrentFOV, {len(snap)} fed by a select")
+    eases = [n for n in wg if {"Current", "Target", "InterpSpeed"} <= in_pins(n)
+             and "Get CurrentFOV" in one_hop(n, "Current")]
+    check("...at the gun's own speed: the FInterpTo's InterpSpeed is AdsSpeed, "
+          "Held's AdsZoomSpeed (a GUN SETTINGS column), not a literal",
+          len(eases) == 1 and one_hop(eases[0], "InterpSpeed") == {"Get AdsSpeed"},
+          f"{len(eases)} eases, speed {sorted(one_hop(eases[0], 'InterpSpeed')) if eases else '-'}")
     base_reads = [x for x in wg if "FieldOfView" in out_pins(x)]
     check("BaseFOV is cached off the camera, not written down as a literal",
           bool(base_reads), str(len(base_reads)))
     check("aiming is refused while sprinting, which cannot fire anyway",
           "Get Sprinting" in
           {str(BEL.get_node_title(x)).replace("\n", " ") for x in wg})
+
+
+# ─── The cut to the sights, after the zoom-in ────────────────────────────────
+
+def check_sights_cut():
+    """ads.py's _author_sight_snap: how long the sights key has been down,
+    the cut once that is past the gun's AdsZoomInSeconds, the zoom-in before
+    it that keeps the gun lowered (unless the shoulder key holds it up), and
+    the gun's AdsZoomSpeed taken as AdsSpeed."""
+    def one_hop(n, pin):
+        return {str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
+                for q in PIN.list_connected_pins(BEL.find_input_pin(n, pin))}
+
+    def writes(var):
+        sets = [x for x in wg if str(BEL.get_node_title(x)).replace("\n", " ")
+                == f"Set {var}"]
+        wired = [x for x in sets if PIN.list_connected_pins(BEL.find_input_pin(x, var))]
+        return sets, wired
+
+    held, wired = writes("SightHeld")
+    check("SightHeld is written twice: counting while aiming, and 0 not aiming",
+          len(held) == 2 and len(wired) == 1, f"{len(held)} writes, {len(wired)} wired")
+    picks = [PIN.get_owning_node(q) for x in wired
+             for q in PIN.list_connected_pins(BEL.find_input_pin(x, "SightHeld"))]
+    count = [n for n in picks if {"A", "B", "bPickA"} <= in_pins(n)]
+    adds = [PIN.get_owning_node(q) for n in count
+            for q in PIN.list_connected_pins(BEL.find_input_pin(n, "A"))]
+    check("...aiming, it is SightHeld + DeltaSeconds while SightAiming, else 0: the "
+          "time the sights key has been down",
+          len(count) == 1 and len(adds) == 1
+          and "Get SightHeld" in one_hop(adds[0], "A")
+          and any("tick" in t.lower() for t in one_hop(adds[0], "B"))
+          and one_hop(count[0], "bPickA") == {"Set SightAiming"},
+          f"{len(count)} selects, {len(adds)} adds")
+
+    snapped, wired = writes("SightSnapped")
+    check("SightSnapped is written twice: aiming, and false not aiming",
+          len(snapped) == 2 and len(wired) == 1,
+          f"{len(snapped)} writes, {len(wired)} wired")
+    past = [n for x in wired for m in [PIN.get_owning_node(q) for q in
+            PIN.list_connected_pins(BEL.find_input_pin(x, "SightSnapped"))]
+            for n in [PIN.get_owning_node(q) for q in
+                      PIN.list_connected_pins(BEL.find_input_pin(m, "B"))]
+            if {"A", "B"} <= in_pins(n)]
+    check("...the cut: SightAiming AND SightHeld >= Held's AdsZoomInSeconds (a GUN "
+          "SETTINGS column), so the zoom eases in for the gun's own time first",
+          len(past) == 1 and one_hop(past[0], "A") == {"Set SightHeld"}
+          and one_hop(past[0], "B") == {"Get AdsZoomInSeconds"}
+          and any("Set SightAiming" in one_hop(m, "A") for x in wired for m in
+                  [PIN.get_owning_node(q) for q in
+                   PIN.list_connected_pins(BEL.find_input_pin(x, "SightSnapped"))]),
+          f"{len(past)} compares")
+
+    pending, wired = writes("SightPending")
+    fed = {str(BEL.get_node_title(n)).replace("\n", " ")
+           for x in wired for n in _reach(BEL.find_input_pin(x, "SightPending"))}
+    check("SightPending is written twice: aiming, and false not aiming; aiming it "
+          "is SightAiming AND NOT SightSnapped AND NOT the shoulder key, so the "
+          "carry keeps the gun lowered through the zoom-in and raises it with the "
+          "cut, unless the shoulder key already holds it up",
+          len(pending) == 2 and len(wired) == 1
+          and {"Set SightAiming", "Set SightSnapped", "Get AimForced"} <= fed
+          and any("IsInputKeyDown" in t.replace(" ", "") for t in fed),
+          str(sorted(fed)))
+
+    speed, wired = writes("AdsSpeed")
+    check("AdsSpeed is written once, aiming, off Held's AdsZoomSpeed (a GUN SETTINGS "
+          "column), and kept on letting go so the ease out is that gun's",
+          len(speed) == 1 and len(wired) == 1
+          and one_hop(wired[0], "AdsSpeed") == {"Get AdsZoomSpeed"},
+          f"{len(speed)} writes")
+    for var in ("SightHeld", "SightSnapped", "SightPending"):
+        check(f"...{var} starts clear", not w.get_editor_property(var),
+              repr(w.get_editor_property(var)))
+    got = w.get_editor_property("AdsSpeed")
+    check(f"...and AdsSpeed starts at every gun's default ({COMBAT.ads_interp_speed:g})",
+          isinstance(got, float) and abs(got - COMBAT.ads_interp_speed) < 1e-9, repr(got))
+
+
+def _reach(pin, limit=60):
+    """Every node feeding this pin through data links."""
+    seen, stack = set(), [pin]
+    while stack and len(seen) < limit:
+        for q in PIN.list_connected_pins(stack.pop()):
+            node = PIN.get_owning_node(q)
+            if node in seen:
+                continue
+            seen.add(node)
+            stack.extend(x for x in BEL.list_input_pins(node)
+                         if str(PIN.get_pin_name(x)) != "execute")
+    return seen
 
 
 # ─── Mouse sensitivity, and what the zoom does to it ─────────────────────────
@@ -257,6 +355,7 @@ def check_sprint_drops_ready_pose():
 
 def run():
     check_aiming_down_sights()
+    check_sights_cut()
     check_mouse_sensitivity()
     check_aiming_mobility()
     check_sprint_drops_ready_pose()

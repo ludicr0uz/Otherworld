@@ -57,6 +57,7 @@ FN_INTERP_FF = "/Script/Engine.KismetMathLibrary.FInterpTo"
 FN_INT_TO_FLOAT = "/Script/Engine.KismetMathLibrary.Conv_IntToDouble"
 FN_INVERT_TRANSFORM = "/Script/Engine.KismetMathLibrary.InvertTransform"
 FN_INV_XFORM_DIR = "/Script/Engine.KismetMathLibrary.InverseTransformDirection"
+FN_INV_XFORM_LOC = "/Script/Engine.KismetMathLibrary.InverseTransformLocation"
 FN_IN_RANGE = "/Script/Engine.KismetMathLibrary.InRange_FloatFloat"
 FN_LERP = "/Script/Engine.KismetMathLibrary.Lerp"
 # The step between two swings (npc/strafe.py).

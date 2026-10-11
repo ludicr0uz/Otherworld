@@ -244,6 +244,19 @@ class CombatConfig:
     # that a 4x snap does not read as a teleport. CurrentFOV is stored rather
     # than recomputed because FInterpTo needs its own previous output.
     ads_interp_speed: float = 12.0
+    # Bringing the sights up is in two parts (weapon_component/ads.py,
+    # seat.py): for this long after the sights key goes down the camera stays
+    # on the boom and the zoom eases in at ads_interp_speed (a glimpse of the
+    # zoom starting, like the old glide), then the view cuts to the sights'
+    # (the weapon's own zoom, the camera at the head) and the gun is raised
+    # into it. Letting go eases out at the same speed, the inverse. Both are
+    # columns of gun_tuning.csv (AdsZoomSpeed, AdsZoomInSeconds), tuned per
+    # gun on the GUN SETTINGS tab; these are every gun's defaults.
+    ads_zoom_in_s: float = 0.1
+    # How long the gun takes to rise into the sights' view: the ready pose's
+    # blend in (the equip's PlaySlotAnimation, inventory.py). A column too
+    # (AdsRaiseSeconds); this is every gun's default, and the blend out.
+    ads_raise_s: float = 0.25
     # And what it costs in mobility: at full ADS the player walks at half
     # speed. Aiming is meant to be a commitment -- the cloud is narrower (or
     # gone, down the sights) and the camera is inside a scope, so the price is that you cannot also

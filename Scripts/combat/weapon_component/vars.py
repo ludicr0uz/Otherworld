@@ -7,7 +7,8 @@ it was handed, a clip it loads) is in its own short dict.
 """
 
 from uebp.vars import (
-    BOOL, FLOAT, INT, KEY, NAME, REPLICATED, REP_NOTIFY, VECTOR, Var, array, cls, key, obj,
+    BOOL, FLOAT, INT, KEY, NAME, REPLICATED, REP_NOTIFY, VECTOR, ZERO_VECTOR, Var, array, cls,
+    key, obj,
 )
 from combat.paths import FIRE_WARD_VAR, ITEM_CLASS_PATH, THROW_ARC_CLASS_PATH
 from combat.ask_consts import (
@@ -86,6 +87,23 @@ SightAiming = Var("SightAiming", BOOL, False)
 # A divisor (AimZoom - 1) from the first frame, so never 1.0.
 AimZoom = Var("AimZoom", FLOAT, COMBAT.shoulder_zoom)
 SightBlend = Var("SightBlend", FLOAT, 0.0)
+# Bringing the sights up (ads.py, seat.py, sights.py). SightHeld is how long
+# the sights key has been down (s); SightSnapped is that past Held's
+# AdsZoomInSeconds: the view has cut to the sights (the seat, the zoom and
+# the gun's raise key off it, the body's SightBlend too). SightPending is
+# the brief zoom-in before it, with no shoulder key holding the gun up: the
+# carry keeps the gun lowered through it, so the raise starts with the cut.
+# AdsSpeed is Held's AdsZoomSpeed, taken while aiming and kept on letting
+# go (as AimZoom is), so the ease out is the gun's own with empty hands too.
+# SightAnchor is where the camera stands while the gun rises, in the owner's
+# frame: the head bone, taken while the view is not on the sights and held
+# from the cut, so the head's lean into the ready pose does not carry the
+# camera with it.
+SightHeld = Var("SightHeld", FLOAT, 0.0)
+SightSnapped = Var("SightSnapped", BOOL, False)
+SightPending = Var("SightPending", BOOL, False)
+AdsSpeed = Var("AdsSpeed", FLOAT, COMBAT.ads_interp_speed)
+SightAnchor = Var("SightAnchor", VECTOR, ZERO_VECTOR)
 # Mouse sensitivity, and the two controller scales it multiplies. Both
 # bases are cached off the PlayerController at BeginPlay -- BasePitchScale
 # especially, because the engine ships it negative and a literal would
@@ -343,7 +361,8 @@ ThrowArcClass = Var("ThrowArcClass", cls(THROW_ARC_CLASS_PATH))
 CORE = (
     Inventory, Held, EquippedIndex, NeedsRefresh, OwnerMesh, AimPoint, AimValid, AimBlocked,
     Stamina, MaxStamina, Sprinting, Blocking, BaseFOV, CurrentFOV, TargetFOV, Aiming,
-    SightAiming, AimZoom, SightBlend, MouseSensitivity, ScopeSensitivity, BaseYawScale,
+    SightAiming, AimZoom, SightBlend, SightHeld, SightSnapped, SightPending, AdsSpeed,
+    SightAnchor, MouseSensitivity, ScopeSensitivity, BaseYawScale,
     BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ItemClass,
     BloodClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds, ThrowSounds, ThrowSharpSounds,
     PunchHitSounds, BladeHitSounds, LodgeSounds, HeadKillSounds, BreathSounds, BreathNextTime,

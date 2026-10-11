@@ -4,7 +4,7 @@ interact.py's, and picking an item up pickup.py's.
 
 from combat.anim_blueprint import AIM_SLOT
 from combat.weapon_component.look import _author_hand_pose
-from combat.weapon_component.look_vars import HandPose
+from combat.weapon_component.look_vars import HandPose, HandRaise
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.nodes import CAMERA_CLASS_PATH, MOVEMENT_CLASS_PATH
@@ -259,7 +259,10 @@ def _author_equip(ed, exec_in):
     _connect(anim_out, _pin(play, "self"))
     _connect(pose_pin, _pin(play, "Asset"))
     _set(play, "SlotNodeName", AIM_SLOT)
-    _set(play, "BlendInTime", AIM_BLEND)
+    # The blend in is the gun's raise into the sights (HandRaise, look.py:
+    # Held's AdsRaiseSeconds); the blend out every pose's.
+    raise_for = keep(ed.add_get_member_variable_node(HandRaise))
+    _connect(out(raise_for, HandRaise), _pin(play, "BlendInTime"))
     _set(play, "BlendOutTime", AIM_BLEND)
     _set(play, "InPlayRate", 1.0)
     _set(play, "LoopCount", AIM_LOOPS)

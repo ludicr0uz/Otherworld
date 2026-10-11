@@ -20,6 +20,7 @@ from combat.throw_tuning import (
     THROW_PITCH_VAR, THROW_SPEED, THROW_SPEED_VAR, THROW_SPIN_DEG_S, THROW_SPIN_VAR,
 )
 from combat.torch_tuning import BURN_OUT_VAR, BURNS_VAR, LIT_VAR, USE_POSE_VAR
+from combat.tuning import COMBAT
 from combat.wear_tuning import (
     CLOTHING_SLOT_VAR, NOT_CLOTHING, WORN_MESH_VAR, WORN_PART_VAR,
 )
@@ -78,6 +79,14 @@ AdsZoom = Var("AdsZoom", FLOAT)
 # and the scope is what the sight looks like, and a future weapon is free
 # to be a 4x with irons or a 2x with glass without either answer moving.
 Scoped = Var("Scoped", BOOL)
+# Bringing this weapon's sights up (weapon_component/ads.py, seat.py): how
+# fast the zoom eases in and out, how long it eases in before the view cuts
+# to the sights, and how long the gun takes to rise into them (the ready
+# pose's blend in). Columns of gun_tuning.csv, so per gun; the defaults are
+# COMBAT's, the same on every gun.
+AdsZoomSpeed = Var("AdsZoomSpeed", FLOAT, COMBAT.ads_interp_speed)
+AdsZoomInSeconds = Var("AdsZoomInSeconds", FLOAT, COMBAT.ads_zoom_in_s)
+AdsRaiseSeconds = Var("AdsRaiseSeconds", FLOAT, COMBAT.ads_raise_s)
 # How far this weapon's shot is heard by the wanderers, in cm (see
 # SHOT_VOLUME_CM in tuning.py). On the item so the shot's noise is read off
 # Held like every other per-weapon number.
@@ -207,6 +216,7 @@ TABLE = (
     Damage, SpreadDegrees, WeaponRange, FireInterval, NextFireTime, ReloadSeconds,
     MuzzleOffset, SightOffset, SightAim, GripLocation, GripRotation, SlotColor, Icon,
     FireSound, DryFireSound, ReloadSound, HandleSounds, UseSounds, AimPose, TwoHanded, AdsZoom, Scoped, ShotVolume,
+    AdsZoomSpeed, AdsZoomInSeconds, AdsRaiseSeconds,
     Lodged, InWorld, Dormant,
     DisplayName, PelletCount, Dropped, UsesAmmo, MagazineSize, Loaded, Reserve,
     InfiniteReserve, Automatic, Consumable, Melee, Chops, Lights, HasSights, Burns, Lit,

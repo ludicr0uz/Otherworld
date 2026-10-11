@@ -8,7 +8,7 @@ from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.hit_reaction import HIT_REACT_PROBE, POSE_BACK_PROBE_PREFIX
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS
-from combat.weapon_component.look_vars import HandPose
+from combat.weapon_component.look_vars import HandPose, HandRaise
 from combat.weapon_component.throw_windup import THROW_ANIM_VAR
 from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_IS_PLAYING_SLOT, FN_IS_SLOT_ACTIVE, FN_PLAY_SLOT
 from uebp.nodes.math import FN_AND, FN_NEQ_BB, FN_NOT
@@ -121,7 +121,8 @@ def _author_ready_pose_keepalive(ed, exec_ins):
     _connect(anim_out, _pin(replay, "self"))
     _connect(pose_pin, _pin(replay, "Asset"))
     _set(replay, "SlotNodeName", AIM_SLOT)
-    _set(replay, "BlendInTime", AIM_BLEND)
+    raise_for = keep(ed.add_get_member_variable_node(HandRaise))
+    _connect(out(raise_for, HandRaise), _pin(replay, "BlendInTime"))
     _set(replay, "BlendOutTime", AIM_BLEND)
     _set(replay, "InPlayRate", 1.0)
     _set(replay, "LoopCount", AIM_LOOPS)

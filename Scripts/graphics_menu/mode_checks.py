@@ -361,6 +361,26 @@ def _check_in_play(check, nodes):
           and any(UC.QUIT_ROW_LABEL in v for v in exits), str(exits))
 
 
+def _check_no_single_row(check, nodes):
+    """A client in play is offered no first row (single player, or resume)."""
+    hides = [n for n in nodes if {"self", "InVisibility"} <= _pins(n)
+             and "Collapsed" in _value(n, "InVisibility")
+             and any("MenuRow" in _bare(c) for c in _sources(n, "self"))]
+    client = [n for n in hides
+              if any("IsStandalone" in [_bare(c) for c in _sources(g, "Condition")]
+                     for g in _gates(n))]
+    carets = [n for n in nodes if _title(n) == f"Set {UC.PAUSE_ROW_VAR}"
+              and any(c in _upstream(n) for c in client)]
+    check("as a client in play the menu's first row (single player on the title, "
+          "resume in single player) is collapsed off IsStandalone, and the caret "
+          "is moved off it: down to the next row, or up round to the last",
+          len(client) == 1
+          and sorted(_int(n, UC.PAUSE_ROW_VAR) for n in carets)
+          == [UC.PAUSE_START_ROW + 1, len(UC.PAUSE_ROW_ACTIONS) - 1],
+          f"{len(hides)} row(s) collapsed, {len(client)} by the client's arm, "
+          f"{len(carets)} caret write(s)")
+
+
 def check_modes(check, bp, nodes):
     check_session(check)
     check_no_client_game_mode(check)
@@ -375,3 +395,4 @@ def check_modes(check, bp, nodes):
     _check_join(check, nodes)
     _check_begin(check, nodes)
     _check_in_play(check, nodes)
+    _check_no_single_row(check, nodes)

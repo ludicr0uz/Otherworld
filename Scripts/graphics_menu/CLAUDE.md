@@ -30,8 +30,9 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   row takes it too. **No row has a hotkey** (the 1-4, D, X, K, T, N, O and P keys are gone).
 - **Escape is BACK**, in every menu that has somewhere to go back to (below: "Escape").
 - **The rows:** `Single Player` (on the title it opens the Single Player page, whose one
-  row is `New Game`, or `Continue Game` with a saved profile; in play it reads `Resume` and
-  shuts the menu), `Multiplayer` (on the title it opens the Multiplayer page: the server's
+  row is `New Game`, or `Continue Game` with a saved profile; in single player it reads
+  `Resume` and shuts the menu; as a client in play the row is not there: collapsed, and the
+  caret goes round it, `mode_draw.author_mode_words`), `Multiplayer` (on the title it opens the Multiplayer page: the server's
   address and `Join Server`; in play it does nothing and says `from the title`), `Controls` (the settings page, titled
   **CONTROLS**; the code still calls it the settings page), `Debug` (wanderer numbers, pellet tracers and impact damage,
   the wanderers' sight cones; not the FPS readout, which is always on), `Dev All Guns`, `Gun Settings`,

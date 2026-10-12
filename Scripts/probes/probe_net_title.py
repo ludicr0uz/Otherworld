@@ -42,10 +42,13 @@ from graphics_menu.profile_consts import EXIT_ACTION, EXIT_ROW_LABEL
 from graphics_menu.settings_rows import PAGE_TITLE
 from net import session_consts as S
 from probes import title as T
+from title.paths import PLAY_LEVEL
 
 RUNS_ON = ("server", "client 1")
 WRITABLE = list(T.WRITABLE)
 TRAVEL_S = 90.0
+PLAY_LEVEL_NAME = PLAY_LEVEL.rsplit("/", 1)[1]
+GS = unreal.GameplayStatics
 EXIT_ROW = C.PAUSE_ROW_ACTIONS.index(EXIT_ACTION)
 MULTI_ROW = C.PAUSE_ROW_ACTIONS.index(C.MULTI_ACTION)
 
@@ -104,14 +107,28 @@ def probe_client(p):
     pid, gi, own = os.getpid(), T.session(p), T.address(p)
     profile = T.profile_file()
     try:
-        yield from _both_modes(p, gi, profile)
+        yield from _both_modes(p, gi, profile, own)
     finally:
         if p.world() and p.hud():
             T.restore_address(p, own)
-    p.check("...all in one process", os.getpid() == pid and T.session(p) == gi, f"pid {pid}")
+    world = p.world() or _play_world()
+    p.check("...all in one process",
+            os.getpid() == pid and GS.get_game_instance(world) == gi, f"pid {pid}")
 
 
-def _both_modes(p, gi, profile):
+def _play_world():
+    """The play level's world, once New Game has opened it (p.world() is the
+    run's map or the title's, and is None from then on)."""
+    return unreal.find_object(None, f"{PLAY_LEVEL}.{PLAY_LEVEL_NAME}")
+
+
+def _first_row_shown(p):
+    """Is the menu's first row (single player; resume in play) drawn?"""
+    rows = p.get(p.hud(), C.UI_VAR[C.WBP_PAUSE_MENU]).get_editor_property(C.PAUSE_ROWS)
+    return rows.get_child_at(C.PAUSE_START_ROW).is_visible()
+
+
+def _both_modes(p, gi, profile, own):
     hud = p.hud()
     yield _frames()
     p.check("the client opens on the title level: alone, in no session",
@@ -119,6 +136,7 @@ def _both_modes(p, gi, profile):
     _shown(p, "the title's first two rows are Single Player and Multiplayer",
            lambda: [T.row_text(p, C.PAUSE_ROWS, i) for i in (C.PAUSE_START_ROW, MULTI_ROW)],
            [C.SINGLE_ROW_LABEL, C.MULTI_ROW_LABEL])
+    _shown(p, "...and the first is there to take", lambda: _first_row_shown(p), True)
 
     # --- Multiplayer: the address, the join ------------------------------------
     yield from T.take_row(p, C.MULTI_ACTION, lambda: p.get(hud, MV.MenuPage) == MC.PAGE_MULTI)
@@ -160,9 +178,12 @@ def _both_modes(p, gi, profile):
     p.check("the menu up as a client pauses nothing", not T.paused(p))
     _shown(p, "the menu says which mode this is, and its last row reads Save and Exit",
            lambda: [T.menu_text(p, C.PAUSE_MODE), T.row_text(p, C.PAUSE_ROWS, EXIT_ROW),
-                    T.row_text(p, C.PAUSE_ROWS, C.PAUSE_START_ROW),
                     T.row_text(p, C.PAUSE_ROWS, MULTI_ROW, C.ROW_VALUE)],
-           [C.MODE_MULTI_TEXT, EXIT_ROW_LABEL, C.RESUME_ROW_LABEL, C.TITLE_ONLY])
+           [C.MODE_MULTI_TEXT, EXIT_ROW_LABEL, C.TITLE_ONLY])
+    _shown(p, "...and it has no first row (single player, or resume): the row is "
+           "collapsed and the caret is off it, on the row under it",
+           lambda: [_first_row_shown(p), p.get(hud, C.PAUSE_ROW_VAR)],
+           [False, C.PAUSE_START_ROW + 1])
 
     # --- Save and Exit, as a client ---------------------------------------------
     wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
@@ -203,23 +224,53 @@ def _both_modes(p, gi, profile):
             T.address(p) == p.net.address, T.address(p))
 
     # --- Single Player, from the same title ------------------------------------
+    # The player's own address back first: this HUD's settings go with the title.
+    T.restore_address(p, own)
     yield from T.take_row(p, C.START_ACTION, lambda: p.get(hud, MV.MenuPage) == MC.PAGE_SINGLE)
     yield _frames()
     _shown(p, "the Single Player page's row reads new game, or continue game "
            "with a saved profile",
            lambda: T.row_text(p, MC.SINGLE.rows_box, MC.SINGLE_START_ROW),
            C.CONTINUE_ROW_LABEL if profile[0] else C.START_ROW_LABEL)
-    yield from T.take_page_row(p, MC.SINGLE_START_ROW, lambda: T.in_play(p))
-    t0 = unreal.GameplayStatics.get_time_seconds(p.world())
-    yield from T.wait(lambda: unreal.GameplayStatics.get_time_seconds(p.world()) > t0 + 0.2)
-    p.check("from the same title a single-player game starts: alone, unpaused, "
-            "time running, the same HUD",
-            T.in_play(p) and T.alone(p) and not T.paused(p) and p.hud() == hud
-            and unreal.GameplayStatics.get_time_seconds(p.world()) > t0,
-            f"in play {T.in_play(p)}, alone {T.alone(p)}, paused {T.paused(p)}")
+    # New Game opens the play level (title/paths.py): another world and another
+    # HUD, found by the level's own path (the probe's world was the title's).
+    play_world = _play_world
+
+    def play_hud():
+        world = play_world()
+        pc = GS.get_player_controller(world, 0) if world else None
+        return pc.get_hud() if pc else None
+
+    def playing():
+        now = play_hud()
+        return bool(now and GS.get_player_pawn(play_world(), 0)
+                    and p.get(now, C.GAME_STARTED_VAR))
+    yield from T.take_page_row(p, MC.SINGLE_START_ROW, playing, TRAVEL_S)
+    world, hud = play_world(), play_hud()
+    if not playing():
+        p.check(f"from the same title a single-player game starts on {PLAY_LEVEL_NAME}",
+                False, f"play level {world is not None}, its HUD {hud is not None}")
+        return
+    t0 = GS.get_time_seconds(world)
+    yield from T.wait(lambda: GS.get_time_seconds(world) > t0 + 0.2)
+    p.check(f"from the same title a single-player game starts on {PLAY_LEVEL_NAME}: "
+            "alone, unpaused, time running",
+            unreal.SystemLibrary.is_standalone(world) and not GS.is_game_paused(world)
+            and GS.get_time_seconds(world) > t0,
+            f"alone {unreal.SystemLibrary.is_standalone(world)}, "
+            f"paused {GS.is_game_paused(world)}")
     p.set(hud, MV.MenuOpen, True)
     yield _frames()
-    _shown(p, "...and its menu says SINGLE PLAYER, the exit row Save and Exit",
-           lambda: [T.menu_text(p, C.PAUSE_MODE), T.row_text(p, C.PAUSE_ROWS, EXIT_ROW)],
-           [C.MODE_SINGLE_TEXT, EXIT_ROW_LABEL])
+
+    def menu(name):
+        return p.get(hud, C.UI_VAR[C.WBP_PAUSE_MENU]).get_editor_property(name)
+    first = menu(C.PAUSE_ROWS).get_child_at(C.PAUSE_START_ROW)
+    exit_row = menu(C.PAUSE_ROWS).get_child_at(EXIT_ROW)
+    said = [str(w.get_text()) for w in (menu(C.PAUSE_MODE),
+                                        exit_row.get_editor_property(C.ROW_LABEL),
+                                        first.get_editor_property(C.ROW_LABEL))]
+    p.check("...and its menu says SINGLE PLAYER, the exit row Save and Exit, and "
+            "the first row is there, reading Resume",
+            said == [C.MODE_SINGLE_TEXT, EXIT_ROW_LABEL, C.RESUME_ROW_LABEL]
+            and first.is_visible(), f"{said}, shown {first.is_visible()}")
     p.set(hud, MV.MenuOpen, False)

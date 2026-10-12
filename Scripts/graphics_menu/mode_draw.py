@@ -10,7 +10,8 @@
                        typing while the caret is on it; the status line says
                        a join is under way, or why the last one ended
   author_mode_hidden   on the menu's own rows: both panels collapsed
-  author_mode_words    the menu's rows: single player (resume in play),
+  author_mode_words    the menu's rows: single player (resume in play; no
+                       such row for a client in play),
                        multiplayer (from the title only), the last row (exit
                        game on the title, save and exit in play), and the
                        mode under the title
@@ -19,12 +20,12 @@ DrawHUD, like the settings page's keys: the title is a paused world. What a
 taken row does is Tick's (mode_tick.py).
 """
 
-from uebp.graph import _connect, _loose_pin, _node, _pin, out, then
+from uebp.graph import _connect, _loose_pin, _node, _pin, _set, out, then
 from graphics_menu.cursor import ROW, author_back_row, author_row_cursor
 from graphics_menu.cursor_consts import PAGE_CLICK_VAR
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.loot_find import put
-from graphics_menu.menu_nav import _emit_row_nav
+from graphics_menu.menu_nav import NAV_UP, _emit_row_nav
 from graphics_menu.mode_consts import (
     ADDRESS_CARET, ADDRESS_ERASE_KEY, ADDRESS_MAX, CONNECTING_PREFIX, CONNECTING_SUFFIX,
     MULTI_ADDRESS_ROW, MULTI_STATUS, PAGES, SINGLE, SINGLE_START_ROW,
@@ -33,10 +34,10 @@ from graphics_menu.mode_session import address, put_address, session, sget
 from graphics_menu.profile_consts import (
     EXIT_ACTION, EXIT_ROW_LABEL, PROFILE_SLOT, PROFILE_USER_INDEX)
 from graphics_menu.settings_rows import PAGE_TITLE
-from graphics_menu.ui_graph import mark_rows, member, part, row_at, row_value, set_shown, set_text
+from graphics_menu.ui_graph import _wire, mark_rows, member, part, row_at, row_value, set_shown, set_text
 from graphics_menu.umg_consts import (
     CONTINUE_ROW_LABEL, GAME_STARTED_VAR, MODE_MULTI_TEXT, MODE_SINGLE_TEXT, PAUSE_ACCEPT_KEY,
-    PAUSE_MODE, PAUSE_ROW_ACTIONS, PAUSE_START_ROW, QUIT_ROW_LABEL, RESUME_ROW_LABEL, ROW_CARET, ROW_LABEL,
+    PAUSE_MODE, PAUSE_ROW_ACTIONS, PAUSE_ROW_VAR, PAUSE_START_ROW, QUIT_ROW_LABEL, RESUME_ROW_LABEL, ROW_CARET, ROW_LABEL,
     ROW_VALUE, SINGLE_ROW_LABEL, START_ROW_LABEL, TITLE_ACTIONS, TITLE_ONLY, WBP_MENU_ROW,
     WBP_PAUSE_MENU)
 from net import session_consts as S
@@ -186,12 +187,28 @@ def author_mode_words(ed, rows, in_execs, made):
     def alone(in_execs):
         return _branch(ed, out(_call(ed, FN_IS_STANDALONE, made)), in_execs, made)
 
+    def caret_to(row, in_execs):
+        n = ed.add_set_member_variable_node(PAUSE_ROW_VAR)
+        made.append(n)
+        _set(n, PAUSE_ROW_VAR, row)
+        return _wire(in_execs, n)
+
     # The first row: the Single Player page from the title, resume in play.
-    text, found, missing = row_at(ed, rows, PAUSE_START_ROW, in_execs)
-    text = member(ed, text, WBP_MENU_ROW, ROW_LABEL)
+    # A client in play has no such row: it is collapsed, and the caret never
+    # rests on it (Up from the row under it goes round to the last).
+    first, found, missing = row_at(ed, rows, PAUSE_START_ROW, in_execs)
+    text = member(ed, first, WBP_MENU_ROW, ROW_LABEL)
     playing, title = started([found])
-    flow = [set_text(ed, text, RESUME_ROW_LABEL, [playing]),
-            set_text(ed, text, SINGLE_ROW_LABEL, [title]), missing]
+    single, client = alone([playing])
+    on_it = _call(ed, FN_EQ_II, made, A=_get(ed, PAUSE_ROW_VAR, made), B=PAUSE_START_ROW)
+    there, clear = _branch(ed, out(on_it), [set_shown(ed, first, False, [client])], made)
+    going_up = _call(ed, FN_WAS_PRESSED, made, self=out(_call(ed, FN_GET_OWNING_PC, made)),
+                     Key=NAV_UP)
+    up, down = _branch(ed, out(going_up), [there], made)
+    flow = [set_text(ed, text, RESUME_ROW_LABEL, [set_shown(ed, first, True, [single])]),
+            set_text(ed, text, SINGLE_ROW_LABEL, [set_shown(ed, first, True, [title])]),
+            caret_to(len(PAUSE_ROW_ACTIONS) - 1, [up]),
+            caret_to(PAUSE_START_ROW + 1, [down]), clear, missing]
     # The rows that only the title serves say so in play.
     for action in TITLE_ACTIONS:
         text, found, missing = words(action, ROW_VALUE, flow)

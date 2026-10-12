@@ -80,7 +80,8 @@ this machine's; M32, `Scripts/graphics_menu/CLAUDE.md`, "The tuning tabs by mode
 title or Save and Exit in play (a 15 s countdown, cancelled by a hit, a move or the
 trigger; saves stats, inventory and worn garments, not the location; death deletes the
 profile). Pausing is single player's alone; as a client of a server the same screens are
-overlays over a running world. Every screen carries Ellivian Inc.'s confidentiality
+overlays over a running world, and the menu has no first row there (Single Player on the
+title, Resume in single player). Every screen carries Ellivian Inc.'s confidentiality
 watermark.
 
 **Clothing** (`Scripts/clothing/CLAUDE.md`). Eight garments, one slot each, shown as icons

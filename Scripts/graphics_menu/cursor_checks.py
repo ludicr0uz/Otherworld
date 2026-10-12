@@ -113,12 +113,20 @@ def _check_show(check, nodes):
           str([sorted(r) for r in again]))
     free = [n for n in nodes if "InMouseLockMode" in _pins(n)]
     taken = [n for n in nodes if _pins(n) == {"execute", "PlayerController", "bFlushInput"}]
+    begun = [n for n in taken
+             if f"Set {UC.GAME_STARTED_VAR}" in _feeders(n, "execute")]
+    switched = [n for n in taken if n not in begun]
     check("shown is Game-and-UI with the cursor kept through a click; hidden "
           "is Game-only, which gives the mouse back to the camera",
-          len(free) == len(wishes) == len(taken) and all(
+          len(free) == len(wishes) == len(switched) and all(
               _value(n, "bHideCursorDuringCapture") == "false"
               and not _feeders(n, "InWidgetToFocus") for n in free),
-          f"{len(free)} Game-and-UI, {len(taken)} Game-only")
+          f"{len(free)} Game-and-UI, {len(switched)} Game-only")
+    check("...and a HUD that opens in play takes the mouse at BeginPlay, once: "
+          "the viewport keeps the mode of the level before (the title's, the "
+          "death screen's), and a new HUD sees no change to apply",
+          len(begun) == 1,
+          f"{len(begun)} Game-only after Set {UC.GAME_STARTED_VAR}, of {len(taken)}")
     check("...and shown, it is locked to the viewport: not onto another "
           "monitor",
           bool(free) and all(_value(n, "InMouseLockMode") == "LockAlways" for n in free),

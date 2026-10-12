@@ -236,10 +236,8 @@ Moved word for word: `docs/history/menu.md#the-mouse-cursor`.
   window is on (`CGDisplayCapture`) and puts the window above the capture's shield
   (`OtherworldMacFullScreen`, game only, not the editor): the engine's exclusive mode,
   less the change of display mode, so the size stays native. The capture is given back
-  when another app comes forward or the window leaves full screen. Two things tried
-  first, each failed with a real mouse: asking macOS to hide them (`setPresentationOptions`,
-  taken, 1029 to 1034, the Dock still came up) and raising the window to level 25 with no
-  capture (the menu bar still dropped over it, a hot corner still fired).
+  when another app comes forward or the window leaves full screen. What was tried
+  before it: `docs/history/menu.md`, "What keeps macOS out is a captured display".
 - **Two things the capture needs beside it** (same file). Command-Tab: a captured display
   takes it away, so the capture is not held while Command is down, and comes back when
   the key goes up with the game still in front. The window's own title bar: in a Space

@@ -125,7 +125,7 @@ from graphics_menu.inv_carry import carry_defaults, declare_carry_vars   # noqa:
 from graphics_menu.wear_tick import (                               # noqa: E402
     author_wear_tick, declare_wear_vars, wear_defaults)
 from graphics_menu.cursor import (                                  # noqa: E402
-    author_cursor_read, cursor_defaults, declare_cursor_vars)
+    author_cursor_read, author_take_mouse, cursor_defaults, declare_cursor_vars)
 from graphics_menu.menu_nav import pause_row_taken                  # noqa: E402
 from graphics_menu.menu_main import (                               # noqa: E402
     author_in_play, author_main_rows_tick)
@@ -557,6 +557,8 @@ def _author_begin_play(ed, begin_play):
     _connect(else_(shown), _pin(skip, "execute"))
     for tail in as_client:
         _connect(tail, _pin(skip, "execute"))
+    # ...with the mouse: the viewport is still in the mode of the level before.
+    author_take_mouse(ed, [then(skip)])
 
     ed.add_comment_to_nodes(
         f"Open on the menu, on {TITLE_LEVEL_NAME} alone, unpaused: the title is "

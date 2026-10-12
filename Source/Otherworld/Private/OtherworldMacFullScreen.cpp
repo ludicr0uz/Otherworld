@@ -23,15 +23,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogOtherworldFullScreen, Log, All);
 // AppKit keeps it in a window of its own, above the screen, and slides it down with the
 // menu bar. That window is emptied (the engine cannot make the Mac's game window
 // borderless: PLATFORM_SUPPORTS_BORDERLESS_WINDOW is 0 there).
-// What did not work, in the order tried (12 Oct 2026):
-// - Exclusive Fullscreen, the engine's own way: it cannot take a native size on many
-//   monitors (Scripts/graphics_menu/CLAUDE.md, "Full screen on the Mac").
-// - Replacing FCocoaWindow's window:willUseFullScreenPresentationOptions: it is never
-//   called, the window being in full screen before this module starts.
-// - [NSApp setPresentationOptions:] with HideDock | HideMenuBar: macOS takes it (1029
-//   becomes 1034) and the Dock comes up all the same.
-// - Raising the window to NSStatusWindowLevel (25) with no capture: the menu bar still
-//   drops over it and a hot corner still fires.
+// What was tried before this: Scripts/graphics_menu/docs/history/menu.md, "What keeps
+// macOS out is a captured display".
 static CGDirectDisplayID CapturedDisplay = kCGNullDirectDisplay;
 static NSWindow* ShieldedWindow = nil;
 

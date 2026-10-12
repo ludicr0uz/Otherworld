@@ -104,6 +104,15 @@ caret whenever the mouse was nudged), and the verifier checks nothing polls its 
 - **Shown is Game-and-UI, hidden is Game-only** (`author_cursor_mode`), switched only when
   `CursorWanted != CursorShown`. Without the Game-only call the camera stays dead after a
   menu closes until the next click.
+- **A HUD that opens in play takes the mouse at BeginPlay, once** (`cursor.author_take_mouse`,
+  after `GameStarted` is set; 12 Oct 2026). The input mode is the viewport's and outlives the
+  level, while the HUD is new: New Game's `OpenLevel` came in from the title's Game-and-UI
+  with `CursorShown` false like its wish, so DrawHUD saw no change and never called
+  Game-only. The look was dead until a menu (the I panel) was opened and shut. The build's
+  log showed it: `CaptureDuringMouseDown -> CapturePermanently` only at that close, and now
+  at the forest's `LoadMap` (a `--game --title --windowed` run of `probe_title_single.py`;
+  the log runs seconds behind, so the lines are there only if the game outlives the probe).
+  The death menu's restart is the same path. The verifier asserts the node.
 - **Shown, the cursor is locked to the viewport** (`cursor.SHOWN_LOCK`, `LockAlways` on the
   Game-and-UI call; the verifier asserts it). The node's default is `DoNotLock`, and the
   published build's log read `MouseLockMode Changed, LockOnCapture -> DoNotLock` each time a

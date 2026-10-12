@@ -14,7 +14,7 @@ import _paths  # noqa: F401
 
 from asset_pipeline import fab_library
 from devteam import fab
-from devteam.session import FAB_MARK, build_prompt
+from devteam.session import FAB_MARK, build_system
 from devteam.tasks import Task, parse_tasks
 
 GAS = "Game Animation Sample | url: https://www.fab.com/listings/gas | at: /Game/GAS | why: locomotion"
@@ -115,7 +115,7 @@ class TaskHintTest(unittest.TestCase):
 class PromptTest(unittest.TestCase):
 
     def test_every_session_is_told_the_contract(self):
-        prompt = build_prompt(Task("Add a rock"), 1, 1, "/p.md", None, True)
+        prompt = build_system(True)
         self.assertIn(FAB_MARK, prompt)
         self.assertIn("never try to sign in", prompt)
         self.assertIn("assets/cache/fab/index.md", prompt)

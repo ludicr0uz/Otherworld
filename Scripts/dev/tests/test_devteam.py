@@ -16,7 +16,8 @@ from devteam import gate
 from devteam import limits as pacing
 from devteam.accounting import describe_time, merge_results, token_usage
 from devteam.session import (
-    FAIL_MARK, Narrator, build_cmd, build_fix_prompt, build_prompt, session_env,
+    COMPACT_WINDOW, FAIL_MARK, Narrator, build_cmd, build_fix_prompt, build_prompt,
+    build_system, session_env,
 )
 from devteam import triage
 from devteam.tasks import Task, parse_tasks, requeue, tick
@@ -288,20 +289,52 @@ class GateTest(unittest.TestCase):
 class SessionTest(unittest.TestCase):
 
     def test_first_task_is_not_pointed_at_an_empty_progress_file(self):
-        prompt = build_prompt(Task("Do X"), 1, 2, "/run/progress.md", "| t |", True)
+        prompt = build_prompt(Task("Do X"), 1, 2, "/run/progress.md", "| t |")
         self.assertNotIn("/run/progress.md", prompt)
         self.assertIn("Do X", prompt)
         self.assertIn("| t |", prompt)
-        self.assertIn("Issues encountered", prompt)
+        self.assertIn("Issues encountered", build_system(True))
 
     def test_later_tasks_are(self):
-        prompt = build_prompt(Task("Do Y"), 2, 2, "/run/progress.md", "| t |", False)
+        prompt = build_prompt(Task("Do Y"), 2, 2, "/run/progress.md", "| t |")
         self.assertIn("/run/progress.md", prompt)
-        self.assertNotIn("Issues encountered", prompt)
+        self.assertNotIn("Issues encountered", build_system(False))
 
     def test_a_broken_baseline_says_so(self):
-        prompt = build_prompt(Task("Do X"), 1, 1, "/p", None, True)
+        prompt = build_prompt(Task("Do X"), 1, 1, "/p", None)
         self.assertIn("could not get a baseline", prompt)
+
+    def test_the_rules_are_the_system_prompt_and_the_task_is_not(self):
+        # A compaction summarises the conversation and leaves the system prompt
+        # alone, so the rules live there and only the task's own facts are sent.
+        system = build_system(True)
+        prompt = build_prompt(Task("Do X"), 2, 3, "/run/progress.md", "| t |",
+                              "/run/task-02-notes.md")
+        self.assertIn("No human is watching", system)
+        self.assertIn(FAIL_MARK, system)
+        self.assertIn(f"nearing {COMPACT_WINDOW:,} tokens", system)
+        self.assertNotIn("{", system)
+        for mine in ("Do X", "| t |", "/run/progress.md", "task-02-notes.md"):
+            self.assertIn(mine, prompt)
+            self.assertNotIn(mine, system)       # one system prompt for the whole run
+        self.assertNotIn("No human is watching", prompt)
+        self.assertTrue(prompt.startswith("Your task (2 of 3):"))
+        self.assertNotIn("notes file", build_prompt(Task("Do X"), 1, 1, "/p", "| t |"))
+
+    def test_cmd_carries_the_system_prompt_on_a_resume_too(self):
+        for how in (dict(name="n"), dict(resume="abc")):
+            cmd = build_cmd("go", "auto", system="RULES", **how)
+            self.assertEqual(cmd[cmd.index("--append-system-prompt") + 1], "RULES")
+        self.assertNotIn("--append-system-prompt", build_cmd("go", "auto"))
+
+    def test_cmd_adds_the_hooks_to_the_settings(self):
+        hooks = {"SessionStart": [{"matcher": "compact", "hooks": []}]}
+        cmd = build_cmd("go", "auto", hooks=hooks)
+        settings = json.loads(cmd[cmd.index("--settings") + 1])
+        self.assertEqual(settings["hooks"], hooks)
+        self.assertIn("Bash(cd *)", settings["permissions"]["allow"])
+        self.assertNotIn("hooks", json.loads(
+            build_cmd("go", "auto")[build_cmd("go", "auto").index("--settings") + 1]))
 
     def test_fix_prompt(self):
         prompt = build_fix_prompt(["a: 9/10"], "| a |", True)
@@ -329,6 +362,9 @@ class SessionTest(unittest.TestCase):
         self.assertNotIn("UEPY_COLD", env)          # it would bypass the warm editor
         self.assertEqual(env["ENABLE_CLAUDEAI_MCP_SERVERS"], "false")
         self.assertEqual(env["PATH"], "/bin")
+        # The CLI's range; under it a session that starts at 38-48k thrashes.
+        self.assertEqual(env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"], str(COMPACT_WINDOW))
+        self.assertTrue(150000 <= COMPACT_WINDOW <= 1000000)
 
     def test_cmd_allows_the_everyday_commands(self):
         cmd = build_cmd("go", "auto")
@@ -344,12 +380,12 @@ class SessionTest(unittest.TestCase):
             self.assertNotIn("fastMode", json.loads(cmd[cmd.index("--settings") + 1]))
 
     def test_prompt_describes_the_warm_editor(self):
-        prompt = build_prompt(Task("Do X"), 1, 1, "/p", "| t |", True)
+        prompt = build_system(True)
         self.assertIn("UEPY_SERVE", prompt)
         self.assertNotIn("UEPY_COLD=1", prompt)
 
     def test_prompt_forbids_background_runs(self):
-        prompt = build_prompt(Task("Do X"), 1, 1, "/p", "| t |", True)
+        prompt = build_system(True)
         self.assertIn("never run_in_background", prompt)
         self.assertIn("Give a long run a timeout instead", prompt)
         self.assertIn("--detach --probe P", prompt)
@@ -615,15 +651,12 @@ class KnownFailuresTest(unittest.TestCase):
         self.assertIn("remove the line", fixed[0])
 
     def test_prompt_names_the_rule(self):
-        task = mock.Mock(text="t")
-        self.assertIn("known_failures.md",
-                      build_prompt(task, 1, 1, "/p", "| t |", False))
-        self.assertIn("known_failures.md", build_prompt(task, 1, 1, "/p", None, False))
+        self.assertIn("known_failures.md", build_system(False))
 
     def test_prompt_names_the_scoped_forms_with_their_costs(self):
         # The verifiers a change needs, by tool rather than by hand, and the
         # probes opted out: each rule travels with the minutes it is meant to save.
-        prompt = build_prompt(mock.Mock(text="t"), 1, 1, "/p", "| t |", False)
+        prompt = build_system(False)
         self.assertIn("do not run the existing probes (no `--probes-for`, no probe set", prompt)
         self.assertIn("21 hours of launches and found three defects", prompt)
         self.assertIn("swept nightly, apart from dev-team", prompt)

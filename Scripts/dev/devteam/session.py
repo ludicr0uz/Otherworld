@@ -1,5 +1,6 @@
-"""One headless ``claude -p`` session: its prompt, command line, environment,
-and the live one-line-per-step view of what it is doing."""
+"""One headless ``claude -p`` session: its prompts (the standing rules as the
+system prompt, the task as the first message), command line, environment, and
+the live one-line-per-step view of what it is doing."""
 
 import contextlib
 import json
@@ -17,24 +18,45 @@ FAB_MARK = "FAB-REQUIRED:"
 # the runs of 10 Oct 2026 switched model mid-queue when that file changed.
 DEFAULT_MODEL = "claude-opus-5-5"
 
-PROMPT = """\
+# A session's context is summarised once it passes this many tokens. Left to
+# itself the 1M window never was: over 246 sessions to 11 Oct 2026 none
+# compacted, the median peaked at 157k and the longest at 483k, and every call
+# re-reads all of it. Replayed over those transcripts, 200k re-reads a quarter
+# less and compacts 77 of them, mostly once; 100k would compact 179 of them 603
+# times, with sessions starting at 38-48k. The CLI takes 100000 to 1000000,
+# and compacts some way short of what it is given: it keeps 20k of the window
+# back for output (its debug log, "effectiveWindow=180000" for this value), and
+# given 100000 it compacted at 67k, so expect this one to act near 167k.
+COMPACT_WINDOW = 200000
+# A session that refills the window within three turns of a compaction, three
+# times running, is ended by the CLI as an error ("Autocompact is thrashing"),
+# which fails its task here like any other; 100000 did that on four 20k reads.
+
+# The standing rules, as the system prompt (--append-system-prompt): a
+# compaction summarises the conversation and leaves this as it is. What is the
+# task's alone is PROMPT, kept word for word by devteam/brief.py instead.
+SYSTEM = """\
 You are one member of an automated dev team working through a queue of tasks, \
 one fresh session per task. No human is watching this session: do not ask \
 questions or wait for answers. Where a choice is the user's, make the sensible \
 call and say what you chose in your final report.
 
-Your task ({n} of {total}):
-
-{task}
-
 Work the way CLAUDE.md says: follow its conventions and verify your change the \
 way the project verifies things before you finish.{commit}
-{progress}
+
 Every earlier turn is re-read on each new one, so keep what you pull in lean: \
 grep -n and sed -n ranges for a file of more than a few hundred lines, and \
 whole files only when you need all of them. Grep Scripts/dev/symbols.txt \
 first to find where a symbol lives, and batch independent reads into one \
 command rather than one per turn.
+
+A long session's context is compacted: nearing {window:,} tokens the conversation \
+so far is replaced by a summary, and detail goes with it. So keep the notes \
+file your task names, a page at most, and bring it up to date at each \
+milestone and before any long run: the plan, each decision and its reason, \
+what is proven and by which command, what is left. After a compaction dev-team \
+shows you its prompts and those notes again, word for word; nothing else of \
+the detail comes back.
 
 In this session uepy.py runs scripts in a headless editor of this session's \
 own (UEPY_SERVE): the first call boots it (20-40 s), later calls reuse it, so \
@@ -90,13 +112,24 @@ for it); a verifier that newly fails fails the task. End when your change is \
 proven: by the verifiers and the unit tests, and by its own probe when it \
 needed one.
 
-{gate}
+{known}
 
 {fab}
 
 End with a short report: what changed, how you verified it, and anything left \
 undone. If you could not complete the task, make the first line of the report \
 "{fail} <reason>"."""
+
+PROMPT = """\
+Your task ({n} of {total}):
+
+{task}
+{progress}
+{gate}{notes}"""
+
+NOTES = """
+
+Your notes file: {path}"""
 
 # The contract devteam/fab.py parses. Kept beside the prompt it is part of.
 FAB = """\
@@ -123,9 +156,7 @@ Before this session started, dev-team ran the verifier suite (a `probe:` row is 
 
 When you finish, dev-team runs the same suite again. A verifier or probe that newly \
 fails, or fails more checks than above, fails this task, so run the suites \
-you touched before you commit.
-
-{known}"""
+you touched before you commit."""
 
 KNOWN_RULE = """\
 Standing failures are listed in Scripts/dev/known_failures.md (one line each: \
@@ -179,15 +210,17 @@ DENY = ["Bash(gcloud:*)", "Bash(gsutil:*)", "Bash(bq:*)"]
 SETTINGS = {"permissions": {"allow": ALLOW, "deny": DENY}}
 
 
-def build_prompt(task, n, total, progress_path, baseline_table, commit):
+def build_system(commit):
+    """The system prompt: the same for every task of a run."""
+    return SYSTEM.format(commit=COMMIT if commit else "", window=COMPACT_WINDOW,
+                         known=KNOWN_RULE, fab=FAB.format(mark=FAB_MARK), fail=FAIL_MARK)
+
+
+def build_prompt(task, n, total, progress_path, baseline_table, notes_path=None):
     progress = PROGRESS.format(path=progress_path) if n > 1 else ""
-    if baseline_table is None:
-        gate = GATE_BROKEN + "\n\n" + KNOWN_RULE
-    else:
-        gate = GATE.format(table=baseline_table, known=KNOWN_RULE)
-    return PROMPT.format(n=n, total=total, task=task.text, progress=progress,
-                         commit=COMMIT if commit else "", gate=gate, fail=FAIL_MARK,
-                         fab=FAB.format(mark=FAB_MARK))
+    gate = GATE_BROKEN if baseline_table is None else GATE.format(table=baseline_table)
+    return PROMPT.format(n=n, total=total, task=task.text, progress=progress, gate=gate,
+                         notes=NOTES.format(path=notes_path) if notes_path else "")
 
 
 def build_fix_prompt(problems, table, commit):
@@ -244,13 +277,18 @@ def build_uncommitted_prompt():
 
 
 def build_cmd(prompt, permission_mode, name=None, model=None, effort=None,
-              budget=None, resume=None):
+              budget=None, resume=None, system=None, hooks=None):
     # --strict-mcp-config with no --mcp-config: no MCP servers at all. The
     # claude.ai connectors (Docs, Drive) add tools to every turn and no task
     # here uses them; ENABLE_CLAUDEAI_MCP_SERVERS=false in session_env() too.
+    # ``system`` goes on a resumed session's command too: the CLI builds the
+    # system prompt per process, and one that changed would miss the cache.
+    settings = dict(SETTINGS, hooks=hooks) if hooks else SETTINGS
     cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--permission-mode", permission_mode, "--strict-mcp-config",
-           "--settings", json.dumps(SETTINGS)]
+           "--settings", json.dumps(settings)]
+    if system:
+        cmd += ["--append-system-prompt", system]
     if resume:
         cmd += ["--resume", resume]
     elif name:
@@ -270,6 +308,7 @@ def session_env(base, serve_dir):
     env["UEPY_SERVE"] = serve_dir        # its own warm editor, never the user's
     env["UEPY_OUTPUT"] = "summary"       # counts and failures, not 2,000 lines
     env["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false"
+    env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(COMPACT_WINDOW)
     # An empty config directory: gcloud and gsutil find no account, so nothing a
     # session runs can reach GCP. Scripts/server/gcp/config.sh refuses on OW_NO_GCP.
     env["CLOUDSDK_CONFIG"] = os.path.join(serve_dir, "no-gcloud")

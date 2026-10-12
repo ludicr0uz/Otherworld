@@ -436,6 +436,32 @@ class RunOneTest(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("--model") + 1], work.DEFAULT_MODEL)
         self.assertEqual(work.DEFAULT_MODEL, "claude-opus-5-5")
 
+    def test_a_session_can_be_compacted_without_losing_its_task(self):
+        # The rules as the system prompt, a window to compact at, and a hook
+        # that prints the task's brief back after each compaction.
+        from devteam import brief
+        self.run_one()
+        cmd = self.sessions[0]
+        self.assertIn("No human is watching", cmd[cmd.index("--append-system-prompt") + 1])
+        prompt = cmd[cmd.index("-p") + 1]
+        brief_path, notes_path = brief.paths(self.tmp, 1)
+        self.assertIn(notes_path, prompt)
+        settings = json.loads(cmd[cmd.index("--settings") + 1])
+        self.assertEqual(settings["hooks"], brief.hooks(brief_path, notes_path))
+        self.assertIn(prompt, open(brief_path).read())
+
+    def test_a_follow_up_prompt_joins_the_brief(self):
+        from devteam import brief
+        parked = {"stage": "session", "branch": "paused/t-1", "reports": [],
+                  "result": {"session_id": "sid", "interrupted": True}, "baseline": None}
+        self.run_one(parked)
+        (cmd,) = self.sessions
+        self.assertIn("--append-system-prompt", cmd)    # the same prefix as before the pause
+        kept = open(brief.paths(self.tmp, 1)[0]).read()
+        # A task paused before briefs were kept still gets its task back.
+        self.assertIn("## Prompt 1\n\nDo it", kept)
+        self.assertIn("## Prompt 2\n\n" + cmd[cmd.index("-p") + 1], kept)
+
     def test_a_pause_during_the_baseline_sweep_starts_no_session(self):
         self.pause_in = ("sweep", 1)
         with self.assertRaises(pause.Paused) as caught:

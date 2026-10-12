@@ -9,7 +9,8 @@ dev-team itself is the thin CLI (argument parsing and the per-task loop):
   pause       the typed ``pause``: listening for it, the WIP branch, the session
               backup, the record ``dev-team resume`` reads; and the typed
               ``stop``, which ends the run once the task in hand is done
-  session     one headless ``claude -p`` session: prompt, command, env, live output
+  session     one headless ``claude -p`` session: the rules as its system prompt, the
+              task prompt, command, env, the compaction window, live output
   triage      one Haiku call before the run marks the small, obvious tasks low effort
   limits      the session limit: its latest reading, waited out when spent, and the
               session resumed
@@ -35,4 +36,8 @@ Unit-tested in Scripts/dev/tests (everything but the process launching).
   scope  What a change can move in the verifier sweep, and the tree snapshot that says what changed
 
   awake  Keep the Mac awake for the length of a run
+
+  brief  What a session must still know once its context has been compacted: the
+         prompts dev-team sent it and its own notes, kept in the run directory
+         and printed back by a hook after each compaction
 """

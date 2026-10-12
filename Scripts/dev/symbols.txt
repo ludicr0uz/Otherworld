@@ -3909,6 +3909,14 @@ dev/devteam/baseline_cache.py:30: key
 dev/devteam/baseline_cache.py:40: load
 dev/devteam/baseline_cache.py:63: exact
 dev/devteam/baseline_cache.py:69: save
+dev/devteam/brief.py:24: HEADER
+dev/devteam/brief.py:30: NO_NOTES
+dev/devteam/brief.py:32: NOTES_LIMIT
+dev/devteam/brief.py:35: paths
+dev/devteam/brief.py:41: add
+dev/devteam/brief.py:51: _read
+dev/devteam/brief.py:59: render
+dev/devteam/brief.py:68: hooks
 dev/devteam/fab.py:33: FIELDS
 dev/devteam/fab.py:34: MAX_ROUNDS
 dev/devteam/fab.py:37: class FabStop

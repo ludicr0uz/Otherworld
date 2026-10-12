@@ -156,6 +156,13 @@ task, each task's sweep output, run.log (what the terminal showed) and
 progress.md with each task's report and gate table. ``claude --resume
 <session id>`` opens any task to inspect it.
 
+A session's context is compacted as it nears 200k tokens (session.COMPACT_WINDOW)
+rather than left to grow. The standing rules are its system prompt, which a
+compaction leaves alone; the prompts dev-team sent it (task-NN-brief.md) and the
+notes it keeps (task-NN-notes.md) are in the run directory, and a hook shows it
+both again after each compaction (devteam/brief.py). ``compact_boundary`` lines
+in a transcript say where one happened.
+
 The pieces live in Scripts/dev/devteam (see its __init__ for the map).
 """
 

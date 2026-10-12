@@ -12,7 +12,9 @@ import hashlib
 import os
 import time
 
-from devteam import baseline_cache, fab, gate, limits, pause, probe_gate, probe_record, scope
+from devteam import (
+    baseline_cache, brief, fab, gate, limits, pause, probe_gate, probe_record, scope,
+)
 from devteam.trace import shown, step
 from devteam.accounting import (
     describe_time, describe_tokens, git, git_head, merge_results, tag_commit,
@@ -20,7 +22,8 @@ from devteam.accounting import (
 )
 from devteam.session import (
     DEFAULT_MODEL, build_cmd, build_fix_prompt, build_limit_resumed_prompt, build_prompt,
-    build_resumed_prompt, build_uncommitted_prompt, run_session, session_env,
+    build_resumed_prompt, build_system, build_uncommitted_prompt, run_session,
+    session_env,
 )
 from devteam.tasks import Task, tick
 from uepylib import editors, server
@@ -183,6 +186,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     pause.Paused when the user paused it."""
     log_path = os.path.join(run_dir, f"task-{n:02d}.jsonl")
     sweep_log = os.path.join(run_dir, f"task-{n:02d}-sweeps.txt")
+    brief_path, notes_path = brief.paths(run_dir, n)   # what outlives a compaction
     timings = {}
     env = session_env(os.environ, SERVE_DIR)
     ask = dict(interactive=args.interactive)
@@ -203,6 +207,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         limits.wait(meter, pauser)
         if pauser and pauser.requested:        # paused while waiting: nothing ran
             return False, "", {"session_id": how.get("resume"), "interrupted": True}
+        brief.add(brief_path, prompt)
         step("session " + ("resuming" if how.get("resume") else "starting")
              + f"  (transcript: {shown(log_path, ROOT)})")
         ok, report, result = run_session(build_cmd(prompt, args.permission_mode, **how, **opts),
@@ -254,9 +259,13 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         limits.wait(meter, pauser)
         paused("start")
         prompt = build_prompt(task, n, total, progress,
-                              gate.table(baseline) if baseline else None, args.commit)
+                              gate.table(baseline) if baseline else None, notes_path)
+    elif not os.path.isfile(brief_path):    # paused before a run kept briefs
+        brief.add(brief_path, f"{task.text}\n\nYour notes file: {notes_path}")
     common = dict(model=task.model or args.model or DEFAULT_MODEL,
-                  effort=task.effort or args.effort, budget=args.budget)
+                  effort=task.effort or args.effort, budget=args.budget,
+                  system=build_system(args.commit),
+                  hooks=brief.hooks(brief_path, notes_path))
     earlier = list(parked.get("reports") or []) if parked else []
     head0, tree0 = git_head(ROOT), tree_fingerprint()
     if parked is None:

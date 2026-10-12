@@ -278,9 +278,9 @@ def _run(p):
     chances = [round(float(c), 3) for c in p.get(table, LOOT_CHANCES_VAR)]
     want = [(e.item_bp.rsplit("/", 1)[1] + "_C", e.chance) for e in WANDERER_LOOT]
     p.check("a live wanderer's loot table is the table's: water at 50%, and the "
-            "jacket, the pants and the boots at 10% each",
+            "jacket, the pants and the boots at 10% each, the knife and the axe at 15% each",
             list(zip(items, chances)) == want and want[0] == (CANTEEN, 0.5)
-            and (JACKET, 0.1) in want and len(want) == 4, f"{items} {chances}")
+            and (JACKET, 0.1) in want and len(want) == 6, f"{items} {chances}")
     p.check("no body in reach: nothing to search, standing",
             p.get(hud, LOOT_TARGET_VAR) is None and not p.get(wc, SEARCHING_VAR))
 

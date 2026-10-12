@@ -16,6 +16,7 @@ ground, picked up with E (combat/gun_drop.py, GUN_LOOT_TABLE in combat.tuning).
 
 from collections import namedtuple
 
+from combat.paths import AXE_BP_PATH, KNIFE_BP_PATH
 from survival.paths import CANTEEN_BP_PATH
 
 # The garments are named here, not imported: `clothing` imports combat, and
@@ -28,6 +29,10 @@ BOOTS_BP_PATH = f"{CLOTHING_DIR}/BP_Boots"
 CLOTHING_LOOT = (JACKET_BP_PATH, PANTS_BP_PATH, BOOTS_BP_PATH)
 CLOTHING_CHANCE = 0.10
 
+# The blades: the knife and the axe, each rolled on its own like every row.
+BLADE_LOOT = (KNIFE_BP_PATH, AXE_BP_PATH)
+BLADE_CHANCE = 0.15
+
 # item_bp: the item's Blueprint (a BP_WeaponItem child); chance: 0..1 per kill.
 LootEntry = namedtuple("LootEntry", "item_bp chance")
 
@@ -36,6 +41,8 @@ WANDERER_LOOT = (
     LootEntry(CANTEEN_BP_PATH, 0.5),
     # Clothing: one wanderer in ten carries each of the three real garments.
     *(LootEntry(path, CLOTHING_CHANCE) for path in CLOTHING_LOOT),
+    # Blades: 15% of the wanderers carry a knife, and 15% an axe.
+    *(LootEntry(path, BLADE_CHANCE) for path in BLADE_LOOT),
 )
 
 

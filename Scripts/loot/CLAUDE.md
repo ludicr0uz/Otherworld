@@ -15,7 +15,8 @@ has (`Scripts/net/CLAUDE.md`, "Death"). In single player a player's body carries
 - **A loot table is a row list in `tables.py`:** `LootEntry(item_bp, chance)`. Each entry is
   rolled on its own, once per counted kill, so a body can carry several things or nothing.
   Today: `WANDERER_LOOT` = the canteen (water) at 50%, and the jacket, the pants and the
-  boots at 10% each (the three garments drawn on the body when worn).
+  boots at 10% each (the three garments drawn on the body when worn), and the knife and
+  the axe at 15% each (`BLADE_LOOT`; each its own roll, so a body can carry both).
 - **The garments' paths are written in `tables.py`, not imported:** `clothing` imports
   `combat`, so neither `loot` nor `combat` may import it. `Scripts/dev/tests/test_loot_paths.py`
   holds them to `clothing/specs.py`.

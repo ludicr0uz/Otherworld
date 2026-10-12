@@ -146,7 +146,7 @@ intended rule for a respawn; for a logout it is the save's job.
 
 - **Water is also corpse loot:** `build_survival.py` fills the wanderers' loot table
   (`Scripts/loot/`), a canteen at 50% (and three garments at 10% each, which
-  `build_clothing.py` makes first), because it builds the last items the table names.
+  `build_clothing.py` makes first, and the knife and the axe at 15% each), because it builds the last items the table names.
 
 ## The campfire (`campfire.py`)
 

@@ -6,7 +6,13 @@
                moves the caret, WearSel, there), NO_SLOT over none
     right button pressed over a slot (not a worn cell) -> the weapon
         component's AskUseSlot(InvOver): a garment worn, a weapon into a weapon
-        slot, anything else to hand (weapon_component/use_request.py)
+        slot, anything else to hand (weapon_component/use_request.py); and
+        over the hand's cell, its UseHeld as well: what is in hand is used as
+        a tap of the fire key uses it (eaten, drunk, a match struck:
+        weapon_component/use_held.py)
+    the use key (the component's KeySights, so a rebind moves it) pressed ->
+        the hand's item used, wherever the cursor is: AskWear(HAND) (worn if
+        a garment), then UseHeld
     left button pressed over a filled slot -> InvDragFrom := InvOver
     left button released with a drag on:
         over the slot it started on (a click): a weapon or bag slot ->
@@ -42,9 +48,11 @@ probe writes the component's request variables instead.
 from uebp.vars import declare, defaults
 from graphics_menu.inv_consts import DRAG_TABLE
 from uebp.graph import out
-from combat.ask_consts import ASK_DROP, ASK_MOVE, ASK_SLOT, ASK_TAKE_OFF, ASK_USE, ASK_WEAR
+from combat.ask_consts import (
+    ASK_DROP, ASK_MOVE, ASK_SLOT, ASK_TAKE_OFF, ASK_USE, ASK_WEAR, USE_HELD)
 from combat.paths import WEAPON_COMP_CLASS_PATH
-from combat.slot_tuning import PRIMARY, SLOT_ITEMS_VAR
+from combat.slot_tuning import HAND, PRIMARY, SLOT_ITEMS_VAR
+from combat.use_tuning import USE_BIND
 from combat.wear_tuning import WORN_VAR
 from graphics_menu.ask import ask
 from graphics_menu.cursor import _clicked, _pc, _under, author_row_cursor
@@ -89,15 +97,24 @@ def _author_over(ed, in_execs, made):
 
 def _author_use(ed, wc, in_execs, made):
     """The right button over a slot asks for its item used (AskUseSlot); the
-    component decides what that is, and that there is one. Returns the
-    exec tails."""
+    component decides what that is, and that there is one. Over the hand's
+    cell what is in hand is used too (UseHeld), and the use key does that
+    from anywhere on the open panel. Returns the exec tails."""
     over = _get(ed, INV_OVER_VAR, made)
     on_slot = _call(ed, FN_AND, made, A=out(_call(ed, FN_GE_II, made, A=over, B=0)),
                     B=out(_call(ed, FN_LESS_II, made, A=over, B=WORN_CODE_FIRST)))
     pressed = _call(ed, FN_WAS_PRESSED, made, self=_pc(ed, made), Key=USE_KEY)
     used = _call(ed, FN_AND, made, A=out(pressed), B=out(on_slot))
     hit, miss = _branch(ed, out(used), in_execs, made)
-    return [ask(ed, wc, ASK_USE, [hit], made, From=over), miss]
+    asked = ask(ed, wc, ASK_USE, [hit], made, From=over)
+    in_hand, other = _branch(ed, out(_call(ed, FN_EQ_II, made, A=over, B=HAND)), [asked], made)
+    used = ask(ed, wc, USE_HELD, [in_hand], made)
+    # The use key: the component's own bind, read off it.
+    key = _get(ed, USE_BIND, made, WEAPON_COMP_CLASS_PATH, wc)
+    keyed = _call(ed, FN_WAS_PRESSED, made, self=_pc(ed, made), Key=key)
+    go, idle = _branch(ed, out(keyed), [used, other, miss], made)
+    worn = ask(ed, wc, ASK_WEAR, [go], made, From=HAND)
+    return [ask(ed, wc, USE_HELD, [worn], made), idle]
 
 
 def _author_press(ed, wc, in_execs, made):
@@ -185,7 +202,8 @@ def author_inv_drag(ed, wc, in_execs):
     flow = _author_release(ed, wc, flow, made)
     ed.add_comment_to_nodes(
         "The mouse on the inventory's slots with the I panel open: the right "
-        "button on a slot asks for its item used (AskUseSlot); a press on a "
+        "button on a slot asks for its item used (AskUseSlot), and on the hand's "
+        "for what is in hand used (UseHeld), as the use key does; a press on a "
         "filled slot starts a drag; the release on the same slot asks for it "
         "in hand (AskSlot) or, worn, off (WearTakeOffRequested); on another "
         "asks for the move (AskMove), the take-off into it (AskTakeOff) or the "

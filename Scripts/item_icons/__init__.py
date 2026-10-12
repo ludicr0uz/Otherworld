@@ -7,11 +7,13 @@ the compose here (Pillow + numpy), and the import
 
   items     the table: each item's DisplayName, Blueprint, camera view and
             share of the slot; the texture's name and size; the white tint
-  portrait  the character's portrait (the I panel's): the player's MetaHuman
-            from the front, posed; its texture's name and size, the meshes,
-            the grooms, the clip
+  portrait  the character's portraits (the I panel's): the player's MetaHuman
+            from the front, posed, one picture per set of the garments drawn
+            on the body (PORTRAITS, the index a bit per garment); the
+            textures' names and size, the meshes, the grooms, the clip
   portrait_capture  in the editor: that body, face and hair stood before the
-            camera in the idle's first frame, and shot through capture's passes
+            camera in the idle's first frame, in each set of garments in
+            turn, and shot through capture's passes
   paths     where the passes, the PNGs and the contact sheet go (assets/);
             the names of a picture's part masks
   parts     outside it: what light mends by the part masks (the seam between

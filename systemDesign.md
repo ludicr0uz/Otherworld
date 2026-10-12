@@ -39,8 +39,10 @@ hit only where their fitted physics bodies are.
 `Scripts/graphics_menu/CLAUDE.md`, `Scripts/clothing/CLAUDE.md`). The hand, four weapon
 slots (primary, secondary, pistol, melee; 1-4) and a ten-slot backpack (5-9, Q cycles it).
 I opens the panel: keys or mouse bring an item to hand, a right click uses it (a garment is
-worn, a gun goes to a weapon slot), drag moves items between slots, and a drop outside the
-panel sets the item down. A pick-up goes to a free weapon slot of its kind, else the bag,
+worn, a gun goes to a weapon slot; on the hand's slot, or with the use key, what is in hand
+is eaten, drunk or struck), drag moves items between slots, and a drop outside the
+panel sets the item down. The character's portrait beside it is the player in the jacket,
+pants and boots they wear. A pick-up goes to a free weapon slot of its kind, else the bag,
 else empty hands.
 
 **The wanderers** (`Scripts/npc/CLAUDE.md`). Ten zombies and wendigos on Behavior Trees:

@@ -18,7 +18,7 @@ from PIL import Image
 from item_icons.items import ICON_H, ICON_W, ITEMS, icon_name
 from item_icons.light import lit
 from item_icons.paths import ICON_DIR, PASSES_DIR, SHEET_PATH
-from item_icons.portrait import PORTRAIT, PORTRAIT_H, PORTRAIT_TEXTURE, PORTRAIT_W
+from item_icons.portrait import PORTRAIT, PORTRAIT_H, PORTRAIT_W, PORTRAITS
 
 # The portrait's level: a clothed body brought up to the guns' (light.LEVEL_TO)
 # washes out, and left as captured is lost on the panel's dark.
@@ -105,11 +105,13 @@ def compose_all(only=()):
         icons.append(icon)
     if icons:
         _sheet(icons)
-    # The character's portrait: the same light, on its own taller canvas.
-    folder = os.path.join(PASSES_DIR, PORTRAIT)
-    if (not only or PORTRAIT in only) and os.path.isdir(folder):
-        portrait = _fit(lit(folder, PORTRAIT_LEVEL_TO), 1.0, (PORTRAIT_W, PORTRAIT_H))
-        _check(PORTRAIT, portrait)
-        portrait.save(os.path.join(ICON_DIR, f"{PORTRAIT_TEXTURE}.png"))
-        made.append(PORTRAIT_TEXTURE)
+    # The character's portraits: the same light, on their own taller canvas.
+    for portrait in PORTRAITS:
+        folder = os.path.join(PASSES_DIR, portrait.passes)
+        if (only and PORTRAIT not in only) or not os.path.isdir(folder):
+            continue
+        picture = _fit(lit(folder, PORTRAIT_LEVEL_TO), 1.0, (PORTRAIT_W, PORTRAIT_H))
+        _check(portrait.passes, picture)
+        picture.save(os.path.join(ICON_DIR, f"{portrait.texture}.png"))
+        made.append(portrait.texture)
     return made

@@ -135,6 +135,9 @@ Input, settings and state
   wear_draw       DrawHUD: the worn slots (Worn's icons, or each slot's
                   silhouette; always shown), and with the I panel open the
                   lit caret, the mouse and the drag
+  wear_portrait   DrawHUD, the I panel open: the portrait's picture is the one
+                  of the player in what is worn (an index off Worn, a bit per
+                  garment drawn on the body)
   wbp_wear        WBP_HUD's worn panel, a grid of inventory slots (called from
                   wbp_hud, in the Kit), and the portrait
   legal_consts    the proprietary notices' words and places, WATERMARK_RECIPIENT

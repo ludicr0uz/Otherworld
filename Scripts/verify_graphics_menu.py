@@ -58,6 +58,7 @@ from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
 from graphics_menu.legal_checks import check_legal
 from graphics_menu.umg_checks import check_hud_graph, check_trees, text_literal
 from graphics_menu.var_checks import check_var_tables
+from combat.wear_tuning import WORN_VAR                                   # noqa: E402
 from combat.tuning import COMBAT, SHOT_VOLUME_CM
 from item_icons.checks import check_item_icons
 
@@ -179,13 +180,15 @@ def main():
           "and the cursor's click (never the wheel): no row of the M panel has a hotkey",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
-    # Exactly two Key pins in this graph are driven rather than literal: the
+    # Exactly three Key pins in this graph are driven rather than literal: the
     # capture poll, which asks the PlayerController about each entry of KeyPool
-    # in turn, and the Multiplayer page's address row, which asks about each
-    # of AddressKeys (mode_checks.py). Nowhere else is a key a value.
-    check("two key polls are driven -- the rebind capture, over KeyPool, and the "
-          "address row's typing, over AddressKeys",
-          len(driven_keys) == 2, str(len(driven_keys)))
+    # in turn, the Multiplayer page's address row, which asks about each
+    # of AddressKeys (mode_checks.py), and the I panel's use key, which is the
+    # weapon component's own bind (inv_drag.py). Nowhere else is a key a value.
+    check("three key polls are driven -- the rebind capture, over KeyPool, the "
+          "address row's typing, over AddressKeys, and the I panel's use key, the "
+          "weapon component's bind",
+          len(driven_keys) == 3, str(len(driven_keys)))
     # The navigation keys must not be bindable, or a keypress can lock the
     # settings screen shut with no way back but deleting the save.
     nav = {N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT} | set(N.START_KEYS)
@@ -734,10 +737,12 @@ def main():
     # Literal indices only: the settings page's own Array_Get and Array_Set
     # take theirs from the loop and from MenuRow, and those are not the push.
     # Nor are the kept tuning tabs' cells (literal, off each one's table and
-    # the built copy of it: MonTuneValues, WorldTuneValuesBuilt and the rest).
+    # the built copy of it: MonTuneValues, WorldTuneValuesBuilt and the rest),
+    # nor the portrait's reads of the drawn garments' worn slots (wear_portrait.py).
     reads = [n for n in by_pins("TargetArray", "Index")
              if not BEL.find_input_pin(n, "Index").list_connected_pins()
-             and not {f"Get {v}" for t in KEPT_TABS for v in (t.values_var, t.built_var)} & {
+             and not ({f"Get {v}" for t in KEPT_TABS for v in (t.values_var, t.built_var)}
+                      | {f"Get {WORN_VAR}"}) & {
                  str(BEL.get_node_title(PIN.get_owning_node(q)))
                  for q in BEL.find_input_pin(n, "TargetArray").list_connected_pins()}]
     check("...read out of Binds by index, one per action",

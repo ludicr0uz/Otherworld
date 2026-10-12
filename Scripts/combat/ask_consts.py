@@ -59,4 +59,10 @@ EXIT_CALLED_OFF_VAR = "ExitCalledOffAt"
 # The countdown ran out: the character may be saved and the player leave.
 EXIT_DUE_VAR = "ExitDue"
 
-ALL_ASKS = tuple(name for name, _ in INT_ASKS) + (ASK_LOOT_TAKE, ASK_SAVE_EXIT)
+# Use what is in hand, as a tap of the fire key does (eat, drink, strike a
+# match): the I panel's right click on the hand's slot and the use key with
+# the panel open. A plain event on the machine the screen is on: it calls the
+# key's own Server events (weapon_component/use_held.py).
+USE_HELD = "UseHeld"
+
+ALL_ASKS = tuple(name for name, _ in INT_ASKS) + (ASK_LOOT_TAKE, ASK_SAVE_EXIT, USE_HELD)

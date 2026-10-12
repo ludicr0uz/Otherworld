@@ -5,7 +5,7 @@ An item's inventory icon is a picture of its own 3D model. Nothing is drawn by h
 ```bash
 python3 Scripts/build_item_icons.py              # capture, compose, import: every item
 python3 Scripts/build_item_icons.py Axe Wood     # only these
-python3 Scripts/build_item_icons.py Character    # the I panel's portrait alone
+python3 Scripts/build_item_icons.py Character    # the I panel's portraits alone (all eight)
 python3 Scripts/build_item_icons.py --no-editor  # compose again from the passes on disk
 ```
 
@@ -49,7 +49,21 @@ the black contour shows).
 The I panel's picture of the player (`T_UI_Portrait`, 256 x 512) goes through the same three
 steps, named `Character` on the command line: the MetaHuman the player is drawn as
 (`asset_pipeline/metahuman_paths.py`), from the front, in boxers, in the first frame of the
-idle. It is the same picture whatever the player wears.
+idle.
+
+- **One picture per set of the garments drawn on the body** (`PORTRAITS`): the garments
+  with a `worn` mesh (`clothing/specs.py`: the jacket, the pants, the boots) have a bit
+  each, in the order of their slots, and `PORTRAITS[index]` is the body in the ones whose
+  bit is set: 8 textures, `T_UI_Portrait` bare and `T_UI_Portrait_<Garment>_...` for the
+  rest (`T_UI_Portrait_Jacket_Boots`). The HUD shows the one for what is worn
+  (`graphics_menu/wear_portrait.py`, off the weapon component's `Worn`). The other five
+  garments and the item in hand are not in it: nothing draws them on the body either.
+  A fourth drawn garment doubles the table by itself (a `worn` in its row), and needs a
+  re-run and the menu build.
+- **A garment is led by the body** (`_garment`), bone by name, as the face is: in the game
+  the hoodie and the shoes copy the body's pose in a post-process anim Blueprint, which
+  never runs in the capture. Every picture is framed on the body and the face alone, so
+  the eight are the same size and the body does not jump between them.
 
 - **What stands before the camera** (`portrait_capture.py`) is `combat/metahuman_body.py`'s
   tree rebuilt from plain actors: the whole body in `MI_BodyUnderwear`, the face, the six
@@ -133,6 +147,7 @@ idle. It is the same picture whatever the player wears.
   group, no mips), is the item's own `Icon`, and the item's `SlotColor` is white.
 - `light.py` refuses a model that covers under 2% of its capture, and `compose.py` an icon that
   has fewer than 24 shades: an empty or flat picture never reaches the game.
-- The portrait: imported the same way, 256 x 512 (`checks.py`); the widget and its gate are
-  `graphics_menu/wear_checks.py`'s.
-- By eye: `sheet.png`, and `assets/ui/T_UI_Portrait.png`.
+- The portraits: all eight imported the same way, 256 x 512 (`checks.py`); the widget, its
+  gate and the pick of the picture are `graphics_menu/wear_checks.py`'s; the table's sums
+  `dev/tests/test_portraits.py`; in a game, `probes/probe_inventory_use.py` (windowed).
+- By eye: `sheet.png`, and `assets/ui/T_UI_Portrait*.png`.

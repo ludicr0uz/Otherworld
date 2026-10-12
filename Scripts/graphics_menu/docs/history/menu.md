@@ -80,7 +80,7 @@ mouse is the camera's.
 | M panel | the caret goes there | takes the row (as Enter does) |
 | tuning tab | the caret goes there | one step up; on the hint line: save (the graphics tab: on its SAVE DEFAULT row); on BACK: back to the panel; held on a scrolling list's bar: drags the list |
 | loot window | the caret goes there | take; on the `[TAB] close` line: shut |
-| I panel | the caret goes there (a worn slot) | on a worn slot: take that garment off; on the `[I] inventory` line: shut; on a slot: bring it to hand; a press on one slot and a release on another: move it there (a worn garment off into it, a carried one onto the worn grid worn) |
+| I panel | the caret goes there (a worn slot) | on a worn slot: take that garment off; on a slot: bring it to hand; a right click on a slot: use it (on the hand's: eat, drink, strike the match); a press on one slot and a release on another: move it there (a worn garment off into it, a carried one onto the worn grid worn) |
 | death menu | | on the hint line: restart |
 
 **The wheel does nothing in any menu**: no key poll reads it (it turned a value or moved a
@@ -351,8 +351,21 @@ loot window, in play only. Traps met here:
   of the player's body from the front, a canvas child of `Body` left of the Kit (not in
   it: `umg_checks` holds the Kit to its two children). `hud_inventory.py` shows it on the
   bag's own condition (WearOpen and no menu). The picture is a render
-  (`Scripts/item_icons/CLAUDE.md`), so it does not change with what is worn or held.
-  `probe_inventory_window.py` (windowed) saves the screen with it up.
+  (`Scripts/item_icons/CLAUDE.md`), one per set of the garments drawn on the body, and
+  the HUD puts up the one for what is worn (`wear_portrait.py`: `WearPortraitIndex`, a
+  bit per drawn garment found in `Worn`, into `WearPortraits`; the brush is set on a
+  change). What is held is not in it.
+  `probe_inventory_window.py` (windowed) saves the screen with it up, and
+  `probe_inventory_use.py` (windowed) dresses the player and reads the picture.
+- **No words on the panel:** the `[I]   inventory` line over the worn slots, which a
+  click shut the panel by, is gone. I shuts it.
+- **What is in hand is used from the panel** (`inv_drag._author_use`): with the cursor up
+  every press is spent, so the fire key's tap never eats. A right click on the hand's
+  slot, or the use key (the weapon component's `KeySights`, read off it, so a rebind
+  moves it) anywhere on the open panel, calls the component's `UseHeld`
+  (`combat/weapon_component/use_held.py`): food and drink are eaten (`Server_Consume`),
+  the matches struck (`Server_Light`). A garment in hand is worn by the ask the click
+  already made (`AskUseSlot`), and by `AskWear` for the key.
 - **Still needs a play session:** dragging with a real mouse (no probe can aim at a cell:
   `probe_clothing_drag.py` and `probe_inventory_drag.py` write the component's requests
   and the HUD's `InvDragFrom` instead: whether the view really stays still under a held

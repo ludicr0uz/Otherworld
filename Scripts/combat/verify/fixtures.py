@@ -14,6 +14,7 @@ from combat.paths import (
 from combat.tuning import HEALTH_DRAINS
 from combat.verify.common import BEL, PIN, by_pins, cdo, graph, load, num_pin, pin_value
 from combat.aim_pitch import AIM_PITCH_VAR
+from combat.ask_consts import USE_HELD
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.stance import STANCE_VAR
 
@@ -108,6 +109,16 @@ def _mirror_arm(nodes):
     return _with_private_feeds(arm)
 
 
+def _use_held_arm():
+    """UseHeld's event, what it runs, and the pure nodes that feed nothing else."""
+    event = graph(wc).find_event_node(USE_HELD)
+    if not event:
+        return {}
+    arm = {n.get_path_name(): n
+           for n in [event] + exec_reach(BEL.list_output_pins(event))}
+    return _with_private_feeds(arm)
+
+
 # The weapon component's Tick is two states (weapon_component/dead.py): the
 # living Tick, which is what every section but verify/dead.py reads as ``wg``,
 # and the dead arm, which lets go of what the living one holds. Kept apart so
@@ -121,8 +132,13 @@ _arm = _dead_arm(_wg_all)
 wg_dead = list(_arm.values())
 _mirror = _mirror_arm(_wg_all)
 wg_mirror = list(_mirror.values())
+# And UseHeld's event (weapon_component/use_held.py), a screen's use of what is
+# in hand: the fire key's eat and strike a second time, by name. "The key's
+# arm asks once" is a statement about the Tick; verify/asks.py reads this one.
+_use_held = _use_held_arm()
+wg_use_held = list(_use_held.values())
 wg = [n for n in _wg_all if n.get_path_name() not in _arm
-      and n.get_path_name() not in _mirror]
+      and n.get_path_name() not in _mirror and n.get_path_name() not in _use_held]
 titles = [str(BEL.get_node_title(n)).replace("\n", " ") for n in wg]
 
 gm = load(GAME_MODE_BP_PATH)

@@ -26,7 +26,7 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
 | the slots, `ClothingSlot` on the item, `Worn`/`TakeOffSlot` on the weapon component | `combat/wear_tuning.py` |
 | putting one on, taking one off (the server's: `Scripts/net/CLAUDE.md`, "Clothing") | `combat/weapon_component/wear.py`, `wear_drag.py` (checks: `combat/verify/wear.py`) |
 | what is worn, as the owning client is told it and pictures it | the record's `Worn` (`combat/record_vars.py`; C++, read with `WornRow`: `uebp/nodes/inventory.py`), `view_worn.py` |
-| the **I** panel, and the character's portrait in it | `graphics_menu/wear_*.py`, `wbp_wear.py` (checks: `graphics_menu/wear_checks.py`); the picture: `item_icons/portrait.py` |
+| the **I** panel, and the character's portrait in it, which shows the jacket, the pants and the boots when worn | `graphics_menu/wear_*.py`, `wbp_wear.py` (checks: `graphics_menu/wear_checks.py`); the pictures, one per set of them: `item_icons/portrait.py`; the pick: `graphics_menu/wear_portrait.py` |
 | the icons | `item_icons/items.py` rows, `python3 Scripts/build_item_icons.py Hat ...` |
 | the body the garments are drawn on: the MetaHuman in boxers, with a bare, hidden `Torso`, `Legs` and `Feet` component for a garment to fill | `combat/metahuman_body.py`; the meshes `asset_pipeline/metahuman_paths.py` `CLOTHING` (`Scripts/asset_pipeline/CLAUDE.md`, "The MetaHuman") |
 | what is worn, in a saved profile | `WornClasses` (`Scripts/graphics_menu/CLAUDE.md`, "Save and exit"; in a game: `probes/probe_clothing_save.py`) |
@@ -60,7 +60,8 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   or the hand free; the slot emptied).
   The HUD never touches the bag.
 - **A right click on a bag slot's garment wears it** (`AskUseSlot`, `weapon_component/use_request.py`:
-  it raises `WearRequest`, so the swap below is the same one).
+  it raises `WearRequest`, so the swap below is the same one). With the I panel open the
+  use key wears the one in hand the same way (`AskWear` of the hand's slot).
 - **The mouse does both, in the I panel** (`graphics_menu/inv_drag.py` asks,
   `probes/probe_clothing_drag.py` checks): a worn garment dragged onto the hand or a bag
   slot is taken off into it (`TakeOffTo` with `TakeOffSlot`; a filled slot or a weapon

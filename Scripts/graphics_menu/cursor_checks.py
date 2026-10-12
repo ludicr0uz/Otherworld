@@ -25,9 +25,9 @@ PIN = unreal.BlueprintGraphPinLibrary
 # pages (mode_draw.py).
 ROW_LISTS = 4 + len(TABS) + len(SLOT_BOXES) + len(PAGES)
 # ...and the single lines a click lands on: the death menu's hint, the loot
-# window's and the I panel's close buttons, the settings page's BACK row, each
+# window's close button, the settings page's BACK row, each
 # tab's hint and each tab's BACK row, and each mode page's BACK row.
-CLICK_LINES = 4 + 2 * len(TABS) + len(PAGES)
+CLICK_LINES = 3 + 2 * len(TABS) + len(PAGES)
 # A scrolling tab's rows count only inside its list's window: one more test.
 # Its bar's drag reads the list's box twice more: the press on it, and how far
 # down it the cursor is (tune_scroll.py).

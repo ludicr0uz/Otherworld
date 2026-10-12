@@ -4,7 +4,13 @@
 from uebp import net
 from combat import ask_consts as AC
 from combat.game_state import LAST_DAMAGE_VAR
+from combat import item_vars as IV
+from combat.fire_vars import SERVER_LIGHT
+from combat.light_tuning import LIGHTS_VAR
 from combat.slot_tuning import HAS_ROOM_VAR
+from combat.tuning import SERVER_CONSUME
+from combat.wear_tuning import CLOTHING_SLOT_VAR
+from combat.weapon_component import vars as WV
 from combat.verify.common import BEL, PIN, check, graph, in_pins, pin_value
 from combat.verify.fixtures import _is_exec, wc, wc_cdo, wg, wg_dead
 from combat.weapon_component.asks import WRITES
@@ -68,6 +74,37 @@ def check_asks():
         check(f"{name}({', '.join(params)}) raises the request the Tick serves, and "
               f"nothing else ({', '.join(v for v, _ in WRITES[name])}, in that order)",
               len(sets) == len(want) and got == want, str(got))
+
+
+def check_use_held():
+    """use_held.py: a screen's use of what is in hand."""
+    event = _event(AC.USE_HELD)
+    if not event:
+        return
+    run = _after(event)
+    names = [_title(n).replace(" ", "").replace("_", "") for n in run]
+    gates = [n for n in run if "Condition" in in_pins(n)]
+    reads = [_title(g) for b in gates for c in _feeders(b, "Condition")
+             for g in [c, *_feeders(c, "A"), *_feeders(c, "Object")]]
+    check(f"{AC.USE_HELD} uses what is in hand as the fire key's tap does: only a valid "
+          f"{WV.Held}; food and drink ({IV.Consumable}, not a garment: "
+          f"{CLOTHING_SLOT_VAR}) are asked of the server ({SERVER_CONSUME}), the matches "
+          f"({LIGHTS_VAR}) struck ({SERVER_LIGHT}), and nothing else is done",
+          names.count(SERVER_CONSUME.replace("_", "")) == 1
+          and names.count(SERVER_LIGHT.replace("_", "")) == 1
+          and {n for n in names if n != "Branch"}
+          == {SERVER_CONSUME.replace("_", ""), SERVER_LIGHT.replace("_", ""),
+              "PlaySoundAtLocation", f"Set{WV.TriggerSpent}"}
+          and {f"Get {WV.Held}", f"Get {IV.Consumable}", f"Get {CLOTHING_SLOT_VAR}",
+               f"Get {LIGHTS_VAR}"} <= set(reads),
+          f"{len(gates)} gates reading {sorted(set(reads))}; calls {names}")
+    garment = [b for b in gates for c in _feeders(b, "Condition")
+               if f"Get {CLOTHING_SLOT_VAR}" in [_title(g) for g in _feeders(c, "A")]]
+    arms = [(len(PIN.list_connected_pins(BEL.find_then_pin(b))),
+             len(PIN.list_connected_pins(BEL.find_else_pin(b)))) for b in garment]
+    check("...a garment in hand is not its business (the screen asks that worn): the "
+          "garment's arm goes nowhere, and what is not one is eaten",
+          arms == [(0, 1)], str(arms))
 
 
 def check_ask_loot_take():
@@ -207,5 +244,6 @@ def check_ask_save_exit():
 
 def run():
     check_asks()
+    check_use_held()
     check_ask_loot_take()
     check_ask_save_exit()

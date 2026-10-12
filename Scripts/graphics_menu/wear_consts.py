@@ -12,9 +12,9 @@ mouse work it (inv_consts.py has the backpack's half).
     Enter, or a click   a worn slot: take that garment off, into the bag
     drag                a worn garment onto the hand or a bag slot takes it
                         off into it; a carried one onto the worn grid wears it
-    a click on "[I] inventory"  shuts it, as I does
 
-While it is open the character's portrait stands left of it: a picture only.
+While it is open the character's portrait stands left of it: the picture of
+the player in what they wear (wear_portrait.py picks it).
 
 A fixed key, like Tab: not a gameplay bind. Up/Down/Enter are the menu's
 navigation keys; with the loot window open they are the loot window's, and
@@ -22,7 +22,9 @@ with the menu open the menu's.
 """
 
 from combat.wear_tuning import WEAR_SLOTS
-from uebp.vars import BOOL, INT, Var
+from graphics_menu.umg_consts import UI_ART_DIR
+from item_icons.portrait import PORTRAITS
+from uebp.vars import BOOL, INT, Var, array, lazy, obj
 
 WEAR_KEY = "I"
 WEAR_UP, WEAR_DOWN = "Up", "Down"       # menu_nav.NAV_UP / NAV_DOWN
@@ -34,17 +36,31 @@ WEAR_OPEN_VAR = Var("WearOpen", BOOL, False)
 WEAR_SEL_VAR = Var("WearSel", INT, 0)
 WEAR_TAKE_VAR = Var("WearTakeOffRequested", BOOL, False)
 WEAR_STILL_VAR = Var("WearStill", BOOL, False)
+
+
+def _portraits():
+    from uebp.graph import _must_load
+    return [_must_load(f"{UI_ART_DIR}/{p.texture}") for p in PORTRAITS]
+
+
+# The portrait's pictures, by index (item_icons/portrait.py: a bit per garment
+# drawn on the body), the index of what is worn now, and the one on show.
+WEAR_PORTRAITS_VAR = Var("WearPortraits", array(obj("/Script/Engine.Texture2D")),
+                         lazy(_portraits))
+WEAR_PORTRAIT_INDEX_VAR = Var("WearPortraitIndex", INT, 0)
+WEAR_PORTRAIT_SHOWN_VAR = Var("WearPortraitShown", INT, 0)
 # In the order wear_tick.py has always declared them.
-TABLE = (WEAR_SEL_VAR, WEAR_OPEN_VAR, WEAR_TAKE_VAR, WEAR_STILL_VAR)
+TABLE = (WEAR_SEL_VAR, WEAR_OPEN_VAR, WEAR_TAKE_VAR, WEAR_STILL_VAR,
+         WEAR_PORTRAITS_VAR, WEAR_PORTRAIT_INDEX_VAR, WEAR_PORTRAIT_SHOWN_VAR)
 
 # WBP_HUD's widgets.
 WEAR_PANEL = "WearPanel"
 WEAR_SLOTS_BOX = "WearSlots"        # a grid of WBP_InventorySlot, one per slot
 WEAR_COLUMNS = 4
-WEAR_CLOSE = "WearClose"            # the close button: a line a click lands on
 WEAR_ROWS = len(WEAR_SLOTS)
 # The character's portrait (item_icons/portrait.py renders it): a picture of
-# the player's body from the front, left of the kit, up while the panel is open.
+# the player's body from the front, in what is worn, left of the kit, up
+# while the panel is open.
 WEAR_PORTRAIT = "WearPortrait"
 WEAR_PORTRAIT_IMAGE = "WearPortraitImage"
 WEAR_PORTRAIT_SIZE = (150.0, 300.0)     # the texture's own 1:2
@@ -54,6 +70,3 @@ WEAR_PORTRAIT_GAP = 12.0                # between it and the kit
 # Each worn slot's silhouette: the item (item_icons/items.py's DisplayName)
 # whose icon stands, translucent, in the empty slot.
 WEAR_GHOSTS = tuple(s.capitalize() for s in WEAR_SLOTS)
-WEAR_CLOSE_TEXT = f"[{WEAR_KEY}]   inventory"
-WEAR_CLOSE_FONT = 12.0
-WEAR_CLOSE_GAP = 4.0                # px between the line and the worn grid

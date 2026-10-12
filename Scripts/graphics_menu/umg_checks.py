@@ -10,6 +10,7 @@ import re
 
 import unreal
 
+from item_icons.portrait import DRAWN_SLOTS
 from graphics_menu import inv_consts as IC
 from graphics_menu import settings_rows as S
 from ui_art.slot_ghosts import ghost_name
@@ -370,6 +371,7 @@ def check_hud_graph(check, nodes):
     guards = [n for n in nodes if {"TargetArray", "IndexToTest"} <= _pins(n)]
     check("an inventory slot reads its item only behind IsValidIndex, and so "
           "do the equipped name, the I panel's worn slots, its drag's start (on "
-          "a slot, on a worn slot), the icon the drag carries (the same two) and "
-          "the loot window's take of the caret's row",
-          len(guards) == 8, str(len(guards)))
+          "a slot, on a worn slot), the icon the drag carries (the same two), "
+          "the loot window's take of the caret's row, and the portrait's pick "
+          "(each drawn garment's worn slot, and the picture)",
+          len(guards) == 8 + len(DRAWN_SLOTS) + 1, str(len(guards)))

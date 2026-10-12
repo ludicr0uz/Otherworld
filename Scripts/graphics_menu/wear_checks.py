@@ -7,6 +7,8 @@ combat/verify/wear.py's.
 import unreal
 
 from combat import ask_consts as AC
+from combat.slot_tuning import HAND
+from combat.use_tuning import USE_BIND
 from combat.wear_tuning import NOT_CLOTHING, WORN_VAR
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from graphics_menu import umg_consts as UC
@@ -17,7 +19,7 @@ from graphics_menu.wear_tick import WEAR_STILL_VAR
 from graphics_menu.inv_consts import (
     DRAG_FROM_VAR, DRAG_ICON, INV_OVER_VAR, LOOK_HELD_VAR, NO_SLOT)
 from item_icons.items import UI_ART_DIR, icon_name
-from item_icons.portrait import PORTRAIT_TEXTURE
+from item_icons.portrait import DRAWN, DRAWN_SLOTS, PORTRAIT_TEXTURE, PORTRAITS
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -50,8 +52,10 @@ def _check_widgets(check):
                k.get_editor_property("slot").get_editor_property("column")) for k in kids]
     check("WBP_HUD has the I panel: one inventory slot per worn slot, in rows of "
           f"{WC.WEAR_COLUMNS}, each with its garment's silhouette and no text, and "
-          "its close line",
-          WC.WEAR_PANEL in widgets and WC.WEAR_CLOSE in widgets
+          "no line of words over them (the [I] inventory line is gone)",
+          WC.WEAR_PANEL in widgets and "WearClose" not in widgets
+          and [k.get_name() for k in widgets[WC.WEAR_PANEL].get_all_children()]
+          == [WC.WEAR_SLOTS_BOX]
           and ghosts == [icon_name(d) for d in WC.WEAR_GHOSTS]
           and places == [divmod(i, WC.WEAR_COLUMNS) for i in range(WC.WEAR_ROWS)]
           and all(k.get_class().get_name() == "WBP_InventorySlot_C" for k in kids),
@@ -80,6 +84,48 @@ def _check_portrait(check, nodes):
     check(f"...shown and collapsed on one branch, which reads {WC.WEAR_OPEN_VAR}",
           len(sets) == 2 and len({_value(n, "InVisibility") for n in sets}) == 2
           and gates == {f"Get {WC.WEAR_OPEN_VAR}"}, f"{len(sets)} sets, gated by {gates}")
+    _check_portrait_pick(check, nodes)
+
+
+def _check_portrait_pick(check, nodes):
+    """wear_portrait.py: the picture follows what is worn."""
+    pictures = [p.texture for p in PORTRAITS]
+    missing = [t for t in pictures
+               if not unreal.EditorAssetLibrary.does_asset_exist(f"{UI_ART_DIR}/{t}")]
+    check(f"there is a portrait for every set of the garments drawn on the body "
+          f"({', '.join(g.display for g in DRAWN)}): {len(pictures)} pictures, the bare "
+          "one first", len(pictures) == 1 << len(DRAWN) and pictures[0] == PORTRAIT_TEXTURE
+          and not missing, f"missing {missing}")
+    adds = [n for n in nodes if _title(n) == f"Set {WC.WEAR_PORTRAIT_INDEX_VAR}"
+            and _feeders(n, WC.WEAR_PORTRAIT_INDEX_VAR)]
+    bits, slots = [], []
+    for n in adds:
+        add = _feeders(n, WC.WEAR_PORTRAIT_INDEX_VAR)[0]
+        bits.append(_value(add, "B"))
+        valid = [c for b in _feeders(n, "execute") for c in _feeders(b, "Condition")]
+        gets = [g for v in valid for g in _feeders(v, "Object")]
+        slots.append([(_value(g, "Index"), [_title(a) for a in _feeders(g, "TargetArray")])
+                      for g in gets])
+    want = [[(str(s), [f"Get {WORN_VAR}"])] for s in DRAWN_SLOTS]
+    check(f"the HUD works out which: {WC.WEAR_PORTRAIT_INDEX_VAR} starts at 0 and takes "
+          f"each drawn garment's bit where {WORN_VAR} holds one in its slot "
+          f"(slots {list(DRAWN_SLOTS)}, read behind IsValid)",
+          sorted(bits, key=int) == [str(1 << b) for b in range(len(DRAWN))]
+          and sorted(slots) == sorted(want)
+          and [_value(n, WC.WEAR_PORTRAIT_INDEX_VAR) for n in nodes
+               if _title(n) == f"Set {WC.WEAR_PORTRAIT_INDEX_VAR}"
+               and not _feeders(n, WC.WEAR_PORTRAIT_INDEX_VAR)] in (["0"], [""]),
+          f"bits {bits}, slots {slots}")
+    brushes = [n for n in nodes if "Texture" in _pins(n)
+               and [_title(f) for f in _feeders(n, "self")] == [f"Get {WC.WEAR_PORTRAIT_IMAGE}"]]
+    source = [_title(a) for n in brushes for g in _feeders(n, "Texture")
+              for a in _feeders(g, "TargetArray")]
+    after = [_title(PIN.get_owning_node(q)) for n in brushes
+             for q in BEL.find_then_pin(n).list_connected_pins()]
+    check(f"...and puts {WC.WEAR_PORTRAITS_VAR}[it] on the portrait when it changes "
+          f"({WC.WEAR_PORTRAIT_SHOWN_VAR} remembers)",
+          len(brushes) == 1 and source == [f"Get {WC.WEAR_PORTRAITS_VAR}"]
+          and after == [f"Set {WC.WEAR_PORTRAIT_SHOWN_VAR}"], f"{source}, then {after}")
 
 
 def _check_keys(check, nodes):
@@ -110,11 +156,37 @@ def _check_keys(check, nodes):
     wears = asks(nodes, AC.ASK_WEAR)
     check("...the drag names the slot it dropped the garment on (To := InvOver), "
           f"and a slot's item dropped on the worn grid is asked worn ({AC.ASK_WEAR}("
-          f"{DRAG_FROM_VAR}))",
-          len(drags) == 1 and len(wears) == 1
+          f"{DRAG_FROM_VAR})); the other wear is the use key's, of the hand's",
+          len(drags) == 1 and len(wears) == 2
           and fed(drags[0], "To") == [f"Get {INV_OVER_VAR}"]
-          and fed(wears[0], "From") == [f"Get {DRAG_FROM_VAR}"],
-          f"{len(drags)} drags, {len(wears)} wears")
+          # The hand's code is the pin's default, which a saved graph drops.
+          and sorted(str(fed(w, "From") or (_value(w, "From") or str(HAND))) for w in wears)
+          == sorted([str([f"Get {DRAG_FROM_VAR}"]), str(HAND)]),
+          f"{len(drags)} drags, {[fed(w, 'From') for w in wears]}")
+    _check_use(check, nodes)
+
+
+def _check_use(check, nodes):
+    """inv_drag.py's use of what is in hand: the right click on the hand's
+    cell, and the use key."""
+    uses = asks(nodes, AC.USE_HELD)
+    def gate(n):
+        return [_title(c) for b in _feeders(n, "execute") for c in _feeders(b, "Condition")]
+    by_click = [n for n in uses if fed(n, "execute") == ["Branch"]]
+    by_key = [n for n in uses if n not in by_click]
+    polls = [k for n in by_key for a in _feeders(n, "execute")
+             for b in _feeders(a, "execute") for k in _feeders(b, "Condition")]
+    check(f"a right click on the hand's cell uses what is in hand ({AC.USE_HELD}, after "
+          f"{AC.ASK_USE}, where InvOver is the hand's code), and so does the use key, "
+          f"the weapon component's {USE_BIND}, with the panel open (after "
+          f"{AC.ASK_WEAR} of the hand's, for a garment)",
+          len(by_click) == 1 and len(by_key) == 1
+          and [fed(c, "A") for b in _feeders(by_click[0], "execute")
+               for c in _feeders(b, "Condition")] == [[f"Get {INV_OVER_VAR}"]]
+          and [_title(a).split(" ")[0] for a in _feeders(by_key[0], "execute")] == [AC.ASK_WEAR]
+          and [fed(k, "Key") for k in polls] == [[f"Get {USE_BIND}"]],
+          f"{len(by_click)} by click, {len(by_key)} by key, "
+          f"polls {[fed(k, 'Key') for k in polls]}")
     takes = sorted(_value(n, WC.WEAR_TAKE_VAR) for n in nodes
                    if _title(n) == f"Set {WC.WEAR_TAKE_VAR}")
     check("Enter or a click on a worn slot raises the take-off, and Tick lowers it (and "

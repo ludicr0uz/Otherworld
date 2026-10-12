@@ -10,10 +10,10 @@
 
 Only reads; wear_tick.py decides. The one thing it writes is the mouse's
 (cursor.py), with the I panel open only, because only DrawHUD knows where a
-cell is: a click on the WearClose line lowers WearOpen, as I does; and the
-slots, the worn ones among them (inv_drag.py: the cell under the cursor ->
-WearSel, a click on it raises WearTakeOffRequested, which Tick serves
-exactly as it serves Enter, and a drag wears or takes off).
+cell is: the slots, the worn ones among them (inv_drag.py: the cell under
+the cursor -> WearSel, a click on it raises WearTakeOffRequested, which Tick
+serves exactly as it serves Enter, and a drag wears or takes off). Open, the
+portrait is also given the picture of what is worn (wear_portrait.py).
 """
 
 import unreal
@@ -21,15 +21,15 @@ import unreal
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, else_, out, then
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.wear_tuning import WORN_VAR
-from graphics_menu.cursor import author_widget_click
 from graphics_menu.hud_inventory import _author_empty_slot, _author_filled_slot
 from graphics_menu.inv_consts import DRAG_FROM_VAR, WORN_CODE_FIRST
 from graphics_menu.inv_carry import author_carry_end, author_carry_icon
 from graphics_menu.inv_drag import author_inv_drag
 from graphics_menu.ui_graph import part, set_shown
 from graphics_menu.umg_consts import WBP_HUD
+from graphics_menu.wear_portrait import author_portrait_pick
 from graphics_menu.wear_consts import (
-    WEAR_CLOSE, WEAR_OPEN_VAR, WEAR_PANEL, WEAR_ROWS, WEAR_SEL_VAR, WEAR_SLOTS_BOX,
+    WEAR_OPEN_VAR, WEAR_PANEL, WEAR_ROWS, WEAR_SEL_VAR, WEAR_SLOTS_BOX,
 )
 from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_VALID
@@ -123,9 +123,7 @@ def author_wear_panel(ed, in_execs):
     # click is a shot. Before the slots are drawn, so the caret it moves and
     # the drag it starts are lit this frame.
     opened, idle = _branch(ed, _get(ed, WEAR_OPEN_VAR), [then(cast)])
-    # The close button: a click on it lowers WearOpen, as I does.
-    flow = author_widget_click(ed, part(ed, WBP_HUD, WEAR_CLOSE),
-                               (WEAR_OPEN_VAR, "false"), [opened])
+    flow = author_portrait_pick(ed, worn, [opened])
     flow = author_inv_drag(ed, wc, flow)
     flow = author_carry_icon(ed, wc, worn, flow)
     box = part(ed, WBP_HUD, WEAR_SLOTS_BOX)

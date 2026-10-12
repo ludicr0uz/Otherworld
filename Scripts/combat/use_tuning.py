@@ -3,6 +3,11 @@ apart from that graph, so a kind of use (weapon_component/torch.py) and the
 aim (weapon_component/ads.py) can read them without importing it.
 """
 
+# The key itself: the sights key's bind on the weapon component (with a gun in
+# hand it is the sights). The I panel reads it off the component too
+# (graphics_menu/inv_drag.py), so a rebind moves both.
+USE_BIND = "KeySights"
+
 USING_VAR = "Using"               # the use key is held on an item with no sights
 USE_PRESSED_VAR = "UsePressed"    # ...and went down this frame
 USE_WAS_VAR = "UseWas"            # last frame's Using

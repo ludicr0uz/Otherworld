@@ -32,6 +32,11 @@ The defaults are all rebindable on the settings screen:
   (`probes/probe_item_no_sights.py`). It lights a stick at a campfire and holds a burning one
   out, and with a hot knife or axe it cauterises a bleed (both below); on a cold blade, the
   matches, wood and food it does nothing yet.
+  **With the I panel open** the cursor is up and every click is spent, so the fire key
+  uses nothing: there a right click on the hand's slot, or the use key, uses what is in
+  hand (`UseHeld`, `weapon_component/use_held.py`: food and drink eaten, the matches
+  struck; a garment worn by the panel's own ask). `verify/fixtures.wg_use_held` keeps
+  that event's nodes out of `wg`, as the dead arm's are.
   **1-4** bring the primary, secondary, pistol or melee slot's item to hand (the same key
   again puts it back: empty hands), **5-9** the bag's first five slots, **Q** the next filled
   bag slot, round the bag (not the weapon slots: `NextRequest`, `probes/probe_slots.py`) (all fixed keys, not settings binds: see "The slots" below), **G** drops, **E** interacts (an item in reach is picked up; a campfire heats the knife or axe in hand), **Shift** sprints, **F** blocks (held),

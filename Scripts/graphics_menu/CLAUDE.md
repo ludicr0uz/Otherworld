@@ -49,7 +49,9 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   portrait left of them (`wear_*.py`, `inv_*.py`, `Scripts/clothing/CLAUDE.md`). **Up/Down** run the
   caret over the worn slots, then the bag's slots; **Enter** takes a garment off, or brings
   a bag slot's item to hand; the mouse drags an item from slot to slot, a worn garment
-  onto the hand or a bag slot, or a carried one onto the worn grid (below). It does not
+  onto the hand or a bag slot, or a carried one onto the worn grid (below). A right
+  click on a slot uses its item, and on the hand's slot (or with the use key) what is in
+  hand is eaten, drunk, struck or worn. The portrait is the player in what is worn. It does not
   pause, holds the walk while open, and hides under the menu; with the loot window open
   too, the arrows and Enter are the loot window's. **1-9** are the weapon component's
   (`combat/slot_tuning.py`).

@@ -9,7 +9,7 @@ light.py's and compose.py's own check: they refuse to write one that is not.
 import unreal
 
 from item_icons.items import ICON_H, ICON_TINT, ICON_W, ITEMS, UI_ART_DIR, icon_name
-from item_icons.portrait import PORTRAIT_H, PORTRAIT_TEXTURE, PORTRAIT_W
+from item_icons.portrait import PORTRAIT_H, PORTRAIT_TEXTURE, PORTRAIT_W, PORTRAITS
 
 
 def _texture(item):
@@ -49,8 +49,9 @@ def check_item_icons(check):
     wrong = [f"{i.display}: {f}" for i in ITEMS for f in [_item_fault(i)] if f]
     check("every item shows its own icon (T_UI_Icon_<DisplayName>, the render of "
           "its model), untinted: its SlotColor is white", not wrong, "; ".join(wrong))
-    fault = _texture_fault(
-        unreal.EditorAssetLibrary.load_asset(f"{UI_ART_DIR}/{PORTRAIT_TEXTURE}"),
-        (PORTRAIT_W, PORTRAIT_H))
-    check(f"the character's portrait is imported the same way: {PORTRAIT_TEXTURE}, "
-          f"{PORTRAIT_W} x {PORTRAIT_H}", not fault, fault)
+    wrong = [f"{p.texture}: {f}" for p in PORTRAITS for f in [_texture_fault(
+        unreal.EditorAssetLibrary.load_asset(f"{UI_ART_DIR}/{p.texture}"),
+        (PORTRAIT_W, PORTRAIT_H))] if f]
+    check(f"the character's portraits are imported the same way: {PORTRAIT_TEXTURE} and "
+          f"one per set of worn garments, {len(PORTRAITS)} in all, "
+          f"{PORTRAIT_W} x {PORTRAIT_H}", not wrong, "; ".join(wrong))

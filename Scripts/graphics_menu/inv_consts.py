@@ -15,7 +15,11 @@ mouse) read one table. The slot codes are combat/slot_tuning.py's.
         right-click a slot   use it (USE_KEY; the component's AskUseSlot): a
             garment is worn, a weapon goes into a free weapon slot it fits
             (else swaps with the first it fits: a long gun's the primary),
-            anything else comes to hand
+            anything else comes to hand; on the hand's own slot what is
+            in hand is used as the fire key's tap uses it (food and drink,
+            the matches: the component's UseHeld)
+        the use key      (the component's KeySights) the same use of what is
+            in hand, wherever the cursor is; a garment in hand is worn
         drag anything out of the inventory (released over none of
             INV_AREAS)   set it down on the ground (the component's DropRequest)
     while a drag is on, its item's icon is carried on the cursor (DRAG_ICON)

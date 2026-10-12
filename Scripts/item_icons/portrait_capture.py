@@ -4,7 +4,9 @@ posed, photographed from the front through capture.py's passes.
 What stands before the camera is combat/metahuman_body.py's tree rebuilt out
 of plain actors (nothing here spawns the player): the whole body in its
 underwear material, the face following the body's neck and head, the grooms
-bound to the face. The hidden mesh and the retargeting anim blueprint are not
+moved as the head moved, and over the body the garments of the picture
+(portrait.PORTRAITS: one picture per set of them), each led by the body as
+the face is. The hidden mesh and the retargeting anim blueprint are not
 there: nothing ticks an animation in the capture, so the idle is retargeted
 onto the body's skeleton as a clip, once, and its first frame is the pose.
 """
@@ -18,7 +20,7 @@ from item_icons.capture import FAR_ABOVE, _log, _shoot, _world
 from item_icons.paths import PART_HAIR, PART_SEAM, PASSES_DIR
 from item_icons.portrait import (
     PORTRAIT, PORTRAIT_FACE, PORTRAIT_GROOMS, PORTRAIT_MATERIAL, PORTRAIT_MESH, PORTRAIT_POSE,
-    PORTRAIT_POSE_MESH, PORTRAIT_RETARGETER, PORTRAIT_SCRATCH, PORTRAIT_YAW,
+    PORTRAIT_POSE_MESH, PORTRAIT_RETARGETER, PORTRAIT_SCRATCH, PORTRAIT_YAW, PORTRAITS,
 )
 
 EAL = unreal.EditorAssetLibrary
@@ -122,8 +124,21 @@ def _grooms(body, head_made, spawned):
     return made
 
 
+def _garment(path, body, spawned):
+    """A garment's mesh on the body. In the game the jeans take the body's
+    pose as their leader's and the hoodie and the shoes copy it in a
+    post-process anim blueprint, which never runs here: all three are led by
+    the body, bone by name, as the face is."""
+    worn = _spawn(unreal.SkeletalMeshActor, spawned, body).skeletal_mesh_component
+    worn.set_skinned_asset_and_update(unreal.load_asset(path))
+    worn.set_leader_pose_component(body, True)
+    _full_textures(worn)
+    return worn.get_owner()
+
+
 def capture_portrait():
-    """Write the character's passes: the player's body, posed, from the front."""
+    """Write every picture's passes: the player's body, posed, from the
+    front, once in each set of the garments drawn on it."""
     mesh = unreal.load_asset(PORTRAIT_MESH) if EAL.does_asset_exist(PORTRAIT_MESH) else None
     if not mesh:
         _log(f"SKIPPED {PORTRAIT}: {PORTRAIT_MESH} is not imported")
@@ -135,10 +150,18 @@ def capture_portrait():
         grooms = _grooms(body, head_made, spawned)
         for comp in (body, face):
             _full_textures(comp)
-        _shoot(_world(), [body.get_owner(), face.get_owner()],
-               unreal.Rotator(roll=0.0, pitch=0.0, yaw=PORTRAIT_YAW + 180.0),
-               os.path.join(PASSES_DIR, PORTRAIT), PORTRAIT, spawned, also=grooms,
-               parts={PART_SEAM: [face.get_owner()], PART_HAIR: grooms})
+        for portrait in PORTRAITS:
+            # Framed on the body and the face alone, so every picture is the
+            # same size: the garments are only in it (`also`).
+            worn = [_garment(mesh, body, spawned) for mesh in portrait.meshes]
+            _shoot(_world(), [body.get_owner(), face.get_owner()],
+                   unreal.Rotator(roll=0.0, pitch=0.0, yaw=PORTRAIT_YAW + 180.0),
+                   os.path.join(PASSES_DIR, portrait.passes), portrait.passes, spawned,
+                   also=[*grooms, *worn],
+                   parts={PART_SEAM: [face.get_owner()], PART_HAIR: grooms})
+            for actor in worn:
+                spawned.remove(actor)
+                actor.destroy_actor()
         return True
     finally:
         for a in spawned:

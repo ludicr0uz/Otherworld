@@ -194,6 +194,9 @@ def parse_args():
     ap.add_argument("--lag", type=int, default=0, metavar="MS",
                     help="with --net: delay every packet a client sends by MS "
                          "(the engine's Net PktLag), to check prediction")
+    ap.add_argument("--loss", type=int, default=0, metavar="PCT",
+                    help="with --net: drop PCT percent of the packets each client sends "
+                         "and receives (the engine's Net PktLoss and PktIncomingLoss)")
     ap.add_argument("--server-arg", action="append", default=[], metavar="SWITCH",
                     help="with --net: start the server with -SWITCH (repeatable; type it "
                          "without its dash: --server-arg AllowDevTuning)")
@@ -419,7 +422,7 @@ def main():
                 sys.exit(f"[uepy] no such probe: {p}")
     if args.net:
         problem = net_plan.check_args(args.clients, args.port, args.seconds, args.lag,
-                                      args.bots)
+                                      args.bots, args.loss)
         if problem:
             ap.error(problem)
         ok = True
@@ -427,7 +430,7 @@ def main():
             ok &= net.run_net(engine, level, args.clients, args.port, args.seconds, group,
                               args.probe_timeout, args.windowed, args.allow_pie, args.title,
                               args.lag, args.bots, args.trace,
-                              server_args=args.server_arg)
+                              server_args=args.server_arg, loss_pct=args.loss)
         return 0 if ok else 1
     if args.game:
         seconds = args.seconds or (game.PROBE_SECONDS if probes else game.GAME_SECONDS)

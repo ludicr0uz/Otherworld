@@ -243,7 +243,7 @@ python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's 
   check (`uepylib/net.py`): one dedicated server (the editor binary, `-server`) on `--map`
   (default `Lvl_Forest_200m`) and N clients that join it on `127.0.0.1` (`--port`, default
   17777), all started at once, about 40 s for a server and two clients.
-  Its report, `--lag MS`, `--bots N` and `--trace`, the log files and the memory it takes
+  Its report, `--lag MS`, `--loss PCT`, `--bots N` and `--trace`, the log files and the memory it takes
   (a server and two `-nullrhi` clients are 12.9 GB of this machine's 16: close the editor
   first, and run one at a time): `docs/headless_runs.md#net`.
 - **PIE:** `uepy.py` refuses to run while PIE is running, unless given `--allow-pie`

@@ -52,4 +52,6 @@ Scripts/net/CLAUDE.md has the conventions and the traps.
   probe_*     the probes themselves, one behaviour each
 
   systems  The systems a probe may declare in its SYSTEMS tuple
+
+  throw_watch  What a client shows of one thrown item, frame by frame (task R2)
 """

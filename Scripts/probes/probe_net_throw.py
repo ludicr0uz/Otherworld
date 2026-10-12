@@ -4,14 +4,24 @@ into a tree, every machine sees it lodged there, and client 2 takes it out.
     server     refuses a throw that starts 10 m from the thrower; clears the
                wanderers; finds a trunk (probe_throw_strike's spot) and stands
                client 1 in front of it
-    client 1   brings its axe to hand, rests the reticle on the trunk, holds
-               the throw key and clicks: its own hand lets go and asks
-               Server_Throw. It posts once the server's record has taken the
-               axe out of its inventory
+    client 1   brings its axe to hand, rests the reticle on the trunk and
+               holds the throw key
+    server     empties its own copy of client 1's hand, so the next throw is
+               one it refuses
+    client 1   clicks: its stand-in leaves on the click, the server refuses,
+               and the axe is in its hand again, one axe shown on every frame
+    server     gives the hand back
+    client 1   clicks again: its own hand lets go and asks Server_Throw. It
+               posts once the server's record has taken the axe out of its
+               inventory
     server     its own axe actor left client 1's inventory, flew and is in the
                trunk: Dropped, Lodged, InWorld, replicated, off the ground
     client 1,  each see one axe in the trunk, where the server has it: the
-    client 2   server's actor, sent to them
+    client 2   server's actor, sent to them. And each flew it there itself
+               (task R2, probes/throw_watch.py): a stand-in of its own, shown
+               within 100 ms of the release (client 1's from its own click),
+               on the curve to 30 cm every frame and never still in the air,
+               one axe shown on every frame until a second after the rest
     server     stands client 2 at the trunk
     client 2   presses E: Server_Take. It posts once the record has put a
                second axe in its inventory, and sees none left in the tree
@@ -19,10 +29,10 @@ into a tree, every machine sees it lodged there, and client 2 takes it out.
                a second take of it is refused; a throw asked for at ten times
                the item's speed leaves at the item's own, and flies a second
     client 1   sees no axe in the tree, and has none
-    client 1,  each see that last item for the whole of its flight (task R1):
-    client 2   shown, at five or more places before it lies still. The axe's
-               own flight to the trunk is 0.15 s, two places at the item's
-               10 Hz, so the count is taken on the long one
+    client 1,  never showed the server's own actor in the air: not the axe,
+    client 2   and not that last item, of whose launch no client is told (the
+               probe's Python made the throw, and under it no event leaves the
+               machine): hidden until it rests
 
 ThrowKeyForced, ThrowClickForced and InteractForced stand in for the keys.
 Single player's check is probes/probe_throw_strike.py, which throws the same
@@ -40,7 +50,8 @@ from combat import health_vars as HV
 from combat import item_vars as IV
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.strike_vars import SERVER_TAKE, SERVER_THROW, THROW_SPEED_SLACK
-from combat.throw_tuning import LODGE_MAX_HEIGHT_CM, THROW_SPEED_VAR
+from combat.throw_tuning import (
+    LODGE_MAX_HEIGHT_CM, THROW_GRAVITY_Z, THROW_MAX_FLIGHT_S, THROW_SPEED_VAR)
 from combat.weapon_component import vars as WV
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
 from combat.weapon_component.throw import (
@@ -49,19 +60,22 @@ from combat.weapon_component.throw_flight import THROWN_VAR, THROW_VELOCITY_VAR
 from probes.probe_chop_tree import CLEAR_CM, _flat, _items, _trees
 from probes.probe_hot_blade import _wanderers
 from probes.probe_throw_strike import AXE, ON_GROUND_CM, _launch, _reticle_on, _spot
+from probes import throw_watch as TW
 
 RUNS_ON = ("server", "client")
 WRITABLE = [(WEAPON_COMP_BP_PATH, v) for v in
             (THROW_FORCED_VAR, THROW_CLICK_FORCED_VAR, INTERACT_FORCED_VAR,
-             WV.EquippedIndex)] + [(HEALTH_BP_PATH, HV.Health)]
+             WV.EquippedIndex, WV.Held)] + [(HEALTH_BP_PATH, HV.Health)]
 
 WAIT = 30.0
 SPARE_HEALTH = 100000.0
 SAME_PLACE_CM = 15.0      # a client's copy of the lodged axe, from the server's
 STOOD_CM = 60.0           # a client is where the server stood it
 CHEST_UP_CM = 110.0       # where on the trunk the reticle is put
-FLIGHT_PLACES = 5         # a client's copy of an item in the air, seen at this many places
-APART_CM = 5.0            # two places are different this far apart
+FLIGHT_PLACES = 5         # a client's stand-in in the air, seen at this many places
+SEEN_S = 0.1              # a client shows the throw this soon after the server's release
+OFF_CURVE_CM = 30.0       # ...and never further than this from the server's curve
+AFTER_REST_S = 1.0        # one axe is shown until this long after the rest
 
 
 def _await(ready, seconds=WAIT):
@@ -107,11 +121,56 @@ def _watching(p, sample, ready, seconds=WAIT):
 
 
 def _flying(p):
-    """Where this client shows each of the server's items in the air: sent to
-    it, shown, of the world's and not yet lying."""
-    return [a.get_actor_location() for a in _items(p)
+    """The server's items this client shows in the air: sent to it, of the
+    world's, not yet lying, and not hidden."""
+    return [a for a in _items(p)
             if not a.has_authority() and not a.get_editor_property("hidden")
             and p.get(a, IV.InWorld) and not p.get(a, IV.Dropped)]
+
+
+def _watch(p, wc, name=AXE):
+    """Every frame's pictures of the ``name`` that ``wc``'s owner throws."""
+    return TW.Watch(p, wc, name, lambda: _items(p, name),
+                    lambda: unreal.GameplayStatics.get_time_seconds(p.world()),
+                    WV.ThrowFlyer, WV.ThrowStopped, WV.ThrowEnded, IV.InWorld)
+
+
+def _other_wc(p, mine):
+    """The weapon component of this client's copy of the other player."""
+    others = [a for a in _players(p) if a != mine]
+    return p.component(others[0], WEAPON_COMP_CLASS_PATH) if others else None
+
+
+def _check_flight(p, what, frames, launch, rest, rested, since=None, count=True):
+    """A client flew ``what`` itself: the checks of task R2 over its frames.
+    ``launch`` is the server's (t, start, velocity), ``rest`` where its item
+    came to lie and ``rested`` when; ``since`` the wall clock the count of
+    items shown starts at (the first stand-in's, if none)."""
+    t0, start, velocity = launch
+    first = TW.first_wall(frames, TW.STANDIN)
+    p.check(f"{p.where} shows {what} within {SEEN_S * 1000:.0f} ms of the server's "
+            "release: a stand-in of its own, flown here",
+            first is not None and first - t0 < SEEN_S,
+            "never shown" if first is None else f"{(first - t0) * 1000:.0f} ms after it")
+    if first is None:
+        return
+    off = TW.worst_off(frames, start, velocity, THROW_GRAVITY_Z, THROW_MAX_FLIGHT_S, rest)
+    seen = TW.places(frames)
+    p.check(f"...on the server's curve every frame, never more than {OFF_CURVE_CM:g} cm "
+            "off it", off <= OFF_CURVE_CM, f"{off:.1f} cm at worst, over {seen} place(s)")
+    p.check("...and never still in the air", TW.stalls(frames) == 0,
+            f"{TW.stalls(frames)} frame(s) it did not move")
+    if not count:
+        return
+    wrong = TW.miscounts(frames, first if since is None else since, rested + AFTER_REST_S)
+    last = frames[-1][2]
+    lies = (len(last) == 1 and last[0][0] == TW.WORLD
+            and (unreal.Vector(*last[0][1]) - unreal.Vector(*rest)).length() < SAME_PLACE_CM)
+    p.check(f"...one {what} shown on every frame from the release to "
+            f"{AFTER_REST_S:g} s after the rest, and at the end the server's own, where "
+            "the server has it",
+            not wrong and lies and frames[-1][0] >= rested + AFTER_REST_S,
+            f"{len(wrong)} frame(s) of another count {wrong[:4]}, at the end {last}")
 
 
 # ─── the server ──────────────────────────────────────────────────────────────
@@ -165,11 +224,36 @@ def probe_server(p):
         at - unreal.MathLibrary.get_forward_vector(turn) * 300.0, turn, False, True)
     p.post("stand", [_vec(at), yaw, _vec(base)])
 
-    yield _await(lambda: p.posted("client 1", "thrown"), 60.0)
+    # --- a throw the server refuses: its own copy of the hand is empty -----------
+    yield _await(lambda: p.posted("client 1", "aimed"), 60.0)
+    # Emptied after every frame: the request is served at the head of the next,
+    # before the server's own Tick can put the axe back in the hand.
+    barred = time.time()
+
+    def bar():
+        p.set(wc1, WV.Held, None)
+        if time.time() > barred + 0.2 and not p.posted("server", "barred"):
+            p.post("barred")
+    yield _watching(p, bar, lambda: p.posted("client 1", "refused") is not None, 30.0)
+    p.check("the throw client 1 predicted with the server's hand empty is refused: "
+            "the server threw nothing",
+            axe in list(p.get(wc1, "Inventory")) and p.get(wc1, THROWN_VAR) is None
+            and not p.get(axe, IV.InWorld), f"Thrown {p.get(wc1, THROWN_VAR)}")
+    p.set(wc1, WV.Held, axe)
+    yield 0.1
+    p.post("open")
+
+    # --- the throw: when it leaves on the server, and on what curve ------------------
+    def release():
+        if not p.posted("server", "release") and p.get(wc1, THROWN_VAR) is not None:
+            p.post("release", [time.time(), _vec(p.get(wc1, WV.ThrowStart)),
+                               _vec(p.get(wc1, THROW_VELOCITY_VAR))])
+    yield _watching(p, release, lambda: p.posted("client 1", "thrown"), 60.0)
     if not p.posted("client 1", "thrown"):
         p.check("client 1 threw its axe", False, "no post")
         return
     yield _await(lambda: p.get(wc1, THROWN_VAR) is None and p.get(axe, IV.Dropped), 10.0)
+    rested = time.time()
     yield 0.3
     rest = axe.get_actor_location()
     p.check("the server's axe left client 1's inventory: thrown by the server, at "
@@ -184,7 +268,7 @@ def probe_server(p):
     p.check("...an actor of the world's: InWorld, and replicated",
             bool(p.get(axe, IV.InWorld)) and bool(axe.get_editor_property("replicates")),
             f"InWorld {p.get(axe, IV.InWorld)}, replicates {axe.get_editor_property('replicates')}")
-    p.post("lodged", _vec(rest))
+    p.post("lodged", [_vec(rest), rested])
 
     yield _await(lambda: p.posted("client 1", "seen") and p.posted("client 2", "seen"))
     two.set_actor_location_and_rotation(near, turn, False, True)
@@ -222,15 +306,29 @@ def probe_server(p):
                 "item's own", p.get(wc2, THROWN_VAR) == held
                 and speed <= top * THROW_SPEED_SLACK + 1.0,
                 f"{speed:.0f} cm/s, the item's {top:.0f}")
-        # It flies free for a second, away from the tree: each client watches.
+        p.post("free", [time.time(), _vec(p.get(wc2, WV.ThrowStart)),
+                        _vec(p.get(wc2, THROW_VELOCITY_VAR))])
+        # It flies free for a second, away from the tree.
         yield _await(lambda: p.get(wc2, THROWN_VAR) is None, 10.0)
-        yield 0.5
+        p.post("free rest", [_vec(held.get_actor_location()), time.time()])
+        yield AFTER_REST_S + 1.0
     p.post("judged", held is not None)
 
 
 # ─── the clients ─────────────────────────────────────────────────────────────
 
+def _armed(p):
+    """This client's own character, once it has one (a join under packet loss
+    can leave it a spectator for seconds)."""
+    pawn = p.pawn()
+    try:
+        return pawn is not None and p.component(pawn, WEAPON_COMP_CLASS_PATH) is not None
+    except LookupError:
+        return False
+
+
 def probe_client(p):
+    yield _await(lambda: _armed(p), 60.0)
     mine = p.pawn()
     wc = p.component(mine, WEAPON_COMP_CLASS_PATH)
     yield _await(lambda: p.get(wc, "Held") is not None)
@@ -243,6 +341,14 @@ def probe_client(p):
     at, yaw, base = p.posted("server", "stand")
     at, base = unreal.Vector(*at), unreal.Vector(*base)
     mine_axes = len(_axes(p, wc))
+    # Client 1 throws: its own component here, its copy's on client 2.
+    watch = _watch(p, wc if p.client == 1 else _other_wc(p, mine))
+    clicked = None
+    aloft = []
+
+    def sample():
+        watch.sample()
+        aloft.extend(_flying(p))
 
     if p.client == 1:
         yield _await(lambda: (mine.get_actor_location() - at).length() < STOOD_CM, 10.0)
@@ -259,10 +365,18 @@ def probe_client(p):
         p.set(wc, THROW_FORCED_VAR, True)
         yield _await(lambda: p.get(wc, THROW_AIMING_VAR), 5.0)
         yield 0.1
+        p.post("aimed")
+        yield _await(lambda: p.posted("server", "barred"), 30.0)
+        yield from _refused(p, wc, axe, mine_axes)
+        p.post("refused")
+        yield _await(lambda: p.posted("server", "open"), 30.0)
+        yield _await(lambda: p.get(wc, THROW_AIMING_VAR), 10.0)
+        yield 0.1
+        clicked = time.time()
         p.set(wc, THROW_CLICK_FORCED_VAR, True)
-        yield _await(lambda: not p.get(wc, THROW_AIMING_VAR), 5.0)
+        yield _watching(p, sample, lambda: not p.get(wc, THROW_AIMING_VAR), 5.0)
         p.set(wc, THROW_CLICK_FORCED_VAR, False)
-        yield _await(lambda: len(_axes(p, wc)) < mine_axes, 10.0)
+        yield _watching(p, sample, lambda: len(_axes(p, wc)) < mine_axes, 10.0)
         p.set(wc, THROW_FORCED_VAR, False)
         p.check("client 1's throw takes the axe out of its own inventory: the "
                 "server's record says so", len(_axes(p, wc)) == mine_axes - 1,
@@ -270,12 +384,27 @@ def probe_client(p):
                 "off the trunk")
         p.post("thrown")
 
-    yield _await(lambda: p.posted("server", "lodged"), 90.0)
+    yield _watching(p, sample, lambda: p.posted("server", "lodged"), 90.0)
     if not p.posted("server", "lodged"):
         return
-    rest = unreal.Vector(*p.posted("server", "lodged"))
+    at_rest, rested = p.posted("server", "lodged")
+    rest = unreal.Vector(*at_rest)
+    yield _watching(p, sample,
+                    lambda: time.time() > rested + AFTER_REST_S + 0.3, 10.0)
     yield _await(lambda: any((a.get_actor_location() - rest).length() < SAME_PLACE_CM
                              for a in _in_world(p)), 10.0)
+    if p.posted("server", "release"):
+        _check_flight(p, "the axe client 1 threw", watch.frames,
+                      p.posted("server", "release"), at_rest, rested, since=clicked)
+    if p.client == 1 and watch.frames:
+        first = next((at for _w, _t, shown, _f in watch.frames
+                      for kind, at in shown if kind == TW.STANDIN), None)
+        start = unreal.Vector(*p.posted("server", "release")[1]) \
+            if p.posted("server", "release") else None
+        gap = (unreal.Vector(*first) - start).length() if first and start else -1.0
+        p.check("...client 1's own leaves its hand on its click, not on the server's "
+                "word: first shown at the start of the curve",
+                0.0 <= gap < 100.0, f"{gap:.0f} cm from the start")
     seen = _in_world(p)
     gap = min(((a.get_actor_location() - rest).length() for a in seen), default=-1.0)
     p.check(f"{p.where} sees one axe in the trunk, where the server has it: the "
@@ -297,13 +426,6 @@ def probe_client(p):
                 f"{(mine.get_actor_location() - rest).length():.0f} cm from it")
         p.post("taken")
 
-    # From here the server's last throw may be in the air: every frame is read.
-    places = []
-
-    def sample():
-        for at in _flying(p):
-            if not places or (at - places[-1]).length() > APART_CM:
-                places.append(at)
     yield _watching(p, sample, lambda: p.posted("client 2", "taken"), 90.0)
     yield _watching(p, sample, lambda: not _in_world(p), 10.0)
     p.check(f"{p.where} sees no axe left in the tree once it is taken",
@@ -311,10 +433,36 @@ def probe_client(p):
     if p.client == 1:
         p.check("...and client 1 has none: its axe is client 2's now",
                 len(_axes(p, wc)) == mine_axes - 1, f"{len(_axes(p, wc))} axe(s)")
+    # The server's last throw is made by this probe's Python, under which no
+    # event leaves the machine (the editor's script guard makes every call
+    # local), so no client is told of its launch: it is the case of a launch
+    # that never came, and the item's copy must still not be seen in the air.
     yield _watching(p, sample, lambda: p.posted("server", "judged") is not None, 30.0)
-    if p.posted("server", "judged"):
-        span = (places[-1] - places[0]).length() if places else 0.0
-        p.check(f"{p.where} sees the item the server threw last for the whole of its "
-                f"flight: shown, at {FLIGHT_PLACES} or more places before it lies still",
-                len(places) >= FLIGHT_PLACES,
-                f"{len(places)} place(s) over {span:.0f} cm")
+    p.check(f"{p.where} never showed the server's own actor in the air, in either "
+            "throw: not the axe it flew a stand-in for, and not the last item, whose "
+            "launch it was never told of", not aloft and len(watch.frames) > FLIGHT_PLACES,
+            f"shown in the air {len(aloft)} time(s) over {len(watch.frames)} frame(s)")
+
+
+def _refused(p, wc, axe, mine_axes):
+    """Client 1 clicks while the server's copy of its hand is empty: the
+    stand-in it predicts is taken back, and the axe is in its hand."""
+    watch = _watch(p, wc)
+    p.set(wc, THROW_CLICK_FORCED_VAR, True)
+    yield _watching(p, watch.sample, lambda: p.get(wc, WV.ThrowFlyer) is not None, 5.0)
+    p.set(wc, THROW_CLICK_FORCED_VAR, False)
+    yield _watching(p, watch.sample, lambda: p.get(wc, WV.ThrowFlyer) is None, 10.0)
+    yield _watching(p, watch.sample, lambda: False, 0.5)
+    flew = TW.places(watch.frames)
+    p.check("client 1's click flies its stand-in at once, before the server has "
+            "answered", flew >= 1, f"shown at {flew} place(s)")
+    held = p.get(wc, "Held")
+    p.check("...and the server's refusal takes it back: no stand-in, the axe shown "
+            "in the hand again and still carried",
+            p.get(wc, WV.ThrowFlyer) is None and held == axe
+            and not held.get_editor_property("hidden") and len(_axes(p, wc)) == mine_axes,
+            f"stand-in {p.get(wc, WV.ThrowFlyer)}, Held {held}, "
+            f"{len(_axes(p, wc))} of {mine_axes} axe(s)")
+    wrong = TW.miscounts(watch.frames)
+    p.check("...one axe shown on every frame of it: in the hand, in the air, in the "
+            "hand", not wrong, f"{len(wrong)} frame(s) of another count {wrong[:4]}")

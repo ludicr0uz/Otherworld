@@ -26,6 +26,8 @@ DEFAULT_PORT = 17777
 MAX_CLIENTS = 8
 # The most --lag may ask for: past a second the engine's own timeouts start to matter.
 MAX_LAG_MS = 1000
+# The most --loss may ask for: past this a join's handshake rarely gets through.
+MAX_LOSS_PCT = 50
 # The most --bots may ask for: the 64 players of the target (serversupportsysdesign.md
 # 1) less the two real clients a load run joins.
 MAX_BOTS = 62
@@ -50,7 +52,7 @@ class Process(object):
         self.trace = os.path.join(run_dir, f"{slug}.utrace")
 
 
-def check_args(clients, port, seconds=None, lag_ms=0, bots=0):
+def check_args(clients, port, seconds=None, lag_ms=0, bots=0, loss_pct=0):
     """The reason ``--net``'s arguments cannot run, or None."""
     if clients < 1:
         return "--net needs at least one client (--clients N)"
@@ -65,6 +67,8 @@ def check_args(clients, port, seconds=None, lag_ms=0, bots=0):
         return f"--lag {lag_ms}: expected 0-{MAX_LAG_MS} milliseconds"
     if not 0 <= bots <= MAX_BOTS:
         return f"--bots {bots}: expected 0-{MAX_BOTS} (64 players less the two real clients)"
+    if not 0 <= loss_pct <= MAX_LOSS_PCT:
+        return f"--loss {loss_pct}: expected 0-{MAX_LOSS_PCT} percent"
     return None
 
 
@@ -81,7 +85,7 @@ def server_switches(names):
 
 
 def command(editor, project, process, port, windowed=False, level="", lag_ms=0,
-            trace=False, server_args=()):
+            trace=False, server_args=(), loss_pct=0):
     """The process's command line.
 
     ``server_args`` are switches for the server alone (``--server-arg``): how
@@ -89,7 +93,10 @@ def command(editor, project, process, port, windowed=False, level="", lag_ms=0,
 
     ``lag_ms`` delays every packet a client sends (the engine's packet
     simulation, as the console's ``Net PktLag=``), so its ping is at least
-    that: what a movement prediction check needs.
+    that: what a movement prediction check needs. ``loss_pct`` drops that
+    share of the packets a client sends and of those it receives (``Net
+    PktLoss=``, ``PktIncomingLoss=``): what is reliable must still arrive,
+    and what is not must not be missed.
 
     No client is given -nomenu: one that joins a server has no title by the
     game's own rule (graphics_menu/mode_tick.py), which every run thereby
@@ -107,6 +114,8 @@ def command(editor, project, process, port, windowed=False, level="", lag_ms=0,
             how += [f"-WinX={offset}", f"-WinY={offset}"]
         if lag_ms:
             how += [f"-PktLag={lag_ms}"]
+        if loss_pct:
+            how += [f"-PktLoss={loss_pct}", f"-PktIncomingLoss={loss_pct}"]
     met = title_args(level, title=process.role == CLIENT)
     return [editor, project, ENTRY_URL, *how, "-unattended", *met,
             "-forcelogflush", f"-abslog={process.log}"]

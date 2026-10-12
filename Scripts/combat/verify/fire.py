@@ -12,10 +12,11 @@ from uebp import net
 from combat.fire_vars import FIRE_PARAM, SERVER_EVENTS, SERVER_HEAT
 from combat.heat_tuning import HOT_VAR
 from combat.record_vars import RECORD_COMPONENT, VIEW_ROW
+from combat.strike_vars import THROW_LAUNCH
 from combat.torch_tuning import LIT_VAR
-from combat.verify.common import BEL, PIN, by_pins, check, component_template, out_pins
+from combat.verify.common import BEL, PIN, check, component_template, out_pins
 from combat.verify.fixtures import _is_exec, char, wc, wg
-from combat.verify.record import _authority_branches, _feeders, _title, _upstream
+from combat.verify.record import _feeders, _title, _upstream
 from combat.verify.shot import _calls_of, _event
 
 
@@ -46,7 +47,10 @@ def check_events():
 def check_told():
     row = _event(VIEW_ROW)
     for var in (LIT_VAR, HOT_VAR):
-        fed = [n for n in wg if _title(n) == f"Set {var}" and _feeders(n, var)]
+        # (R2: a thrown item's stand-in, a local actor of a client's own,
+        # is told its by the launch: verify/throw.py.)
+        fed = [n for n in wg if _title(n) == f"Set {var}" and _feeders(n, var)
+               and _event(THROW_LAUNCH) not in _feeders(n, var)]
         check(f"a client's picture of an item is told its {var} by its row "
               f"({VIEW_ROW}), and writes it nowhere else",
               len(fed) == 1 and row is not None and _feeders(fed[0], var) == [row]

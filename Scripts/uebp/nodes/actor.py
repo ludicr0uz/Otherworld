@@ -179,6 +179,8 @@ FN_SKELETAL_MESH_OF = "/Script/Engine.SkeletalMeshComponent.GetSkeletalMeshAsset
 FN_SKELETON_OF = "/Script/Engine.SkeletalMesh.GetSkeleton"
 FN_SET_LEADER_POSE = "/Script/Engine.SkinnedMeshComponent.SetLeaderPoseComponent"
 FN_ATTACH_PARENT = "/Script/Engine.SceneComponent.GetAttachParent"
+FN_ATTACH_SOCKET = "/Script/Engine.SceneComponent.GetAttachSocketName"
+FN_SOCKET_TRANSFORM = "/Script/Engine.SceneComponent.GetSocketTransform"
 FN_SET_HIDDEN_IN_GAME = "/Script/Engine.SceneComponent.SetHiddenInGame"
 
 FN_CLOSEST_BONE = "/Script/Engine.SkinnedMeshComponent.FindClosestBone_K2"

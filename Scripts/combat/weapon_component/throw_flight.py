@@ -24,37 +24,49 @@ flies in, so that same tumble is a throwing axe's forward spin, the blade
 going over the handle edge first, and not whatever wobble the hand's pose at
 the release would have made of it.
 
-The flight is the server's (task M20): it runs in the Tick's upkeep behind
-HasAuthority, on the item the release made a replicated actor
-(item_world.py), so every client sees it fly by the engine's replicated
-movement, and what it strikes is judged once.
+Every machine flies it, by this one graph (task R2): what is carried along
+the curve is ThrowFlyer, which is the item itself with authority (the server,
+and single player) and a client's local stand-in of it (throw_standin.py),
+on this machine's own clock from a ThrowTime the launch set. What it strikes
+is judged once, with authority: a client's stand-in stops where its own curve
+runs into something (ThrowStopped) and waits there for the server's word,
+which the landing sends (Multicast_ThrowEnd: where the item lies, and the
+body and bone a blade is left in). The landing is also where the server's
+item starts to send its movement: no client is sent a position in flight.
 
 Owns the variables the release (throw.py) stores the launch in.
 """
 
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
+from combat.item_world import author_rests
 from combat.paths import ITEM_CLASS_PATH
+from combat.strike_vars import (
+    AT_PARAM, BONE_PARAM, OFF_PARAM, PARENT_PARAM, THROW_END, TIME_PARAM, TURN_PARAM)
 from combat.throw_tuning import (
     THROW_BOUNCE_BACK, THROW_EDGE_ON_VAR, THROW_GRAVITY_Z, THROW_LAND_LIFT,
     THROW_MAX_FLIGHT_S, THROW_SPIN_VAR,
 )
 from combat.weapon_component.common import _prop, _trace_defaults
 from combat.weapon_component.throw_strike import THROW_PAST_VAR, _author_throw_strike
+from uebp.g import _G
 from uebp.nodes.actor import (
-    FN_ADD_WORLD_ROT, FN_GET_OWNER, FN_HAS_AUTHORITY, FN_SET_ACTOR_LOC, FN_SET_ACTOR_ROT)
+    FN_ACTOR_LOC, FN_ADD_WORLD_ROT, FN_ATTACH_PARENT, FN_ATTACH_SOCKET, FN_GET_OWNER,
+    FN_HAS_AUTHORITY, FN_ROOT, FN_SET_ACTOR_LOC, FN_SET_ACTOR_ROT, FN_SOCKET_TRANSFORM)
+from uebp.nodes.locomotion import FN_ACTOR_ROT
 from uebp.nodes.math import (
-    FN_ADD_VV, FN_AND, FN_AXIS_ANGLE, FN_CROSS, FN_GREATER_FF, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF,
-    FN_NORMAL, FN_ROT_FROM_X, FN_SUB_FF)
+    FN_ADD_VV, FN_AND, FN_AXIS_ANGLE, FN_CROSS, FN_GREATER_FF, FN_INV_XFORM_LOC, FN_MAKE_VECTOR,
+    FN_MUL_FF, FN_MUL_VF, FN_NORMAL, FN_NOT, FN_OR, FN_ROT_FROM_X, FN_SUB_FF)
 from uebp.nodes.palette import NODE_BREAK_HIT
 from uebp.nodes.system import FN_DELTA_SECONDS, FN_IS_VALID, FN_TIME_SECONDS, FN_TRACE
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
-THROWN_VAR = WV.Thrown                 # the item in the air, or None
+THROWN_VAR = WV.Thrown                 # the server's item in the air, or None
+FLYER_VAR = WV.ThrowFlyer              # what this machine flies: it, or a stand-in
 THROW_START_VAR = WV.ThrowStart
 THROW_VELOCITY_VAR = WV.ThrowVelocity
-THROW_TIME_VAR = WV.ThrowTime          # world time at release
+THROW_TIME_VAR = WV.ThrowTime          # this machine's world time at release
 THROW_LAST_VAR = WV.ThrowLast          # where the flight was last frame
 FLIGHT_GROUND_CM = 5000.0             # how far down a wall-stopped item looks for ground
 
@@ -128,18 +140,28 @@ def _author_throw_flight(ed, exec_ins):
     """Every frame something is in the air: carry it one frame along the
     curve, and set it down where the segment it just flew hits something.
     Returns the exit exec pins."""
-    thrown_get = ed.add_get_member_variable_node(THROWN_VAR)
-    thrown = out(thrown_get, THROWN_VAR)
+    thrown_get = ed.add_get_member_variable_node(FLYER_VAR)
+    thrown = out(thrown_get, FLYER_VAR)
     flying = _node(ed, FN_IS_VALID)
     _connect(thrown, _pin(flying, "Object"))
-    # ...on the machine that owns it: Thrown replicates to the owning client,
-    # whose arc reads it, and that copy flies nothing.
+    # ...and still in the air: a client's stand-in whose curve ran into
+    # something, or that the server's end has reached, flies no further
+    # (throw_standin.py moves it from there). With authority neither is set.
+    stopped = _node(ed, FN_OR)
+    _connect(out(ed.add_get_member_variable_node(WV.ThrowStopped), WV.ThrowStopped),
+             _pin(stopped, "A"))
+    _connect(out(ed.add_get_member_variable_node(WV.ThrowEnded), WV.ThrowEnded),
+             _pin(stopped, "B"))
+    going = _node(ed, FN_NOT)
+    _connect(out(stopped), _pin(going, "A"))
+    mine = _node(ed, FN_AND)
+    _connect(out(flying), _pin(mine, "A"))
+    _connect(out(going), _pin(mine, "B"))
+    # The strike, the fall and the rest are the server's alone (and single
+    # player's): the machine that owns the thrower.
     owner = _node(ed, FN_GET_OWNER)
     owns = _node(ed, FN_HAS_AUTHORITY)
     _connect(out(owner), _pin(owns, "self"))
-    mine = _node(ed, FN_AND)
-    _connect(out(flying), _pin(mine, "A"))
-    _connect(out(owns), _pin(mine, "B"))
     gate = ed.add_branch_node()
     _connect(out(mine), _pin(gate, "Condition"))
     for pin in exec_ins:
@@ -202,6 +224,19 @@ def _author_throw_flight(ed, exec_ins):
     lost = ed.add_branch_node()
     _connect(out(late), _pin(lost, "Condition"))
     _connect(then(step), _pin(lost, "execute"))
+    # ...which only the server lands: a client's stand-in waits where it is.
+    lands = ed.add_branch_node()
+    _connect(out(owns), _pin(lands, "Condition"))
+    _connect(then(lost), _pin(lands, "execute"))
+    # What the segment hit is the server's to judge: a client's stand-in is
+    # put on it and flies no further.
+    judge = ed.add_branch_node()
+    _connect(out(owns), _pin(judge, "Condition"))
+    _connect(then(struck), _pin(judge, "execute"))
+
+    # With authority what flies is the item itself, Thrown: what is struck
+    # with, set down and told of below.
+    item = out(ed.add_get_member_variable_node(THROWN_VAR), THROWN_VAR)
 
     # --- struck: back off what it hit, then down onto the ground -------------
     # A floor gives the same floor back; a wall or a wanderer drops it at
@@ -224,7 +259,7 @@ def _author_throw_flight(ed, exec_ins):
     _trace_defaults(floor)
     # First what a blade does to what it struck (throw_strike.py): one that
     # lodged in a tree or a body stays there, and skips the way down.
-    falls, lodged = _author_throw_strike(ed, thrown, hit, then(struck))
+    falls, lodged = _author_throw_strike(ed, item, hit, then(judge))
     for pin in falls:
         _connect(pin, _pin(floor, "execute"))
     # ...and the way down passes by a body it wounded, which would catch it.
@@ -239,27 +274,82 @@ def _author_throw_flight(ed, exec_ins):
     _connect(_loose_pin(ground, "Location", is_input=False), _pin(lift, "A"))
     _connect(_vec(ed, 0.0, 0.0, THROW_LAND_LIFT), _pin(lift, "B"))
     rest = _node(ed, FN_SET_ACTOR_LOC)
-    _connect(thrown, _pin(rest, "self"))
+    _connect(item, _pin(rest, "self"))
     _connect(out(lift), _pin(rest, "NewLocation"))
     _connect(then(grounded), _pin(rest, "execute"))
     hang = _node(ed, FN_SET_ACTOR_LOC)
-    _connect(thrown, _pin(hang, "self"))
+    _connect(item, _pin(hang, "self"))
     _connect(out(back), _pin(hang, "NewLocation"))
     _connect(else_(grounded), _pin(hang, "execute"))
 
     # --- landed: an ordinary dropped item, which E picks up ------------------
     flag = ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH)
-    _connect(thrown, _pin(flag, "self"))
+    _connect(item, _pin(flag, "self"))
     _set(flag, IV.Dropped, True)
-    for pin in (then(rest), then(hang), then(lost)) + lodged:
+    for pin in (then(rest), then(hang), then(lands)) + lodged:
         _connect(pin, _pin(flag, "execute"))
+    # At rest its movement is sent (item_world.py), and every client is told
+    # where it lies, for its stand-in to end there (throw_standin.py).
+    told = _author_end_tell(ed, item, author_rests(ed, item, [then(flag)]))
     done = ed.add_set_member_variable_node(THROWN_VAR)
-    _connect(then(flag), _pin(done, "execute"))
+    _connect(told, _pin(done, "execute"))
+    landed = ed.add_set_member_variable_node(FLYER_VAR)
+    _connect(then(done), _pin(landed, "execute"))
+
+    # --- a client's stand-in, stopped by what its own curve ran into ---------
+    stuck = _node(ed, FN_SET_ACTOR_LOC)
+    _connect(thrown, _pin(stuck, "self"))
+    _connect(_loose_pin(hit, "Location", is_input=False), _pin(stuck, "NewLocation"))
+    _connect(else_(judge), _pin(stuck, "execute"))
+    halt = ed.add_set_member_variable_node(WV.ThrowStopped)
+    _set(halt, WV.ThrowStopped, True)
+    for pin in (then(stuck), else_(lands)):
+        _connect(pin, _pin(halt, "execute"))
 
     ed.add_comment_to_nodes(
-        "The thrown item's flight: start + v t + g t^2 / 2, the curve the arc "
-        "was drawn from, tumbling as it goes. A trace from last frame's point to this one sets it "
-        "down, after what a blade does to what it struck; then it is an "
-        "ordinary Dropped item, for E to pick up.",
-        [gate, seg, struck, fly, lost, floor, flag, done])
-    return (then(done), else_(gate), else_(lost))
+        "The thrown item's flight, on every machine (the item itself with "
+        "authority, a client's stand-in of it): start + v t + g t^2 / 2, the curve "
+        "the arc was drawn from, tumbling as it goes. A trace from last frame's "
+        "point to this one ends it. With authority that sets the item down, after "
+        "what a blade does to what it struck; then it is an ordinary Dropped item, "
+        "for E to pick up, and every client is told where it lies. A client's "
+        "stand-in stops there and waits for that word.",
+        [gate, seg, struck, judge, fly, lost, lands, floor, flag, done, landed, stuck, halt])
+    return (then(landed), else_(gate), else_(lost), then(halt))
+
+
+def _author_end_tell(ed, item, exec_in):
+    """With authority, the item at rest: Multicast_ThrowEnd says where it
+    lies and how it is turned, and for one left in a body (its root has an
+    attach parent) the component and bone it rides and where it is on that
+    bone, which a client finds again on its own pose of the body. Returns the
+    exec pin after."""
+    g = _G(ed, ITEM_CLASS_PATH)
+    root = out(g.call(FN_ROOT, self=item))
+    parent = out(g.call(FN_ATTACH_PARENT, self=root))
+    bone = out(g.call(FN_ATTACH_SOCKET, self=root))
+    at = out(g.call(FN_ACTOR_LOC, self=item))
+    borne, lying = g.branch(out(g.call(FN_IS_VALID, Object=parent)), [exec_in])
+    exits = []
+    for arm, held in ((borne, True), (lying, False)):
+        tell = g.keep(_node(ed, THROW_END))
+        _connect(g.get(WV.ThrowStamp), _pin(tell, TIME_PARAM))
+        _connect(at, _pin(tell, AT_PARAM))
+        _connect(out(g.call(FN_ACTOR_ROT, self=item)), _pin(tell, TURN_PARAM))
+        if held:
+            on = g.call(FN_SOCKET_TRANSFORM, self=parent, InSocketName=bone)
+            _connect(parent, _pin(tell, PARENT_PARAM))
+            _connect(bone, _pin(tell, BONE_PARAM))
+            _connect(out(g.call(FN_INV_XFORM_LOC, T=out(on), Location=at)),
+                     _pin(tell, OFF_PARAM))
+        else:
+            _connect(_vec(ed, 0.0, 0.0, 0.0), _pin(tell, OFF_PARAM))
+        _connect(arm, _pin(tell, "execute"))
+        exits.append(then(tell))
+    join = g.put(WV.ThrowStopped, "false", exits)
+    ed.add_comment_to_nodes(
+        f"{THROW_END} is told (throw_standin.py): the thrown item lies here, turned "
+        "so, and when a blade is left in a body, on which bone of which mesh and "
+        "where on it.", g.made)
+    return join
+

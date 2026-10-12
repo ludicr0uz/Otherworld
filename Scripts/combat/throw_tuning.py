@@ -39,6 +39,17 @@ THROW_GRAVITY_Z = -980.0        # cm/s^2, the arc's and the flight's gravity
 THROW_ARC_SIM_S = 3.0           # how far ahead the arc is predicted
 THROW_ARC_HZ = 20.0             # dots per second of flight: ~55 cm apart
 THROW_MAX_FLIGHT_S = 4.0        # a throw into nothing lands where it is by then
+# A client's stand-in (task R2, weapon_component/throw_standin.py): how long
+# it takes to move from where its own curve ended to where the server says
+# the item lies; how long a copy of a just-thrown item that came to rest
+# stays hidden for a stand-in to give way to it (and how lately thrown that
+# is); and how long a stand-in outlives a throw nothing ended (the server's
+# word lost with its thrower) or an end no replicated item followed.
+THROW_SETTLE_S = 0.12
+THROW_SHOW_HOLD_S = 0.5
+THROW_RECENT_S = 12.0
+THROW_END_WAIT_S = 3.0
+THROW_ORPHAN_S = THROW_MAX_FLIGHT_S + 5.0
 THROW_LAND_LIFT = 12.0          # cm above the ground it comes to rest
 THROW_BOUNCE_BACK = 15.0        # cm back off a wall, before it drops to the ground
 THROW_DOT_CM = 5.0              # each dot of the arc, across

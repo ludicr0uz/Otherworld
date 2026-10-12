@@ -30,7 +30,9 @@ axe (every third blow on a tree leaves wood), lights a campfire with matches and
 lights the stick at a fire and holds it out as a torch, heats a blade at a fire (cauterises a
 bleed, double damage to a wendigo for 20 s), crouches, goes prone, slides, mantles the
 sample's traversal blocks, throws whatever is in hand (a thrown knife or axe wounds, stays
-in the body or a tree, and is taken back with E), and interacts with the nearest thing in
+in the body or a tree, and is taken back with E; on a server every machine flies the
+throw itself from the one release, the thrower's from its click, and the server alone
+judges it), and interacts with the nearest thing in
 reach. Items lying near the player glimmer, from 5 s after they come to lie there. Each gun has its own accuracy cloud, recoil and
 sway, steadied by stance and the aim; a headshot draws an X round the reticle. Bodies are
 hit only where their fitted physics bodies are.

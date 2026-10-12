@@ -34,8 +34,9 @@ from combat.weapon_component.throw import (
     THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_CLICK_FORCED_VAR,
     THROW_FORCED_VAR,
 )
+from combat.strike_vars import THROW_LAUNCH
 from combat.weapon_component.throw_flight import (
-    THROWN_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_VELOCITY_VAR,
+    FLYER_VAR, THROWN_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_VELOCITY_VAR,
 )
 from combat.weapon_component.throw_windup import (
     THROW_ANIM_VAR, THROW_DUE_VAR, THROW_WINDING_VAR,
@@ -356,13 +357,18 @@ def check_release():
     # Set with a value: the landing's Set Thrown clears it with nothing wired.
     sets = {v: [n for n in wg if _title(n) == f"Set {v}" and _source(n, v)]
             for v in (THROWN_VAR, THROW_START_VAR, THROW_VELOCITY_VAR)}
-    # Each of the launch's two is stored twice: by the ask, where the keys
-    # are, off the launch the arc was drawn from; and by the release, in
-    # Server_Throw, off what the client sent.
-    check("the release stores the item once, and the ask and the release each the "
-          "start and the velocity",
+    # Each of the launch's two is stored three times: by the ask, where the
+    # keys are, off the launch the arc was drawn from; by the release, in
+    # Server_Throw, off what the client sent; and by ThrowLaunch, a client's
+    # stand-in, off what the server told (R2, throw_standin.py).
+    told = {v: [n for n in sets[v]
+                if _title(PIN.get_owning_node(_source(n, v))) == THROW_LAUNCH]
+            for v in (THROW_START_VAR, THROW_VELOCITY_VAR)}
+    check("the release stores the item once, and the ask, the release and a client's "
+          "launch each the start and the velocity",
           [len(sets[v]) for v in (THROWN_VAR, THROW_START_VAR, THROW_VELOCITY_VAR)]
-          == [1, 2, 2], str({k: len(v) for k, v in sets.items()}))
+          == [1, 3, 3] and all(len(t) == 1 for t in told.values()),
+          str({k: len(v) for k, v in sets.items()}))
     if len(preds) != 1 or len(sets[THROWN_VAR]) != 1:
         return
     p = preds[0]
@@ -372,7 +378,7 @@ def check_release():
     check("...the ask's are the very launch the arc was drawn from, start and "
           "velocity alike", all(len(s) == 1 for s in asked.values()),
           str({k: len(v) for k, v in asked.items()}))
-    sent = {v: [n for n in sets[v] if n not in asked[v]]
+    sent = {v: [n for n in sets[v] if n not in asked[v] and n not in told[v]]
             for v in (THROW_START_VAR, THROW_VELOCITY_VAR)}
     caps = [PIN.get_owning_node(_source(n, THROW_VELOCITY_VAR))
             for n in sent[THROW_VELOCITY_VAR]]
@@ -393,13 +399,15 @@ def check_flight():
     falls = [n for n in wg if num_pin(n, "B") == 0.5 * THROW_GRAVITY_Z]
     check("...along start + v t + g t^2 / 2 under the arc's gravity",
           len(falls) == 1, str(len(falls)))
-    lands = [n for n in wg if _title(n) == "Set Dropped"
+    # R2: what a machine flies is ThrowFlyer (the item itself with authority,
+    # a client's stand-in); what lands, with authority alone, is Thrown.
+    lands = [n for n in wg if _title(n) == "Set Dropped" and pin_value(n, "Dropped") == "true"
              and any(_title(PIN.get_owning_node(q)) == f"Get {THROWN_VAR}"
                      for q in PIN.list_connected_pins(BEL.find_input_pin(n, "self")))]
     check("...and it lands as a Dropped item, which pick-up looks for",
           len(lands) == 1 and pin_value(lands[0], "Dropped") == "true", str(len(lands)))
     spins = [n for n in by_pins(wg, "DeltaRotation", "bSweep")
-             if any(_title(PIN.get_owning_node(q)) == f"Get {THROWN_VAR}"
+             if any(_title(PIN.get_owning_node(q)) == f"Get {FLYER_VAR}"
                     for q in PIN.list_connected_pins(BEL.find_input_pin(n, "self")))]
     check("the item in the air is turned every frame it flies",
           len(spins) == 1, str(len(spins)))
@@ -412,7 +420,7 @@ def check_flight():
         back = [n for n in fed if num_pin(n, "B") == -1.0]
         check(f"...its own {THROW_SPIN_VAR} degrees a second of game time, end "
               "over end, top first, about the axis across the throw",
-              len(rates) == 1 and of == [f"Get {THROWN_VAR}"] and len(back) == 1
+              len(rates) == 1 and of == [f"Get {FLYER_VAR}"] and len(back) == 1
               and f"Get {THROW_VELOCITY_VAR}" in src
               and any("DeltaSeconds" in t.replace(" ", "") for t in src),
               str(sorted(src)))

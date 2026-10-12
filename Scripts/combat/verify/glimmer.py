@@ -121,6 +121,39 @@ def _counts_dropped(store):
     return False
 
 
+def _arms_behind(node, gate, limit=60):
+    """The exec outputs of ``gate`` that reach ``node``, by name."""
+    arms, seen, todo = set(), [], [node]
+    while todo and len(seen) < limit:
+        for p in BEL.list_input_pins(todo.pop()):
+            if str(PIN.get_pin_name(p)) != "execute":
+                continue
+            for q in PIN.list_connected_pins(p):
+                f = PIN.get_owning_node(q)
+                if f == gate:
+                    arms.add(str(PIN.get_pin_name(q)))
+                elif f not in seen:
+                    seen.append(f)
+                    todo.append(f)
+    return arms
+
+
+def _reads_behind(node, pin, limit=60):
+    """The variables read by the pure nodes feeding ``pin`` of ``node``."""
+    names, seen, todo = set(), [], list(_feeders(node, pin))
+    while todo and len(seen) < limit:
+        cur = todo.pop()
+        if cur in seen:
+            continue
+        seen.append(cur)
+        if _title(cur).startswith("Get "):
+            names.add(_title(cur)[4:])
+        for p in BEL.list_input_pins(cur):
+            if str(PIN.get_pin_name(p)) != "execute":
+                todo.extend(PIN.get_owning_node(q) for q in PIN.list_connected_pins(p))
+    return names
+
+
 def _glimmer_steps(nodes):
     """The glimmer's SetVisibility nodes that are run straight after the count
     of the seconds the item has been Dropped, and show from GLIMMER_DELAY_S
@@ -197,16 +230,18 @@ def check_item_glimmer():
           f"{len(steps)} step(s), {len(_wired_ticks(nodes))} Tick(s), {len(gate)} gate(s)")
     hides = [f for f in before if "bNewHidden" in {
         str(PIN.get_pin_name(p)) for p in BEL.list_input_pins(f)}]
-    check(f"...after a client's copy of a replicated item is hidden while it is not "
-          f"{IV.InWorld}: off the false arm of a Branch on HasAuthority",
-          len(hides) == 1 and len(gate) == 1
-          and any("HasAuthority" in _title(c).replace(" ", "")
-                  for c in _feeders(gate[0], "Condition"))
-          and [str(PIN.get_pin_name(q)) for q in PIN.list_connected_pins(
-              BEL.find_input_pin(hides[0], "execute"))] == ["else"]
-          and any(_title(v) == f"Get {IV.InWorld}" for n in _feeders(hides[0], "bNewHidden")
-                  for v in _feeders(n, "A")),
-          f"{len(hides)} hide(s)")
+    # R2: hidden unless it lies in the world (InWorld and Dropped), and one
+    # that has just come to rest after a throw until the stand-in that flew
+    # for it gives way (Released) or ShowAt passes.
+    arms = _arms_behind(hides[0], gate[0]) if len(hides) == 1 and len(gate) == 1 else set()
+    reads = _reads_behind(hides[0], "bNewHidden") if len(hides) == 1 else set()
+    check(f"...after a client's copy of a replicated item is hidden while it does not "
+          f"lie in the world ({IV.InWorld} and {IV.Dropped}), or has only just come to "
+          f"rest after a throw ({IV.Released}, {IV.ShowAt}): off the false arm of a "
+          "Branch on HasAuthority, in one place",
+          len(hides) == 1 and len(gate) == 1 and arms == {"else"}
+          and {str(IV.InWorld), str(IV.Dropped), str(IV.Released), str(IV.ShowAt)} <= reads,
+          f"{len(hides)} hide(s), arm(s) {sorted(arms)}, reads {sorted(reads)}")
 
     children = _item_children()
     own, forgot = [], []

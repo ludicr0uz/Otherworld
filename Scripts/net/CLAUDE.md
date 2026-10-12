@@ -145,6 +145,9 @@ of them, plain data, one C++ struct on its own component (`combat/record_vars.py
     blades' own clocks, the ammo pick-up, the HUD's single-player writes. A new graph
     that changes what is carried needs only that call before its compile;
     `verify/record.py` fails on a site with no mark.
+- **A server event a probe calls from Python tells no client:** under `call_method`
+  every nested call is local (the editor's script guard), so its multicasts are not
+  sent. What clients must see is asked by a client's keys.
 - **Python cannot send a Blueprint Server event.** `call_method` on a client runs the
   event there (the engine routes only native functions from `ProcessEvent`; a Blueprint
   one is routed by the VM, when a graph calls it). A probe that has to send one as no
@@ -211,15 +214,45 @@ judges it from its own copy. `combat/strike_vars.py` has the picture.
 |---|---|---|
 | `Server_Punch`, `Server_Slash` (a swing was queued) | empty hands / a `Melee` item in hand, alive, not `Blocking`, the cooldown (0.1 s of grace) | stamps the cooldown and when the blow lands, plays the clip; its Tick sweeps and calls `TakeHit` |
 | `Server_SetHolds(Guard, Use)` (either key changed) | nothing: it keeps `AskGuard`, `AskUse` | each Tick: `Blocking` = asked AND its own stamina AND not sprinting; `FireWard` = asked AND its own item in hand is `Lit` |
-| `Server_Throw(Start, Velocity)` (the hand lets go) | an item in a living hand, nothing of this player's in the air, `Start` within 3 m of its copy, the speed capped at the item's `ThrowSpeed` | the item leaves the inventory, becomes a replicated actor and flies; the strike is judged once |
+| `Server_Throw(Start, Velocity)` (the hand lets go) | an item in a living hand, nothing of this player's in the air, `Start` within 3 m of its copy, the speed capped at the item's `ThrowSpeed` | the item leaves the inventory and becomes a replicated actor, hidden on clients until it rests; everyone is told the launch and flies it themselves (R2, below); the strike is judged once, by the server |
 | `Server_Take(Item)` (E on an item) | the item exists and is `Dropped`, the taker alive and within reach of it, a slot free | into the taker's inventory; the record tells the client |
 
 - M20 melee, the guard, the throw and the take: docs/history/multiplayer.md#m20
-- **A thrown item is sent to the other clients for its whole flight, at the item's 10 Hz**
-  (R1, measured: it is awake from the frame of the release and never hidden). A short
-  throw is in the air 0.12-0.15 s, so a client shows it at one or two places and then at
-  rest; that is the rate, not dormancy. R2 replaces the position stream:
-  docs/history/multiplayer.md ("A thrown item on the other clients").
+- **A thrown item flies on every machine from the release, not from replicated movement**
+  (R2; `combat/weapon_component/throw_standin.py`, `throw_flight.py`). No client's flight
+  reads the item's replicated actor:
+  - **The launch** is `Multicast_Throw` on the thrower's weapon component, reliable
+    (`fx_vars.RELIABLE`): the item's class, `Start`, `Velocity`, the server's time at the
+    release (`Time`, which is also the throw's name, `ThrowStamp`), and whether it burns
+    or is hot.
+  - **A client flies a stand-in** (`ThrowLaunch`): a local, unreplicated actor of that
+    class, `ThrowFlyer`, on the same Tick fragment that flies the server's item (one
+    authoring: the curve and the tumble read `ThrowFlyer`, which on the server is the
+    item). Its clock is this machine's, set back by `GetServerWorldTimeSeconds - Time`,
+    so a late launch shortens the flight. Its own trace stops it where it hits; it
+    judges nothing.
+  - **The thrower predicts:** `Fx_Throw` on the click flies its stand-in at once and
+    hides the item in its hand (`ThrowLetGo`, re-hidden each Tick: the sights write
+    `Held`'s hidden flag every frame). The multicast's copy on that machine only names
+    it (`author_named`). A refusal is `Client_ThrowRefused`, reliable, from every arm of
+    `Server_Throw` that turns the ask away: the stand-in is destroyed and the hand shown.
+  - **The server alone judges** (`throw_strike.py`, behind a HasAuthority Branch) and tells
+    the end reliably: `Multicast_ThrowEnd(Time, At, Turn, Parent, Bone, Off)`. The
+    stand-in is moved there over `THROW_SETTLE_S` (onto the bone, for a blade in a body),
+    and on the frame the replicated item of the same `ThrowStamp` lies there on this
+    machine it is shown (`Released`) and the stand-in destroyed.
+  - **The replicated item** is hidden on a client unless it rests (`item_world.py`
+    `_author_copy_view`), held hidden `THROW_SHOW_HOLD_S` after a recent throw until its
+    stand-in gives way, and its movement is not replicated until it rests
+    (`SetReplicateMovement(false)` at the release, `author_rests` at the landing).
+  - Single player: no stand-in; `ThrowFlyer` is the item and the same fragment flies it.
+  - **A probe's Python cannot make a server tell anyone:** an event called with
+    `call_method` runs under the editor's script guard, where every nested call is local,
+    so the multicasts inside it are never sent. A throw that clients must see is asked by
+    a client's keys (`ThrowKeyForced`, `ThrowClickForced`).
+  - Proof: `probe_net_throw.py` (`probes/throw_watch.py` holds its sums), plain, with
+    `--lag 120` and with `--loss 10`. History: docs/history/multiplayer.md ("A thrown
+    item flies on every machine").
 
 ## Picking up, dropping and looting (M23, done)
 

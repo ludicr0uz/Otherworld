@@ -24,7 +24,7 @@ from uebp import net
 from uebp.g import _G
 from uebp.graph import _connect, _node, _palette, _pin, _set, _vec, out, then
 from combat.fx_vars import (
-    CHOP, FxPlayed, LOCATION_PARAM, NORMAL_PARAM, OTHERS, POINT_PARAMS, SCREEN,
+    CHOP, FxPlayed, LOCATION_PARAM, NORMAL_PARAM, OTHERS, POINT_PARAMS, RELIABLE, SCREEN,
     UNPREDICTED, fx_event, multicast_event)
 from combat.weapon_component.record import authority
 from combat.weapon_component.slot_nodes import not_, op
@@ -58,11 +58,15 @@ GATES = {UNPREDICTED: _unpredicted, OTHERS: _others, SCREEN: _screen}
 
 # --- the pair ------------------------------------------------------------------
 
-def pair(ed, name, params, body, gate, item_class=None):
+def pair(ed, name, params, body, gate, item_class=None, skipped=None):
     """Author Fx_<name> and Multicast_<name>. ``body(g, exec_in, event)``
     authors the cosmetic off ``exec_in``, reading a parameter with
     ``out(event, param)``; ``item_class`` is what its ``g.iget`` reads. Before
-    any call of either, which finds the event by name."""
+    any call of either, which finds the event by name.
+
+    The Multicast is reliable for a name in fx_vars.RELIABLE. ``skipped(g,
+    exec_in, event)`` authors what a copy the gate turns away does with the
+    server's word instead (the owning client, which predicted it)."""
     g = _G(ed, item_class)
     fx = g.keep(net.custom_event(ed, fx_event(name), params))
     body(g, then(fx), fx)
@@ -73,8 +77,11 @@ def pair(ed, name, params, body, gate, item_class=None):
         g.made)
 
     m = _G(ed)
-    cast = m.keep(net.multicast_event(ed, multicast_event(name), params, reliable=False))
-    plays, _owed_nothing = m.branch(GATES[gate](m), [then(cast)])
+    reliable = name in RELIABLE
+    cast = m.keep(net.multicast_event(ed, multicast_event(name), params, reliable=reliable))
+    plays, owed_nothing = m.branch(GATES[gate](m), [then(cast)])
+    if skipped is not None:
+        skipped(m, owed_nothing, cast)
     flow = m.put(FxPlayed, op(m, FN_ADD_II, m.get(FxPlayed), 1), [plays])
     call = m.keep(_node(ed, fx_event(name)))
     for param, _type in params:
@@ -82,7 +89,9 @@ def pair(ed, name, params, body, gate, item_class=None):
     _connect(flow, _pin(call, "execute"))
     ed.add_comment_to_nodes(
         f"{multicast_event(name)} (fx.py): the server's word that it happened, to "
-        f"every machine, unreliable (a lost one loses a sound, never state). Gate "
+        f"every machine, "
+        + ("reliable (more than a sound hangs on it: fx_vars.RELIABLE)" if reliable
+           else "unreliable (a lost one loses a sound, never state)") + ". Gate "
         f"'{gate}' (combat/fx_vars.py); what passes is counted in {FxPlayed} and "
         f"played by {fx_event(name)}.", m.made)
     return fx, cast

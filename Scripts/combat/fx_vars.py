@@ -37,7 +37,8 @@ round or a wound. The noise the wanderers hear is written by the server's
 own event (shot_noise.py), not by any of these.
 """
 
-from uebp.vars import BOOL, FLOAT, INT, VECTOR, Var, array
+from combat.paths import ITEM_CLASS_PATH
+from uebp.vars import BOOL, FLOAT, INT, VECTOR, Var, array, cls
 
 FX_PREFIX = "Fx_"
 MULTICAST_PREFIX = "Multicast_"
@@ -49,7 +50,7 @@ SHOT = "Shot"                 # Held's FireSound at the gun
 RELOAD = "Reload"             # Held's ReloadSound at the gun
 PUNCH = "Punch"               # the punch's clip and one of SwingSounds
 SLASH = "Slash"               # the knife's
-THROW = "Throw"               # the air the thrown item cuts (Start, Sharp)
+THROW = "Throw"               # the launch: the air the item cuts, and its flight on a client
 THROW_CLIP = "ThrowClip"      # the overhand throw's clip, from the ready pose
 PICKUP_CLIP = "PickUpClip"    # the reach down to the ground for an item taken
 
@@ -75,7 +76,14 @@ SOUND_AT_PARAMS = ((LOCATION_PARAM, VECTOR),)
 LOCATIONS_PARAM, NORMALS_PARAM, BLOODS_PARAM = "Locations", "Normals", "Bloods"
 SHOT_HITS_PARAMS = ((LOCATIONS_PARAM, array(VECTOR)), (NORMALS_PARAM, array(VECTOR)),
                     (BLOODS_PARAM, array(BOOL)), (SCALE_PARAM, FLOAT))
-THROW_FX_PARAMS = ((START_PARAM, VECTOR), (SHARP_PARAM, BOOL))
+# The launch (task R2, weapon_component/throw_standin.py): what a client
+# needs to fly a stand-in of the item along the server's curve. Time is the
+# server's clock at the release, which names the throw.
+CLASS_PARAM, VELOCITY_PARAM, TIME_PARAM = "Class", "Velocity", "Time"
+LIT_PARAM, HOT_PARAM = "Lit", "Hot"
+THROW_FX_PARAMS = ((START_PARAM, VECTOR), (SHARP_PARAM, BOOL),
+                   (CLASS_PARAM, cls(ITEM_CLASS_PATH)), (VELOCITY_PARAM, VECTOR),
+                   (TIME_PARAM, FLOAT), (LIT_PARAM, BOOL), (HOT_PARAM, BOOL))
 
 # name -> (its parameters, its gate): every cosmetic, for the verifier.
 COSMETICS = {
@@ -93,6 +101,9 @@ COSMETICS = {
     LODGE: (POINT_PARAMS, SCREEN),
     MATCH: (SOUND_AT_PARAMS, SCREEN),
 }
+# The ones whose Multicast is reliable: more than a sound hangs on them. The
+# launch is a client's whole flight, once a throw.
+RELIABLE = (THROW,)
 # Told in a batch instead: Fx_<name> has no Multicast of its own, and is
 # called once per entry by the batch's (verify/shot_hits.py).
 BATCHED = {PELLET_HIT: SHOT_HITS}

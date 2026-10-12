@@ -32,7 +32,7 @@ Server event is a plain call.
 
 from combat.paths import ITEM_CLASS_PATH
 from combat.tuning import INTERACT_RADIUS
-from uebp.vars import BOOL, VECTOR, Var, obj
+from uebp.vars import BOOL, FLOAT, NAME, ROTATOR, VECTOR, Var, cls, obj
 
 # --- melee ------------------------------------------------------------------
 SERVER_PUNCH = "Server_Punch"
@@ -61,6 +61,24 @@ THROW_PARAMS = ((START_PARAM, VECTOR), (VELOCITY_PARAM, VECTOR))
 THROW_START_REACH_CM = 300.0
 # The item's own speed, and a little for the vector's rounding on the wire.
 THROW_SPEED_SLACK = 1.02
+
+# What the server says back (task R2, weapon_component/throw_standin.py). The
+# launch, as a plain event on a client: Fx_Throw's flight, and the owning
+# client's when the server threw for it. The end, reliably to every machine:
+# where the item lies (At, turned Turn), and when a blade is left in a body,
+# the component and bone it rides and where on that bone (Off). The refusal,
+# to the owning client: its predicted stand-in is taken back.
+THROW_LAUNCH = "ThrowLaunch"
+THROW_END = "Multicast_ThrowEnd"
+THROW_REFUSED = "Client_ThrowRefused"
+CLASS_PARAM, TIME_PARAM, LIT_PARAM, HOT_PARAM = "Class", "Time", "Lit", "Hot"
+LAUNCH_PARAMS = ((CLASS_PARAM, cls(ITEM_CLASS_PATH)), (START_PARAM, VECTOR),
+                 (VELOCITY_PARAM, VECTOR), (TIME_PARAM, FLOAT), (LIT_PARAM, BOOL),
+                 (HOT_PARAM, BOOL))
+AT_PARAM, TURN_PARAM, PARENT_PARAM, BONE_PARAM, OFF_PARAM = "At", "Turn", "Parent", "Bone", "Off"
+END_PARAMS = ((TIME_PARAM, FLOAT), (AT_PARAM, VECTOR), (TURN_PARAM, ROTATOR),
+              (PARENT_PARAM, obj("/Script/Engine.SceneComponent")), (BONE_PARAM, NAME),
+              (OFF_PARAM, VECTOR))
 
 # --- the take ----------------------------------------------------------------
 SERVER_TAKE = "Server_Take"

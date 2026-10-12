@@ -107,6 +107,10 @@ Under the root's `--net --clients N` bullet:
     that did not join, a process that died or a failed check fails the run. One
     exception: a client the server's RPC guard kicked (`RPC-KICKED` in the server's log)
     is forgiven its lost connection, and its row says so (`probe_net_guard.py`).
+  - **`--loss PCT`** drops that share of the packets each client sends and of those it
+    receives (`Net PktLoss`, `PktIncomingLoss`), from the join on: a client can be a
+    spectator for seconds before its character comes, so a probe run under it waits for
+    its pawn's component rather than taking `p.pawn()` at once.
   - **`--lag MS`** delays every packet a client sends (the engine's `Net PktLag`), and the
     row's last column counts the movement corrections that process logged
     (`MOVE-CORRECTION`: the server pulling a client back, rubber-banding when the client

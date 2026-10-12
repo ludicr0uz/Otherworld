@@ -198,6 +198,10 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   axe's ready poses are clips ("The melee clips"). `probes/probe_hold_poses.py` measures the hand heights in game.
 - **The shotgun, pistol, knife, axe, matches and a stick are issued; the SMG, rifle and sniper are found.**: `docs/history/combat.md#the-shotgun-pistol-knife-axe-matches`
 - **Anything in hand can be thrown**: `docs/history/combat.md#anything-in-hand-can-be-thrown`
+- **On a server each client flies a thrown item itself** (R2: a local stand-in,
+  `weapon_component/throw_standin.py`; the flight fragment reads `ThrowFlyer`, the
+  server-only landing and strike read `Thrown`; a copy of an item is hidden unless it
+  rests): `Scripts/net/CLAUDE.md` ("Melee, the guard, the throw and the take").
 - **A thrown blade wounds a body and stays in it, and lodges in a tree**: `docs/history/combat.md#a-thrown-blade-wounds-a-body`
 - **The use key is the sights key on an item with no sights**: `docs/history/combat.md#the-use-key-is-the-sights`
 - **The stick burns**: `docs/history/combat.md#the-stick-burns`

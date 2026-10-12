@@ -190,7 +190,13 @@ _author_* fragment per concern, each in its own module:
   throw_flight  the item in the air flies the arc's curve, tumbling end over
               end, and lands as a Dropped item; a melee weapon leaves the hand
               squared up to the throw, so it spins forward, edge first. In the
-              upkeep, with authority: clients see it by replicated movement
+              upkeep, one authoring for what each machine flies (ThrowFlyer):
+              the server's item, which alone is judged, or a client's stand-in
+  throw_standin  a client's stand-in for a thrown item (R2): ThrowLaunch spawns
+              a local actor of its class on the server's curve from the
+              server's clock, the thrower's own on the click; the server's end
+              (Multicast_ThrowEnd) settles it, and it gives way to the
+              replicated item at rest; Client_ThrowRefused takes it back
   throw_strike  what the flight struck, for an item with a ThrowDamage (the
               knife, the axe): a body is wounded (more in the head) and
               bleeds, and keeps the item, set on the model and attached to

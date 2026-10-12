@@ -10,8 +10,10 @@ it cannot fire the automatic equipped in the thrown item's place.
 The throw is a server request (task M20, combat/strike_vars.py): the arc, the
 cocked arm and the wind-up are the owning machine's, and on the frame the
 hand lets go it asks Server_Throw(Start, Velocity). The event is the release,
-and the flight runs in the Tick's upkeep, with authority. In single player
-the event is a plain call.
+and the flight runs in the Tick's upkeep: the item itself with authority, and
+on a client of a server a stand-in of its own (task R2, throw_standin.py),
+which the thrower's machine launches on the click and a refusal takes back.
+In single player the event is a plain call and there is no stand-in.
 
 _author_throw, called from Tick's local arm, runs three fragments:
 
@@ -63,9 +65,11 @@ from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.paths import THROW_ARC_CLASS_PATH
 from combat.item_world import author_into_world
+from combat.heat_tuning import HOT_VAR
 from combat.strike_vars import (
-    SERVER_THROW, START_PARAM, THROW_PARAMS, THROW_SPEED_SLACK, THROW_START_REACH_CM,
-    VELOCITY_PARAM)
+    LAUNCH_PARAMS, SERVER_THROW, START_PARAM, THROW_LAUNCH, THROW_PARAMS, THROW_REFUSED,
+    THROW_SPEED_SLACK, THROW_START_REACH_CM, VELOCITY_PARAM)
+from combat.torch_tuning import LIT_VAR
 from combat.throw_arc import ARC_COMPONENT
 from combat.throw_tuning import (
     THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_DOT_CM, THROW_GRAVITY_Z, THROW_MARK_CM,
@@ -84,8 +88,13 @@ from combat.weapon_component.throw_flight import (
     THROW_VELOCITY_VAR, _author_square,
 )
 from combat import item_vars as IV
-from combat.fx_vars import SHARP_PARAM, THROW, THROW_CLIP, THROW_FX_PARAMS
+from combat.fx_vars import (
+    CLASS_PARAM, HOT_PARAM, LIT_PARAM, SHARP_PARAM, THROW, THROW_CLIP, THROW_FX_PARAMS,
+    TIME_PARAM)
 from combat.fx_vars import START_PARAM as FX_START_PARAM
+from combat.fx_vars import VELOCITY_PARAM as FX_VELOCITY_PARAM
+from combat.weapon_component.throw_standin import (
+    author_launch_event, author_named, server_now)
 from combat.weapon_component import fx
 from Sound.play import _author_sound
 from combat.weapon_component.throw_launch import _author_launch
@@ -103,7 +112,7 @@ from uebp.nodes.math import (
     FN_AND, FN_CLAMP_VSIZE, FN_DISTANCE, FN_LE_FF, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_NOT,
     FN_OR)
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN
-from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
+from uebp.nodes.system import FN_IS_VALID, FN_OBJECT_CLASS, FN_TIME_SECONDS
 from combat.weapon_component import vars as WV
 
 THROW_AIMING_VAR = WV.ThrowAiming      # the arc was drawn last frame
@@ -166,9 +175,17 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     thrown = ed.add_get_member_variable_node(THROWN_VAR)
     flying = _node(ed, FN_IS_VALID)
     _connect(out(thrown, THROWN_VAR), _pin(flying, "Object"))
-    # One throw at a time: none in the air, none winding up.
+    # One throw at a time: none in the air (the server's item, or on a client
+    # the stand-in it predicted, which outlives the flight by its hand-off),
+    # none winding up.
+    flyer = ed.add_get_member_variable_node(WV.ThrowFlyer)
+    standing = _node(ed, FN_IS_VALID)
+    _connect(out(flyer, WV.ThrowFlyer), _pin(standing, "Object"))
+    aloft = _node(ed, FN_OR)
+    _connect(out(flying), _pin(aloft, "A"))
+    _connect(out(standing), _pin(aloft, "B"))
     busy = _node(ed, FN_OR)
-    _connect(out(flying), _pin(busy, "A"))
+    _connect(out(aloft), _pin(busy, "A"))
     _connect(_winding(ed), _pin(busy, "B"))
     idle = _node(ed, FN_NOT)
     _connect(out(busy), _pin(idle, "A"))
@@ -311,9 +328,14 @@ def _author_throw_ask(ed, held, start, velocity, exec_in):
     # Heard from where it left the hand, by whoever threw it, at once (a
     # blade cuts the air, anything else pushes it aside): a client of a
     # server's prediction; with authority the event tells everyone.
+    # ...and seen: its stand-in leaves the hand now, on this machine's reading
+    # of the server's clock, and the item in the hand is hidden until the
+    # record takes it (throw_standin.py; a refusal shows it again).
     owns, predicts = g.branch(authority(g), [flow])
-    heard = fx.predict(g, THROW, [predicts], **{FX_START_PARAM: g.get(THROW_START_VAR),
-                                              SHARP_PARAM: g.iget(held, IV.Melee)})
+    heard = fx.predict(g, THROW, [predicts], **_launch(g, held, g.get(THROW_START_VAR),
+                                                       g.get(THROW_VELOCITY_VAR)))
+    heard = g.put(WV.ThrowLetGo, held, [heard])
+    heard = then(g.call(FN_SET_HIDDEN, [heard], self=held, bNewHidden="true"))
     ask = g.keep(_node(ed, SERVER_THROW))
     _connect(g.get(THROW_START_VAR), _pin(ask, START_PARAM))
     _connect(g.get(THROW_VELOCITY_VAR), _pin(ask, VELOCITY_PARAM))
@@ -322,27 +344,46 @@ def _author_throw_ask(ed, held, start, velocity, exec_in):
     ed.add_comment_to_nodes(
         f"The throw is asked of the server ({SERVER_THROW}, throw.py), with where "
         "it leaves from and how fast, read on this frame. A client of a server "
-        "plays its sound at once, its prediction. With authority (single player) "
-        "the event is the throw.",
+        "plays its sound and flies its stand-in at once, its prediction, the item "
+        "in its hand hidden. With authority (single player) the event is the throw.",
         g.made)
     return then(ask)
 
 
-def _author_throw_sound(g, exec_in, event):
-    """The body of Fx_Throw: the air the item goes through, from where it
-    left the hand (Start): a blade (Sharp) cuts it, anything else pushes it
-    aside."""
+def _launch(g, held, start, velocity):
+    """Fx_Throw's parameters for ``held`` leaving from ``start`` at
+    ``velocity`` now: its class and whether it burns or is hot, for a
+    client's stand-in, and the server's clock as this machine has it."""
+    return {FX_START_PARAM: start, SHARP_PARAM: g.iget(held, IV.Melee),
+            CLASS_PARAM: out(g.call(FN_OBJECT_CLASS, Object=held)),
+            FX_VELOCITY_PARAM: velocity, TIME_PARAM: server_now(g),
+            LIT_PARAM: g.iget(held, LIT_VAR), HOT_PARAM: g.iget(held, HOT_VAR)}
+
+
+def _author_throw_fx(g, exec_in, event):
+    """The body of Fx_Throw, the launch: the air the item goes through, from
+    where it left the hand (Start): a blade (Sharp) cuts it, anything else
+    pushes it aside. Then, on a client, its flight: ThrowLaunch
+    (throw_standin.py)."""
     sharp_in, blunt_in = g.branch(out(event, SHARP_PARAM), [exec_in])
-    _author_sound(g.ed, WV.ThrowSharpSounds, out(event, FX_START_PARAM), sharp_in)
-    _author_sound(g.ed, WV.ThrowSounds, out(event, FX_START_PARAM), blunt_in)
+    heard = [_author_sound(g.ed, WV.ThrowSharpSounds, out(event, FX_START_PARAM), sharp_in),
+             _author_sound(g.ed, WV.ThrowSounds, out(event, FX_START_PARAM), blunt_in)]
+    call = g.keep(_node(g.ed, THROW_LAUNCH))
+    for param, _type in LAUNCH_PARAMS:
+        _connect(out(event, param), _pin(call, param))
+    for pin in heard:
+        _connect(pin, _pin(call, "execute"))
 
 
 def author_throw_fx(ed):
-    """The throw's cosmetic pairs (fx.py): its sound, which the thrower
-    predicts, and its clip, which the thrower's wind-up plays in both modes
+    """The throw's cosmetic pairs (fx.py): the launch (its sound, and on a
+    client the stand-in's flight: throw_standin.py), which the thrower
+    predicts and the server tells reliably, and its clip, which the thrower's wind-up plays in both modes
     (throw_windup.py), so only the others owe it. Before the Tick and the
     throw's event."""
-    fx.pair(ed, THROW, THROW_FX_PARAMS, _author_throw_sound, fx.UNPREDICTED)
+    author_launch_event(ed, _author_square)
+    fx.pair(ed, THROW, THROW_FX_PARAMS, _author_throw_fx, fx.UNPREDICTED,
+            skipped=author_named)
     fx.pair(ed, THROW_CLIP, (), lambda g, e, _ev: _author_throw_clip(ed, e), fx.OTHERS)
 
 
@@ -356,14 +397,18 @@ def author_throw_event(ed):
     event = g.keep(net.server_event(ed, SERVER_THROW, THROW_PARAMS))
     start = out(event, START_PARAM)
     held = g.get(WV.Held)
-    go, _refused = author_guard(g, SERVER_THROW, [then(event)])
-    armed, _empty = g.branch(valid(g, held), [go])
+    go, flooded = author_guard(g, SERVER_THROW, [then(event)])
+    armed, empty = g.branch(valid(g, held), [go])
     alive = _author_alive(g, [armed])
     idle = not_(g, valid(g, g.get(THROWN_VAR)))
     here = g.call(FN_ACTOR_LOC, self=out(g.call(FN_GET_OWNER)))
     near = op(g, FN_LE_FF, out(g.call(FN_DISTANCE, V1=start, V2=out(here))),
               str(THROW_START_REACH_CM))
-    go, _refused = g.branch(op(g, FN_AND, idle, near), alive)
+    go, refused = g.branch(op(g, FN_AND, idle, near), alive)
+    # A refused throw's predicted stand-in is taken back (throw_standin.py).
+    g.keep(_node(ed, THROW_REFUSED))
+    for pin in (flooded, empty, refused):
+        _connect(pin, _pin(g.made[-1], "execute"))
     top = op(g, FN_MUL_FF, g.iget(held, THROW_SPEED_VAR), str(THROW_SPEED_SLACK))
     capped = g.call(FN_CLAMP_VSIZE, A=out(event, VELOCITY_PARAM), Max=top)
     ed.add_comment_to_nodes(
@@ -371,11 +416,13 @@ def author_throw_event(ed):
         "hand lets go. Refused unless there is an item in a living hand, nothing "
         f"of this player's in the air and the start within {THROW_START_REACH_CM:g} "
         "cm of this machine's copy of them; the speed is capped at the item's "
-        "own. Everyone is told of the throw (its sound at Start, and the clip "
-        "on the other players' copies). Then the release: the item leaves the "
-        "hand and the inventory, replicates to everyone, and the Tick flies it.",
+        "own; a refusal tells the owning client, whose stand-in is taken back. "
+        "Everyone is told of the launch, reliably (its sound at Start, the "
+        "stand-in each client flies, and the clip on the other players' copies). "
+        "Then the release: the item leaves the hand and the inventory, replicates "
+        "to everyone without its movement, and the Tick flies it.",
         g.made)
-    told = fx.tell(g, THROW, [go], **{FX_START_PARAM: start, SHARP_PARAM: g.iget(held, IV.Melee)})
+    told = fx.tell(g, THROW, [go], **_launch(g, held, start, out(capped)))
     told = fx.tell(g, THROW_CLIP, [told])
     _author_throw_release(ed, held, start, out(capped), told)
 
@@ -383,15 +430,20 @@ def author_throw_event(ed):
 def _author_throw_release(ed, held, start, velocity, exec_in):
     """Let go, with authority: the launch is stored for the flight, the item
     leaves the hand and the inventory the way a drop's does, and from here on
-    it is an actor every client sees (InWorld, replicated). Returns the exit
+    it is the world's actor (InWorld, replicated; its movement only once it
+    rests: each client flies a stand-in, throw_standin.py). Returns the exit
     exec pin. Reads Held: run it only where the hand is known to hold
     something."""
+    # With authority this machine's clock is the server's: the one stamp is
+    # the flight's start and the throw's name on every machine.
     now = _node(ed, FN_TIME_SECONDS)
     prev = exec_in
     for var, value in ((THROW_START_VAR, start),
                        (THROW_LAST_VAR, start),
                        (THROW_VELOCITY_VAR, velocity),
                        (THROW_TIME_VAR, out(now)),
+                       (WV.ThrowStamp, out(now)),
+                       (WV.ThrowFlyer, held),
                        (THROWN_VAR, held)):
         n = ed.add_set_member_variable_node(var)
         _connect(value, _pin(n, var))
@@ -413,7 +465,8 @@ def _author_throw_release(ed, held, start, velocity, exec_in):
     _connect(then(shown), _pin(put, "execute"))
     squared = _author_square(ed, held, then(put))
     # The server's item is now the world's: every client is sent it.
-    loosed = author_into_world(ed, held, squared)
+    loosed = author_into_world(
+        ed, held, out(ed.add_get_member_variable_node(WV.ThrowStamp), WV.ThrowStamp), squared)
 
     inv = ed.add_get_member_variable_node(WV.Inventory)
     idx = ed.add_get_member_variable_node(WV.EquippedIndex)

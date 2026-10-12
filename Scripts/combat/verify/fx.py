@@ -110,11 +110,15 @@ GATE_READS = {
 def check_pairs():
     for name, (params, gate) in FX.COSMETICS.items():
         fx, cast = FX.fx_event(name), FX.multicast_event(name)
-        check(f"{fx} is a plain event and {cast} an unreliable Multicast: the cosmetic "
+        # R2: the throw's launch is what a client's flight starts from, so
+        # its word is reliable (fx_vars.RELIABLE); every other is not.
+        sure = name in FX.RELIABLE
+        check(f"{fx} is a plain event and {cast} "
+              f"{'a reliable' if sure else 'an unreliable'} Multicast: the cosmetic "
               "once, and the server's word of it to everyone",
               event(fx) is not None and event(cast) is not None
               and net.compiled_rpc(wc, fx) == (net.LOCAL, False)
-              and net.compiled_rpc(wc, cast) == (net.MULTICAST, False),
+              and net.compiled_rpc(wc, cast) == (net.MULTICAST, sure),
               f"{net.compiled_rpc(wc, fx) if event(fx) else None}, "
               f"{net.compiled_rpc(wc, cast) if event(cast) else None}")
         if event(cast) is None or event(fx) is None:

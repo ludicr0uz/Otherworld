@@ -40,6 +40,7 @@ from combat.weapon_component.fire import author_fire_events
 from combat.weapon_component.use_held import author_use_held_event
 from combat.weapon_component.impact import author_pellet_fx
 from combat.weapon_component.throw import author_throw_fx
+from combat.weapon_component.throw_standin import author_end_event, author_refused_event
 from combat.weapon_component.throw_strike import author_throw_strike_fx
 from combat import fx_vars as FX
 from combat.shot_vars import TABLE as SHOT_TABLE
@@ -142,6 +143,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     author_strike_fx(ed, PUNCH)
     author_strike_fx(ed, KNIFE)
     author_throw_fx(ed)
+    # The throw's end and its refusal (throw_standin.py), before the Tick's
+    # flight and Server_Throw, which call them by name.
+    author_end_event(ed)
+    author_refused_event(ed)
     author_pickup_fx(ed)
     author_throw_strike_fx(ed)
     author_chop_fx(ed)

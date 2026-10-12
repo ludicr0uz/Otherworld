@@ -128,6 +128,17 @@ class PlanTest(unittest.TestCase):
         self.assertIsNone(net_plan.check_args(2, 17777, None, 120))
         self.assertIn("--lag", net_plan.check_args(2, 17777, None, -5))
 
+    def test_loss_drops_the_clients_packets_both_ways(self):
+        lossy = net_plan.command("ed", "p", self.plan[1], 17777, loss_pct=10)
+        self.assertIn("-PktLoss=10", lossy)
+        self.assertIn("-PktIncomingLoss=10", lossy)
+        self.assertFalse([a for a in net_plan.command("ed", "p", self.plan[0], 17777,
+                                                      loss_pct=10) if "Loss" in a])
+        self.assertFalse([a for a in net_plan.command("ed", "p", self.plan[1], 17777)
+                          if "Loss" in a])
+        self.assertIsNone(net_plan.check_args(2, 17777, None, 0, 0, 10))
+        self.assertIn("--loss", net_plan.check_args(2, 17777, None, 0, 0, 90))
+
     def test_trace_is_the_servers_alone(self):
         cmd = net_plan.command("ed", "p", self.plan[0], 17777, trace=True)
         self.assertIn(f"-trace={net_plan.TRACE_CHANNELS}", cmd)

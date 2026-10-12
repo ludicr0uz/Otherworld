@@ -17,13 +17,13 @@ from combat.item_world import REPLICATED as ITEM_REPLICATED
 from combat.paths import FIRE_WARD_VAR, ITEM_BP_PATH
 from combat.strike_vars import (
     SERVER_EVENTS, SERVER_PUNCH, SERVER_SET_HOLDS, SERVER_SLASH, SERVER_TAKE, SERVER_THROW,
-    STRIKE_GRACE_S, TABLE, THROW_START_REACH_CM, AskGuard, AskUse, BlockForced, SentGuard,
+    STRIKE_GRACE_S, TABLE, THROW_END, THROW_START_REACH_CM, AskGuard, AskUse, BlockForced, SentGuard,
     SentUse)
 from combat.torch_tuning import LIT_VAR
 from combat.verify.common import BEL, PIN, by_pins, check, load, num_pin, pin_value
 from combat.verify.fixtures import wc, wc_cdo, wg
 from combat.verify.record import _authority_branches, _feeders, _title, _upstream
-from combat.verify.shot import _asked_above, _calls_of, _event, _gate_arm, _reads_behind
+from combat.verify.shot import _asked_above, _calls_of, _event, _gate_arm
 from combat.verify.torch import _served_ward
 from combat.weapon_component import vars as WV
 from combat.weapon_component.knife import (
@@ -167,24 +167,44 @@ def check_throw():
     loosed = {t: [n for n in wg if _title(n).replace(" ", "") == t and event in _upstream(n)]
               for t in ("SetReplicates", "SetReplicateMovement")}
     world = [n for n in _sets(IV.InWorld, "true") if event in _upstream(n)]
-    check(f"the release makes the item the world's: {IV.InWorld}, and the server's "
-          "actor replicates with its movement from there on",
+    # R2: the actor replicates from the release, its movement only from the
+    # rest: in the air each client flies a stand-in (throw_standin.py), and
+    # the stamp names the throw on the item for that stand-in to find.
+    rests = [n for n in wg if _title(n).replace(" ", "") == "SetReplicateMovement"
+             and pin_value(n, "bInReplicateMovement") == "true"
+             and [_title(f) for f in _feeders(n, "self")] == [f"Get {THROWN_VAR}"]]
+    stamps = [n for n in wg if _title(n) == f"Set {IV.ThrowStamp}" and event in _upstream(n)
+              and _feeders(n, "self")]   # the item's, not the component's own
+    check(f"the release makes the item the world's: {IV.InWorld} and stamped "
+          f"({IV.ThrowStamp}), and the server's actor replicates from there on, its "
+          "movement only once it rests",
           all(len(v) == 1 for v in loosed.values()) and len(world) == 1
           and pin_value(loosed["SetReplicates"][0], "bInReplicates") == "true"
-          and pin_value(loosed["SetReplicateMovement"][0], "bInReplicateMovement") == "true",
-          str({k: len(v) for k, v in loosed.items()}))
+          and pin_value(loosed["SetReplicateMovement"][0], "bInReplicateMovement") != "true"
+          and len(rests) == 1 and event not in _upstream(rests[0]) and len(stamps) == 1,
+          str({k: len(v) for k, v in loosed.items()}) + f", {len(rests)} at rest, "
+          f"{len(stamps)} stamp(s)")
     off = [n for n in wg if _title(n).replace(" ", "") == "SetReplicates"
            and pin_value(n, "bInReplicates") != "true"]
     check("...and nothing switches an item's replication off again: the generic "
           "driver would leave each client's copy standing (item_world.py)", not off,
           str(len(off)))
-    flights = [n for n in wg if _title(n) == "Branch"
-               and str(THROWN_VAR) in {v for c in _feeders(n, "Condition")
-                                       for v in _reads_behind(c)}
-               and any("HasAuthority" in _title(x).replace(" ", "")
-                       for c in _feeders(n, "Condition") for x in _feeders(c, "B"))]
-    check("the flight runs only with authority: the owning client has Thrown too, "
-          "and flies nothing", len(flights) == 1, str(len(flights)))
+    # R2: the curve is flown on every machine (ThrowFlyer), and what it runs
+    # into or how long it lasts is the server's alone to act on: the landing
+    # sits behind a Branch on the owner's authority, and so does the end told.
+    def _judged(n):
+        return [b for b in _upstream(n) if _title(b) == "Branch"
+                and any("HasAuthority" in _title(c).replace(" ", "")
+                        for c in _feeders(b, "Condition"))]
+    lands = [n for n in _sets(IV.Dropped, "true") if event not in _upstream(n)
+             and [_title(f) for f in _feeders(n, "self")] == [f"Get {THROWN_VAR}"]]
+    ends = _calls_of(THROW_END)
+    check("the flight is every machine's, its end the server's: the landing and the "
+          f"one {THROW_END} sit behind a Branch on authority, which a client's "
+          "stand-in never passes",
+          len(lands) == 1 and len(_judged(lands[0])) >= 1
+          and len(ends) == 2 and all(lands[0] in _upstream(e) for e in ends),
+          f"{len(lands)} landing(s), {len(ends)} tell(s)")
 
 
 def check_item_world():

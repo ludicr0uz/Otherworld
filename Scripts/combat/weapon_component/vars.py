@@ -334,6 +334,24 @@ ThrowStart = Var("ThrowStart", VECTOR)
 ThrowVelocity = Var("ThrowVelocity", VECTOR)
 ThrowLast = Var("ThrowLast", VECTOR)
 ThrowTime = Var("ThrowTime", FLOAT, 0.0)
+# What this machine carries along the curve (task R2, throw_standin.py): the
+# item itself with authority, a local stand-in of its class on a client; the
+# server's time at the release, which names the throw on every machine; and a
+# stand-in's end: its own curve ran into something (Stopped), the server's
+# word of where the item lies (Ended: from where, to where, on which bone of
+# which body, since when), and the replicated item it gives way to.
+ThrowFlyer = Var("ThrowFlyer", _ITEM)
+ThrowStamp = Var("ThrowStamp", FLOAT, 0.0)
+ThrowStopped = Var("ThrowStopped", BOOL, False)
+ThrowEnded = Var("ThrowEnded", BOOL, False)
+ThrowEndFrom = Var("ThrowEndFrom", VECTOR)
+ThrowEndAt = Var("ThrowEndAt", VECTOR)
+ThrowEndOff = Var("ThrowEndOff", VECTOR)
+ThrowEndParent = Var("ThrowEndParent", obj("/Script/Engine.SceneComponent"))
+ThrowEndBone = Var("ThrowEndBone", NAME)
+ThrowEndTime = Var("ThrowEndTime", FLOAT, 0.0)
+ThrowTwin = Var("ThrowTwin", _ITEM)
+ThrowLetGo = Var("ThrowLetGo", _ITEM)   # the hand's item a predicted throw hid
 # What the thrown item's fall to the ground ignores (throw_strike.py), the
 # bone of the body the blade is set into, None for no bone, and where on that
 # bone's body.
@@ -391,7 +409,9 @@ STATE = (
     PunchQueued, PunchPending, NextPunchTime, PunchDueTime, BlowDamage, KnifeAnim, AxeAnim,
     AxePose, KnifeQueued, KnifePending, NextKnifeTime, KnifeDueTime, InteractTarget,
     InteractGap, InteractForced, CrouchForced, ThrowAiming, ThrowKeyForced, ThrowClickForced,
-    Thrown, ThrowStart, ThrowVelocity, ThrowLast, ThrowTime, ThrowPast, ThrowBone, ThrowSkin,
+    Thrown, ThrowStart, ThrowVelocity, ThrowLast, ThrowTime, ThrowFlyer, ThrowStamp,
+    ThrowStopped, ThrowEnded, ThrowEndFrom, ThrowEndAt, ThrowEndOff, ThrowEndParent,
+    ThrowEndBone, ThrowEndTime, ThrowTwin, ThrowLetGo, ThrowPast, ThrowBone, ThrowSkin,
     ThrowAnim, ThrowReadyAnim, ThrowWinding, ThrowDueTime, PickUpAnim, ChopTree, ChopItem,
     ChopCount,
     WoodSpot, WoodClass, LightWood, ThrowArc, ThrowArcClass,

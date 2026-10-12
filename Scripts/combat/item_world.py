@@ -11,7 +11,11 @@ gets there:
                       where it is, what it is attached to (a blade left in
                       a body rides its bone), its Dropped and Lodged, and
                       whether it burns or is hot (Lit, Hot)
-      the throw's release (author_into_world, in the component's graph)
+      the throw's release (author_into_world, in the component's graph):
+        without its movement, which is sent from the frame it comes to rest
+        (author_rests; task R2). A client's copy is hidden while it flies:
+        what is seen in the air is a stand-in each client flies itself
+        (weapon_component/throw_standin.py), found again by ThrowStamp
       lying there Dropped: the item's own Tick, on the server
         (author_world_view), which is every other way in: set down with the
         drop key or dragged out of the inventory, placed in the level, left
@@ -74,15 +78,18 @@ from net.relevancy_consts import ITEM
 from uebp.nodes.actor import (
     FN_FLUSH_NET_DORMANCY, FN_HAS_AUTHORITY, FN_SET_HIDDEN, FN_SET_NET_DORMANCY,
     FN_SET_REPLICATE_MOVEMENT, FN_SET_REPLICATES)
-from uebp.nodes.math import FN_AND, FN_NEQ_BB, FN_NOT, FN_OR
-from uebp.nodes.system import FN_IS_SERVER
+from combat.throw_tuning import THROW_RECENT_S, THROW_SHOW_HOLD_S
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_AND, FN_LESS_FF, FN_NEQ_BB, FN_NOT, FN_OR, FN_SELECT_FF, FN_SUB_FF)
+from uebp.nodes.system import (
+    FN_GET_GAME_STATE, FN_IS_SERVER, FN_SERVER_WORLD_TIME, FN_TIME_SECONDS)
 
 # The enum literals SetNetDormancy's pin takes.
 DORMANT, AWAKE = "DORM_DormantAll", "DORM_Awake"
 
 # Lit and Hot: a burning stick or a hot blade lying there is seen so by
 # everyone (task M25, combat/fire_vars.py).
-REPLICATED = (IV.Dropped, IV.Lodged, IV.InWorld, LIT_VAR, HOT_VAR)
+REPLICATED = (IV.Dropped, IV.Lodged, IV.InWorld, IV.ThrowStamp, LIT_VAR, HOT_VAR)
 
 
 def replicate_item(bp):
@@ -108,19 +115,32 @@ def author_wake(ed, exec_ins, item=None):
     return then(woke)
 
 
-def author_into_world(ed, item, exec_ins):
-    """In a component's graph, with authority: ``item`` leaves for the world.
-    Returns the exec pin after it."""
+def author_into_world(ed, item, stamp, exec_ins):
+    """In a component's graph, with authority: ``item`` leaves the hand for
+    the world, thrown at the server's time ``stamp`` (a float pin). Returns
+    the exec pin after it."""
     g = _G(ed, ITEM_CLASS_PATH)
     flow = g.iput(item, IV.InWorld, "true", exec_ins)
-    moves = g.call(FN_SET_REPLICATE_MOVEMENT, [flow], self=item, bInReplicateMovement="true")
+    flow = g.iput(item, IV.ThrowStamp, stamp, [flow])
+    moves = g.call(FN_SET_REPLICATE_MOVEMENT, [flow], self=item, bInReplicateMovement="false")
     sent = g.call(FN_SET_REPLICATES, [then(moves)], self=item, bInReplicates="true")
     ed.add_comment_to_nodes(
-        "The item is the world's now (item_world.py): InWorld, and the server's "
-        "actor replicates from here on, with its movement and what it is "
-        "attached to.", g.made)
+        "The thrown item is the world's now (item_world.py): InWorld, named by the "
+        "server's time at its release, and the server's actor replicates from here "
+        "on. Not its movement, until it rests: each client flies a stand-in of its "
+        "own (weapon_component/throw_standin.py).", g.made)
     # ...and one more thing left there: a server gives it a lifetime (M31).
     return author_left(ed, LEFT_ITEM, [then(sent)], item)
+
+
+def author_rests(ed, item, exec_ins):
+    """In a component's graph, with authority: the thrown ``item`` has come to
+    rest, and its movement is sent from here on (with Dropped, which the
+    caller has just set: one update tells a client that it lies and where).
+    Returns the exec pin after it."""
+    g = _G(ed, ITEM_CLASS_PATH)
+    moves = g.call(FN_SET_REPLICATE_MOVEMENT, exec_ins, self=item, bInReplicateMovement="true")
+    return then(moves)
 
 
 def author_out_of_world(ed, item, exec_ins):
@@ -212,13 +232,45 @@ def author_world_view(ed, exec_ins):
     _connect(out(owns), _pin(gate, "Condition"))
     for e in exec_ins:
         _connect(e, _pin(gate, "execute"))
-    carried = _node(ed, FN_NOT)
-    _connect(out(ed.add_get_member_variable_node(IV.InWorld), IV.InWorld), _pin(carried, "A"))
-    hide = _node(ed, FN_SET_HIDDEN)
-    _connect(out(carried), _pin(hide, "bNewHidden"))
-    _connect(else_(gate), _pin(hide, "execute"))
+    shown = _author_copy_view(ed, else_(gate))
     ed.add_comment_to_nodes(
         "A client's copy of a replicated item (item_world.py) is shown only "
-        "while the item is InWorld: carried, the hand that holds it is drawn "
-        "from the record's picture, not from this copy.", [owns, gate, carried, hide])
-    return _author_rest(ed, list(_author_enter_world(ed, then(gate)))) + (then(hide),)
+        "while the item lies in the world: carried, the hand that holds it is "
+        "drawn from the record's picture, and in the air a stand-in flies for it.",
+        [owns, gate])
+    return _author_rest(ed, list(_author_enter_world(ed, then(gate)))) + tuple(shown)
+
+
+def _author_copy_view(ed, exec_in):
+    """A client's copy, each Tick: hidden unless the item lies in the world
+    (InWorld and Dropped). One that has just come to rest after a throw
+    (ThrowStamp within THROW_RECENT_S) stays hidden THROW_SHOW_HOLD_S more,
+    or until the stand-in that flew for it gives way (Released, set by
+    weapon_component/throw_standin.py on the frame it is destroyed). Returns
+    the exec pins after it."""
+    g = _G(ed, ITEM_CLASS_PATH)
+    lies = out(g.call(FN_AND, A=g.get(IV.InWorld), B=g.get(IV.Dropped)))
+    resting, away = g.branch(lies, [exec_in])
+    seen, first = g.branch(g.get(IV.RestSeen), [resting])
+    now = out(g.call(FN_TIME_SECONDS))
+    server = out(g.call(FN_SERVER_WORLD_TIME, self=out(g.call(FN_GET_GAME_STATE))))
+    age = g.call(FN_SUB_FF, A=server, B=g.get(IV.ThrowStamp))
+    recent = g.call(FN_LESS_FF, A=out(age))
+    _set(recent, "B", THROW_RECENT_S)
+    hold = g.call(FN_SELECT_FF, bPickA=out(recent))
+    _set(hold, "A", THROW_SHOW_HOLD_S)
+    _set(hold, "B", 0.0)
+    flow = g.put(IV.ShowAt, out(g.call(FN_ADD_FF, A=now, B=out(hold))), [first])
+    flow = g.put(IV.RestSeen, "true", [flow])
+    lain = flow
+    flow = g.put(IV.RestSeen, "false", [away])
+    flow = g.put(IV.Released, "false", [flow])
+    early = g.call(FN_LESS_FF, A=now, B=g.get(IV.ShowAt))
+    held_back = out(g.call(FN_AND, A=out(g.call(FN_NOT, A=g.get(IV.Released))), B=out(early)))
+    hidden = g.call(FN_OR, A=out(g.call(FN_NOT, A=lies)), B=held_back)
+    hide = g.call(FN_SET_HIDDEN, [seen, lain, flow], bNewHidden=out(hidden))
+    ed.add_comment_to_nodes(
+        "Hidden unless the item lies in the world. One that has just come to rest "
+        f"after a throw stays hidden up to {THROW_SHOW_HOLD_S:g} s for the stand-in "
+        "that flew for it to settle and give way (Released).", g.made)
+    return [then(hide)]

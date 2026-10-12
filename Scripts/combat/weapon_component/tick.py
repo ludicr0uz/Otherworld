@@ -63,6 +63,7 @@ from combat.weapon_component.drop_request import _author_drop_keys, _author_drop
 from combat.weapon_component.save_exit import _author_save_exit
 from combat.weapon_component.throw import _author_throw, _author_throw_key
 from combat.weapon_component.throw_flight import _author_throw_flight
+from combat.weapon_component.throw_standin import _author_standin_upkeep
 from combat.weapon_component.trigger import _author_trigger
 from combat.shot_vars import ReloadForced
 from uebp.nodes.actor import FN_GET_OWNER, FN_WAS_PRESSED
@@ -443,7 +444,7 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
 
 def _author_upkeep(ed, flight_exits, tap):
     """What follows from state on every copy: a blow that is due and a thrown
-    item's flight (the server's), the slots served (the server) or pictured
+    item's flight (the server's item, a client's stand-in), the slots served (the server) or pictured
     (a client), placed and recorded, then the equip, if anything asked for
     one."""
     # --- save and exit's countdown (save_exit.py): the trigger's tap, the
@@ -456,6 +457,7 @@ def _author_upkeep(ed, flight_exits, tap):
     flight_exits = _author_punch_blow(ed, flight_exits)
     flight_exits = _author_knife_blow(ed, flight_exits)
     flight_exits = _author_throw_flight(ed, flight_exits)
+    flight_exits = _author_standin_upkeep(ed, flight_exits)
 
     # --- the slots: requests and drags served, then every item placed --------
     # (slot_moves.py, slot_sync.py): last, so the equip below follows them.

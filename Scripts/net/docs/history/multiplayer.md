@@ -1494,3 +1494,57 @@ until `InWorld` arrives, and the item's rate (`net/relevancy_consts.py` `ITEM`, 
   axe's own flight is too short to hold five places at 10 Hz): "sees the item the server
   threw last for the whole of its flight: shown, at 5 or more places before it lies
   still", 12 places over 13.0 m; with `--lag 120` 11 over 12.0 m, 8/8, 6/6 and 4/4.
+
+## A thrown item flies on every machine (R2, 2026-10-12)
+
+R1 found that a client saw a thrown axe at one or two places: the flight ran only with
+authority and the clients were sent positions at the item's 10 Hz, and the thrower saw
+its own throw a round trip late. Now the release is sent once and every machine runs the
+curve; nothing seen in the air depends on the item's replicated actor.
+
+- **Built** (all Blueprint graphs, no C++): `combat/weapon_component/throw_standin.py`
+  (`ThrowLaunch`, `Multicast_ThrowEnd`, `Client_ThrowRefused`, the stand-in's upkeep in
+  the Tick); `throw_flight.py` flies `ThrowFlyer` (the server's item, or a client's
+  stand-in) and keeps the landing, the strike and the end's telling behind HasAuthority
+  on `Thrown`; `throw.py` predicts on the click and refuses by name; `fx.pair` learned
+  `skipped=` (what the copy its gate turns away does) and `fx_vars.RELIABLE`;
+  `item_world.py` hides a copy that is not resting and stops the movement stream for the
+  flight. Variables: `ThrowFlyer`, `ThrowStamp`, `ThrowStopped`, `ThrowEnded`,
+  `ThrowEnd*`, `ThrowTwin`, `ThrowLetGo` on the component; `ThrowStamp` (replicated),
+  `RestSeen`, `ShowAt`, `Released` on the item.
+- **Decisions.** The stand-in's clock is local world time set back by what the server's
+  has run since the release, so the curve is the server's and a late message shortens
+  it. The throw's identity is the server's release time (a float both sides compare
+  exactly: it is sent, never recomputed). The settle is a VLerp in world space, with no
+  attach, so the stand-in never becomes part of a body. The hand-off waits for the
+  replicated item to be `InWorld` and `Dropped` on this machine; a stand-in whose end or
+  item never comes is destroyed (`THROW_ORPHAN_S`, `THROW_END_WAIT_S`).
+- **Found on the way.**
+  - The sights write `SetActorHiddenInGame(Held, ...)` every frame, so hiding the
+    predicted item once showed two axes for six frames: `ThrowLetGo` is re-hidden in the
+    stand-in's upkeep, after the sights, while it is still `Held`.
+  - On the other clients the launch arrives a frame or two before the item's own
+    channel says it left the hand: `ThrowLaunch` hides the thrower's `Held` of the
+    thrown class, and shows it again if the stand-in goes while it is still held.
+  - A server event called from a probe's Python sends none of its multicasts (the
+    editor's script guard makes every nested call local): the probe's last throw, made
+    that way, tells no client, and is kept as the case of a launch that never came (the
+    copy stays hidden in the air, and shows once it rests).
+  - `replicate_movement` is not readable from Python; the verifier holds the release's
+    `SetReplicateMovement(false)` and the landing's `author_rests` instead.
+- **The harness can lose packets now:** `uepy.py --net --loss PCT` (`-PktLoss` and
+  `-PktIncomingLoss` on each client; `uepylib/net_plan.py`, `tests/test_net.py`). A join
+  under loss can leave a client a spectator for seconds: the probe waits for its
+  character.
+- **Proof** (`uepy.py --net --clients 2 --probe Scripts/probes/probe_net_throw.py`;
+  server 9/9, client 1 14/14, client 2 8/8, the same with `--lag 120` and with
+  `--loss 10`): client 2 shows client 1's axe 12 ms after the server's release, client 1
+  from its click (64 ms before the release); on both it is within 18 cm of the server's
+  curve on every frame (41 and 50 places, where R1 saw one or two), never still in the
+  air, exactly one axe shown on every frame from the release to a second after the
+  rest, and at the end the server's own actor 1 cm from where the server has it. A throw
+  the server refuses (its copy of the hand emptied) flies the thrower's stand-in and
+  takes it back, one axe shown throughout. `verify_weapons_and_combat.py` 2607/2607.
+- **Not run here** (the session runs only the probe it changed): `probe_net_pvp.py`,
+  `probe_net_fx.py`, `probe_net_late_join.py`, `probe_net_leftovers.py` and the `--game`
+  `probe_throw*` set; their files are unchanged. Not done: lag compensation of a throw.

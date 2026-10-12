@@ -103,6 +103,16 @@ InWorld = Var("InWorld", BOOL, False, rep=REPLICATED)
 # Whether the server has put the actor to sleep (NetDormancy DormantAll): an item
 # lying still, or carried. Its own Tick decides (item_world.py); not replicated.
 Dormant = Var("Dormant", BOOL, False)
+# A thrown item in the world (task R2, weapon_component/throw_standin.py): the
+# server's time at its release, which names the throw to every machine (each
+# client's stand-in finds the replicated item it gives way to by it), and a
+# client's copy's own account of coming to rest: whether it has seen itself
+# lie there, until when it stays hidden for a stand-in to settle, and
+# whether that stand-in has given way to it.
+ThrowStamp = Var("ThrowStamp", FLOAT, 0.0, rep=REPLICATED)
+RestSeen = Var("RestSeen", BOOL, False)
+ShowAt = Var("ShowAt", FLOAT, 0.0)
+Released = Var("Released", BOOL, False)
 DisplayName = Var("DisplayName", STRING)
 PelletCount = Var("PelletCount", INT)
 Dropped = Var("Dropped", BOOL, rep=REPLICATED)
@@ -221,7 +231,7 @@ TABLE = (
     MuzzleOffset, SightOffset, SightAim, GripLocation, GripRotation, SlotColor, Icon,
     FireSound, DryFireSound, ReloadSound, HandleSounds, UseSounds, AimPose, TwoHanded, AdsZoom, Scoped, ShotVolume,
     AdsZoomSpeed, AdsZoomInSeconds, AdsRaiseSeconds,
-    Lodged, InWorld, Dormant,
+    Lodged, InWorld, Dormant, ThrowStamp, RestSeen, ShowAt, Released,
     DisplayName, PelletCount, Dropped, GlimmerWait, UsesAmmo, MagazineSize, Loaded, Reserve,
     InfiniteReserve, Automatic, Consumable, Melee, Chops, Lights, HasSights, Burns, Lit,
     Heats, Hot, ClothingSlot, WornPart, WornMesh, Slot, WeaponKind, BurnOutTime, CoolTime, HeatMaterial, UsePose,

@@ -243,13 +243,19 @@ def check_strike_gate():
           and all(pin_value(c, "B") in ("", "0", "0.0", "0.000000") for c in conds),
           str([pin_value(c, "B") for c in conds]))
     entry = the(_feeders(w.gate, "execute"))
-    before = the(_feeders(entry, "execute")) if entry is not None else None
-    check("...on the frame the flight's segment hits something, before the "
-          f"item is set down, {THROW_PAST_VAR} emptied first",
+    # R2: the segment is flown on every machine, and what it hit is the
+    # server's to judge: a Branch on the owner's authority, off the hit's.
+    judge = the(_feeders(entry, "execute")) if entry is not None else None
+    before = the(_feeders(judge, "execute")) if judge is not None else None
+    check("...on the frame the flight's segment hits something, with authority "
+          f"alone, before the item is set down, {THROW_PAST_VAR} emptied first",
           entry is not None and entry in _entries()
+          and judge is not None and _title(judge) == "Branch"
+          and any("HasAuthority" in _title(c).replace(" ", "")
+                  for c in _feeders(judge, "Condition"))
           and before is not None and _title(before) == "Branch"
           and any(is_throw_trace(t) for t in _feeders(before, "Condition")),
-          str([_t(entry), _t(before)]))
+          str([_t(entry), _t(judge), _t(before) if before is not None else None]))
     return True
 
 

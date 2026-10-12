@@ -208,11 +208,14 @@ def check_keys_are_variables():
     # The one turn there is comes after the hand has let go: the throw's
     # release detaches a melee weapon, then squares it up to the throw
     # (throw_flight._author_square).
+    # (R2: a client's stand-in of a thrown item, ThrowFlyer, was never in a
+    # hand: it is squared up as it is spawned and turned as the item lies.)
     turns = titled(wg, "Set Actor Rotation")
-    held_turns = [n for n in turns if not _after_detach(n)]
+    held_turns = [n for n in turns if not _after_detach(n)
+                  and [title(f) for f in feeders(n, "self")] != [f"Get {WV.ThrowFlyer}"]]
     check("nothing rotates the held weapon in the hand: the only turn is the "
           "throw's, after the item is detached",
-          not held_turns,
+          not held_turns and any(_after_detach(n) for n in turns),
           f"{len(turns)} SetActorRotation node(s), {len(held_turns)} not after a detach")
     # No trace draws itself any more: DrawDebugType is an enum literal on the pin
     # and an enum pin cannot be driven, so "only in debug mode" is inexpressible

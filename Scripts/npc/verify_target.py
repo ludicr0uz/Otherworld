@@ -135,6 +135,22 @@ def check_blame(tag, hurt):
           and len(flips) == 1 and flips[0] in _else(guards[0]))
 
 
+def check_heard(tag, sound):
+    takes = _titled(sound, f"Set {TARGET_VAR}")
+    flips = _titled(sound, "Set Aggro")
+    check(f"{tag}: a noise heard, it turns on whoever made it (M28): {TARGET_VAR} is "
+          f"the noise's Maker, before Aggro is set",
+          len(takes) == 1 and len(flips) == 1 and flips[0] in _exec_reach(takes[0])
+          and _titles(_feeders(takes[0], TARGET_VAR)) == {"HearNoise"})
+    guards = [PIN.get_owning_node(d) for b in takes
+              for d in BEL.find_execute_pin(b).list_connected_pins()]
+    check(f"{tag}: ...only when that pawn is there: otherwise the candidate "
+          f"stands, and Aggro is set all the same",
+          len(guards) == 1 and _title(guards[0]) == "Branch"
+          and "IsValid" in _titles(_feeders(guards[0], "Condition"))
+          and len(flips) == 1 and flips[0] in _else(guards[0]))
+
+
 def check_target(path, key):
     tag = path.rsplit("/", 1)[-1]
     bp = unreal.load_asset(path)
@@ -144,6 +160,7 @@ def check_target(path, key):
     check_candidate(tag, present)
     check_keep(tag, hunt, key)
     check_blame(tag, step_nodes(nodes, dict(SENSE_STEPS)["hurt"]))
+    check_heard(tag, step_nodes(nodes, dict(SENSE_STEPS)["sound"]))
     rest = outside_step(outside_step(nodes, STEP_PRESENT), STEP_TARGET)
     asks = sorted({_title(n) for n in rest if _title(n) in (LIVING_TITLE, NEAREST_TITLE)}
                   | {_title(n) for n in nodes if _title(n) in PLAYER_ZERO})

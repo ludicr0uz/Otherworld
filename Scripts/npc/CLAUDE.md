@@ -412,6 +412,9 @@ itself, and none reads player 0: a new fragment reads `target(ed)` / `target_pin
   pass (0.5 s each: with three near, a touch is felt within 1.5 s). No one that near: the
   nearest, however far, so a noise or a wound from far off is laid on someone. No one
   living: the step fails and it strolls.
+- **Hearing a noise, it turns on whoever made it** (M28): the sound sense writes `Target`
+  from `HearNoise`'s `Maker` (`_author_take`, the fragment the blame below is built on)
+  before `Aggro` is set. A maker that is no pawn, or gone, leaves the candidate.
 - **Hurt, it turns on whoever struck it:** the hurt sense writes `Target` from the health
   component's `LastInstigator` (`_author_blame`) before `Aggro` is set. The wendigo's rage
   reads the same fragment, so a wendigo stalking one player and shot by another is
@@ -479,7 +482,7 @@ controller plays nothing itself: it picks the take or the clip and hands it to i
   | hurt | `DamagedByPlayer` |
   | sight | within range and half-angle, **and** `LineOfSightTo` (trunks hide the player) |
   | touch | within `touch_range_cm` |
-  | sound | the latest noise's reach × `hearing_scale` |
+  | sound | the nearest recent noise whose reach × `hearing_scale` holds it (`HearNoise`); `Target` is its maker |
 
 - **Patrol traps:**
   - **NPCs that stand still while patrolling mean there's no navmesh under them.** Check that
@@ -497,9 +500,24 @@ controller plays nothing itself: it picks the take or the clip and hands it to i
     `RunSpeed × TuneRunSpeed / stock [× TunePatrolSpeed]`, where stock is the creature's built
     run speed, so the level's per-instance gait survives the tuning. The Chase and Stroll steps
     write it every pass (after their move order); aggro and the setup no longer do.
-- **Noise** is one record on the GameMode (`Noise*`, written by `combat/noise.py`).
-  - A new noise overwrites the record only if the old one is older than `noise_hold_s` (0.6 s,
-    which must outlast the tree's 0.5 s beat) or the new one is at least as loud.
+- **Noise** is a list of recent noises, one entry per maker (M28): the native
+  `UOtherworldNoiseList`, a world subsystem (`Source/CLAUDE.md`), written by `MakeNoise`
+  (`combat/noise.py`) and asked by `HearNoise` (`senses._author_hearing`; the node paths are
+  `uebp/nodes/noise.py`). The GameMode's six `Noise*` variables are gone
+  (`game_mode_vars.REMOVED`).
+  - **Written on the server alone:** `MakeNoise` does nothing in a world with no GameMode,
+    so a client's shot and steps, which run the same graph, leave its list empty.
+  - A maker's new noise replaces **its own** entry only if that is older than `noise_hold_s`
+    (0.6 s, which must outlast the tree's 0.5 s beat) or the new one is at least as loud: a
+    footstep does not erase the shot before it. Another maker's noise lands beside it.
+    Entries past the hold go at each write.
+  - **A listener hears the nearest** entry that is recent and reaches it, not the loudest:
+    with two players firing 130 m apart, each one's zombie hears its own.
+  - `probes/probe_net_noise.py` proves it: two clients fire at once, 25 m from one zombie
+    each; both turn Aggro by `sound` with the player beside them as `Target`; the list's
+    rules are then asked of the library; `--game` runs it with one player.
+  - For a probe: `unreal.OtherworldNoiseLibrary.noises_held(world)` (the entries),
+    `noises_made`, `noises_refused`, and `make_noise` / `hear_noise` themselves.
   - **Gunshots:** the reach is the weapon's `ShotVolume` (`SHOT_VOLUME_CM`: sniper 150 m, rifle
     90, shotgun 85, SMG 50, pistol 35), plus a 1.6× cone within 30° of the shot's line.
   - **Footsteps (player only):** 12 m at a run, 18 m sprinting, 6 m while aiming.

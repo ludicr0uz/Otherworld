@@ -56,8 +56,9 @@ builders, verifiers excluded (*verified*).
 
 **Designs that break at 32–64 players:**
 
-- **The noise record is one record.** One noise per 0.6 s for the whole world: with dozens
-  of players firing, the wanderers hear only the loudest shot on the server.
+- **The noise record was one record** (fixed, M28: a list, one entry per maker, and a
+  listener hears the nearest that reaches it). One noise per 0.6 s for the whole world: with
+  dozens of players firing, the wanderers heard only the loudest shot on the server.
 - **Ten wanderers, respawned 75–100 m from the player start** (`NPC_COUNT = 10`,
   `forest_generator/npc_placement.py`). Both numbers are built round one player.
 - **Each wanderer checks one player per heartbeat.** Checking 64 needs a distance pre-filter.
@@ -154,7 +155,7 @@ owning client: read input  --Server RPC-->  server: validate, change state
 | `PlayerDead` | GameMode | PlayerState (done, M7) |
 | team | none | PlayerState (team id), GameState (roster) |
 | debug flags, the difficulty, the day's clock | GameMode, `BP_DayNightCycle` | GameState / a replicated actor (debug mode and the difficulty done, M7: `BP_OtherworldGameState`; the clock is M30) |
-| the noise record | GameMode | stays on the server (only AI reads it), as a list |
+| the noise record | GameMode | stays on the server (only AI reads it), as a list: `UOtherworldNoiseList`, a native world subsystem (M28) |
 | gun-drop random streams, spawn counter | GameMode | stay on the GameMode: server only is right |
 | health, inventory, slots, ammo, worn garments | components, unreplicated | the same components, server-owned and replicated |
 | the character's save | a local `BP_Profile` | a server-side file per account |

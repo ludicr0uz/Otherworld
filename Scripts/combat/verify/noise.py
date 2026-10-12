@@ -1,5 +1,8 @@
-"""verify.noise -- the GameMode's noise record, each gun's ShotVolume, and the
-two things that write the record: the shot and the player's footsteps.
+"""verify.noise -- the world's noise list (the native library the graphs
+call), each gun's ShotVolume, and the two things that add a noise to it: the
+shot and the player's footsteps. The list itself (one entry a maker, the
+stale-or-louder guard, the server alone) is C++ and is proved in a running
+game: probes/probe_net_noise.py.
 """
 
 import math
@@ -7,11 +10,7 @@ import math
 import unreal
 
 from combat.footsteps import FOOTSTEP_BP_PATH
-from combat.game_state import (
-    NOISE_CONE_COS_VAR, NOISE_CONE_RANGE_VAR, NOISE_DIRECTION_VAR,
-    NOISE_FLOAT_VARS, NOISE_LOCATION_VAR, NOISE_RANGE_VAR, NOISE_TIME_VAR,
-    NOISE_VECTOR_VARS,
-)
+from combat import game_mode_vars as GV
 from combat.tuning import COMBAT, SHOT_VOLUME_CM
 from combat.weapon_specs import _weapon_specs
 from combat.verify.common import (
@@ -19,6 +18,8 @@ from combat.verify.common import (
 )
 from combat.verify.fixtures import gm, wg
 from forest_generator.npc_placement import NPC_REPATH_SECONDS
+
+MAKE_TITLE = "MakeNoise"
 
 
 def _feeders(node, pin_name):
@@ -28,21 +29,14 @@ def _feeders(node, pin_name):
             for q in PIN.list_connected_pins(pin)}
 
 
-def _sets(nodes, var):
-    """Set nodes for ``var`` (on any class)."""
-    return [n for n in nodes if str(BEL.get_node_title(n)) == f"Set {var}"]
-
-
 def check_noise_record():
-    mode = cdo(gm)
-    for name in NOISE_FLOAT_VARS:
-        value = mode.get_editor_property(name)
-        check(f"the GameMode's {name} is a float", isinstance(value, float),
-              type(value).__name__)
-    for name in NOISE_VECTOR_VARS:
-        value = mode.get_editor_property(name)
-        check(f"the GameMode's {name} is a vector", isinstance(value, unreal.Vector),
-              type(value).__name__)
+    check("the noise list's library is compiled in (Source/Otherworld: OtherworldNoise.h)",
+          all(hasattr(getattr(unreal, "OtherworldNoiseLibrary", None), f)
+              for f in ("make_noise", "hear_noise", "noises_held")))
+    # The one record the list replaced (M28): a GameMode built before it loses it.
+    names = {str(v) for v in BEL.list_member_variable_names(gm, False)}
+    check("the GameMode no longer holds a noise record: the noises are the world's list",
+          not names & set(GV.REMOVED), f"{sorted(names & set(GV.REMOVED))}")
     # A noise has to survive one NPC heartbeat, or a footstep right after a
     # gunshot erases the shot before half the pack has checked for it.
     check("a noise is held longer than one NPC heartbeat",
@@ -69,76 +63,73 @@ def check_shot_volumes():
           v["SMG"] > v["Pistol"] and v["Pistol"] == min(v.values()))
 
 
-def _check_writer(label, nodes):
-    """What every noise write shares: the stale-or-louder guard, all six fields."""
-    holds = [n for n in titled(nodes, "float >= float")
-             if num_pin(n, "B") == COMBAT.noise_hold_s]
-    guards = [n for n in titled(nodes, "Branch")
-              if _feeders(n, "Condition") == {"OR Boolean"}
-              and any(str(BEL.get_node_title(PIN.get_owning_node(q))) == f"Set {NOISE_TIME_VAR}"
-                      for q in BEL.find_then_pin(n).list_connected_pins())]
-    check(f"{label}: only a stale or quieter noise is replaced",
-          len(holds) == 1 and len(guards) == 1,
-          f"{len(holds)} hold comparison(s), {len(guards)} stale-or-louder branch(es)")
-    for var in (NOISE_TIME_VAR, NOISE_LOCATION_VAR, NOISE_RANGE_VAR,
-                NOISE_CONE_RANGE_VAR, NOISE_CONE_COS_VAR):
-        check(f"{label}: writes {var}", len(_sets(nodes, var)) == 1,
-              f"{len(_sets(nodes, var))}")
+def _check_writer(label, nodes, maker):
+    """What every noise write shares: one MakeNoise, its maker and the hold.
+    Returns the node, or None."""
+    makes = titled(nodes, MAKE_TITLE)
+    check(f"{label}: one noise added to the world's list", len(makes) == 1, f"{len(makes)}")
+    if len(makes) != 1:
+        return None
+    make = makes[0]
+    check(f"{label}: only its maker's stale or quieter noise is replaced "
+          f"(held {COMBAT.noise_hold_s} s)",
+          num_pin(make, "HoldSeconds") == COMBAT.noise_hold_s, pin_value(make, "HoldSeconds"))
+    check(f"{label}: the noise is its maker's ({maker})",
+          _feeders(make, "Maker") == {maker}, f"{_feeders(make, 'Maker')}")
+    check(f"{label}: it has a place", len(_feeders(make, "Location")) == 1,
+          f"{_feeders(make, 'Location')}")
+    return make
 
 
 def check_shot_noise():
-    _check_writer("the shot", wg)
-    ranges = _sets(wg, NOISE_RANGE_VAR)
+    make = _check_writer("the shot", wg, "GetOwner")
+    if make is None:
+        return
     check("the shot's reach is the held weapon's ShotVolume",
-          bool(ranges) and _feeders(ranges[0], NOISE_RANGE_VAR) == {"Get ShotVolume"},
-          f"{_feeders(ranges[0], NOISE_RANGE_VAR) if ranges else None}")
-    cone = _sets(wg, NOISE_CONE_RANGE_VAR)
+          _feeders(make, "Reach") == {"Get ShotVolume"}, f"{_feeders(make, 'Reach')}")
     scale = [n for n in titled(wg, "float * float")
              if num_pin(n, "B") == COMBAT.shot_noise_cone_range_scale
              and _feeders(n, "A") == {"Get ShotVolume"}]
     check(f"down the barrel it carries {COMBAT.shot_noise_cone_range_scale}x further",
-          len(scale) == 1 and bool(cone)
-          and _feeders(cone[0], NOISE_CONE_RANGE_VAR) == {"float * float"},
+          len(scale) == 1 and _feeders(make, "ConeReach") == {"float * float"},
           f"{len(scale)} scale node(s)")
-    cos = _sets(wg, NOISE_CONE_COS_VAR)
     want = math.cos(math.radians(COMBAT.shot_noise_cone_half_angle_deg))
+    got = num_pin(make, "ConeCos")
     check(f"the cone is {COMBAT.shot_noise_cone_half_angle_deg:.0f} degrees either side",
-          bool(cos) and abs(float(pin_value(cos[0], NOISE_CONE_COS_VAR)) - want) < 1e-4,
-          pin_value(cos[0], NOISE_CONE_COS_VAR) if cos else "missing")
+          got is not None and abs(got - want) < 1e-4, pin_value(make, "ConeCos"))
     # The same Normalize the pellet cone is built around, not a second copy of
     # the muzzle -> AimPoint line that could drift from it.
-    heading = _sets(wg, NOISE_DIRECTION_VAR)
     pellet_dirs = {PIN.get_owning_node(q) for n in titled(wg, "RandomUnitVectorInConeInRadians")
                    for q in PIN.list_connected_pins(BEL.find_input_pin(n, "ConeDir"))}
-    shot_dirs = {PIN.get_owning_node(q) for n in heading
-                 for q in PIN.list_connected_pins(BEL.find_input_pin(n, NOISE_DIRECTION_VAR))}
+    shot_dirs = {PIN.get_owning_node(q)
+                 for q in PIN.list_connected_pins(BEL.find_input_pin(make, "Direction"))}
     # The pellets now fly around ShotDirection, which the shot's cloud draw
     # centres on that same Normalize.
     check("the cone points down the line the shot was drawn around",
-          len(heading) == 1 and bool(shot_dirs) and shot_dirs <= pellet_dirs,
+          bool(shot_dirs) and shot_dirs <= pellet_dirs,
           f"{len(shot_dirs)} source(s), shared with the shot's cone: "
           f"{shot_dirs <= pellet_dirs}")
 
 
 def check_footstep_noise():
     fg = graph(load(FOOTSTEP_BP_PATH)).list_all_nodes()
-    _check_writer("a footstep", fg)
+    make = _check_writer("a footstep", fg, "Cast To Character")
     gate = [n for n in titled(fg, "Branch")
             if _feeders(n, "Condition") == {"IsPlayerControlled"}]
     check("only the player's footsteps are a noise -- the wanderers share the component",
           len(gate) == 1, f"{len(gate)} IsPlayerControlled gate(s)")
+    if make is None:
+        return
     per_speed = COMBAT.footstep_noise_range_cm / COMBAT.footstep_noise_reference_speed_cms
     reach = [n for n in titled(fg, "float * float") if num_pin(n, "B") == per_speed]
-    ranges = _sets(fg, NOISE_RANGE_VAR)
     check(f"a step carries {COMBAT.footstep_noise_range_cm / 100:.0f} m at "
           f"{COMBAT.footstep_noise_reference_speed_cms:.0f} cm/s, in proportion to speed",
-          len(reach) == 1 and bool(ranges)
-          and _feeders(ranges[0], NOISE_RANGE_VAR) == {"float * float"},
+          len(reach) == 1 and _feeders(make, "Reach") == {"float * float"},
           f"{len(reach)} x{per_speed} node(s)")
-    cone = _sets(fg, NOISE_CONE_RANGE_VAR)
+    # A literal equal to its pin's default is not saved: "" once loaded from disk.
     check("a footstep has no cone -- it is heard the same all round",
-          bool(cone) and num_pin(cone[0], NOISE_CONE_RANGE_VAR) == 0.0,
-          pin_value(cone[0], NOISE_CONE_RANGE_VAR) if cone else "missing")
+          not _feeders(make, "ConeReach") and (num_pin(make, "ConeReach") or 0.0) == 0.0,
+          pin_value(make, "ConeReach"))
 
 
 def run():

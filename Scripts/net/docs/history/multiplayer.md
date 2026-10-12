@@ -794,6 +794,37 @@ the ask, predicting ---------->    Server_Fire / _Punch /        Multicast_<Name
   read on every body exactly what the server rolled (matched by `NpcId`), one canteen at
   most. `--game` runs its single-player arm; `probe_bleeding.py` is the on-hit roll's.
 
+<a id="m28"></a>
+## Noise for several players (M28, done, 2026-10-11)
+
+- **Built:** `Source/Otherworld` `OtherworldNoise.h/.cpp`: `UOtherworldNoiseList` (a world
+  subsystem of game and PIE worlds: the entries, `Make`, `Hear`) and
+  `UOtherworldNoiseLibrary` (`MakeNoise`, `HearNoise`, and `NoisesHeld`, `NoisesMade`,
+  `NoisesRefused` for the probes). `combat/noise.py` is one `MakeNoise` node with the
+  maker (the shot's owner, the footsteps' character); `npc/senses._author_hearing` one
+  `HearNoise` node, whose `Maker` the sense takes as `Target` (`target._author_take`).
+  The GameMode's six `Noise*` variables are removed.
+- **Why native:** a list of structs written from two graphs and walked by every wanderer
+  each pass is seven parallel arrays and a loop in a Blueprint; in C++ it is one node on
+  each side, and the walk costs nothing a profile will see at 64 players.
+- **The rule kept:** per maker, the old record's rule (replace if stale or at least as
+  loud), so a single-player game, with its one maker, hears what it heard before.
+- **Changed for a listener:** it hears the nearest noise that reaches it and hunts its
+  maker; before, it heard the one record and hunted the patrol's candidate.
+- **Measured** (`probes/probe_net_noise.py`, a server and two clients, 68 s): two zombies
+  132 m apart, a player 25 m from each, shotguns (85 m all round) fired into the sky at
+  once: both Aggro by `sound`, each with the player beside it as `Target`; the list held
+  both players' noises at one moment; each client's own list stayed empty (`NoisesMade`
+  0). `--game`: 12/12 with one player.
+- **Verifiers:** npc 567/567 (was 561), weapons 2590/2590 (was 2598: the six-variable
+  record's checks went).
+- **Trap met:** adding a source changed which files share a unity blob, and three
+  existing files' unnamed-namespace helpers of one name collided: the module now has
+  `bUseUnity = false` (`Source/CLAUDE.md`).
+- **Left for later:** footsteps of other makers than players write nothing (as before);
+  a noise is not occluded; the list is walked whole by each listener (128 entries at
+  most, no spatial index).
+
 <a id="m27"></a>
 ## Wanderers among several players (M27, done, 2026-10-11)
 

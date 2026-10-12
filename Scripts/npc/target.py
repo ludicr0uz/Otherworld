@@ -21,6 +21,10 @@ among every living player and kept (task M27). Every other step reads it
         -> [the pawn of whoever struck the last blow is there?]
                Target = them (``_author_blame``)
 
+    the sound sense, as it answers yes (M28):
+        -> [the pawn that made the noise it heard is there?]
+               Target = them (``_author_take``)
+
 On patrol the candidate changes every pass, so a sense fires at whoever it
 is true of, not at whoever stands nearest: a player in the sight cone is seen
 though another stands closer behind the wanderer's back. The sense that fires
@@ -158,9 +162,19 @@ def _author_blame(ed, exec_in, health_pin):
     known = g.branch(out(named), exec_in)
     pawn = g.call(FN_GET_PAWN)
     _connect(out(by, LAST_INSTIGATOR_PROP), _pin(pawn, "self"))
+    took, taken = _author_take(ed, then(known), out(pawn))
+    join = g.branch(None, [taken, else_(known)])
+    return g.made + took, then(join)
+
+
+def _author_take(ed, exec_in, pawn_pin):
+    """Target is ``pawn_pin``'s pawn if it is there; the candidate stays if
+    not. The hurt sense's striker and the sound sense's noise-maker (M28).
+    Returns ``(nodes, the exec pin after)``."""
+    g = _Graph(ed)
     bodied = g.call(FN_IS_VALID)
-    _connect(out(pawn), _pin(bodied, "Object"))
-    there = g.branch(out(bodied), then(known))
-    blamed = g.put(TARGET_VAR, then(there), pin=out(pawn))
-    join = g.branch(None, [blamed, else_(known), else_(there)])
+    _connect(pawn_pin, _pin(bodied, "Object"))
+    there = g.branch(out(bodied), exec_in)
+    taken = g.put(TARGET_VAR, then(there), pin=pawn_pin)
+    join = g.branch(None, [taken, else_(there)])
     return g.made, then(join)

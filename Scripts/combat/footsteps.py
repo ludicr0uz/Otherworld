@@ -187,7 +187,7 @@ def build_footstep_component(rebuild=True):
     hushed = _node(ed, FN_MUL_FF)
     _connect(out(reach), _pin(hushed, "A"))
     _connect(out(ed.add_get_member_variable_node(FV.StepNoise), FV.StepNoise), _pin(hushed, "B"))
-    _author_make_noise(ed, then(players), out(at), out(hushed))
+    _author_make_noise(ed, then(players), char_out, out(at), out(hushed))
 
     ed.add_comment_to_nodes(
         f"A footfall every {FOOTSTEP_STRIDE_CM:.0f} cm of ground covered, "

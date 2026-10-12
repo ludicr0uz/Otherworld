@@ -1,5 +1,5 @@
 """The noise a shot makes: the held weapon's ShotVolume all round, and a louder
-cone down the aim line, written into the GameMode's noise record.
+cone down the aim line, added to the world's noise list as its shooter's.
 """
 
 import math
@@ -8,6 +8,7 @@ from uebp.graph import _connect, _node, _pin, _set, out
 from combat.noise import _author_make_noise
 from combat.tuning import COMBAT
 from combat.weapon_component.common import _prop
+from uebp.nodes.actor import FN_GET_OWNER
 from uebp.nodes.math import FN_MUL_FF
 from combat import item_vars as IV
 
@@ -29,8 +30,11 @@ def _author_shot_noise(ed, held, muzzle, direction, exec_in):
     _connect(volume, _pin(ahead, "A"))
     _set(ahead, "B", COMBAT.shot_noise_cone_range_scale)
 
+    # Whose noise it is: the pawn that wears this component.
+    owner = _node(ed, FN_GET_OWNER)
+
     made, then = _author_make_noise(
-        ed, exec_in, muzzle, volume,
+        ed, exec_in, out(owner), muzzle, volume,
         direction=direction,
         cone_reach=out(ahead),
         cone_cos=math.cos(math.radians(COMBAT.shot_noise_cone_half_angle_deg)))
@@ -38,6 +42,6 @@ def _author_shot_noise(ed, held, muzzle, direction, exec_in):
         f"The shot's noise: heard all round out to the weapon's ShotVolume, "
         f"and {COMBAT.shot_noise_cone_range_scale}x that inside "
         f"{COMBAT.shot_noise_cone_half_angle_deg:.0f} degrees of the aim line. "
-        f"Written to the GameMode for the wanderers to hear.",
-        made + [volume_n, ahead])
+        f"Added to the world's noise list, as this pawn's, for the wanderers to hear.",
+        made + [volume_n, ahead, owner])
     return then

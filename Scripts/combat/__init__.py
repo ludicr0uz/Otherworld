@@ -69,7 +69,7 @@ DATA (constants and pure tables -- no Blueprint authoring)
   difficulty        EASY / MEDIUM / SURVIVOR: labels, default, the variable
   game_state        world-scoped + health-component variable names (which live
                     on the GameMode, which moved: net/state_consts.py), debug mode,
-                    the noise record, ensure_game_mode_vars()
+                    ensure_game_mode_vars()
   gun_tuning        gun_tuning.csv: the tunable stats (TUNE_STATS: column,
                     variable, label, step, minimum), which are whose
                     (columns_of: a gun's, a melee weapon's), reading and writing it
@@ -167,7 +167,7 @@ SHARED AUTHORING HELPERS
   (uebp)            node/pin/connect/set, out/then, variables, components,
                     events: Scripts/uebp/graph.py, shared by every package
   log               _log: the [GUN] log line
-  noise             _author_make_noise: write the GameMode's noise record
+  noise             _author_make_noise: add to the server's list of recent noises
                     (the shot and the player's footsteps call it)
 
 ASSETS AND PATCHES

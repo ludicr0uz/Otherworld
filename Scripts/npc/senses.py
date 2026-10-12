@@ -5,7 +5,7 @@ They are exec branches chained one after another (npc/agro.py) rather than one
 big boolean, on purpose. Pure nodes are evaluated by whoever reads them and
 BooleanAND does not short-circuit (see the possession gate in controller.py),
 so a single OR of four senses would run the line-of-sight trace and the
-GameMode cast on every heartbeat whether or not a cheaper sense had already
+noise list's question on every heartbeat whether or not a cheaper sense had already
 answered -- and could not say WHICH sense fired, which is the one thing the
 log line is for.
 
@@ -15,23 +15,18 @@ also a "no", and an exec input takes any number of links, so the next sense
 simply takes them all.
 """
 
-from combat.game_state import (
-    DAMAGED_BY_PLAYER_VAR, NOISE_CONE_COS_VAR, NOISE_CONE_RANGE_VAR,
-    NOISE_DIRECTION_VAR, NOISE_LOCATION_VAR, NOISE_RANGE_VAR, NOISE_TIME_VAR,
-)
-from combat.paths import GAME_MODE_CLASS_PATH
+from combat.game_state import DAMAGED_BY_PLAYER_VAR
 from combat.tuning import COMBAT
-from npc.target import _author_blame, target, target_pin
+from npc.target import _author_blame, _author_take, target, target_pin
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from npc.paths import HEALTH_CLASS_PATH
 from npc.tuned import tuned
 from uebp.nodes.actor import (
     FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_GET_COMP, FN_GET_PAWN, FN_LINE_OF_SIGHT)
 from uebp.nodes.math import (
-    FN_AND, FN_DEG_COS, FN_DISTANCE, FN_DOT_VV, FN_GE_FF, FN_LE_FF, FN_MUL_FF, FN_NORMAL,
-    FN_OR, FN_SUB_FF, FN_SUB_VV)
-from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_CAST_HEALTH
-from uebp.nodes.system import FN_GET_GAME_MODE, FN_TIME_SECONDS
+    FN_AND, FN_DEG_COS, FN_DISTANCE, FN_DOT_VV, FN_GE_FF, FN_LE_FF, FN_NORMAL, FN_SUB_VV)
+from uebp.nodes.noise import FN_HEAR_NOISE
+from uebp.nodes.palette import NODE_CAST_HEALTH
 
 
 class _Maker:
@@ -168,80 +163,35 @@ def _author_touch(ed, exec_in):
 
 
 def _author_hearing(ed, exec_in):
-    """Is this wanderer inside the reach of the latest noise?
+    """Is this wanderer inside the reach of a recent noise? One question of
+    the world's noise list (combat/noise.py; the native HearNoise):
 
-        recent  = now - NoiseTime <= COMBAT.noise_hold_s
-        d       = |pawn - NoiseLocation|
-        round   = d <= NoiseRange * hearing_scale
-        cone    = d <= NoiseConeRange * hearing_scale
-                  AND NoiseDirection . unit(pawn - NoiseLocation) >= NoiseConeCos
-        heard   = recent AND (round OR cone)
+        for each noise of the last COMBAT.noise_hold_s:
+            d       = |pawn - its Location|
+            round   = d <= its Reach * hearing_scale
+            cone    = d <= its ConeReach * hearing_scale
+                      AND its Direction . unit(pawn - Location) >= its ConeCos
+        heard   = the nearest noise that is round OR cone
+        yes -> [its maker's pawn is there?] Target = them
 
-    The reach is the noise's (combat/noise.py); hearing_scale is the only
-    thing the listener brings. "Recent" matters: without it a wanderer that
-    strolls into range of a shot fired a minute ago would hear it now.
+    The reach is the noise's; hearing_scale is the only thing the listener
+    brings. "Recent" matters: without it a wanderer that strolls into range
+    of a shot fired a minute ago would hear it now. The list holds every
+    player's noise (task M28), so of two players firing far apart each draws
+    the wanderers near them, and the one heard is the one hunted: not this
+    pass's candidate, who may be the other.
     """
     k = _Maker(ed)
-    mode = k.fn(FN_GET_GAME_MODE)
-    as_mode = k(_palette(ed, NODE_CAST_GAME_MODE))
-    _connect(k.out(mode), _pin(as_mode, "Object"))
-    for pin in exec_in:
-        _connect(pin, _pin(as_mode, "execute"))
-    mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
-
-    def read(name):
-        n = k(ed.add_get_member_variable_node(name, GAME_MODE_CLASS_PATH))
-        _connect(mode_out, _pin(n, "self"))
-        return k.out(n, name)
-
-    now = k.fn(FN_TIME_SECONDS)
-    age = k.fn(FN_SUB_FF)
-    _connect(k.out(now), _pin(age, "A"))
-    _connect(read(NOISE_TIME_VAR), _pin(age, "B"))
-    recent = k.fn(FN_LE_FF)
-    _connect(k.out(age), _pin(recent, "A"))
-    _set(recent, "B", COMBAT.noise_hold_s)
-
     pawn = k.fn(FN_GET_PAWN)
     here = k.fn(FN_ACTOR_LOC)
     _connect(k.out(pawn), _pin(here, "self"))
-    source = read(NOISE_LOCATION_VAR)
-    gap = k.fn(FN_DISTANCE)
-    _connect(k.out(here), _pin(gap, "V1"))
-    _connect(source, _pin(gap, "V2"))
-
-    def within(reach_var):
-        reach = k.fn(FN_MUL_FF)
-        _connect(read(reach_var), _pin(reach, "A"))
-        _connect(k.tuned("hearing_scale"), _pin(reach, "B"))
-        inside = k.fn(FN_LE_FF)
-        _connect(k.out(gap), _pin(inside, "A"))
-        _connect(k.out(reach), _pin(inside, "B"))
-        return k.out(inside)
-
-    all_round = within(NOISE_RANGE_VAR)
-    cone_reach = within(NOISE_CONE_RANGE_VAR)
-
-    away = k.fn(FN_SUB_VV)
-    _connect(k.out(here), _pin(away, "A"))
-    _connect(source, _pin(away, "B"))
-    unit = k.fn(FN_NORMAL)
-    _connect(k.out(away), _pin(unit, "A"))
-    dot = k.fn(FN_DOT_VV)
-    _connect(read(NOISE_DIRECTION_VAR), _pin(dot, "A"))
-    _connect(k.out(unit), _pin(dot, "B"))
-    aimed = k.fn(FN_GE_FF)
-    _connect(k.out(dot), _pin(aimed, "A"))
-    _connect(read(NOISE_CONE_COS_VAR), _pin(aimed, "B"))
-    in_cone = k.fn(FN_AND)
-    _connect(cone_reach, _pin(in_cone, "A"))
-    _connect(k.out(aimed), _pin(in_cone, "B"))
-
-    reached = k.fn(FN_OR)
-    _connect(all_round, _pin(reached, "A"))
-    _connect(k.out(in_cone), _pin(reached, "B"))
-    heard = k.fn(FN_AND)
-    _connect(k.out(recent), _pin(heard, "A"))
-    _connect(k.out(reached), _pin(heard, "B"))
-    hears = _branch(k, k.out(heard), [then(as_mode)])
-    return k.made, then(hears), [else_(hears), out(as_mode, "CastFailed")]
+    ask = k.fn(FN_HEAR_NOISE)
+    for pin in exec_in:
+        _connect(pin, _pin(ask, "execute"))
+    _connect(k.out(here), _pin(ask, "Listener"))
+    _connect(k.tuned("hearing_scale"), _pin(ask, "HearingScale"))
+    _set(ask, "HoldSeconds", COMBAT.noise_hold_s)
+    hears = _branch(k, k.out(ask), [then(ask)])
+    maker, made_by = _author_take(ed, then(hears), k.out(ask, "Maker"))
+    k.made.extend(maker)
+    return k.made, made_by, [else_(hears)]

@@ -13,7 +13,7 @@ The senses, patrol, speed, melee and health numbers, and those of the hunt
 and the fire that a developer tunes, are then overlaid by
 npc/monster_tuning.csv (monster_tuning.py) and baked as the controller's
 Tune* variable defaults (tuned.py), not as pin literals. The
-noise record the senses listen to, and the per-gun ShotVolume, are combat's
+noise list the senses listen to, and the per-gun ShotVolume, are combat's
 (combat/noise.py, combat/tuning.py); this package reads their names.
 
 DATA (constants -- no Blueprint authoring)

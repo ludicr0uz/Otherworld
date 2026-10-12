@@ -49,7 +49,9 @@ else empty hands.
 patrol until they notice a player, then chase and melee, sidestepping between swings. Each
 hunts one player, chosen among the living ones near it and kept until they die or leave,
 then the nearest; its AI runs on the server alone and its sounds and clips reach every
-machine by Multicast. A
+machine by Multicast. What it hears is a list of recent noises the server keeps, one per
+maker, so players firing far apart each draw the wanderers near them, and a wanderer that
+hears a noise hunts whoever made it. A
 burning campfire draws patrolling zombies within 200 m. A wendigo hunts before it chases:
 roars, comes in tree to tree round the player, charges from 10 m, charges at once if the
 player runs 30 m or shoots it; fire held out keeps it circling and eventually drives it off
@@ -378,7 +380,7 @@ visibility trace and the noise read, and the one that fired is reported:
 | hurt | the health component's `DamagedByPlayer` (the flag the kill count trusts) |
 | sight | within the creature's vision range and half-angle, with line of sight from the pawn's eyes (trunks block it) |
 | touch | within touch range, from any direction |
-| sound | the noise record below, heard |
+| sound | a noise of the list below, heard; the wanderer hunts its maker |
 
 The ranges, the patrol radius and speed and the re-pick times are per creature in
 `monster_tuning.csv` (3.2d). The patrol step picks a random reachable point round
@@ -386,20 +388,27 @@ The ranges, the patrol radius and speed and the re-pick times are per creature i
 by distance, because on failure the query returns its origin. `Scripts/npc/CLAUDE.md`,
 "Patrol and agro", has the graph and its verifier.
 
-**Sound is one noise record, owned by whatever made the noise.** The emitters (the weapon
-component's shot, the footstep component) and the listeners (every controller) share no
-reference, so a noise is published on the world (`combat/game_state.py`, `combat/noise.py`):
-its time, location, all-round range, and for a gunshot a cone (direction, reach, cosine of
-the half-angle). With `loud(x) = max(range, cone range)`, a noise is written iff the record
-is older than `noise_hold_s` (0.6 s) or the new noise is at least as loud; the hold keeps a
-footstep from erasing a gunshot before every wanderer has had a heartbeat (0.5 s) to check
-it, and the combat verifier asserts that inequality. A listener hears it iff it is recent and
-within the all-round range or inside the cone, both scaled by its own `hearing_scale`. A
-gunshot's reach is the weapon's `ShotVolume` (the GUN SETTINGS tab's row); a footstep's scales
-with speed and is written for the player only.
+**Sound is a short list of recent noises, one per maker, kept by the server (M28).** The
+emitters (the weapon component's shot, the footstep component) and the listeners (every
+controller) share no reference, so a noise is published on the world: a native world
+subsystem, `UOtherworldNoiseList` (`Source/Otherworld`, `OtherworldNoise.h`), behind two
+nodes, `MakeNoise` (`combat/noise.py`) and `HearNoise` (`npc/senses.py`). An entry is who
+made it, its time, location, all-round reach, and for a gunshot a cone (direction, reach,
+cosine of the half-angle). It is written only where the world has a GameMode (the server, or
+a single-player game); on a client the node does nothing. With `loud(x) = max(reach, cone
+reach)`, a maker's noise replaces **that maker's** entry iff the entry is older than
+`noise_hold_s` (0.6 s) or the new noise is at least as loud; the hold keeps a footstep from
+erasing its maker's gunshot before every wanderer has had a heartbeat (0.5 s) to check it,
+and the combat verifier asserts that inequality. Another maker's noise lands beside it, so
+two players firing at once are two entries; entries past the hold are dropped at each write
+(128 at most). A listener hears the **nearest** entry that is recent and whose all-round
+reach or cone holds it, both scaled by its own `hearing_scale`, and is told who made it: the
+sound sense sets the wanderer's `Target` to that player. A gunshot's reach is the weapon's
+`ShotVolume` (the GUN SETTINGS tab's row); a footstep's scales with speed and is written for
+players only.
 
 Limits by design: there is no way back to patrol (a "calm" would be a branch on the aggro
-arm); one record keeps only the louder of two simultaneous noises; sound ignores occlusion
+arm); one maker's entry keeps only the louder of its two simultaneous noises; sound ignores occlusion
 while sight does not; one wanderer going aggro does not alert its neighbours. Since then the
 wendigo's hunt and the campfire's draw were added on the same heartbeat
 (`Scripts/npc/CLAUDE.md`), and the queued N1/N2 tasks move sight and hearing onto AI
@@ -541,7 +550,8 @@ each of these outlives every actor that touches it, the player's own components 
 
 | variable | on | written by | read by |
 |---|---|---|---|
-| `NpcSpawnCount`, the noise record | the GameMode (server only) | each wanderer's `BeginPlay`; whatever made a noise | the next wanderer, for its number; every controller's hearing |
+| `NpcSpawnCount` | the GameMode (server only) | each wanderer's `BeginPlay` | the next wanderer, for its number |
+| the noise list | `UOtherworldNoiseList`, a world subsystem (written on the server only) | whatever made a noise (`MakeNoise`) | every controller's hearing (`HearNoise`) |
 | `NpcKillCount`, `PlayerKillCount`, `PlayerDead` | `BP_OtherworldPlayerState`, replicated | the death path on the server, a kill credited only when `DamagedByPlayer` or the striker was a player | that player's HUD and death menu |
 | `DebugMode` | `BP_OtherworldGameState`, replicated | the HUD's BeginPlay and the menu's debug row, where the machine owns the GameState | the weapon component (tracers), the HUD, the wanderers' AI (cones) |
 

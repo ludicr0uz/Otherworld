@@ -301,8 +301,13 @@ module that owns the action.
   senses are asked about the living players within 60 m, one a pass in turn; Aggro, it
   keeps that `Target` until they die or leave, then takes the nearest living player and
   starts its hunt over. With no one living it strolls, still Aggro.
+- **What it hears is a list, one noise per maker** (M28): `UOtherworldNoiseList`, a native
+  world subsystem written only where there is a GameMode. Each player's shot and steps keep
+  an entry of their own for 0.6 s; a wanderer hears the nearest that reaches it and hunts
+  its maker (`probes/probe_net_noise.py`, a server and two clients).
 - Owned by `Scripts/npc/CLAUDE.md` ("Who it hunts", "Heard and seen on every machine").
 - M27 wanderers among several players: docs/history/multiplayer.md#m27
+- M28 noise for several players: docs/history/multiplayer.md#m28
 
 ## Random rolls (M17, done)
 
@@ -346,7 +351,8 @@ by the weapons build and named on the GameMode (`state.py`):
 |---|---|---|---|
 | `BP_OtherworldPlayerState` (one per player, replicated to all) | `NpcKillCount`, `PlayerDead` | the server: the death graph (`combat/death.py`) | that player's HUD, through its owning controller |
 | `BP_OtherworldGameState` (one, replicated) | `DebugMode`, `Difficulty` | the machine that owns it: the HUD's writes are behind `HasAuthority` of the GameState | every machine: the HUD, the weapon component, the consume ability, the wanderers' AI |
-| the GameMode (the server alone) | the spawn counter, the noise record, the gun-drop streams, the combat trace's switch | the server | the server |
+| the GameMode (the server alone) | the spawn counter, the gun-drop streams, the combat trace's switch | the server | the server |
+| `UOtherworldNoiseList`, a world subsystem (M28) | the recent noises, one per maker | the server (`MakeNoise` does nothing with no GameMode) | the server's AI controllers (`HearNoise`) |
 
 - **Reach them with `state_graph.py`,** never a hand-made cast: `game_state`,
   `owned_game_state` (for a write), `player_state_of` (a controller's or a pawn's),

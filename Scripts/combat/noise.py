@@ -1,136 +1,63 @@
 """Making a noise the wanderers can hear: the one fragment every noise-maker
-calls to write the GameMode's noise record.
+calls to add a noise to the server's list.
 
-WHY ONE RECORD ON THE GAMEMODE
-------------------------------
+WHY A LIST ON THE WORLD
+-----------------------
 The emitters (BP_WeaponComponent's shot, BP_FootstepComponent's step) and the
 listeners (every wanderer's AI controller) are built by different builders and
-share no reference to each other. The GameMode is already the project's
-world-scoped wiring point (spawn and kill counters, PlayerDead, DebugMode), so
-a noise is written there and each patrolling wanderer reads it on its own
-heartbeat (Scripts/npc/senses.py). No event dispatch, no list of listeners, and
-a respawned wanderer hears the next noise with nothing registering it.
+share no reference to each other, so a noise is published on the world and
+each patrolling wanderer asks for it on its own heartbeat (Scripts/npc/senses.py).
+No event dispatch, no list of listeners, and a respawned wanderer hears the
+next noise with nothing registering it.
 
-The cost of one record is that a new noise replaces the old one, so the write
-is guarded: it lands only if the current record is STALE (older than
-COMBAT.noise_hold_s) or the new noise is at least as LOUD. A footstep a
-fraction of a second after a gunshot therefore cannot erase the gunshot before
-the pack has checked for it -- noise_hold_s outlasts one NPC heartbeat, which
-the verifier asserts. Loudness is the larger of the two reaches, all-round and
-cone.
+It is a list (task M28: the native UOtherworldNoiseList, a world subsystem;
+Source/Otherworld/Public/OtherworldNoise.h), one entry per maker, because the
+single record it replaced kept only the loudest noise in the world: of two
+players firing far apart, the wanderers near the quieter heard nothing. Each
+entry holds the place, the reach, the time and who made it. Only a machine
+with authority writes it (a client's call does nothing: only the wanderers'
+AI reads it, and that runs on the server), and single player is that machine.
 
-What the record holds is the noise's own reach, because how far a noise
+A maker's own entry is still guarded as the one record was: a new noise
+replaces it only if it is STALE (older than COMBAT.noise_hold_s) or the new
+noise is at least as LOUD. A footstep a fraction of a second after a gunshot
+therefore cannot erase the gunshot before the pack has checked for it --
+noise_hold_s outlasts one NPC heartbeat, which the verifier asserts. Loudness
+is the larger of the two reaches, all-round and cone. An entry older than the
+hold is dropped at the next write, so the list is the recent noises: at most
+one per player.
+
+What an entry holds is the noise's own reach, because how far a noise
 carries belongs to what made it (a pistol, a sprint). The listener only scales
 it (AgroSettings.hearing_scale in forest_generator/npc_agro.py).
 """
 
-from combat.game_state import (
-    NOISE_CONE_COS_VAR, NOISE_CONE_RANGE_VAR, NOISE_DIRECTION_VAR,
-    NOISE_LOCATION_VAR, NOISE_RANGE_VAR, NOISE_TIME_VAR,
-)
-from uebp.graph import _connect, _node, _pin, _set, else_, then
-from combat.paths import GAME_MODE_CLASS_PATH
-from net.state_graph import server_game_mode
 from combat.tuning import COMBAT
-from uebp.nodes.math import FN_GE_FF, FN_MAX_FF, FN_OR, FN_SUB_FF
-from uebp.nodes.system import FN_TIME_SECONDS
+from uebp.graph import _connect, _node, _pin, _set, then
+from uebp.nodes.noise import FN_MAKE_NOISE
 
 
-def _author_make_noise(ed, exec_in, location, reach,
+def _author_make_noise(ed, exec_in, maker, location, reach,
                        direction=None, cone_reach=None, cone_cos=1.0):
-    """Write a noise into the GameMode's record, if it is allowed to replace
-    the one already there. Returns ``(nodes, then_pin)``.
+    """Add a noise to the world's list. Returns ``(nodes, then_pin)``.
 
-        exec_in -> Switch Has Authority -> GetGameMode -> cast
-                -> [record stale  OR  this noise at least as loud?]
-                     yes -> NoiseTime = now, NoiseLocation, NoiseRange,
-                            NoiseDirection, NoiseConeRange, NoiseConeCos
-                -> then (every path, the failed cast and a client included)
+        exec_in -> MakeNoise(Maker, Location, Reach, Direction, ConeReach,
+                             ConeCos, HoldSeconds = COMBAT.noise_hold_s) -> then
 
-    The record is the server's (only the wanderers' AI reads it, and that
-    runs there): a client has no GameMode and writes nothing.
-
-    ``location``, ``reach`` and the optional ``direction``/``cone_reach`` are
-    data pins; ``cone_cos`` is a literal. An all-round noise leaves
-    ``cone_reach`` None, which writes a cone reach of 0 -- nothing is ever
-    inside a cone that reaches nowhere -- and leaves the direction unwritten.
+    ``maker`` (the pawn that made it), ``location``, ``reach`` and the
+    optional ``direction``/``cone_reach`` are data pins; ``cone_cos`` is a
+    literal. An all-round noise leaves ``cone_reach`` None, which leaves the
+    cone's reach at 0 -- nothing is ever inside a cone that reaches nowhere.
+    The authority test and the stale-or-louder guard are the node's own.
     """
-    made = []
-
-    def keep(n):
-        made.append(n)
-        return n
-
-    server = server_game_mode(ed, [exec_in])
-    made.extend(server.nodes)
-    as_mode = server.nodes[-1]
-    mode_out = server.pin
-
-    def read(name):
-        n = keep(ed.add_get_member_variable_node(name, GAME_MODE_CLASS_PATH))
-        _connect(mode_out, _pin(n, "self"))
-        return _pin(n, name, is_input=False)
-
-    # --- is the record stale? ------------------------------------------------
-    now = keep(_node(ed, FN_TIME_SECONDS))
-    now_out = _pin(now, "ReturnValue", is_input=False)
-    age = keep(_node(ed, FN_SUB_FF))
-    _connect(now_out, _pin(age, "A"))
-    _connect(read(NOISE_TIME_VAR), _pin(age, "B"))
-    stale = keep(_node(ed, FN_GE_FF))
-    _connect(_pin(age, "ReturnValue", is_input=False), _pin(stale, "A"))
-    _set(stale, "B", COMBAT.noise_hold_s)
-
-    # --- ...or is this one at least as loud? ---------------------------------
+    make = _node(ed, FN_MAKE_NOISE)
+    _connect(exec_in, _pin(make, "execute"))
+    _connect(maker, _pin(make, "Maker"))
+    _connect(location, _pin(make, "Location"))
+    _connect(reach, _pin(make, "Reach"))
     if cone_reach is not None:
-        mine = keep(_node(ed, FN_MAX_FF))
-        _connect(reach, _pin(mine, "A"))
-        _connect(cone_reach, _pin(mine, "B"))
-        loudness = _pin(mine, "ReturnValue", is_input=False)
-    else:
-        loudness = reach
-    theirs = keep(_node(ed, FN_MAX_FF))
-    _connect(read(NOISE_RANGE_VAR), _pin(theirs, "A"))
-    _connect(read(NOISE_CONE_RANGE_VAR), _pin(theirs, "B"))
-    louder = keep(_node(ed, FN_GE_FF))
-    _connect(loudness, _pin(louder, "A"))
-    _connect(_pin(theirs, "ReturnValue", is_input=False), _pin(louder, "B"))
-
-    either = keep(_node(ed, FN_OR))
-    _connect(_pin(stale, "ReturnValue", is_input=False), _pin(either, "A"))
-    _connect(_pin(louder, "ReturnValue", is_input=False), _pin(either, "B"))
-    lands = keep(ed.add_branch_node())
-    _connect(_pin(either, "ReturnValue", is_input=False), _pin(lands, "Condition"))
-    _connect(then(as_mode), _pin(lands, "execute"))
-
-    # --- write it ------------------------------------------------------------
-    tail = then(lands)
-
-    def write(name, value_pin=None, literal=None):
-        nonlocal tail
-        n = keep(ed.add_set_member_variable_node(name, GAME_MODE_CLASS_PATH))
-        _connect(mode_out, _pin(n, "self"))
-        if value_pin is not None:
-            _connect(value_pin, _pin(n, name))
-        else:
-            _set(n, name, literal)
-        _connect(tail, _pin(n, "execute"))
-        tail = then(n)
-
-    write(NOISE_TIME_VAR, now_out)
-    write(NOISE_LOCATION_VAR, location)
-    write(NOISE_RANGE_VAR, reach)
-    if cone_reach is not None:
-        write(NOISE_DIRECTION_VAR, direction)
-        write(NOISE_CONE_RANGE_VAR, cone_reach)
-    else:
-        write(NOISE_CONE_RANGE_VAR, literal=0.0)
-    write(NOISE_CONE_COS_VAR, literal=cone_cos)
-
-    # One exec out whether or not the record was replaced, and whether or not
-    # the GameMode was the one this project builds.
-    out = keep(ed.add_branch_node())
-    _set(out, "Condition", True)
-    for pin in (tail, else_(lands), *server.fails):
-        _connect(pin, _pin(out, "execute"))
-    return made, then(out)
+        _connect(direction, _pin(make, "Direction"))
+        _connect(cone_reach, _pin(make, "ConeReach"))
+    _set(make, "ConeCos", cone_cos)
+    _set(make, "HoldSeconds", COMBAT.noise_hold_s)
+    return [make], then(make)

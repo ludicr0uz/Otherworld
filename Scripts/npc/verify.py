@@ -321,11 +321,14 @@ def check_controller(path, key):
     check(f"{tag}: feels the player within TuneTouchRange "
           f"({spec['touch_range_cm']:.0f} cm)",
           sum(_fed(n, "B", "touch_range_cm") for n in reach) == 1, f"{fed}")
+    hears = _titled(nodes, "HearNoise")
     check(f"{tag}: hears at TuneHearing ({spec['hearing_scale']:g})x a noise's own "
-          f"reach, all round and down the cone",
-          sum(_fed(n, "B", "hearing_scale") for n in muls) == 2)
+          f"reach, all round and down the cone: one question of the world's noise "
+          f"list, from where its pawn stands",
+          len(hears) == 1 and _fed(hears[0], "HearingScale", "hearing_scale")
+          and {_title(f) for f in _feeders(hears[0], "Listener")} == {"Get Actor Location"})
     check(f"{tag}: only a noise from the last {COMBAT.noise_hold_s} s is heard",
-          len(_with_literal(_titled(nodes, "float <= float"), "B", COMBAT.noise_hold_s)) == 1)
+          len(_with_literal(hears, "HoldSeconds", COMBAT.noise_hold_s)) == 1)
 
 
 def _exec_reach(start):

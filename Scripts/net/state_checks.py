@@ -126,9 +126,11 @@ def check_no_client_game_mode(check):
           f"{len(guarded)} behind the switch, {len(server_only)} in server-only classes")
     # The scan has to be seeing reads at all for "none bare" to mean anything.
     homes = {w.split(".")[0] for w in guarded}
+    # The noise's writers and the wanderers' hearing read it until M28; the
+    # noises are the world's own list now (combat/noise.py), not the GameMode's.
     check("the scan finds the server's reads where they are: the health "
-          "component's (spawn counter, gun drop) and the noise's writers "
-          "behind the switch, the wanderers' hearing in their AI controller",
-          {"BP_HealthComponent", "BP_WeaponComponent", "BP_FootstepComponent"} <= homes
+          "component's (spawn counter, gun drop) behind the switch, the "
+          "wanderers' (the combat trace's switch) in their AI controller",
+          {"BP_HealthComponent"} <= homes
           and bool(server_only), f"guarded {sorted(homes)}; "
           f"server-only {sorted({w.split('.')[0] for w in server_only})}")

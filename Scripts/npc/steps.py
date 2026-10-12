@@ -221,8 +221,7 @@ def _author_steps(ed, key, melee_anim):
     Its numbers are read off the Tune* variables (npc/tuned.py); ``spec``
     here only words the comments.
 
-    Returns the sense step names authored, in priority order (sound is
-    dropped when the GameMode has no noise record)."""
+    Returns the sense step names authored, in priority order."""
     declare(ed, NV.STEPS)
     _declare_agro_vars(ed)
     declare_target_vars(ed)

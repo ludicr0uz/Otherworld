@@ -3,8 +3,9 @@ health component's; plus ensure_game_mode_vars(), which declares the ones
 that live on the GameMode.
 
 Where each lives (serversupportsysdesign.md 4.2; net/state_consts.py):
-    the GameMode     what only the server reads: the spawn counter, the noise
-                     record, the gun-drop streams, the combat trace's switch
+    the GameMode     what only the server reads: the spawn counter, the
+                     gun-drop streams, the combat trace's switch (the
+                     noises are the world's own list: combat/noise.py)
     the PlayerState  what is one player's: NpcKillCount, PlayerDead
     the GameState    what every machine reads: DebugMode, Difficulty
 A client has no GameMode, so nothing it reads may be declared here.
@@ -106,22 +107,6 @@ FELL_LOG_PREFIX = "[NPC-FELL] ERROR #"
 # afterwards.
 DEAD_LOG_PREFIX = "[PLAYER-DEAD] killed with "
 SPAWNED_AT_VAR = HV.SpawnedAt
-# The last noise the player made, for the wanderers to hear. One record,
-# world-scoped for the same reason as the counters above: the emitters (the
-# weapon component, the footstep component) and the listeners (every
-# wanderer's AI controller) share nothing else. Written by combat/noise.py,
-# read by Scripts/npc/senses.py. Where, when, how far it carries all round,
-# and -- for a gunshot -- the direction and reach of the louder cone down the
-# barrel, with the cosine of its half-angle. An all-round noise leaves the
-# cone reach at 0, which no listener can be inside.
-NOISE_TIME_VAR = GV.NoiseTime
-NOISE_LOCATION_VAR = GV.NoiseLocation
-NOISE_RANGE_VAR = GV.NoiseRange
-NOISE_DIRECTION_VAR = GV.NoiseDirection
-NOISE_CONE_RANGE_VAR = GV.NoiseConeRange
-NOISE_CONE_COS_VAR = GV.NoiseConeCos
-NOISE_FLOAT_VARS = GV.NOISE_FLOATS
-NOISE_VECTOR_VARS = GV.NOISE_VECTORS
 # Debug mode's damage readout, drawn at each impact for as long as the tracer.
 DAMAGE_TEXT_COLOR = "(R=1.000000,G=0.850000,B=0.100000,A=1.000000)"
 
@@ -143,8 +128,6 @@ def ensure_game_mode_vars():
         CombatTrace    whether wanderers log each landed swing (see
                        COMBAT_TRACE_VAR). Its default is written by
                        combat_trace.build_combat_trace_switch().
-        Noise*         the last noise the player made (see NOISE_TIME_VAR),
-                       written by whatever made it, heard by every wanderer.
         GunDrop*       the gun drop's roll and pick streams and their
                        seeded-this-session flag (see GUN_ROLL_STREAM_VAR).
 
@@ -164,7 +147,8 @@ def ensure_game_mode_vars():
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     if not ed:
         raise RuntimeError(f"{GAME_MODE_BP_PATH} has no EventGraph")
-    for name in MOVED_VARS:
+    # GV.REMOVED: the one noise record, a list of the world's since M28.
+    for name in (*MOVED_VARS, *GV.REMOVED):
         ed.remove_member_variable(name)
     declare(ed, GV.TABLE)
     arrange(ed)
@@ -172,5 +156,5 @@ def ensure_game_mode_vars():
         raise RuntimeError("BP_ThirdPersonGameMode failed to compile")
     eas.save_loaded_asset(bp)
     _log(f"{GAME_MODE_BP_PATH}: {SPAWN_COUNT_VAR}, {COMBAT_TRACE_VAR}, "
-         f"the noise record and the gun-drop streams ready")
+         f"the gun-drop streams ready")
     return bp

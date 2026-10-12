@@ -4,10 +4,9 @@ drives, and what a stance does to the footsteps (combat/footsteps.py).
 """
 
 from combat.footsteps import FOOTSTEP_BP_PATH
-from combat.noise import NOISE_RANGE_VAR
 from combat.tuning import BIND_VARS, COMBAT, CROUCH_KEY, PRONE_KEY
 from combat.verify.common import (
-    BEL, PIN, cdo, check, graph, in_pins, load, num_pin, titled,
+    BEL, PIN, cdo, check, graph, in_pins, load, num_pin,
 )
 from combat.verify.fixtures import char, w, wg
 from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR, STAND
@@ -133,10 +132,10 @@ def check_footsteps_by_stance():
               _title(n) for n in _feeds(BEL.find_input_pin(p, "VolumeMultiplier"))}
               for p in plays),
           f"{len(plays)} PlaySoundAtLocation")
-    ranges = [n for n in fg if _title(n) == f"Set {NOISE_RANGE_VAR}"]
+    ranges = [n for n in fg if _title(n) == "MakeNoise"]
     check("the step's noise reach is scaled by StepNoise",
           len(ranges) == 1 and "Get StepNoise" in {
-              _title(n) for n in _feeds(BEL.find_input_pin(ranges[0], NOISE_RANGE_VAR))})
+              _title(n) for n in _feeds(BEL.find_input_pin(ranges[0], "Reach"))})
     # CanJump is false while crouched, so it silenced every low step.
     check("the ground test is the movement component's, not CanJump",
           any(_flat(n) == "IsMovingOnGround" for n in fg)

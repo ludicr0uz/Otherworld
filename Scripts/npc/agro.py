@@ -27,15 +27,11 @@ M panel's MONSTER SETTINGS tab writes them on a live wanderer.
 from uebp.vars import declare
 from npc import controller_vars as NV
 
-from combat.game_state import DEBUG_MODE_VAR, NOISE_TIME_VAR
-from combat.paths import GAME_MODE_BP_PATH
+from combat.game_state import DEBUG_MODE_VAR
 from net.state_consts import GAME_STATE_CLASS_PATH
 from net.state_graph import game_state
 from forest_generator.npc_agro import AGRO_LOG_PREFIX
-from npc.graph import _log
-from uebp.graph import (
-    BEL, _assets, _connect, _name_literal, _node, _pin, _set, else_,
-    out, then)
+from uebp.graph import _connect, _name_literal, _node, _pin, _set, else_, out, then
 from npc.patrol import _author_patrol_step, _author_walk_speed
 from npc.paths import (
     AGGRO_REASON_VAR, AGGRO_VAR, AGGRO_VOICES_VAR, BB_AGGRO_KEY, BB_REASON_KEY, SENSE_STEPS,
@@ -55,16 +51,6 @@ def _declare_agro_vars(ed):
     """All zero/false by default, which is the right start: not aggro, not set
     up, and a patrol point due immediately (NextPatrolTime 0)."""
     declare(ed, NV.AGRO)
-
-
-def _noise_record_exists():
-    """Is the GameMode's noise record there to be heard? build_weapons_and_combat
-    declares it; a project that has not run that builder gets deaf wanderers
-    (sight, touch and hurt still work) rather than a graph that will not
-    compile. Loading it is also what puts its cast node in the palette."""
-    bp = _assets().load_asset(GAME_MODE_BP_PATH)
-    return bool(bp) and NOISE_TIME_VAR in {
-        str(v) for v in BEL.list_member_variable_names(bp, False)}
 
 
 def _author_enter_agro(ed, reasons, chase_in):
@@ -181,16 +167,10 @@ def _author_agro_steps(ed, step, result, stock):
     # candidate, the controller's Target (npc/target.py).
     made += _author_candidate(ed, step(STEP_PRESENT), result(True), result(False))
 
-    noise = _noise_record_exists()
-    if not noise:
-        _log(f"note: {GAME_MODE_BP_PATH} has no noise record -- the wanderers "
-             f"will not hear (run build_weapons_and_combat.py first)")
     fragments = {"hurt": _author_hurt, "sight": _author_sight,
                  "touch": _author_touch, "sound": _author_hearing}
     reasons, senses = [], []
     for sense, name in SENSE_STEPS:
-        if sense == "sound" and not noise:
-            continue
         nodes, yes, nothing = fragments[sense](ed, [step(name)])
         made.extend(nodes)
         missed = result(False)

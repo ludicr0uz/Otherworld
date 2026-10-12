@@ -8,8 +8,9 @@ builds them, state_graph.py is how a graph reaches them.
     BP_OtherworldGameState    one per world, replicated: what every machine
                               reads the same (debug mode, the difficulty)
 
-The GameMode keeps what only the server reads (the noise record, the gun-drop
-streams, the spawn counter: combat/game_state.py): a client has no GameMode.
+The GameMode keeps what only the server reads (the gun-drop streams, the
+spawn counter: combat/game_state.py): a client has no GameMode. The noises
+the wanderers hear are a native list written there alone (combat/noise.py).
 
 The variables keep the names they had on the GameMode (combat/game_state.py,
 combat/difficulty.py), which the weapon component's own DebugMode copy and

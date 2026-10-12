@@ -1304,12 +1304,12 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 
 - [x] Update the character to have pants as an equipped starting item when the game starts (already in the equiptment slot). This also means on loading screen a fresh character should already have pants. (low effort)
 
-- [ ] In the inventory mode, the front facing image of the character should represent the current equiptment. Remove the [i] Inventory text. Allow right clicking on a usable item in hand to use it (or use the "Use" key while in inventory mode.). 
+- [x] In the inventory mode, the front facing image of the character should represent the current equiptment. Remove the [i] Inventory text. Allow right clicking on a usable item in hand to use it (or use the "Use" key while in inventory mode.). 
 
 ## Multiplayer, phase 5: wanderers and the world (moved from
 ## Scripts/dev/plans/multiplayer_tasks.md; phases 6-8 wait there)
 
-- [ ] M27. Wanderers in a world with several players. Senses, aggro, the wendigo's stalk,
+- [x] M27. Wanderers in a world with several players. Senses, aggro, the wendigo's stalk,
       charge, torch ward and "ran too far" rule, zombie attacks and the "Drawn" state each
       choose and keep a target among all living players, switch when the target dies or
       leaves, and never read player 0. All AI runs only on the server; clients get movement

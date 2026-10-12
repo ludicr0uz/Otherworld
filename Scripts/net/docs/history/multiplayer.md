@@ -822,6 +822,33 @@ the ask, predicting ---------->    Server_Fire / _Punch /        Multicast_<Name
 
 <a id="m28"></a>
 
+<a id="m31"></a>
+## Things left in the world (M31, done, 2026-10-12)
+
+- **Before:** what lay in the world replicated and went dormant (A2), but nothing ever
+  removed an item: on a server that runs for days, dropped gear, lodged blades and cut wood
+  only grew. A body had its 60 s and a fire its 180 s, with no bound on how many at once.
+  No probe had a latecomer look at a dropped item, a lodged blade or a corpse.
+- **Built:** `UOtherworldLeftovers` (C++ world subsystem, server only) and
+  `UOtherworldLeftoverLibrary` (`LeftInWorld`, `TakenFromWorld`, and `LeftCount`,
+  `LeftLifetime`, `LeftExpired`, `LeftEvicted` for probes); `net/leftover_consts.py` (the
+  table), `net/leftover.py` (the two nodes), `net/leftover_checks.py` (what a verifier
+  asks of them), `uebp/nodes/leftover.py`. Called from `combat/item_world.py`,
+  `combat/death.py`, `combat/player_respawn.py`, `survival/campfire.py`.
+- **Decided:** the numbers (an item 20 minutes and 300 at once, 48 bodies, 64 fires) are a
+  first guess for 32-64 players, in one table. The chopped tree is its wood: the tree does
+  not change. The rule is in C++ because it needs a list across actors and a timer that
+  outlives any one of them; standalone is refused there by net mode, so no graph branches.
+- **Found on the way:** the first rule left out every level actor, and the wanderers are
+  placed by the generator, so no corpse was counted. Now only an item with a lifetime of
+  ours is left out, and only until it has been carried. The take's `TakenFromWorld` sits
+  after the flush: `verify/pickup.py` walks that chain backwards from the detach.
+- **Proof:** `probe_net_leftovers.py`, server 18/18, client 1 6/6, client 2 7/7 on
+  `Lvl_Probe_50m`; `--game` 4/4. `verify_weapons_and_combat` 2600 checks (2591 before),
+  `verify_survival` 160 (158).
+- **Left:** the caps are not load-tested; gear on a dead player's corpse is the later
+  death task's.
+
 <a id="m30"></a>
 ## One world clock (M30, done, 2026-10-11)
 
@@ -1168,8 +1195,8 @@ or owns, at the rate each thing needs, and a late joiner's world is the server's
   wanderers' (A1's three largest costs), not replication's, so the frame does not move.
   The gain in bytes grows with the players a server has, since each is sent only its
   neighbourhood; the cost that remains is what A3 onwards measures against.
-- **Left for M31:** corpses, chopped trees and a cleanup rule (a lifetime, a cap) for what
-  lies in a long-running world.
+- **Left for M31** (done since, #m31): corpses, chopped trees and a cleanup rule (a
+  lifetime, a cap) for what lies in a long-running world.
 
 <a id="memory"></a>
 ## Memory (measured, the editor binary; `serversupportsysdesign.md` 5 has the table)

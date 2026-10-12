@@ -162,6 +162,8 @@ intended rule for a respawn; for a logout it is the save's job.
   replicates and only the server spawns one (`Server_Light`), so every client is sent it.
   The warmth and the life span are behind HasAuthority; a client's copy only shows.
 - **It burns out:** BeginPlay, with authority, sets a life span of `CAMPFIRE_BURN_S`; the actor is destroyed.
+  On a server it is also counted as a leftover: past the `CAMPFIRE` cap the oldest fire goes
+  (`net/leftover_consts.py`, M31; `verify/campfire.check_leftover`).
   It is not saved with the profile and blocks nothing (the player walks through it).
 - **The model** is Quaternius's `SM_Bonfire_Fire` at 0.4 (87 cm across) with a point light
   that casts no shadows.

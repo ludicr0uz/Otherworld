@@ -36,6 +36,13 @@ replication authoring).
                 often (A2): the cull distance and the update rates, one row
                 per kind (characters, items, campfires)
     relevancy.py  writes a row onto a class's defaults and reads it back
+    leftover_consts.py  what a server does with each kind of thing left in
+                the world (M31): its lifetime and the cap on how many exist
+                (items, corpses, campfires)
+    leftover.py  the node a graph says it with: left in the world, taken
+                out of it
+    leftover_checks.py  the verifiers' check that a graph notes an actor by
+                its row
     guard_consts.py  what a Server event may be asked (A5): each event's asks
                 a second, when refusals close a connection, the aim a shot
                 may name; the RPC guard's table

@@ -255,3 +255,12 @@ Compared on the bridge skeleton (the player plays `A_UEFN_Player_MM_HitReact_*`,
 it is a worse spread. Lyra's `MM_HitReact_{Front,Back,Left,Right}_*` are the same Epic
 mannequin clips the game already uses; nothing is gained by swapping, and nothing was imported
 for the comparison, so nothing was deleted. `probes/probe_hit_react.py` shows one reaction from each side.
+
+## A body left in the world (M31)
+
+On a server a wanderer's corpse, and a dead player's body at respawn, are counted as
+leftovers straight after their `SetLifeSpan` (`net/leftover.py` `author_left`, the `CORPSE`
+row of `net/leftover_consts.py`): the 60 s stay the body's own, and past the cap the oldest
+body goes. An item entering the world is noted the same way, and struck off when taken
+(`combat/item_world.py`). `verify/leftovers.py` holds the nodes to the rows;
+`Scripts/net/CLAUDE.md`, "Things left in the world", has the rule.

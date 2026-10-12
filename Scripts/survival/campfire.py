@@ -62,6 +62,8 @@ from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_HAS_AUTHORITY, FN_LIF
 from uebp.nodes.math import FN_ADD_FF, FN_DISTANCE, FN_FMIN, FN_LE_FF, FN_MUL_FF
 from uebp.nodes.palette import NODE_CAST_SURVIVAL
 from net import relevancy
+from net.leftover import author_left
+from net.leftover_consts import CAMPFIRE as LEFT_CAMPFIRE
 from net.players import each_living_player
 from net.relevancy_consts import CAMPFIRE
 
@@ -180,6 +182,9 @@ def build_campfire(rebuild=True):
     life = _node(ed, FN_LIFESPAN)
     _set(life, "InLifespan", CAMPFIRE_BURN_S)
     _connect(then(owns), _pin(life, "execute"))
+    # One more fire on a server: the oldest goes when there are too many
+    # (net/leftover_consts.py, M31).
+    author_left(ed, LEFT_CAMPFIRE, [then(life)])
     _author_warmth(ed, tick)
 
     arrange(ed)

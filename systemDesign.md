@@ -94,7 +94,10 @@ now, the night moonlit under the real stars, and a level starts at a random hour
 has one owner: the server's (single player's own), which every client's sky and wind follow
 through the GameState (`Scripts/net/CLAUDE.md`, "One world clock"). At night
 the player's temperature falls; a campfire warms them. Grass and trees sway in a wind the
-graphics tab tunes.
+graphics tab tunes. What players leave in the world (items set down or thrown, a blade in
+a tree, cut wood, bodies, fires) is there for whoever joins a server later, and on a server
+each kind has a lifetime and a cap so a long-running world does not fill up; single player
+keeps what is left until it is taken (`Scripts/net/CLAUDE.md`, "Things left in the world").
 
 **Death** (`Scripts/combat/docs/health.md`, `Scripts/net/CLAUDE.md`). Nothing a dead body
 could do runs. In single player death ends the game: the world pauses on the death menu and

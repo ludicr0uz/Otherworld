@@ -69,7 +69,7 @@ def check_pickup_takes_once():
     if len(takes) != 1:
         return
 
-    # Backwards from the add: Detach <- FlushNetDormancy <- Set InWorld <- Set Dropped
+    # Backwards from the add: Detach <- TakenFromWorld <- FlushNetDormancy <- Set InWorld <- Set Dropped
     # <- Set TakeItem (the item, or a fresh one) <- Branch(IsLevelActor) <- Branch(free).
     looses = [n for n, _pin in _exec_from(takes[0])]
     check("the taken item is detached from whatever it was left in (a body a "
@@ -81,7 +81,14 @@ def check_pickup_takes_once():
           ", ".join(_title(n) for n in looses))
     if len(looses) != 1:
         return
-    wakes = [n for n, _pin in _exec_from(looses[0])]
+    struck = [n for n, _pin in _exec_from(looses[0])]
+    check("the taken item is struck off the server's list of what is left in the "
+          "world (TakenFromWorld, M31): no lifetime runs on a carried item",
+          len(struck) == 1 and _title(struck[0]).replace(" ", "").lower() == "takenfromworld"
+          and _taken_item(struck[0], "Actor"), ", ".join(_title(n) for n in struck))
+    if len(struck) != 1:
+        return
+    wakes = [n for n, _pin in _exec_from(struck[0])]
     check("the taken item, dormant where it lay, is sent once more (FlushNetDormancy)",
           len(wakes) == 1 and _title(wakes[0]).replace(" ", "") == "FlushNetDormancy"
           and _taken_item(wakes[0], "self"), ", ".join(_title(n) for n in wakes))

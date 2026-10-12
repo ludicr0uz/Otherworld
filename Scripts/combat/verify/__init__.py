@@ -142,6 +142,8 @@ and it never relies on a variable another section left behind.
               server sets it down, and an item lying Dropped replicates
   relevancy   what the server sends and how often (A2): the rows on the
               class defaults, the item's dormancy and its wakes
+  leftovers   what is left in the world is noted for the server's cleanup
+              rule (M31): an item entering the world and the take, a corpse
   glimmer     the glimmer over an item on the ground: MPC_ItemGlimmer and
               M_ItemGlimmer, the sprite on the item and the ammo pickup, the
               Tick step on the base and on each child with its own Tick;
@@ -200,7 +202,7 @@ and it never relies on a variable another section left behind.
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "ammo_graph", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "seat", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "melee_clips", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "glimmer", "heat", "trigger",
+    "hold_pose", "melee_clips", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "leftovers", "glimmer", "heat", "trigger",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "wear_draw", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
     "var_tables",
 )

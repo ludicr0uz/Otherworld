@@ -317,6 +317,39 @@ module that owns the action.
 - M28 noise for several players: docs/history/multiplayer.md#m28
 - M29 wanderer population by mode: docs/history/multiplayer.md#m29
 
+## Things left in the world (M31, done)
+
+- **What a player leaves is the server's actor, and a latecomer is sent it.** An item set
+  down or thrown, a blade lodged in a tree (`Lodged`), the wood cut from a trunk (the tree
+  itself never changes: the chop count is the weapon component's) are dormant replicated
+  items since A2; a wanderer's body is a replicated Character whose `Dead` is a RepNotify, so
+  a client that first hears of it dead runs the death path and collapses it.
+- **The cleanup rule is one list on the server**, `UOtherworldLeftovers` (a world subsystem,
+  `Source/Otherworld/Public/OtherworldLeftovers.h`), and a table, `net/leftover_consts.py`:
+  `Leftover(kind, lifetime_s, cap)`. `ITEM` 1200 s and 300; `CORPSE` and `CAMPFIRE` have no
+  lifetime of ours (the body's 60 s and the fire's 180 s are their own `SetLifeSpan`) and a
+  cap of 48 and 64. A graph says `LeftInWorld(actor, kind, lifetime, cap)` where a thing
+  enters the world and `TakenFromWorld(actor)` where it leaves it (`net/leftover.py`
+  `author_left`, `author_taken`; the numbers are pin literals from the row). The list is
+  swept once a second: past its lifetime an actor is destroyed; noted past the cap, the
+  oldest of the kind is destroyed (never the one just noted). Noting again starts the
+  lifetime again.
+- **Where it is said:** the three writes of an item's `InWorld` (`combat/item_world.py`:
+  the item's own Tick as it enters the world, the throw's release, the take), the
+  wanderer's corpse (`combat/death.py`) and a dead player's body at respawn
+  (`combat/player_respawn.py`), the campfire as it is lit (`survival/campfire.py`).
+- **Not noted:** anything in single player or on a client (the mode table's row), and an
+  item lying where the level put it, which no one left: it gets no lifetime until it has
+  been carried once. A level's wanderer that dies is counted like any other body.
+- **Proved:** `uepy.py --net --title --clients 2 --probe-timeout 420 --probe
+  Scripts/probes/probe_net_leftovers.py` (client 1's character sets matches down, lodges
+  its axe in a trunk and a wanderer is killed beside it; client 2 joins 5 s later and sees
+  the three, the body collapsed; then a 3 s lifetime destroys the matches, a take strikes
+  an item off the list, and a cap of one evicts the axe, on both clients); `--game` with
+  the same file is single player's arm (nothing noted, the call does nothing).
+  `combat/verify/leftovers.py`, `survival/verify/campfire.py` `check_leftover`.
+- M31 things left in the world: docs/history/multiplayer.md#m31
+
 ## One world clock (M30, done)
 
 - **The server's `BP_DayNightCycle` keeps the time of day; a client's shows it.** The cycle
@@ -426,6 +459,7 @@ difference is added there, with its reason, in the same commit, and copied here)
 | death | as today: the profile is deleted, back to the title | gear onto a corpse, respawn |
 | dev settings tabs and cheats | available | read-only unless the server allows them |
 | wanderer population | the level's fixed count | a budget that follows the players |
+| what is left in the world (an item set down or thrown, wood cut, a body, a campfire) | stays until it is taken (a body 60 s, a fire 180 s, as before) | each kind also has a lifetime and a cap: an item lies 20 minutes, and past the cap the oldest of the kind goes |
 | the title menu | the game opens on it, paused: Single Player and Multiplayer are chosen there | none: a connected client is in its game, however it joined (the title or an address on the command line). Leaving, a failed join or a dropped connection returns the process to standalone, and so to the title |
 
 **Pause** (M5, done). Every `SetGamePaused` in the game is authored by `net/pause.py`, and

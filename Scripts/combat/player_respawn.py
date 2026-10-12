@@ -29,6 +29,8 @@ back on RestartPlayer, the engine's own choice.
 
 from combat import health_vars as HV
 from combat.death import CORPSE_SECONDS
+from net.leftover import author_left
+from net.leftover_consts import CORPSE as LEFT_CORPSE
 from combat.game_state import PLAYER_DEAD_VAR
 from net.state_consts import PLAYER_STATE_CLASS_PATH
 from net.state_graph import CONTROLLER_CLASS_PATH, player_state_of, server_game_mode
@@ -82,8 +84,10 @@ def author_player_respawn(ed, exec_ins):
                       StartSpot=out(spot, "Item"))
     anywhere = g.call(FN_RESTART_PLAYER, [none], self=server.pin, NewPlayer=who)
 
-    g.call(FN_LIFESPAN, [then(at_start), then(anywhere), gone], self=body,
-           InLifespan=str(CORPSE_SECONDS))
+    rot = g.call(FN_LIFESPAN, [then(at_start), then(anywhere), gone], self=body,
+                 InLifespan=str(CORPSE_SECONDS))
+    # A corpse as a wanderer's is: under the same cap (M31).
+    author_left(ed, LEFT_CORPSE, [then(rot)], body)
     ed.add_comment_to_nodes(
         "A dead player on a server (never in standalone): after PlayerRespawnWait the "
         "controller lets go of the body and the GameMode gives it a new pawn at a random "

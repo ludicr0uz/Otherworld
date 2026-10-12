@@ -1585,15 +1585,15 @@ combat/damage.py:69: hit
 combat/damage.py:87: owner_instigator
 combat/damage.py:97: author_health_changed
 combat/damage.py:117: replicate_health
-combat/death.py:35: CORPSE_SECONDS
-combat/death.py:39: CONTROLLER_RETIRE_SECONDS
-combat/death.py:44: DEATH_PAUSE_SECONDS
-combat/death.py:48: PLAYER_RESPAWN_SECONDS
-combat/death.py:49: PLAYER_RESPAWN_WAIT
-combat/death.py:52: _author_kill_count
-combat/death.py:144: _author_death_collapse
-combat/death.py:221: _author_corpse
-combat/death.py:290: _author_player_death
+combat/death.py:37: CORPSE_SECONDS
+combat/death.py:41: CONTROLLER_RETIRE_SECONDS
+combat/death.py:46: DEATH_PAUSE_SECONDS
+combat/death.py:50: PLAYER_RESPAWN_SECONDS
+combat/death.py:51: PLAYER_RESPAWN_WAIT
+combat/death.py:54: _author_kill_count
+combat/death.py:146: _author_death_collapse
+combat/death.py:223: _author_corpse
+combat/death.py:294: _author_player_death
 combat/debuff_drain.py:39: _author_debuff_drain
 combat/difficulty.py:20: DIFFICULTY_VAR
 combat/difficulty.py:22: EASY
@@ -2013,15 +2013,15 @@ combat/install.py:117: install_on_character
 combat/install.py:175: install_on_npc
 combat/install.py:237: retire_old_assets
 combat/item_vars.py:215: TABLE
-combat/item_world.py:80: REPLICATED
-combat/item_world.py:83: replicate_item
-combat/item_world.py:91: relevance_item
-combat/item_world.py:97: author_wake
-combat/item_world.py:106: author_into_world
-combat/item_world.py:120: author_out_of_world
-combat/item_world.py:131: _author_enter_world
-combat/item_world.py:170: _author_rest
-combat/item_world.py:194: author_world_view
+combat/item_world.py:85: REPLICATED
+combat/item_world.py:88: replicate_item
+combat/item_world.py:96: relevance_item
+combat/item_world.py:102: author_wake
+combat/item_world.py:111: author_into_world
+combat/item_world.py:126: author_out_of_world
+combat/item_world.py:139: _author_enter_world
+combat/item_world.py:181: _author_rest
+combat/item_world.py:205: author_world_view
 combat/knife.py:58: KNIFE_MESH
 combat/knife.py:59: KNIFE_DISPLAY
 combat/knife.py:63: HANDLE_CENTRE
@@ -2179,8 +2179,8 @@ combat/player_move.py:75: reparent_player
 combat/player_move.py:112: set_move_numbers
 combat/player_pace.py:17: movement_of
 combat/player_pace.py:26: set_jog_speed
-combat/player_respawn.py:45: PLAYER_START_CLASS_PATH
-combat/player_respawn.py:48: author_player_respawn
+combat/player_respawn.py:47: PLAYER_START_CLASS_PATH
+combat/player_respawn.py:50: author_player_respawn
 combat/player_tuning.py:22: CSV_PATH
 combat/player_tuning.py:31: PLAYER_STATS
 combat/player_tuning.py:37: SAVED_COLUMNS
@@ -2559,7 +2559,7 @@ combat/use_tuning.py:9: USE_BIND
 combat/use_tuning.py:11: USING_VAR
 combat/use_tuning.py:12: USE_PRESSED_VAR
 combat/use_tuning.py:13: USE_WAS_VAR
-combat/verify/__init__.py:200: SECTIONS
+combat/verify/__init__.py:202: SECTIONS
 combat/verify/accuracy.py:20: _title
 combat/verify/accuracy.py:24: _sources
 combat/verify/accuracy.py:31: _sets
@@ -2906,6 +2906,10 @@ combat/verify/knife.py:130: check_knife_loadout
 combat/verify/knife.py:141: check_knife_press
 combat/verify/knife.py:192: check_knife_swing
 combat/verify/knife.py:251: check_knife_blow
+combat/verify/leftovers.py:18: _in_world_sets
+combat/verify/leftovers.py:23: _rows
+combat/verify/leftovers.py:27: check_items
+combat/verify/leftovers.py:61: check_corpses
 combat/verify/light.py:45: MATCHES_HEIGHT_CM
 combat/verify/light.py:47: MATCHES_REACH_CM
 combat/verify/light.py:50: _fires
@@ -2957,10 +2961,10 @@ combat/verify/pickup.py:40: _target_as_item
 combat/verify/pickup.py:46: _event_item
 combat/verify/pickup.py:52: _taken_item
 combat/verify/pickup.py:57: check_pickup_takes_once
-combat/verify/pickup.py:187: check_lodged_to_hand
-combat/verify/pickup.py:230: _reads_clip
-combat/verify/pickup.py:235: is_pickup_play
-combat/verify/pickup.py:242: check_pickup_clip
+combat/verify/pickup.py:194: check_lodged_to_hand
+combat/verify/pickup.py:237: _reads_clip
+combat/verify/pickup.py:242: is_pickup_play
+combat/verify/pickup.py:249: check_pickup_clip
 combat/verify/player_body.py:29: check_player_body
 combat/verify/player_death.py:19: _title
 combat/verify/player_death.py:23: _feeders
@@ -6272,6 +6276,17 @@ net/input_checks.py:44: _source
 net/input_checks.py:51: _by_index
 net/input_checks.py:58: scan_input
 net/input_checks.py:84: check_local_input
+net/leftover.py:14: author_left
+net/leftover.py:24: author_taken
+net/leftover_checks.py:14: _title
+net/leftover_checks.py:18: _value
+net/leftover_checks.py:22: left_nodes
+net/leftover_checks.py:27: taken_nodes
+net/leftover_checks.py:32: carries
+net/leftover_consts.py:27: ITEM
+net/leftover_consts.py:31: CORPSE
+net/leftover_consts.py:33: CAMPFIRE
+net/leftover_consts.py:35: ROWS
 net/owner_checks.py:29: BGE
 net/owner_checks.py:33: OWNED
 net/owner_checks.py:34: GET_PAWN
@@ -7529,6 +7544,31 @@ probes/probe_net_late_join.py:128: _joined
 probes/probe_net_late_join.py:133: _join
 probes/probe_net_late_join.py:233: _client_one
 probes/probe_net_late_join.py:283: _client_two
+probes/probe_net_leftovers.py:69: LEFT
+probes/probe_net_leftovers.py:71: SPARE_HEALTH
+probes/probe_net_leftovers.py:72: LATE_S
+probes/probe_net_leftovers.py:73: JOIN_S
+probes/probe_net_leftovers.py:74: SAME_PLACE_CM
+probes/probe_net_leftovers.py:75: CORPSE_NEAR_CM
+probes/probe_net_leftovers.py:76: BESIDE_CM
+probes/probe_net_leftovers.py:77: SHORT_S
+probes/probe_net_leftovers.py:78: NOT_NOTED
+probes/probe_net_leftovers.py:81: _lying
+probes/probe_net_leftovers.py:87: _alive
+probes/probe_net_leftovers.py:94: _noted
+probes/probe_net_leftovers.py:98: _health
+probes/probe_net_leftovers.py:102: _corpses
+probes/probe_net_leftovers.py:112: _bodies_seen
+probes/probe_net_leftovers.py:127: _spare
+probes/probe_net_leftovers.py:136: _leave_three
+probes/probe_net_leftovers.py:229: _cleanup
+probes/probe_net_leftovers.py:339: _joined
+probes/probe_net_leftovers.py:345: _join
+probes/probe_net_leftovers.py:367: _near
+probes/probe_net_leftovers.py:372: _sees_three
+probes/probe_net_leftovers.py:406: _sees_cleanup
+probes/probe_net_leftovers.py:430: _client_one
+probes/probe_net_leftovers.py:443: _client_two
 probes/probe_net_living_players.py:42: RATE
 probes/probe_net_living_players.py:43: SETTLE
 probes/probe_net_living_players.py:44: WATCH
@@ -8438,22 +8478,22 @@ server/start_server.py:83: engine_dir
 server/start_server.py:103: command
 server/start_server.py:111: environment
 server/start_server.py:119: parse_args
-survival/campfire.py:69: CAMPFIRE_MESH
-survival/campfire.py:70: CAMPFIRE_SCALE
-survival/campfire.py:72: MESH_CENTRE_XY
-survival/campfire.py:73: MESH_BOTTOM_Z
-survival/campfire.py:75: WARM_RADIUS_VAR
-survival/campfire.py:76: WARM_RATE_VAR
-survival/campfire.py:77: TEMPERATURE_VAR
-survival/campfire.py:78: MAX_TEMPERATURE_VAR
-survival/campfire.py:80: GLOW_HEIGHT_CM
-survival/campfire.py:81: GLOW_COLOUR
-survival/campfire.py:82: GLOW_INTENSITY
-survival/campfire.py:83: GLOW_RADIUS_CM
-survival/campfire.py:86: _build_model
-survival/campfire.py:106: _author_warmth
-survival/campfire.py:168: build_campfire
-survival/campfire.py:208: install_campfire
+survival/campfire.py:71: CAMPFIRE_MESH
+survival/campfire.py:72: CAMPFIRE_SCALE
+survival/campfire.py:74: MESH_CENTRE_XY
+survival/campfire.py:75: MESH_BOTTOM_Z
+survival/campfire.py:77: WARM_RADIUS_VAR
+survival/campfire.py:78: WARM_RATE_VAR
+survival/campfire.py:79: TEMPERATURE_VAR
+survival/campfire.py:80: MAX_TEMPERATURE_VAR
+survival/campfire.py:82: GLOW_HEIGHT_CM
+survival/campfire.py:83: GLOW_COLOUR
+survival/campfire.py:84: GLOW_INTENSITY
+survival/campfire.py:85: GLOW_RADIUS_CM
+survival/campfire.py:88: _build_model
+survival/campfire.py:108: _author_warmth
+survival/campfire.py:170: build_campfire
+survival/campfire.py:213: install_campfire
 survival/campfire_vars.py:12: TABLE
 survival/component_vars.py:19: STATS
 survival/component_vars.py:24: TABLE
@@ -8560,16 +8600,17 @@ survival/tuning.py:86: FORAGE_MIN_SPACING_CM
 survival/tuning.py:87: FORAGE_SEED
 survival/verify/__init__.py:24: SECTIONS
 survival/verify/ability.py:43: check_easy_heal
-survival/verify/campfire.py:28: CAMPFIRE_WIDTH_CM
-survival/verify/campfire.py:31: _title
-survival/verify/campfire.py:35: LIVING
-survival/verify/campfire.py:38: _squash
-survival/verify/campfire.py:42: _feeders
-survival/verify/campfire.py:47: _feeds
-survival/verify/campfire.py:61: check_model
-survival/verify/campfire.py:104: _owned
-survival/verify/campfire.py:115: check_replicates
-survival/verify/campfire.py:126: check_warmth
+survival/verify/campfire.py:30: CAMPFIRE_WIDTH_CM
+survival/verify/campfire.py:33: _title
+survival/verify/campfire.py:37: LIVING
+survival/verify/campfire.py:40: _squash
+survival/verify/campfire.py:44: _feeders
+survival/verify/campfire.py:49: _feeds
+survival/verify/campfire.py:63: check_model
+survival/verify/campfire.py:106: _owned
+survival/verify/campfire.py:117: check_replicates
+survival/verify/campfire.py:128: check_leftover
+survival/verify/campfire.py:142: check_warmth
 survival/verify/forage.py:11: GENERATED
 survival/verify/server.py:14: SWITCH
 survival/verify/server.py:15: OWNER_ONLY
@@ -8905,6 +8946,13 @@ uebp/nodes/inventory.py:45: FN_INVENTORY_RECORD_WRITES
 uebp/nodes/inventory.py:46: FN_INVENTORY_RECORD_STALE
 uebp/nodes/inventory.py:47: FN_SET_INVENTORY_RECORD_AUDIT
 uebp/nodes/inventory.py:48: FN_IS_PUSH_MODEL_ON
+uebp/nodes/leftover.py:8: LEFTOVER_LIBRARY
+uebp/nodes/leftover.py:13: FN_LEFT_IN_WORLD
+uebp/nodes/leftover.py:15: FN_TAKEN_FROM_WORLD
+uebp/nodes/leftover.py:18: FN_LEFT_COUNT
+uebp/nodes/leftover.py:19: FN_LEFT_LIFETIME
+uebp/nodes/leftover.py:20: FN_LEFT_EXPIRED
+uebp/nodes/leftover.py:21: FN_LEFT_EVICTED
 uebp/nodes/level.py:6: NET_LIBRARY
 uebp/nodes/level.py:10: FN_IS_LEVEL_ACTOR
 uebp/nodes/locomotion.py:7: FN_TRY_GET_PAWN_OWNER
@@ -9567,6 +9615,14 @@ Source/Otherworld/Public/OtherworldInventoryRecord.h:362: UFUNCTION static int32
 Source/Otherworld/Public/OtherworldInventoryRecord.h:370: UFUNCTION static void SetInventoryRecordAudit(bool bOn);
 Source/Otherworld/Public/OtherworldInventoryRecord.h:374: UFUNCTION static bool IsPushModelOn();
 Source/Otherworld/Public/OtherworldInventoryRecord.h:383: UCLASS class OTHERWORLD_API UOtherworldRecordSave : public USaveGame
+Source/Otherworld/Public/OtherworldLeftovers.h:24: UCLASS class OTHERWORLD_API UOtherworldLeftovers : public UWorldSubsystem
+Source/Otherworld/Public/OtherworldLeftovers.h:75: UCLASS class OTHERWORLD_API UOtherworldLeftoverLibrary : public UBlueprintFun
+Source/Otherworld/Public/OtherworldLeftovers.h:86: UFUNCTION static void LeftInWorld(AActor* Actor, FName Kind, float LifetimeSecon
+Source/Otherworld/Public/OtherworldLeftovers.h:90: UFUNCTION static void TakenFromWorld(AActor* Actor);
+Source/Otherworld/Public/OtherworldLeftovers.h:94: UFUNCTION static int32 LeftCount(const UObject* WorldContextObject, FName Kind);
+Source/Otherworld/Public/OtherworldLeftovers.h:98: UFUNCTION static float LeftLifetime(const AActor* Actor);
+Source/Otherworld/Public/OtherworldLeftovers.h:102: UFUNCTION static int32 LeftExpired(const UObject* WorldContextObject);
+Source/Otherworld/Public/OtherworldLeftovers.h:105: UFUNCTION static int32 LeftEvicted(const UObject* WorldContextObject);
 Source/Otherworld/Public/OtherworldLoadLibrary.h:47: UCLASS class OTHERWORLD_API UOtherworldLoadLibrary : public UBlueprintFunctio
 Source/Otherworld/Public/OtherworldLoadLibrary.h:57: UFUNCTION static TArray<FOtherworldConnectionStats> ConnectionStats(const UObjec
 Source/Otherworld/Public/OtherworldLoadLibrary.h:67: UFUNCTION static void StartFrameTiming();

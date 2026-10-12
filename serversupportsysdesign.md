@@ -73,7 +73,8 @@ builders, verifiers excluded (*verified*).
   World Partition streaming. The navmesh bounds are capped at exactly 1 km
   (`NAV_MAX_HALF_XY_CM = 50000`) and the mesh is built at boot, about 2 minutes at 1 km.
 - **World changes that never go away.** Chopped wood, lodged blades, campfires and dropped
-  gear pile up on a long-running server.
+  gear pile up on a long-running server. (Closed by M31: each kind has a lifetime and a cap on
+  a server, `Scripts/net/CLAUDE.md` "Things left in the world".)
 
 ---
 
@@ -255,7 +256,12 @@ The rules every multiplayer task follows:
    | death | as today: the profile is deleted, back to the title | gear onto a corpse, respawn |
    | dev settings tabs and cheats | available | read-only unless the server allows them |
    | wanderer population | the level's fixed count | a budget that follows the players |
+   | what is left in the world (an item set down or thrown, wood cut, a body, a campfire) | stays until it is taken (a body 60 s, a fire 180 s, as before) | each kind also has a lifetime and a cap: an item lies 20 minutes, and past the cap the oldest of the kind goes |
    | the title menu | the game opens on it, paused: Single Player and Multiplayer are chosen there | none: a connected client is in its game, however it joined (the title or an address on the command line). Leaving, a failed join or a dropped connection returns the process to standalone, and so to the title |
+
+   The leftovers' row (task M31): a single-player session ends long before what the player
+   dropped can matter, and losing a thing they set down would be a surprise; a server runs
+   for days. Asked in C++ by net mode (`UOtherworldLeftovers::Leave`), not by a graph.
 
    The title's row (task M6): the title is where a mode is chosen, so a process that is
    already a client of a server has passed it. Asked with IsStandalone at the HUD's BeginPlay.

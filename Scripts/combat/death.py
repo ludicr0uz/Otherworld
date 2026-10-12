@@ -24,6 +24,8 @@ from uebp.nodes.palette import (
     MACRO_SWITCH_AUTHORITY_COMP, NODE_CAST_CHARACTER, NODE_CAST_PAWN, NODE_SPAWN)
 from uebp.nodes.system import (
     FN_CONCAT, FN_DELAY, FN_INT_TO_STR, FN_IS_VALID, FN_PRINT)
+from net.leftover import author_left
+from net.leftover_consts import CORPSE as LEFT_CORPSE
 from net.pause import author_pause
 from uebp import props as EP
 from combat import health_vars as HV
@@ -284,7 +286,9 @@ def _author_corpse(ed, exec_ins):
         f"replacement comes later (replacement.py), off this same component, "
         f"which is why the body has to outlast the respawn delay.",
         [owner, as_pawn, brain, possessed, has_brain, lobotomy, rot])
-    return then(rot)
+    # One more corpse on a server: the oldest goes when there are too many
+    # (net/leftover_consts.py, M31).
+    return author_left(ed, LEFT_CORPSE, [then(rot)], owner_out)
 
 
 def _author_player_death(ed, exec_ins):

@@ -53,8 +53,11 @@ from the record's picture, not from this copy. The engine closes the channel
 of a hidden actor with no collision by itself, so a copy of an item in a bag
 is gone a few seconds on.
 
-Left for M31: what else a late joiner is told of (corpses, chopped trees),
-and a cleanup rule for what lies in a long-running world.
+What lies in the world does not lie there for ever on a server (task M31):
+each of the two ways in notes the actor on the server's list of leftovers
+(net/leftover.py, the ITEM row of net/leftover_consts.py: a lifetime, and a
+cap on how many lie at once) and the take strikes it off. An item placed in
+the level is never noted, and single player notes nothing.
 """
 
 from combat import item_vars as IV
@@ -65,6 +68,8 @@ from uebp import net
 from uebp.g import _G
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from net import relevancy
+from net.leftover import author_left, author_taken
+from net.leftover_consts import ITEM as LEFT_ITEM
 from net.relevancy_consts import ITEM
 from uebp.nodes.actor import (
     FN_FLUSH_NET_DORMANCY, FN_HAS_AUTHORITY, FN_SET_HIDDEN, FN_SET_NET_DORMANCY,
@@ -114,7 +119,8 @@ def author_into_world(ed, item, exec_ins):
         "The item is the world's now (item_world.py): InWorld, and the server's "
         "actor replicates from here on, with its movement and what it is "
         "attached to.", g.made)
-    return then(sent)
+    # ...and one more thing left there: a server gives it a lifetime (M31).
+    return author_left(ed, LEFT_ITEM, [then(sent)], item)
 
 
 def author_out_of_world(ed, item, exec_ins):
@@ -125,7 +131,9 @@ def author_out_of_world(ed, item, exec_ins):
     flow = g.iput(item, IV.InWorld, "false", exec_ins)
     # The item lay dormant: the lowered InWorld is sent, or no client would
     # ever hide its copy.
-    return author_wake(ed, [flow], item)
+    woke = author_wake(ed, [flow], item)
+    # Carried, it is no longer left there: no lifetime runs on it (M31).
+    return author_taken(ed, [woke], item)
 
 
 def _author_enter_world(ed, exec_in):
@@ -164,7 +172,10 @@ def _author_enter_world(ed, exec_in):
         "however it came to lie there (set down, placed in the level, left by a "
         "kill), and sends it once more if it lay dormant.",
         [lying, kept, here, enter, flag, moves, sent, woke])
-    return (else_(enter), then(woke))
+    # From here it is left in the world: a server destroys it at the end of
+    # its lifetime, or to keep the cap (M31; never a level actor, never in
+    # single player).
+    return (else_(enter), author_left(ed, LEFT_ITEM, [then(woke)]))
 
 
 def _author_rest(ed, exec_ins):

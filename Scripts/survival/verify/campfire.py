@@ -13,6 +13,8 @@ from combat.verify.common import (
 from net import relevancy
 from net.players_consts import LIVING_TITLE
 from net.relevancy_consts import CAMPFIRE as CAMPFIRE_ROW
+from net.leftover_checks import carries, left_nodes
+from net.leftover_consts import CAMPFIRE as LEFT_ROW
 from uebp import net
 from Sound.sound_items import CAMPFIRE, CRACKLE_COMP
 from survival.campfire import (
@@ -123,6 +125,20 @@ def check_replicates(bp):
           "told", dormancy == unreal.NetDormancy.DORM_DORMANT_ALL, str(dormancy))
 
 
+def check_leftover(bp):
+    nodes = list(graph(bp).list_all_nodes())
+    noted = left_nodes(nodes)
+    beside = [n for n in noted
+              if any("setlifespan" in _squash(f) for f in _feeders(n, "execute"))]
+    check("the fire is noted as left in the world straight off its lifespan, so a "
+          "server keeps a cap on how many burn (M31)",
+          len(noted) == 1 and len(beside) == 1, f"{len(noted)} node(s)")
+    ok = [carries(n, LEFT_ROW) for n in noted]
+    check(f"...with the CAMPFIRE row of net/leftover_consts.py: its own lifespan, at "
+          f"most {LEFT_ROW.cap}", bool(ok) and all(o for o, _ in ok),
+          str([r for _, r in ok]))
+
+
 def check_warmth(bp):
     d = cdo(bp)
     radius, rate = d.get_editor_property(WARM_RADIUS_VAR), d.get_editor_property(WARM_RATE_VAR)
@@ -183,6 +199,7 @@ def run():
         return
     check_model(bp)
     check_replicates(bp)
+    check_leftover(bp)
     check_warmth(bp)
     got = cdo(load(WEAPON_COMP_BP_PATH)).get_editor_property(CAMPFIRE_CLASS_VAR)
     check(f"BP_WeaponComponent.{CAMPFIRE_CLASS_VAR} points at BP_Campfire_C, so a "

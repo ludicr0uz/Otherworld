@@ -303,7 +303,7 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 - [x] In menus, update the back button to be the top option. Update up/down cotrols to allow overflow. I.E when in bottom most position, going down, brings the cursor to the top of the menu. At the top of the menu, going up brings the selection cursor to the bottom of the menu. 
 - [x] When operating in prod full screen mode, the bottom part of the health bars and icons is cut off
 ## Multiplayer, phase 0: foundations (strategy: serversupportsysdesign.md; the rest of the
-## queue, phases 5-8, waits in Scripts/dev/plans/multiplayer_tasks.md)
+## queue, phases 6-8, waits in Scripts/dev/plans/multiplayer_tasks.md)
 - [x] M1. Add a real C++ module to the project. Create `Source/` from the generated files in
       `Intermediate/Source` (Otherworld runtime module, Editor, Client and Server targets),
       add the module to `Otherworld.uproject`, and compile the editor target on this Mac
@@ -1304,32 +1304,139 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 
 - [x] Update the character to have pants as an equipped starting item when the game starts (already in the equiptment slot). This also means on loading screen a fresh character should already have pants. (low effort)
 
+- [ ] In the inventory mode, the front facing image of the character should represent the current equiptment. Remove the [i] Inventory text. Allow right clicking on a usable item in hand to use it (or use the "Use" key while in inventory mode.). 
+
+## Multiplayer, phase 5: wanderers and the world (moved from
+## Scripts/dev/plans/multiplayer_tasks.md; phases 6-8 wait there)
+
+- [ ] M27. Wanderers in a world with several players. Senses, aggro, the wendigo's stalk,
+      charge, torch ward and "ran too far" rule, zombie attacks and the "Drawn" state each
+      choose and keep a target among all living players, switch when the target dies or
+      leaves, and never read player 0. All AI runs only on the server; clients get movement
+      and animation by replication, and the roar and growl sounds by Multicast. Done when:
+      the NPC verifier and probes pass and a 2-client probe has a wanderer aggro on the
+      nearer client and switch when that client dies.
+      Design goal: Monsters built to hunt one player must choose among many and stay coherent when
+      a target dies or leaves, with all AI on the server.
+      Big picture: this is task M27 of 36 in the multiplayer project, phase 5 of 0-8 (wanderers
+      and the world). The project turns this single-player survival game into one that also runs
+      as a PvP game on a dedicated server (32-64 players, teams or solo, characters that persist),
+      with single player still shipping from the same code. Phases 0-7 are built and proved on
+      this Mac; hosting on GCP comes after and is not part of any task here. This phase is done
+      when the monsters and the world behave sensibly with many players spread over the map. The
+      strategy is `serversupportsysdesign.md`: section 1 the target, 4.1 authority, 4.2 where
+      state lives, 4.8 the two modes, 7 the whole task list; read it before designing, and build
+      for the later phases rather than for this task alone. The tasks before this one are done or
+      in the same queue; this run's progress file and the git log say what they built. Do not do
+      later tasks' work here.
+      Both modes: single player and multiplayer both ship. Follow the standing requirement
+      at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
+      effort: high
+- [ ] M28. Noise for several players. The GameMode's single last-noise record becomes a short
+      list of recent noises (place, loudness, time, who made it), written only on the
+      server and queried by the senses. Done when: two clients firing far apart each draw
+      the wanderers near them.
+      Design goal: Sound-driven AI must work when several players make noise in different places
+      at once.
+      Big picture: this is task M28 of 36 in the multiplayer project, phase 5 of 0-8 (wanderers
+      and the world). The project turns this single-player survival game into one that also runs
+      as a PvP game on a dedicated server (32-64 players, teams or solo, characters that persist),
+      with single player still shipping from the same code. Phases 0-7 are built and proved on
+      this Mac; hosting on GCP comes after and is not part of any task here. This phase is done
+      when the monsters and the world behave sensibly with many players spread over the map. The
+      strategy is `serversupportsysdesign.md`: section 1 the target, 4.1 authority, 4.2 where
+      state lives, 4.8 the two modes, 7 the whole task list; read it before designing, and build
+      for the later phases rather than for this task alone. The tasks before this one are done or
+      in the same queue; this run's progress file and the git log say what they built. Do not do
+      later tasks' work here.
+      Both modes: single player and multiplayer both ship. Follow the standing requirement
+      at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
+- [ ] M29. Wanderer population by mode. Standalone keeps the level's fixed count and the
+      10-second respawn. On a server the count is a budget: wanderers spawn out of sight
+      near players and are removed when no player is within a configurable range, with a
+      cap per player and for the server. The settings join the monster tuning table. Done
+      when: single-player spawn probes are unchanged and a `--net` probe shows the count
+      following two clients standing far apart.
+      Design goal: A fixed monster count cannot serve both one player and sixty-four. Make
+      population follow the players on a server and leave single player as designed.
+      Big picture: this is task M29 of 36 in the multiplayer project, phase 5 of 0-8 (wanderers
+      and the world). The project turns this single-player survival game into one that also runs
+      as a PvP game on a dedicated server (32-64 players, teams or solo, characters that persist),
+      with single player still shipping from the same code. Phases 0-7 are built and proved on
+      this Mac; hosting on GCP comes after and is not part of any task here. This phase is done
+      when the monsters and the world behave sensibly with many players spread over the map. The
+      strategy is `serversupportsysdesign.md`: section 1 the target, 4.1 authority, 4.2 where
+      state lives, 4.8 the two modes, 7 the whole task list; read it before designing, and build
+      for the later phases rather than for this task alone. The tasks before this one are done or
+      in the same queue; this run's progress file and the git log say what they built. Do not do
+      later tasks' work here.
+      Both modes: single player and multiplayer both ship. Follow the standing requirement
+      at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
+- [ ] M30. One world clock. The time of day, the random start time, wind and the night cold
+      are driven by the server and replicated through the GameState, so every client sees
+      the same sun and moon. Done when: two clients report the same time of day within a
+      second after a minute, and the day-night verifier passes.
+      Design goal: Everyone on a server shares one sky, so the clock has a single owner.
+      Big picture: this is task M30 of 36 in the multiplayer project, phase 5 of 0-8 (wanderers
+      and the world). The project turns this single-player survival game into one that also runs
+      as a PvP game on a dedicated server (32-64 players, teams or solo, characters that persist),
+      with single player still shipping from the same code. Phases 0-7 are built and proved on
+      this Mac; hosting on GCP comes after and is not part of any task here. This phase is done
+      when the monsters and the world behave sensibly with many players spread over the map. The
+      strategy is `serversupportsysdesign.md`: section 1 the target, 4.1 authority, 4.2 where
+      state lives, 4.8 the two modes, 7 the whole task list; read it before designing, and build
+      for the later phases rather than for this task alone. The tasks before this one are done or
+      in the same queue; this run's progress file and the git log say what they built. Do not do
+      later tasks' work here.
+      Both modes: single player and multiplayer both ship. Follow the standing requirement
+      at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
+- [ ] M31. Things left in the world. (Reduced by A2, which gave every item and campfire a
+      cull distance, dormancy and a late joiner who sees a placed item taken and a fire lit:
+      `probe_net_late_join.py`.) What remains: corpses, stuck weapons and chopped trees are
+      replicated to players who arrive later, and each thing left in the world has a cleanup
+      rule on a server (a lifetime, and a cap on how many exist) so a long-running world does
+      not fill up. Standalone keeps today's behaviour. Done when: client 2 joining after
+      client 1 dropped an item, lodged a blade in a tree and killed a wanderer sees all three.
+      Design goal: A server runs for days and players arrive at any time: what was left in the
+      world must be there for latecomers, and must not pile up without limit.
+      Big picture: this is task M31 of 36 in the multiplayer project, phase 5 of 0-8 (wanderers
+      and the world). The project turns this single-player survival game into one that also runs
+      as a PvP game on a dedicated server (32-64 players, teams or solo, characters that persist),
+      with single player still shipping from the same code. Phases 0-7 are built and proved on
+      this Mac; hosting on GCP comes after and is not part of any task here. This phase is done
+      when the monsters and the world behave sensibly with many players spread over the map. The
+      strategy is `serversupportsysdesign.md`: section 1 the target, 4.1 authority, 4.2 where
+      state lives, 4.8 the two modes, 7 the whole task list; read it before designing, and build
+      for the later phases rather than for this task alone. The tasks before this one are done or
+      in the same queue; this run's progress file and the git log say what they built. Do not do
+      later tasks' work here.
+      Both modes: single player and multiplayer both ship. Follow the standing requirement
+      at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
+- [ ] M32. Dev settings and cheats by mode. Standalone keeps every dev tab and cheat as today.
+      A client of a server can open the tabs but changes to gameplay tables (guns, monsters,
+      player, world) are sent to the server and applied only when the server was started
+      with a `-AllowDevTuning` switch; otherwise the rows are read-only and say why.
+      Graphics and sound settings stay local in both modes. Done when: both cases are probed.
+      Design goal: The tuning tools were built for a solo developer. Keep them for single player
+      and stop them being a cheat menu on a shared server.
+      Big picture: this is task M32 of 36 in the multiplayer project, phase 5 of 0-8 (wanderers
+      and the world). The project turns this single-player survival game into one that also runs
+      as a PvP game on a dedicated server (32-64 players, teams or solo, characters that persist),
+      with single player still shipping from the same code. Phases 0-7 are built and proved on
+      this Mac; hosting on GCP comes after and is not part of any task here. This phase is done
+      when the monsters and the world behave sensibly with many players spread over the map. The
+      strategy is `serversupportsysdesign.md`: section 1 the target, 4.1 authority, 4.2 where
+      state lives, 4.8 the two modes, 7 the whole task list; read it before designing, and build
+      for the later phases rather than for this task alone. The tasks before this one are done or
+      in the same queue; this run's progress file and the git log say what they built. Do not do
+      later tasks' work here.
+      Both modes: single player and multiplayer both ship. Follow the standing requirement
+      at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
+
+
 - [ ] Add Axe and Knife to the loot table for monsters. 15% change to drop either of the time. 
 
 - [ ] Increase the glimemer distance for items by 30%. Delay the initial glimmer of the item by 5 seconds. 
-
-- [ ] In the inventory mode, the front facing image of the character should represent the current equiptment. 
-
-
-- [ ] I2. Enhanced Input, every remaining key. From I1: one `IA_*` per action in `combat/input_assets.py` (aim, sights, reload, interact, throw, block, slots 1-9, sprint, crouch, prone, slide, jump, menu, inventory, loot, hold breath, use), each bound to a Blueprint-implementable event on the character or the weapon component base, each fragment's poll replaced by its event. Then delete: the SaveGame key push, `_post_physics_tick` and the TG_PostPhysics hack in `uebp/graph.py`, and the `WasInputKeyJustPressed` path from `uebp/nodes` (so `check_node_catalog.py` fails on a new poll). Rebinding on the settings page edits the mapping context. Proof: `probes/sets.py` `FULL`. Done when no builder names `WasInputKeyJustPressed`. effort: high
-
-- [ ] D1. Gun tuning as a DataTable the game reads. `gun_tuning.csv` is read at build and baked into CDO defaults, so a number costs a rebuild and the server, the client and the menu can disagree. Add `combat/tuning_table.py` that imports the CSV into `/Game/Weapons/DT_GunTuning` (`UDataTable` over a `FOtherworldGunRow` struct in the `Otherworld` module) at build, and have `UOtherworldWeaponComponentBase` (W1) read its row by weapon name at BeginPlay on every machine; the CDO defaults for those fields are deleted from the builder. The GUN SETTINGS tab edits the row in memory and still writes the CSV (the dev flow stays; M32 decides which mode may). `combat/verify/tuning.py` asserts the table's rows equal the CSV. Proof: `probe_gun_tuning.py`, `probe_net_fire.py`, the balance assertion in the verifier. effort: medium
-
-- [ ] D2. The other tuning tables the same way: `monster_tuning.csv`, `player_tuning.csv`, `world_tuning.csv`, `graphics_tuning.csv`, `sound_tuning.csv`, one DataTable each, after D1's pattern, one commit per table, each with its probe (`probe_monster_tuning.py`, `probe_player_tuning.py`, `probe_day_night.py`, `probe_graphics_tuning.py`, `probe_sound_tuning.py`). Done when no builder bakes a tuning CSV into a CDO and `Scripts/combat/CLAUDE.md` describes the one flow. effort: medium
-
-- [ ] U1. The HUD bars read a view model. `BP_GraphicsMenuHUD` is 3,057 nodes; the bars (HP, stamina, hunger, thirst, temperature) are polled on Tick from the pawn's components. Enable the engine's `ModelViewViewModel` plugin, add `UOtherworldVitalsViewModel` in C++ (five fields, `FieldNotify`), filled on the owning client from the replicated values (`UOtherworldHealthComponent` after W3, else the Blueprint variables through the record of `OnRep`), and bind the five bar widgets to it through `graphics_menu/umg_author.py` (the UMGToolSet route; if the plugin's binding cannot be authored from Python, say so and stop with the finding). Delete the Tick polling for the bars. Proof: `probe_hud_low_flash.py`, `probe_net_hud_own_pawn.py`, `verify_graphics_menu.py`. Record the HUD's node count before and after. effort: high
-
-- [ ] P1. The character save in C++, both modes, ahead of M35. `BP_Profile` is a SaveGame the HUD writes after the 15 s countdown. Add `UOtherworldSaveLibrary` to the `Otherworld` module: `SaveCharacter(Character, Key)` and `LoadCharacter(Character, Key)` writing one file under `Saved/SaveGames/characters/<key>.sav` holding a version, the record's bytes (`FOtherworldInventoryRecord::ToBytes`), the survival stats and the worn slots, read through `FMemoryReader`. Standalone calls it with the key `local` from the existing save-and-exit flow in place of the SaveGame write; a server calls it with the player id at disconnect (M35 adds the account key and the timer). `graphics_menu/profile_*.py`'s SaveGame path is deleted once the probe passes. Proof: `probe_save_exit.py`, `probe_record_bytes.py`, a new `probe_save_roundtrip.py` (save, wipe, load, the record and stats equal). effort: medium
-
-- [ ] N0. A C++ base for the wanderer controllers. Each controller is its own Blueprint and `npc/step_task.py` reaches its events only by cast, one task class per controller. Add `AOtherworldWandererController : AAIController` with the step entry as `BlueprintImplementableEvent Step(FName)` and `StepResult` as a property, reparent the controllers onto it (`npc/controller.py`), and replace the per-controller `BTT_<controller>_Step` with one native `UBTTask_WandererStep` (`UBTTaskNode` in the `Otherworld` module, `Step` as its one property) that calls the base's event. Delete `npc/step_task.py`'s per-controller classes. Proof: `verify_npc_blueprints.py` same counts but the step tasks, `probe_npc_behavior_tree.py`, `probe_npc_strafe.py`. effort: medium
-
-- [ ] N1. Sight through AI Perception, behind a switch. `npc/senses.py` and `sight_cone.py` hand-roll the cone and the checks; each wanderer checks one player per heartbeat, which breaks at 64. Add a `UAIPerceptionComponent` with a sight sense to `AOtherworldWandererController` (N0), configured from `monster_tuning.csv`'s cone and range, and let `OnTargetPerceptionUpdated` set the same blackboard keys `senses.py` sets today; `NPC_PERCEPTION` in `npc/tuned.py` chooses the path, default off until the probes pass, then on, and the old path is deleted in the same commit if they do. Proof: `verify_sight_cone.py`, `probe_npc_behavior_tree.py`, `probe_net_living_players.py`. effort: medium
-
-- [ ] N2. Hearing through AI Perception: the noise record goes. The GameMode holds one last-noise record for the whole world (`serversupportsysdesign.md` 2: at 64 players the wanderers hear only the loudest shot). Add a hearing sense to N1's component; every noise source (`combat/noise.py` or wherever the record is written) reports `UAISense_Hearing::ReportNoiseEvent` with its loudness and range from the tuning instead; the record and its reads are deleted. This is M28's substance, so mark M28 done by pointing at this task. Proof: `probe_net_fire.py`'s noise checks if any, `probe_monster_sounds.py`, a new `probe_npc_hearing.py` (two shots at once from two bots; the nearer wanderer turns to each). effort: medium
-
-- [ ] N3. Cover and stalk points through EQS. `npc/stalk_cover.py` and `forest_generator/npc_stalk.py` pick a trunk to wait behind by hand. Write one Environment Query (`EQS_StalkCover`: tree HISM instances within range, scored by cover from the target and distance along the arc) as an asset authored from Python or committed through LFS, and a native `UBTTask_RunEQSQuery` use in the tree in place of the hand-rolled pick. Proof: `verify_stalk_cover.py` adjusted to the query, `verify_stalk.py`, a `--game` run of 60 s with the wendigo aggro showing the same arc behaviour in its log. effort: medium
-
-- [ ] F1. A spike: one system as a Game Feature plugin. Move clothing (the smallest system: `Scripts/clothing`, `build_clothing.py`, eight garments) into `Plugins/GameFeatures/OtherworldClothing` with its content under the plugin, its builder writing there, and a `GameFeatureAction` adding the worn-slots component to the character, following Lyra's pattern. Measure what it costs the builders (paths, `_must_load`, the verifier) and write the finding in `systemDesign.md`: adopt for the other systems or not, and why. Proof: `verify_clothing.py`, `probe_clothing.py`, `probe_net_clothing.py`. Revert the move if the finding is "not", keeping the write-up. effort: medium
 
 - [ ] R1. A thrown item reaches the other clients for the whole of its flight (the small fix, ahead of R2). In online play another player's thrown axe shows once in mid-air and then at rest, not flying start to finish; single player is fine. The suspect, not confirmed: a carried item is `DORM_DormantAll` (`combat/item_world.py` `_author_rest`), the release (`author_into_world`) calls `SetReplicates(true)` on it in that state, and only its own next Tick sets `DORM_Awake`, so the replication graph (`AddActor_Dormancy`) takes it in as a still actor, sends it once and closes its channel; the landing's sleep then sends it once more, which is why `probe_net_throw.py` passes. The other candidates: the client's hide until `InWorld` arrives, and the item's rate alone (`net/relevancy_consts.py` `ITEM`, 10 Hz). First find which: one throw under `uepy.py --net --clients 2`, logging on the server the item's `NetDormancy` at the release and each frame of the flight, and on client 2 the frames its copy exists, is visible and moves. Write the finding in `Scripts/net/docs/history/multiplayer.md`. Then the fix where the finding points, and no further: for dormancy, the release wakes the item (`DORM_Awake`, `Dormant` false) before it is made a replicated actor; check whether any other way into the world starts replicating a dormant item and say so. Not here: smoothing, prediction, the rate (R2 replaces the position stream; a flight that hops at 10 Hz is this task's done). Proof: `probe_net_throw.py` with one new check (client 2's copy is visible and at five or more different places between the release and the rest), clean with `--lag 120`; `probe_net_late_join.py` and `probe_net_pvp.py` unchanged. If the finding is none of the three, stop with the finding. effort: low
 

@@ -51,6 +51,8 @@ from uebp.nodes.umg import (
 
 PC_CLASS_PATH = "/Script/Engine.PlayerController"
 SHOW_CURSOR_PROP = "bShowMouseCursor"
+# EMouseLockMode while the cursor shows: kept inside the game's viewport.
+SHOWN_LOCK = "LockAlways"
 
 # What a click writes: (HUD variable, a literal) or (HUD variable, ROW) for
 # the row that was clicked.
@@ -127,6 +129,11 @@ def author_cursor_mode(ed, want, in_execs):
     controller is polled for. Hidden is Game-only, which takes the mouse back
     for the camera -- without it the view stays dead until the next click.
 
+    Free of the camera, not of the window: the mode locks it to the viewport
+    (SHOWN_LOCK). The node's own default is DoNotLock, and a shown cursor
+    went on to the next monitor. The lock is not what keeps the Mac's Dock
+    away (docs/history/menu.md, "The lock does not keep the Dock away").
+
     On the title it is applied every frame, not once: a launched game's
     window becomes the active one some frames in, and the viewport then
     captures the mouse (its launch capture) over a mode set before that, so
@@ -152,7 +159,8 @@ def author_cursor_mode(ed, want, in_execs):
     _connect(_get(ed, CURSOR_WANTED_VAR, made), _pin(show, SHOW_CURSOR_PROP))
     _connect(flow, _pin(show, "execute"))
     on, off = _branch(ed, _get(ed, CURSOR_WANTED_VAR, made), [then(show)], made)
-    free = _call(ed, FN_MODE_GAME_UI, made, PlayerController=pc, bHideCursorDuringCapture="false")
+    free = _call(ed, FN_MODE_GAME_UI, made, PlayerController=pc,
+                 InMouseLockMode=SHOWN_LOCK, bHideCursorDuringCapture="false")
     _connect(on, _pin(free, "execute"))
     taken = _call(ed, FN_MODE_GAME, made, PlayerController=pc)
     _connect(off, _pin(taken, "execute"))

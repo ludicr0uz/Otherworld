@@ -227,6 +227,58 @@ Moved word for word: `docs/history/menu.md#the-m-panel-as-a-menu`.
 
 Moved word for word: `docs/history/menu.md#the-mouse-cursor`.
 
+## Full screen on the Mac (`Config/Mac/MacGameUserSettings.ini`, `Source/Otherworld/Private/OtherworldMacFullScreen.cpp`)
+
+- **The game runs borderless (`WindowedFullscreen`) and captures its display while it is
+  in front.** Borderless on the Mac is a macOS full-screen Space, where the Dock and the
+  menu bar are only auto-hidden and the hot corners stay live: a shown cursor reaches the
+  screen's edge and brings them up. The game module captures the display the full-screen
+  window is on (`CGDisplayCapture`) and puts the window above the capture's shield
+  (`OtherworldMacFullScreen`, game only, not the editor): the engine's exclusive mode,
+  less the change of display mode, so the size stays native. The capture is given back
+  when another app comes forward or the window leaves full screen. Two things tried
+  first, each failed with a real mouse: asking macOS to hide them (`setPresentationOptions`,
+  taken, 1029 to 1034, the Dock still came up) and raising the window to level 25 with no
+  capture (the menu bar still dropped over it, a hot corner still fired).
+- **Two things the capture needs beside it** (same file). Command-Tab: a captured display
+  takes it away, so the capture is not held while Command is down, and comes back when
+  the key goes up with the game still in front. The window's own title bar: in a Space
+  AppKit keeps it in a separate window above the screen (`NSToolbarFullScreenWindow`)
+  and slides it down when the pointer is at the top; that window is emptied and takes no
+  clicks. The engine cannot make the Mac's game window borderless
+  (`PLATFORM_SUPPORTS_BORDERLESS_WINDOW` is 0, so `bUseBorderlessWindow` does nothing).
+- **A captured display shows nothing but the game:** a game hung under a debugger or on
+  an assert holds the screen until its process dies (kill it from another display or
+  over ssh).
+- **Exclusive `Fullscreen` cannot take every size (UE 5.8.3, measured 12 Oct 2026).** In that
+  mode the engine accepts a size only from its own list of display modes, and that list
+  keeps one height per width, the shortest (`FMetalDynamicRHI::RHIGetAvailableResolutions`,
+  a filter for notched MacBooks). A size not in it becomes the list's first entry
+  (`EnsureValidFullscreenResolution`, `SceneViewport.cpp`). On a 2560x1440 monitor that also
+  offers 2560x1080:
+
+  | asked | in the list | got |
+  |---|---|---|
+  | 1920x1080 | yes | 1920x1080 |
+  | 2560x1080 | yes | 2560x1080 |
+  | 2560x1440 (native) | no | 800x600 |
+
+  Config, the console and a menu row all pass that check: none can reach a size it drops.
+  Any monitor with two modes of one width whose native is the taller is affected (1440p
+  beside 2560x1080, 1920x1200 beside 1920x1080, a notched panel's full height).
+- **So a window-mode or resolution row may offer exclusive sizes only from
+  `GetSupportedFullscreenResolutions`** (the same list), never "native", and borderless
+  stays the default. Borderless and windowed are not checked: borderless is always the
+  desktop's size. The rendered size is separate (the resolution-scale row).
+- **A row that changes the window must not run in the editor:** `ApplySettings` and
+  `ApplyResolutionSettings` drive `SWindow::SetWindowMode`, which hangs Mac PIE (below:
+  "Presets").
+- **Tried with a real mouse (12 Oct 2026, 2560x1440 monitor with the laptop beside it):**
+  nothing comes up at the left edge, the top or the bottom-right corner, and Command-Tab
+  goes away and back. Not tried: the laptop's screen alone. The log line `display N
+  captured` says the capture was taken, `display N released` that it was given back. The
+  order of what was tried: `docs/history/menu.md`, "What keeps macOS out".
+
 ## The UMG screens
 
 - **The HUD is the controller, the widgets are views.** `BP_GraphicsMenuHUD` reads the game and

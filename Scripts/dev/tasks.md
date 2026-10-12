@@ -1332,7 +1332,7 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       Both modes: single player and multiplayer both ship. Follow the standing requirement
       at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
       effort: high
-- [ ] M28. Noise for several players. The GameMode's single last-noise record becomes a short
+- [x] M28. Noise for several players. The GameMode's single last-noise record becomes a short
       list of recent noises (place, loudness, time, who made it), written only on the
       server and queried by the senses. Done when: two clients firing far apart each draw
       the wanderers near them.
@@ -1351,7 +1351,7 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       later tasks' work here.
       Both modes: single player and multiplayer both ship. Follow the standing requirement
       at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
-- [ ] M29. Wanderer population by mode. Standalone keeps the level's fixed count and the
+- [x] M29. Wanderer population by mode. Standalone keeps the level's fixed count and the
       10-second respawn. On a server the count is a budget: wanderers spawn out of sight
       near players and are removed when no player is within a configurable range, with a
       cap per player and for the server. The settings join the monster tuning table. Done
@@ -1372,7 +1372,7 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       later tasks' work here.
       Both modes: single player and multiplayer both ship. Follow the standing requirement
       at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
-- [ ] M30. One world clock. The time of day, the random start time, wind and the night cold
+- [x] M30. One world clock. The time of day, the random start time, wind and the night cold
       are driven by the server and replicated through the GameState, so every client sees
       the same sun and moon. Done when: two clients report the same time of day within a
       second after a minute, and the day-night verifier passes.
@@ -1390,7 +1390,7 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       later tasks' work here.
       Both modes: single player and multiplayer both ship. Follow the standing requirement
       at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
-- [ ] M31. Things left in the world. (Reduced by A2, which gave every item and campfire a
+- [x] M31. Things left in the world. (Reduced by A2, which gave every item and campfire a
       cull distance, dormancy and a late joiner who sees a placed item taken and a fire lit:
       `probe_net_late_join.py`.) What remains: corpses, stuck weapons and chopped trees are
       replicated to players who arrive later, and each thing left in the world has a cleanup
@@ -1412,7 +1412,7 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       later tasks' work here.
       Both modes: single player and multiplayer both ship. Follow the standing requirement
       at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
-- [ ] M32. Dev settings and cheats by mode. Standalone keeps every dev tab and cheat as today.
+- [x] M32. Dev settings and cheats by mode. Standalone keeps every dev tab and cheat as today.
       A client of a server can open the tabs but changes to gameplay tables (guns, monsters,
       player, world) are sent to the server and applied only when the server was started
       with a `-AllowDevTuning` switch; otherwise the rows are read-only and say why.
@@ -1434,10 +1434,25 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       at the top of `Scripts/dev/plans/multiplayer_tasks.md` and `serversupportsysdesign.md` 4.8.
 
 
-- [ ] Add Axe and Knife to the loot table for monsters. 15% change to drop either of the time. 
+- [x] Add Axe and Knife to the loot table for monsters. 15% change to drop either of the time. 
 
-- [ ] Increase the glimemer distance for items by 30%. Delay the initial glimmer of the item by 5 seconds. 
+- [x] Increase the glimemer distance for items by 30%. Delay the initial glimmer of the item by 5 seconds. 
 
-- [ ] R1. A thrown item reaches the other clients for the whole of its flight (the small fix, ahead of R2). In online play another player's thrown axe shows once in mid-air and then at rest, not flying start to finish; single player is fine. The suspect, not confirmed: a carried item is `DORM_DormantAll` (`combat/item_world.py` `_author_rest`), the release (`author_into_world`) calls `SetReplicates(true)` on it in that state, and only its own next Tick sets `DORM_Awake`, so the replication graph (`AddActor_Dormancy`) takes it in as a still actor, sends it once and closes its channel; the landing's sleep then sends it once more, which is why `probe_net_throw.py` passes. The other candidates: the client's hide until `InWorld` arrives, and the item's rate alone (`net/relevancy_consts.py` `ITEM`, 10 Hz). First find which: one throw under `uepy.py --net --clients 2`, logging on the server the item's `NetDormancy` at the release and each frame of the flight, and on client 2 the frames its copy exists, is visible and moves. Write the finding in `Scripts/net/docs/history/multiplayer.md`. Then the fix where the finding points, and no further: for dormancy, the release wakes the item (`DORM_Awake`, `Dormant` false) before it is made a replicated actor; check whether any other way into the world starts replicating a dormant item and say so. Not here: smoothing, prediction, the rate (R2 replaces the position stream; a flight that hops at 10 Hz is this task's done). Proof: `probe_net_throw.py` with one new check (client 2's copy is visible and at five or more different places between the release and the rest), clean with `--lag 120`; `probe_net_late_join.py` and `probe_net_pvp.py` unchanged. If the finding is none of the three, stop with the finding. effort: low
+- [x] R1. A thrown item reaches the other clients for the whole of its flight (the small fix, ahead of R2). In online play another player's thrown axe shows once in mid-air and then at rest, not flying start to finish; single player is fine. The suspect, not confirmed: a carried item is `DORM_DormantAll` (`combat/item_world.py` `_author_rest`), the release (`author_into_world`) calls `SetReplicates(true)` on it in that state, and only its own next Tick sets `DORM_Awake`, so the replication graph (`AddActor_Dormancy`) takes it in as a still actor, sends it once and closes its channel; the landing's sleep then sends it once more, which is why `probe_net_throw.py` passes. The other candidates: the client's hide until `InWorld` arrives, and the item's rate alone (`net/relevancy_consts.py` `ITEM`, 10 Hz). First find which: one throw under `uepy.py --net --clients 2`, logging on the server the item's `NetDormancy` at the release and each frame of the flight, and on client 2 the frames its copy exists, is visible and moves. Write the finding in `Scripts/net/docs/history/multiplayer.md`. Then the fix where the finding points, and no further: for dormancy, the release wakes the item (`DORM_Awake`, `Dormant` false) before it is made a replicated actor; check whether any other way into the world starts replicating a dormant item and say so. Not here: smoothing, prediction, the rate (R2 replaces the position stream; a flight that hops at 10 Hz is this task's done). Proof: `probe_net_throw.py` with one new check (client 2's copy is visible and at five or more different places between the release and the rest), clean with `--lag 120`; `probe_net_late_join.py` and `probe_net_pvp.py` unchanged. If the finding is none of the three, stop with the finding. effort: low
 
-- [ ] R2. A thrown item flies on every machine from the release, not from replicated movement. Today the flight (`combat/weapon_component/throw_flight.py`) runs only behind HasAuthority and the clients see the server's positions (`SetReplicateMovement(true)`, 10 Hz, no smoothing), and the thrower sees its own throw a round trip late. The standard design instead: the release is sent once and every machine runs the same kinematic curve, and **no client's flight depends on the item's replicated actor**, so whatever delays or closes that actor's channel cannot touch what is seen in the air. (1) The launch goes out on the thrower's weapon component, which every client already has: `Fx_Throw` carries the item's class, `Start`, `Velocity` and the server's time at the release. (2) Each client flies a stand-in: a local, unreplicated actor of the item's class, carried along `start + v t + g t^2/2` under `THROW_GRAVITY_Z` with the same square-up and tumble, from the server's clock (`GetServerWorldTimeSeconds`), so it starts where the server's is now and a late message shortens the flight, not shifts it. One authoring of the curve for the server's item and the stand-in, not two. (3) The thrower predicts: its stand-in leaves the hand on the click, and the server's launch names that one (no second axe, no pop); a refused throw (`Server_Throw`'s checks) takes it back. (4) The server alone judges the strike, once (`throw_strike.py`), and the end is told reliably: where it lies or lodged, and the body and bone it is in. The stand-in stops there, blended over a few frames if its own curve ended elsewhere, and is destroyed on the frame the replicated item is visible in its place; the replicated item is hidden on clients while it flies, and its movement is not replicated until it rests. (5) The lit stick and the hot blade look the same on the stand-in as on the item. Single player stays one plain call on one machine: no stand-in, the item itself flies (`serversupportsysdesign.md` 4.8). Not here: lag compensation of a throw. Proof: `probe_net_throw.py` extended (on client 2 a thrown axe is visible within 100 ms of the release, sampled every frame it is never more than 30 cm off the curve and never stands still in the air, exactly one axe is visible on every frame from the release to a second after the rest, and it rests where the server's does; the same on client 1, from the frame of the click; a refused throw leaves the axe in the hand), clean with `--lag 120` and under packet loss if the harness can make it (say if it cannot); `probe_net_pvp.py`, `probe_net_fx.py`, `probe_net_late_join.py` and the `--game` `probe_throw*` set unchanged. Update "Melee, the guard, the throw and the take" in `Scripts/net/CLAUDE.md` and its history. effort: high
+- [x] R2. A thrown item flies on every machine from the release, not from replicated movement. Today the flight (`combat/weapon_component/throw_flight.py`) runs only behind HasAuthority and the clients see the server's positions (`SetReplicateMovement(true)`, 10 Hz, no smoothing), and the thrower sees its own throw a round trip late. The standard design instead: the release is sent once and every machine runs the same kinematic curve, and **no client's flight depends on the item's replicated actor**, so whatever delays or closes that actor's channel cannot touch what is seen in the air. (1) The launch goes out on the thrower's weapon component, which every client already has: `Fx_Throw` carries the item's class, `Start`, `Velocity` and the server's time at the release. (2) Each client flies a stand-in: a local, unreplicated actor of the item's class, carried along `start + v t + g t^2/2` under `THROW_GRAVITY_Z` with the same square-up and tumble, from the server's clock (`GetServerWorldTimeSeconds`), so it starts where the server's is now and a late message shortens the flight, not shifts it. One authoring of the curve for the server's item and the stand-in, not two. (3) The thrower predicts: its stand-in leaves the hand on the click, and the server's launch names that one (no second axe, no pop); a refused throw (`Server_Throw`'s checks) takes it back. (4) The server alone judges the strike, once (`throw_strike.py`), and the end is told reliably: where it lies or lodged, and the body and bone it is in. The stand-in stops there, blended over a few frames if its own curve ended elsewhere, and is destroyed on the frame the replicated item is visible in its place; the replicated item is hidden on clients while it flies, and its movement is not replicated until it rests. (5) The lit stick and the hot blade look the same on the stand-in as on the item. Single player stays one plain call on one machine: no stand-in, the item itself flies (`serversupportsysdesign.md` 4.8). Not here: lag compensation of a throw. Proof: `probe_net_throw.py` extended (on client 2 a thrown axe is visible within 100 ms of the release, sampled every frame it is never more than 30 cm off the curve and never stands still in the air, exactly one axe is visible on every frame from the release to a second after the rest, and it rests where the server's does; the same on client 1, from the frame of the click; a refused throw leaves the axe in the hand), clean with `--lag 120` and under packet loss if the harness can make it (say if it cannot); `probe_net_pvp.py`, `probe_net_fx.py`, `probe_net_late_join.py` and the `--game` `probe_throw*` set unchanged. Update "Melee, the guard, the throw and the take" in `Scripts/net/CLAUDE.md` and its history. effort: high
+
+- [x] when in multiplayer game, and menu is opened, the single player button should not be present in the menu. Should only be visible when not in game. (very low effort)
+
+
+- [ ]	(polish - UI) Update the title level to be with night light with trees, matching thick tree density from the middle of 1000m level.
+
+- [ ] (polish - UI) Instead of exit called off, update the wording to "exit interrupted". 
+
+- [ ] (polish - UI) Dev all guns option - make it not available title screen (visible in game only)
+
+- [ ] (bug - UI) -Dragging items does not work from weapon slot to main hand. I should be able to drag from weapon slots to main hand.
+
+- [ ] (bug - graphics) in save and exit state character legs shake
+
+

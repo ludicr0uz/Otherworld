@@ -119,6 +119,10 @@ def _check_show(check, nodes):
               _value(n, "bHideCursorDuringCapture") == "false"
               and not _feeders(n, "InWidgetToFocus") for n in free),
           f"{len(free)} Game-and-UI, {len(taken)} Game-only")
+    check("...and shown, it is locked to the viewport: not onto another "
+          "monitor",
+          bool(free) and all(_value(n, "InMouseLockMode") == "LockAlways" for n in free),
+          str([_value(n, "InMouseLockMode") for n in free]))
 
     spent = [n for n in nodes if _title(n) == f"Set {CC.TRIGGER_SPENT_VAR}"]
     check("while it shows in a running game the weapon's fire press is kept "

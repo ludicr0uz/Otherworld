@@ -104,6 +104,54 @@ caret whenever the mouse was nudged), and the verifier checks nothing polls its 
 - **Shown is Game-and-UI, hidden is Game-only** (`author_cursor_mode`), switched only when
   `CursorWanted != CursorShown`. Without the Game-only call the camera stays dead after a
   menu closes until the next click.
+- **Shown, the cursor is locked to the viewport** (`cursor.SHOWN_LOCK`, `LockAlways` on the
+  Game-and-UI call; the verifier asserts it). The node's default is `DoNotLock`, and the
+  published build's log read `MouseLockMode Changed, LockOnCapture -> DoNotLock` each time a
+  menu opened: with two monitors the cursor left for the other one, and on the title it
+  raised the Dock. A full-screen game on the Mac (`WindowedFullscreen`) is a macOS Space,
+  where the Dock is only hidden until the pointer pushes its edge, so the lock is what keeps
+  the pointer in.
+  - **The lock needs the window where the engine thinks it is, and at launch it was not.**
+    With no display chosen (`DisplayIndex=-1`, the engine's default) UE 5.8 places a
+    full-screen window by `FMacWindow::GetFullScreenInfo`, which answers one screen height
+    too low (`(0, 2337)` on an 1800x1169 screen), and keeps it there until a switch of
+    apps: the locked cursor was held on the screen's bottom row, free only sideways.
+    `Config/Mac/MacGameUserSettings.ini` chooses the first display, and the engine then
+    takes the place from that display's rectangle. Measured by placing the pointer at seven
+    points of the screen and reading it back: every one moved to the bottom row before,
+    none after. A saved `GameUserSettings.ini` from before still says -1 and wins: delete
+    its two `DisplayIndex` lines. The same wrong place is the likely cause of the title
+    taking no click at launch, above; the every-frame mode there is kept until that is
+    tried without it.
+  - **The lock does not keep the Dock away.** With the cursor shown the Dock still came up
+    at the screen's edge. The Mac has no cursor clip: `FMacCursor` clamps the position
+    after each move and its rectangle holds the edge pixel, so macOS sees the mouse pushing
+    at the edge. And the Space's rules were the system's: the running game's presentation
+    options read full screen with the Dock and menu bar auto-hidden (1029), which the
+    engine leaves.
+    In play the pointer is detached from the mouse (high-precision mode) and never reaches
+    the edge, which is why only menus showed it.
+  - **What keeps macOS out is a captured display (12 Oct 2026).** While the game is in
+    front and in full screen the game module captures its display and puts the window
+    above the capture's shield (`Source/Otherworld/Private/OtherworldMacFullScreen.cpp`):
+    the engine's exclusive mode, less the change of display mode, so the size stays the
+    desktop's. Tried in this order, each with a real mouse in the published build:
+
+    | tried | result |
+    |---|---|
+    | exclusive `Fullscreen` | no Dock, but 800x600: the engine drops a native size its mode list lacks (`CLAUDE.md`, "Full screen on the Mac") |
+    | replacing `FCocoaWindow`'s `window:willUseFullScreenPresentationOptions:` | never called: the window is in full screen before the game module starts |
+    | `[NSApp setPresentationOptions:]`, `HideDock`, `HideMenuBar` | taken (1029 to 1034), the Dock still came up |
+    | window raised to level 25, no capture | the bar at the top still slid down, the bottom-right hot corner (Quick Note) still fired |
+    | display captured | no hot corner; the window's own title bar still slid down at the top, Command-Tab gone |
+    | captured, title-bar window emptied, capture let go while Command is down | nothing at the edges, Command-Tab works (2560x1440 monitor, laptop beside it) |
+
+    The title bar was the game's, not the menu bar: in a Space AppKit keeps it in a
+    window of its own above the screen (`NSToolbarFullScreenWindow`). The engine has no
+    borderless game window on the Mac (`PLATFORM_SUPPORTS_BORDERLESS_WINDOW` is 0).
+  - **Open:** the laptop's screen alone is untried; the published copy in
+    `Saved/Packages/Mac` is from before the capture; a window-mode row was asked about
+    while exclusive mode looked like the only way to a clean screen, and is not built.
 - **On the title the mode is given again every frame** the left button is up (`_on_title`:
   wanted, `GameStarted` false, button up). A launched build's window becomes the active one
   some frames in, and the viewport's launch capture then took the mouse over a mode set once

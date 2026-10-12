@@ -70,6 +70,12 @@ def _author_apply(ed, in_execs, made):
     Returns the exec tails."""
     go, idle = _branch(ed, _get(ed, PLAYER_TAB.touched_var, made), in_execs, made)
     pawn = out(_call(ed, FN_GET_OWNING_PAWN, made))
+    return [*author_onto_pawn(ed, pawn, [go], made), idle]
+
+
+def author_onto_pawn(ed, pawn, in_execs, made):
+    """The table onto ``pawn``'s weapon component: the HUD's own player, and
+    on a server each player in turn (game_tuner.py). Returns the tails."""
     comp = _call(ed, FN_GET_COMP, made, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # the cast exists only for a loaded class
@@ -78,7 +84,8 @@ def _author_apply(ed, in_execs, made):
         raise RuntimeError("no cast node for BP_WeaponComponent")
     made.append(cast)
     _connect(out(comp), _pin(cast, "Object"))
-    _connect(go, _pin(cast, "execute"))
+    for e in in_execs:
+        _connect(e, _pin(cast, "execute"))
     wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
     flow = then(cast)
@@ -96,7 +103,7 @@ def _author_apply(ed, in_execs, made):
         _connect(value, _pin(n, var))
         _connect(flow, _pin(n, "execute"))
         flow = then(n)
-    return [flow, idle, out(cast, "CastFailed")]
+    return [flow, out(cast, "CastFailed")]
 
 
 def author_player_tune_tick(ed, pc_out, in_execs):

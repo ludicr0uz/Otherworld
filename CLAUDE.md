@@ -56,7 +56,7 @@ package's `CLAUDE.md`; it adds to this file only a rule that applies in every pa
    |---|---|---|
    | weapons, inventory, the glimmer over an item on the ground, health, death, blood, bullet impacts, audio, hit boxes, chopping trees for wood, the matches, the use key and the stick that burns, the knife or axe heated at a fire, the grip nudges (a CSV row per held item the running game reads: `Content/Tuning/grip_nudges.csv`, `combat/docs/aiming.md`) | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
    | NPCs: behaviour tree, pack, patrol and agro, how many a server keeps (a budget that follows the players) | `build_`/`verify_npc_blueprints.py` | `Scripts/npc/CLAUDE.md` |
-   | the menu (the title's, and M's in play), graphics presets and tuning, settings, HUD | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
+   | the menu (the title's, and M's in play), graphics presets and tuning, settings, HUD; the tuning tabs by mode (M32: a client's gameplay tables are the server's, `BP_GameTuner`, `-AllowDevTuning`) | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
    | survival: GAS, debuffs, on-hit effects and bleeding, forage, the campfire | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
    | level generator, navmesh, trees and grass | `generate_forest_level.py` | `Scripts/forest_generator/CLAUDE.md` |
 | day and night: world config, sun, moon, sky | `build_`/`verify_day_night.py` | `Scripts/world/CLAUDE.md` |
@@ -209,6 +209,7 @@ python3 Scripts/dev/uepy.py --game --windowed --probe <probe>   # rendered, in a
 python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_join.py   # a server and 2 clients, see below
 python3 Scripts/dev/uepy.py --net --clients 1 --lag 120 --probe Scripts/probes/probe_net_move_states.py   # with 120 ms of lag
 python3 Scripts/dev/uepy.py --net --clients 2 --bots 32 --trace --probe Scripts/probes/probe_net_load.py   # the load test: 32 server-driven bots, an Insights trace
+python3 Scripts/dev/uepy.py --net --clients 2 --server-arg AllowDevTuning --probe Scripts/probes/probe_net_dev_tuning.py   # the server alone gets -AllowDevTuning
 python3 Scripts/dev/uepy.py --game --title --probe Scripts/probes/probe_title_single.py   # the real title menu, see below
 python3 Scripts/dev/uepy.py --net --clients 2 --detach --probe P   # start a --game/--net run, print its run dir, return at once
 python3 Scripts/dev/uepy.py --wait <run dir> [--timeout S]       # block for its report (exit code of the run; fails on timeout)

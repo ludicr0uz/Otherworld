@@ -17,6 +17,7 @@ uepy_inbox.py, then the engine's multicast remote execution), which turns those
     Scripts/dev/uepy.py --in-game probe.py           # into a running -game
     Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_join.py
     Scripts/dev/uepy.py --net --clients 2 --bots 32 --trace --probe Scripts/probes/probe_net_load.py
+    Scripts/dev/uepy.py --net --clients 1 --server-arg AllowDevTuning --probe P   # the server gets -AllowDevTuning
     Scripts/dev/uepy.py --net --clients 2 --detach --probe P   # prints a run dir, returns at once
     Scripts/dev/uepy.py --wait <run dir> [--timeout S]       # ...later: its report and exit code
     Scripts/dev/uepy.py --status                              # detached runs
@@ -193,6 +194,9 @@ def parse_args():
     ap.add_argument("--lag", type=int, default=0, metavar="MS",
                     help="with --net: delay every packet a client sends by MS "
                          "(the engine's Net PktLag), to check prediction")
+    ap.add_argument("--server-arg", action="append", default=[], metavar="SWITCH",
+                    help="with --net: start the server with -SWITCH (repeatable; type it "
+                         "without its dash: --server-arg AllowDevTuning)")
     ap.add_argument("--detach", action="store_true",
                     help="with --game or --net: start the run, print its run directory, return at once")
     ap.add_argument("--wait", metavar="RUN_DIR",
@@ -422,7 +426,8 @@ def main():
         for level, group in probe_level.by_level(probes, args.map):
             ok &= net.run_net(engine, level, args.clients, args.port, args.seconds, group,
                               args.probe_timeout, args.windowed, args.allow_pie, args.title,
-                              args.lag, args.bots, args.trace)
+                              args.lag, args.bots, args.trace,
+                              server_args=args.server_arg)
         return 0 if ok else 1
     if args.game:
         seconds = args.seconds or (game.PROBE_SECONDS if probes else game.GAME_SECONDS)

@@ -15,6 +15,7 @@ The rows, their steps and minimums are combat/player_tuning.PLAYER_STATS.
 """
 
 from combat.player_tuning import PLAYER_STATS
+from combat.ask_consts import TUNE_PLAYER
 from graphics_menu.tune_tab import TuneTab, save_command
 
 PLAYER_TUNE_ACTION = "player_tuning"   # the menu row that opens the tab
@@ -39,6 +40,7 @@ PLAYER_STAT_COUNT = len(PLAYER_STATS)
 PLAYER_TUNE_SAVE_COMMAND = save_command("graphics_menu.player_tune_save")
 
 PLAYER_TAB = TuneTab(
+    gameplay=TUNE_PLAYER,
     action=PLAYER_TUNE_ACTION, open_var=PLAYER_TUNE_OPEN_VAR,
     row_var=PLAYER_TUNE_ROW_VAR, pick_var=PLAYER_TUNE_PICK_VAR,
     nudge_var=PLAYER_TUNE_NUDGE_VAR, save_var=PLAYER_TUNE_SAVE_VAR,

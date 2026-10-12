@@ -74,9 +74,18 @@ def processes(run_dir, clients):
         Process(CLIENT, i, run_dir) for i in range(1, clients + 1)]
 
 
+def server_switches(names):
+    """``--server-arg``'s values as switches: each with its one leading dash,
+    however it was typed (argparse reads a bare ``-X`` as an option of its own)."""
+    return ["-" + name.lstrip("-") for name in names if name.strip("-")]
+
+
 def command(editor, project, process, port, windowed=False, level="", lag_ms=0,
-            trace=False):
+            trace=False, server_args=()):
     """The process's command line.
+
+    ``server_args`` are switches for the server alone (``--server-arg``): how
+    a probe starts one that allows what a plain one refuses (-AllowDevTuning).
 
     ``lag_ms`` delays every packet a client sends (the engine's packet
     simulation, as the console's ``Net PktLag=``), so its ping is at least
@@ -90,6 +99,7 @@ def command(editor, project, process, port, windowed=False, level="", lag_ms=0,
         how = ["-server", f"-port={port}"]
         if trace:
             how += [f"-trace={TRACE_CHANNELS}", f"-tracefile={process.trace}"]
+        how += server_switches(server_args)
     else:
         how = ["-game", *render_args(windowed)]
         if windowed:

@@ -70,7 +70,11 @@ the player's character in the saved profile's garments, empty-handed); M opens t
 rows: Single Player (New Game / Continue Game opens `Lvl_Forest_1000m`), Multiplayer (a
 server address and Join Server), Controls (rebinding, difficulty EASY/MEDIUM/SURVIVOR),
 Debug, Dev All Guns, the GUN / MONSTER / PLAYER / SOUND / WORLD / GRAPHICS SETTINGS tabs
-(live tuning, each saved to a tracked CSV the matching build reads), and Exit Game on the
+(live tuning, each saved to a tracked CSV the matching build reads; as a client of a server
+the gun, monster, world and player tables are the server's: a change is sent to it and
+applied there, by `BP_GameTuner` on the GameState, only where the server was started with
+`-AllowDevTuning`, and the rows are read-only and say so otherwise; sound and graphics stay
+this machine's; M32, `Scripts/graphics_menu/CLAUDE.md`, "The tuning tabs by mode"), and Exit Game on the
 title or Save and Exit in play (a 15 s countdown, cancelled by a hit, a move or the
 trigger; saves stats, inventory and worn garments, not the location; death deletes the
 profile). Pausing is single player's alone; as a client of a server the same screens are

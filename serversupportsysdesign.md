@@ -227,6 +227,14 @@ regenerates it.
 The tuning tabs, debug mode and the all-guns cheat become admin-only or are stripped from
 the client. The tuning CSVs become server config.
 
+Done so far (M32): the gameplay tables (guns, monsters, world, player) are the server's. A
+client's tabs are read-only, and say why, unless the server was started with
+`-AllowDevTuning` (a development server; a public one is never started with it), and the
+server checks the same flag again when the change arrives. Debug mode was the GameState
+owner's already, and the all-guns cheat gives nothing on a server. Left for phase 8: an
+admin's identity (the switch opens tuning to every client of that server), and stripping
+the tabs from a shipped client.
+
 ---
 
 ### 4.8 Single player and multiplayer from one code path
@@ -254,7 +262,7 @@ The rules every multiplayer task follows:
    | pause (title menu, M, loot window) | pauses the world, as today | never pauses; the menu is an overlay |
    | the character save | the local `OtherworldProfile` slot, written by the client | a file on the server keyed to the player; the client writes none |
    | death | as today: the profile is deleted, back to the title | gear onto a corpse, respawn |
-   | dev settings tabs and cheats | available | read-only unless the server allows them |
+   | dev settings tabs and cheats | available | the gameplay tables (guns, monsters, world, player) are the server's: read-only, saying why, unless it was started with `-AllowDevTuning`, and then a change is sent to it (`AskTune`) and applied there; sound and graphics stay local; the all-guns cheat gives nothing (M32) |
    | wanderer population | the level's fixed count | a budget that follows the players |
    | what is left in the world (an item set down or thrown, wood cut, a body, a campfire) | stays until it is taken (a body 60 s, a fire 180 s, as before) | each kind also has a lifetime and a cap: an item lies 20 minutes, and past the cap the oldest of the kind goes |
    | the title menu | the game opens on it, paused: Single Player and Multiplayer are chosen there | none: a connected client is in its game, however it joined (the title or an address on the command line). Leaving, a failed join or a dropped connection returns the process to standalone, and so to the title |

@@ -34,16 +34,26 @@ Every tab's table but GRAPHICS SETTINGS' is kept between sessions in a save
 slot of its own (kept, keep_slot, built_var: tune_keep.py), which is what a
 build without the Python plugin has in place of the CSV.
 
+Four of the tables are the game's, not the player's own machine's
+(``gameplay``: guns, monsters, world, player), and on a server they are the
+server's: tune_mode.py says what a nudge of one does in each mode. The
+graphics and sound tabs tune only the machine they are opened on.
+
 Constants only.
 """
 
 from dataclasses import dataclass
 
+from combat.ask_consts import TUNE_TABLES
 from uebp.vars import BOOL, FLOAT, INT, STRING, Var, array
 
 TUNE_UP, TUNE_DOWN = "Up", "Down"
 TUNE_LESS, TUNE_MORE = "Left", "Right"
 TUNE_SAVE_KEY = "Enter"
+# A gameplay tab's hint line where the game's tables are not this player's to
+# move (tune_mode.py): the rows are read-only, and this is why.
+READ_ONLY_HINT = ("READ ONLY   ·   these are the server's numbers, and it was "
+                  "not started with -AllowDevTuning")
 
 
 @dataclass(frozen=True)
@@ -98,11 +108,20 @@ class TuneTab:
     # Cells of values_var that are the session's alone and never read back
     # from a save (WORLD SETTINGS' hour: the live clock).
     unkept_cells: tuple = ()
+    # The table is the game's: which of combat/ask_consts.TUNE_TABLES it is
+    # (a client of a server sends it there: tune_mode.py). "" = it tunes only
+    # this machine (graphics, sound).
+    gameplay: str = ""
 
     @property
     def row_count(self):
         """The rows of the list: the subject, then one per stat."""
         return 1 + self.stat_count
+
+    @property
+    def table_index(self):
+        """A gameplay tab's place in TUNE_TABLES: AskTune's Table."""
+        return TUNE_TABLES.index(self.gameplay)
 
     @property
     def keep_slot(self):

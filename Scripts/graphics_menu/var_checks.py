@@ -17,6 +17,7 @@ from graphics_menu import hud_vars as MV
 from graphics_menu import inv_consts as IC
 from graphics_menu import loot_consts as LC
 from graphics_menu import mode_consts as MC
+from graphics_menu import game_tuner_consts as TC
 from graphics_menu import profile_consts as PC
 from graphics_menu import sound_tune_consts as SC
 from graphics_menu import title_figure as TF
@@ -46,6 +47,7 @@ def hud_table():
 def check_var_tables(check):
     check_table(unreal.load_asset(UC.HUD_BP_PATH), hud_table(), check, others=HUD_LEFT)
     for path, table in ((GC.TUNER_BP_PATH, GC.TUNER_TABLE),
+                        (TC.GAME_TUNER_BP_PATH, TC.GAME_TUNER_TABLE),
                         (GC.GFX_SAVE_BP_PATH, GC.GFX_SAVE_FIELDS),
                         (KC.TUNE_SAVE_BP_PATH, KC.TUNE_SAVE_FIELDS),
                         (PC.PROFILE_BP_PATH, PC.PROFILE_TABLE),

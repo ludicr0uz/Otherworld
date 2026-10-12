@@ -15,6 +15,7 @@ from combat.verify.common import BEL, PIN, check, graph, in_pins, pin_value
 from combat.verify.fixtures import _is_exec, wc, wc_cdo, wg, wg_dead
 from combat.weapon_component.asks import WRITES
 from combat.weapon_component.dead import OWNER_DEAD_VAR
+from net import state_consts as S
 from loot.consts import BODY_ARRAYS, LOOT_TAKE_REACH_CM, LOOT_VAR
 
 
@@ -242,8 +243,35 @@ def check_ask_save_exit():
           str(len(lowered)))
 
 
+def check_tune_ask():
+    """tune_ask.py: a client's tuning table, taken only where the server allows."""
+    event = _event(AC.ASK_TUNE)
+    if not event:
+        return
+    run = _after(event)
+    gates = [n for n in run if "Condition" in in_pins(n)]
+    allowed = [g for g in gates if f"Get {S.DevTuning}" in map(_title, _feeders(g, "Condition"))]
+    check(f"{AC.ASK_TUNE} goes on only where the GameState's {S.DevTuning} is true (a "
+          "server started with -AllowDevTuning): one Branch on it, after the guard's",
+          len(allowed) == 1 and gates.index(allowed[0]) == 1,
+          f"{len(allowed)} of {len(gates)} gates")
+    for i, inbox in enumerate(S.TUNED):
+        sets = [n for n in run if _title(n) == f"Set {inbox}"]
+        tests = [pin_value(c, "B") or "0" for n in sets for g in _feeders(n, "execute")
+                 for c in _feeders(g, "Condition")]
+        fed = [str(PIN.get_pin_name(q)) for n in sets
+               for q in PIN.list_connected_pins(BEL.find_input_pin(n, inbox))]
+        check(f"...table {i} ({AC.TUNE_TABLES[i]}) into the GameState's {inbox}, whole: the "
+              "inbox its tuner takes (graphics_menu/game_tuner.py)",
+              tests == [str(i)] and fed == [AC.VALUES_PARAM], f"{tests}, {fed}")
+    writes = sorted(_title(n) for n in run if _title(n).startswith("Set "))
+    check("...and writes nothing else: the table is checked and applied by the tuner",
+          writes == sorted(f"Set {v}" for v in S.TUNED), str(writes))
+
+
 def run():
     check_asks()
     check_use_held()
     check_ask_loot_take()
     check_ask_save_exit()
+    check_tune_ask()

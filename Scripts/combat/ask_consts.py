@@ -5,7 +5,8 @@ is a custom event on BP_WeaponComponent (combat/weapon_component/asks.py,
 loot_take.py, save_exit.py), which the HUD calls with what was picked and
 nothing else; the component decides whether it happens. One event per action,
 so a multiplayer task that makes one a server request (M18 did the slots',
-M23 the drop and the loot window's take, M24 the garments': SERVER_ASKS; M35;
+M23 the drop and the loot window's take, M24 the garments', M32 a tuning
+tab's table: SERVER_ASKS; M35;
 the I panel's right click, AskUseSlot, from the start)
 has one node to turn into a Server event. Constants only.
 """
@@ -42,8 +43,20 @@ BODY_PARAM, INDEX_PARAM, WANT_PARAM = "Body", "Index", "Want"
 # M23, the take-off and the dragged wear M24): the owning client asks, and the
 # server serves the request, where what fits where and who gets what is
 # decided. The rest are plain calls until their task (M35).
+# A tuning tab's table, from a client of a server (M32): which gameplay table
+# (its place in TUNE_TABLES) and every cell of it, as the tab holds them. The
+# server takes it only where the developer's tuning is allowed (the
+# GameState's DevTuning: a server started with -AllowDevTuning), into the
+# GameState's inbox for that table (net/state_consts.TUNED), which its tuner
+# applies. In single player the tab's own graph applies its table and this
+# is never called.
+ASK_TUNE = "AskTune"
+TABLE_PARAM, VALUES_PARAM = "Table", "Values"
+TUNE_GUNS, TUNE_MONSTERS, TUNE_WORLD, TUNE_PLAYER = "guns", "monsters", "world", "player"
+TUNE_TABLES = (TUNE_GUNS, TUNE_MONSTERS, TUNE_WORLD, TUNE_PLAYER)
+
 SERVER_ASKS = (ASK_SLOT, ASK_MOVE, ASK_NEXT, ASK_DROP, ASK_LOOT_TAKE, ASK_TAKE_OFF,
-               ASK_WEAR, ASK_USE)
+               ASK_WEAR, ASK_USE, ASK_TUNE)
 
 # Save and exit: the M panel's row starts the countdown.
 ASK_SAVE_EXIT = "AskSaveExit"
@@ -65,4 +78,5 @@ EXIT_DUE_VAR = "ExitDue"
 # key's own Server events (weapon_component/use_held.py).
 USE_HELD = "UseHeld"
 
-ALL_ASKS = tuple(name for name, _ in INT_ASKS) + (ASK_LOOT_TAKE, ASK_SAVE_EXIT, USE_HELD)
+ALL_ASKS = tuple(name for name, _ in INT_ASKS) + (ASK_LOOT_TAKE, ASK_SAVE_EXIT, USE_HELD,
+                                                   ASK_TUNE)

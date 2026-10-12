@@ -51,7 +51,9 @@ def check_asks(check, nodes):
     # AskNext is the Q key's, on the component: no screen asks it.
     want = {AC.ASK_SLOT: 2, AC.ASK_MOVE: 2, AC.ASK_NEXT: 0, AC.ASK_TAKE_OFF: 2, AC.ASK_WEAR: 2,
             AC.ASK_DROP: 1, AC.ASK_USE: 1, AC.ASK_LOOT_TAKE: 1, AC.ASK_SAVE_EXIT: 2,
-            AC.USE_HELD: 2}
+            AC.USE_HELD: 2,
+            # One per gameplay tuning tab: a client's nudge (tune_mode.py).
+            AC.ASK_TUNE: len(AC.TUNE_TABLES)}
     check("the HUD asks the weapon component for each thing the player does through "
           "a screen: a slot to hand and a take-off (the keys, and the mouse), a move, "
           "a wear (a drag, and the use key), a drop, a use (the right click), what is in hand used (the right click on it, and the use key), a loot take, save and exit (single player's Tick, and a "

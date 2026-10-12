@@ -88,6 +88,17 @@ class PlanTest(unittest.TestCase):
                          ["server.log", "client1.log", "client2.log"])
         self.assertEqual(len({p.inbox for p in self.plan} | {p.results for p in self.plan}), 6)
 
+    def test_a_server_switch_reaches_the_server_alone(self):
+        cmd = net_plan.command("ed", "p", self.plan[0], 17777,
+                               server_args=["AllowDevTuning", "-Other", "-"])
+        self.assertIn("-AllowDevTuning", cmd)
+        self.assertIn("-Other", cmd)
+        self.assertNotIn("-", cmd)
+        self.assertNotIn("--Other", cmd)
+        self.assertNotIn("-AllowDevTuning", net_plan.command(
+            "ed", "p", self.plan[1], 17777, server_args=["AllowDevTuning"]))
+        self.assertNotIn("-AllowDevTuning", net_plan.command("ed", "p", self.plan[0], 17777))
+
     def test_the_server_command(self):
         cmd = net_plan.command("ed", "p.uproject", self.plan[0], 17777)
         self.assertEqual(cmd[:3], ["ed", "p.uproject", net_plan.ENTRY_URL])

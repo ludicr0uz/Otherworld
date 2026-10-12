@@ -27,6 +27,7 @@ fragments take.
 
 from combat.grip_nudges import GRIP_STATS
 from combat.gun_tuning import TUNE_STATS
+from combat.ask_consts import TUNE_GUNS
 from graphics_menu.tune_tab import TuneTab, save_command
 
 TUNE_ACTION = "gun_tuning"         # the M panel row that opens the tab
@@ -93,6 +94,7 @@ HUD_CLASS_PATH = "/Game/UI/BP_GraphicsMenuHUD.BP_GraphicsMenuHUD_C"
 TUNE_SAVE_COMMAND = save_command("graphics_menu.tune_save")
 
 GUN_TAB = TuneTab(
+    gameplay=TUNE_GUNS,
     action=TUNE_ACTION, open_var=TUNE_OPEN_VAR, row_var=TUNE_ROW_VAR,
     pick_var=TUNE_WEAPON_VAR, nudge_var=TUNE_NUDGE_VAR, save_var=TUNE_SAVE_VAR,
     saved_var=TUNE_SAVED_VAR, touched_var=TUNE_TOUCHED_VAR,

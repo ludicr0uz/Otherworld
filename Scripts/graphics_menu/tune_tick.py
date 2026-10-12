@@ -20,7 +20,11 @@ the table written onto every carried gun.
                                       for a tab that has them); TuneTouched,
                                       NOT TuneSaved, and the table into the
                                       tab's save slot (tune_keep.py; not the
-                                      graphics tab's). In a tab with a live
+                                      graphics tab's). A gameplay tab's cell
+                                      moves only where the GameState allows
+                                      it, and a client sends the table to the
+                                      server instead of keeping it
+                                      (tune_mode.py). In a tab with a live
                                       mask, only a cell that is the subject's
                                       own (TuneLive): the others stay
     TuneSaveRequested -> lower it; TuneSaved = ExecutePythonCommand(the save)
@@ -65,7 +69,7 @@ from graphics_menu.tune_consts import (
     GUN_TAB, STAT_COUNT, TUNE_LIVE_VAR, TUNE_TOUCHED_VAR,
     TUNE_VALUES_VAR, TUNE_WEAPONS_VAR,
 )
-from graphics_menu.tune_keep import author_keep_tab
+from graphics_menu.tune_mode import author_allowed, author_send
 from graphics_menu.tune_tab import TUNE_DOWN, TUNE_LESS, TUNE_MORE, TUNE_SAVE_KEY, TUNE_UP
 from graphics_menu.tune_tabs import other_open_vars
 from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN, FN_WAS_PRESSED
@@ -222,16 +226,16 @@ def _author_nudge(ed, in_execs, made, tab, subjects):
     write = _call(ed, FN_ARR_SET, made, TargetArray=_get(ed, tab.values_var, made))
     _connect(idx, _pin(write, "Index"))
     _connect(out(kept), _pin(write, "Item"))
-    stays = []
+    # A gameplay table on a server that does not allow tuning: read-only.
+    state, stat, stays = author_allowed(ed, tab, [stat], made)
     if tab.live_var:
         # A stat that is not the subject's own: nothing moves, nothing is touched.
         stat, dead = _branch(ed, _cell(ed, tab.live_var, idx, made), [stat], made)
-        stays = [dead]
+        stays = [*stays, dead]
     _connect(stat, _pin(write, "execute"))
     flow = _setter(ed, tab.touched_var, "true", [then(write)], made)
     flow = [_setter(ed, tab.saved_var, "false", [flow], made)]
-    if tab.kept:
-        flow = author_keep_tab(ed, tab, flow, made)
+    flow = author_send(ed, tab, state, flow, made)
     lowered = _setter(ed, tab.nudge_var, 0, [*flow, picked, *stays], made)
     return [lowered, still]
 
@@ -254,6 +258,12 @@ def _author_apply(ed, in_execs, made, guns):
     (the menu's own rows: new game) are never reached."""
     go, idle = _branch(ed, _get(ed, TUNE_TOUCHED_VAR, made), in_execs, made)
     pawn = out(_call(ed, FN_GET_OWNING_PAWN, made))
+    return [*author_onto_pawn(ed, pawn, [go], made, guns), idle]
+
+
+def author_onto_pawn(ed, pawn, in_execs, made, guns):
+    """The table onto what ``pawn`` (a pin) carries: the HUD's own player,
+    and on a server each player in turn (game_tuner.py). Returns the tails."""
     comp = _call(ed, FN_GET_COMP, made, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node
@@ -261,7 +271,8 @@ def _author_apply(ed, in_execs, made, guns):
     cast = _palette(ed, NODE_CAST_WEAPON)
     made.append(cast)
     _connect(out(comp), _pin(cast, "Object"))
-    _connect(go, _pin(cast, "execute"))
+    for e in in_execs:
+        _connect(e, _pin(cast, "execute"))
     wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
     loop = ed.add_macro_node(MACRO_FOR_EACH)
@@ -295,7 +306,7 @@ def _author_apply(ed, in_execs, made, guns):
             _connect(value, _pin(n, var))
             _connect(flow, _pin(n, "execute"))
             flow = then(n)
-    return [_loose_pin(loop, "Completed", is_input=False), idle, out(cast, "CastFailed")]
+    return [_loose_pin(loop, "Completed", is_input=False), out(cast, "CastFailed")]
 
 
 def author_tab_flow(ed, pc_out, in_execs, made, tab, subjects, closes):

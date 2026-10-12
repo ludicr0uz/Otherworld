@@ -227,6 +227,9 @@ _author_* fragment per concern, each in its own module:
               AskSlot, AskMove, AskNext, AskTakeOff, AskWear, AskDrop raise the
               request the Tick serves, in place of the HUD writing it; all
               six are Server events
+  tune_ask    AskTune(Table, Values): a client's tuning tab sends its table; a
+              Server event the server takes only where the GameState's
+              DevTuning is true, into the GameState's inbox (M32)
   loot_take   AskLootTake(Body, Index, Want): the loot window's take, a
               Server event, with its refusals (dead, no body, out of reach,
               no room, no such row, not the item asked for)

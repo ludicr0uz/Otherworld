@@ -112,6 +112,9 @@ Under the root's `--net --clients N` bullet:
     (`MOVE-CORRECTION`: the server pulling a client back, rubber-banding when the client
     predicted wrong). The count fails nothing by itself; a probe says how many a run may
     have (`probe_net_move_states.py`: none through a sprint, prone or an aim).
+  - **`--server-arg SWITCH`** (repeatable) starts the server, and only the server, with
+    `-SWITCH`; type it without its dash, which argparse would read as an option
+    (`--server-arg AllowDevTuning`, `probe_net_dev_tuning.py`'s second case).
   - **`--bots N`** has the server spawn N more player characters driven by simple AI
     (`probes/bots.py`: walk, crouch, fire at the nearest body through the same Server events
     a client asks with), the load test's players; `--trace` writes the server's Unreal

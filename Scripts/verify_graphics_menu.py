@@ -44,6 +44,7 @@ from graphics_menu.gfx_checks import check_gfx_tune
 from graphics_menu.tune_keep_checks import check_kept
 from graphics_menu.tune_keep_consts import KEPT_SLOTS, KEPT_TABS
 from graphics_menu.gfx_tuner_checks import check_gfx_tuner
+from graphics_menu.tune_mode_checks import check_game_tuner, check_tune_mode
 from graphics_menu import cursor_consts as CC
 from graphics_menu.cursor_checks import check_cursor
 from graphics_menu.pause_checks import check_pause_menu
@@ -462,9 +463,11 @@ def main():
     # (mode_tick.py).
     # Twenty-four: and the three the title's figure casts to dress itself
     # (title_figure.py, through player_parts.py).
+    # Twenty-eight: and one per gameplay tuning tab, the weapon component a
+    # client's nudge sends its table through (tune_mode.py).
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 24 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 28 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # The canvas's sized draws: a wanderer's fill from its health fraction,
@@ -873,6 +876,8 @@ def main():
     check_gfx_tune(check, bp, nodes)
     check_kept(check, bp, nodes)
     check_gfx_tuner(check)
+    check_tune_mode(check, nodes)
+    check_game_tuner(check)
     check_cursor(check, bp, nodes)
     check_pause_menu(check, bp, nodes)
     check_main_menu(check, nodes)

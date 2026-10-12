@@ -51,7 +51,8 @@ from graphics_menu.tune_keep_consts import (
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_IDENTICAL, FN_ARR_LEN, FN_ARR_SET
 from uebp.nodes.math import FN_AND, FN_EQ_II
 from uebp.nodes.palette import NODE_CAST_TUNE_SAVE
-from uebp.nodes.system import FN_CREATE_SAVE, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_WRITE_SAVE
+from uebp.nodes.system import (
+    FN_CREATE_SAVE, FN_IS_STANDALONE, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_WRITE_SAVE)
 
 
 def build_tune_savegame():
@@ -95,6 +96,12 @@ def _field(ed, save, name, made):
 def author_load_tab(ed, tab, in_execs, made):
     """BeginPlay: ``tab``'s saved table over the built one (see the module
     docstring). Returns the exec tails."""
+    remote = []
+    if tab.gameplay:
+        # The game's tables are a server's to keep (tune_mode.py): a client
+        # starts on the built ones, whatever this machine saved alone.
+        alone, away = _branch(ed, out(_call(ed, FN_IS_STANDALONE, made)), in_execs, made)
+        in_execs, remote = [alone], [away]
     slot = dict(SlotName=tab.keep_slot, UserIndex=TUNE_SAVE_USER_INDEX)
     exists = _call(ed, FN_SAVE_EXISTS, made, **slot)
     have, none = _branch(ed, out(exists), _chain(exists, in_execs), made)
@@ -120,7 +127,7 @@ def author_load_tab(ed, tab, in_execs, made):
         _connect(flow, _pin(write, "execute"))
         flow = then(write)
     applied = _setter(ed, tab.touched_var, "true", [flow], made)
-    return [applied, none, other, stale]
+    return [applied, none, other, stale, *remote]
 
 
 def author_load_kept(ed, in_execs):

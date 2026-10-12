@@ -263,4 +263,11 @@ verify_graphics_menu.py's checks, beside it because it is over budget
                      CSV's default preset, the graphics tab's SAVE DEFAULT row
 
   var_checks  The verifier's check of the menu's Blueprints against their variable tables (uebp/verify_vars.py): each row ...
+
+  game_tuner         BP_GameTuner, the GameState's component: writes DevTuning, takes the
+                     tables a client sent and applies them where the game runs (M32)
+  game_tuner_consts  its path, its component's name, the gameplay tabs and its variables
+  tune_mode          the gameplay tabs by mode: the nudge allowed or read-only, kept or
+                     sent to the server (AskTune), the hint line's words (M32)
+  tune_mode_checks   the tabs by mode in the HUD's graph, and BP_GameTuner
 """

@@ -18,6 +18,7 @@ their maximums its WORLD_MAXS (only the on/off row has a real one).
 """
 
 from uebp.vars import FLOAT, Var
+from combat.ask_consts import TUNE_WORLD
 from graphics_menu.tune_tab import TuneTab, save_command
 from world.world_tuning import WORLD_STATS
 
@@ -51,6 +52,7 @@ HOUR_ROW = 1                                # the tab row of the time of day
 WORLD_TUNE_SAVE_COMMAND = save_command("graphics_menu.world_tune_save")
 
 WORLD_TAB = TuneTab(
+    gameplay=TUNE_WORLD,
     action=WORLD_TUNE_ACTION, open_var=WORLD_TUNE_OPEN_VAR, row_var=WORLD_TUNE_ROW_VAR,
     pick_var=WORLD_TUNE_PICK_VAR, nudge_var=WORLD_TUNE_NUDGE_VAR,
     save_var=WORLD_TUNE_SAVE_VAR, saved_var=WORLD_TUNE_SAVED_VAR,

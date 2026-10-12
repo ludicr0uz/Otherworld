@@ -17,6 +17,7 @@ the caret or the dragged bar (tune_tab.TuneTab.visible_rows).
 """
 
 from forest_generator.npc_placement import NPC_VARIANTS
+from combat.ask_consts import TUNE_MONSTERS
 from graphics_menu.tune_tab import TuneTab, save_command
 from npc.monster_tuning import MONSTER_STATS
 
@@ -51,6 +52,7 @@ MON_CONTROLLERS = tuple(
 MON_TUNE_SAVE_COMMAND = save_command("graphics_menu.monster_tune_save")
 
 MONSTER_TAB = TuneTab(
+    gameplay=TUNE_MONSTERS,
     action=MON_TUNE_ACTION, open_var=MON_TUNE_OPEN_VAR, row_var=MON_TUNE_ROW_VAR,
     pick_var=MON_TUNE_CREATURE_VAR, nudge_var=MON_TUNE_NUDGE_VAR,
     save_var=MON_TUNE_SAVE_VAR, saved_var=MON_TUNE_SAVED_VAR,

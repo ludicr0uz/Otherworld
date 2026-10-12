@@ -1,8 +1,12 @@
 #include "OtherworldNetLibrary.h"
 
 #include "Components/ActorComponent.h"
+#include "Engine/Engine.h"
 #include "Engine/NetDriver.h"
+#include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(OtherworldNetLibrary)
 
@@ -47,4 +51,22 @@ bool UOtherworldNetLibrary::SendServerEvent(UObject* Target, FName Event, const 
 		It->DestroyValue_InContainer(Parms);
 	}
 	return bSent;
+}
+
+bool UOtherworldNetLibrary::ServerAllowsDevTuning(const UObject* WorldContextObject)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	if (!World)
+	{
+		return false;
+	}
+	switch (World->GetNetMode())
+	{
+	case NM_Standalone:
+		return true;
+	case NM_Client:
+		return false;
+	default:
+		return FParse::Param(FCommandLine::Get(), TEXT("AllowDevTuning"));
+	}
 }

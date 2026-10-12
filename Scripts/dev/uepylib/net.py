@@ -107,7 +107,7 @@ def _wait(running, seconds, has_probes, meter):
 
 def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout=None,
             windowed=False, allow_pie=False, title=False, lag_ms=0, bots=0, trace=False,
-            collect=None):
+            collect=None, server_args=()):
     """Run the server and the clients, print the report. True when clean.
     ``collect``, a list, receives (probe name, passed) per probe asked for,
     passed only when every process that ran it passed (uepylib/game.py)."""
@@ -132,6 +132,8 @@ def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout
         what += f", {bots} bot(s) on the server"
     if trace:
         what += ", the server traced"
+    if server_args:
+        what += f", the server started with {' '.join(net_plan.server_switches(server_args))}"
     log(f"--net: a server and {clients} client(s) on {level}, port {port}, {what} "
         f"-> {folder}")
     started = time.time()
@@ -143,7 +145,7 @@ def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout
             os.makedirs(process.inbox, exist_ok=True)
             running.append((process, subprocess.Popen(
                 net_plan.command(editor, project, process, port, windowed, level, lag_ms,
-                                 trace),
+                                 trace, server_args),
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 env=net_plan.environment(os.environ, process, folder, clients, port,
                                          level, list(probes), probe_timeout, title, bots))))

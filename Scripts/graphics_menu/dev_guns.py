@@ -29,6 +29,7 @@ from graphics_menu.dev_consts import (
 )
 from graphics_menu.menu_nav import pause_row_taken
 from graphics_menu.player_parts import PAWN
+from net.state_graph import owned_game_state
 from uebp.nodes.actor import FN_GET_TRANSFORM
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_LEN
 from uebp.nodes.math import FN_AND, FN_CLASS_EQ, FN_LESS_II, FN_NOT
@@ -155,7 +156,12 @@ def author_dev_guns(ed, pc_out, parts, in_execs, made):
     raised = _setter(ed, DEV_GUNS_REQUEST_VAR, "true", [raise_it], made)
 
     serve, idle = _branch(ed, _get(ed, DEV_GUNS_REQUEST_VAR, made), [raised, no_key], made)
-    flow = [_setter(ed, DEV_GUNS_REQUEST_VAR, "false", [serve], made)]
+    lowered = _setter(ed, DEV_GUNS_REQUEST_VAR, "false", [serve], made)
+    # Only where this machine owns the game (single player): a client that
+    # spawned guns for itself would hold ones the server never made.
+    owned = owned_game_state(ed, [lowered])
+    made += owned.nodes
+    flow = [owned.then]
     wc = parts[WEAPON_COMP_CLASS_PATH]
     for gun in DEV_GUN_CLASS_PATHS:
         flow = _author_give_one(ed, gun, wc, parts[PAWN], flow, made)
@@ -164,4 +170,4 @@ def author_dev_guns(ed, pc_out, parts, in_execs, made):
         f"dev-all-guns (its row in the M panel): one of every gun not "
         f"already carried, while fewer than {SLOT_COUNT} items are. "
         f"NeedsRefresh re-equips; the held item stays held.", made[-1:])
-    return [dirty, idle]
+    return [dirty, idle, *owned.fails]

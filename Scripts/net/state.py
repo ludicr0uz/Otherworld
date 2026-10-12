@@ -1,7 +1,8 @@
 """Builds BP_OtherworldPlayerState and BP_OtherworldGameState and names them
 on the GameMode (state_consts.py says what each holds and why).
 
-Variables only, every one Replicated: the server's graphs write them
+Variables only, every one Replicated but the server's inbox of tuned
+tables (state_consts.TUNED): the server's graphs write them
 (combat/death.py, and the HUD where its machine owns the GameState) and each
 client reads its own copy (state_graph.py). Both actors replicate already:
 the engine's PlayerState and GameStateBase do.
@@ -19,7 +20,7 @@ from combat.paths import GAME_MODE_BP_PATH
 from net import state_consts as S
 from uebp import net
 from uebp.graph import BEL, BGE, _apply_defaults, _assets, _create_blueprint
-from uebp.vars import declare, defaults
+from uebp.vars import NONE, declare, defaults
 
 
 def _build(path, parent, table):
@@ -30,7 +31,8 @@ def _build(path, parent, table):
     # Declare, then replicate: a re-declare drops the flag (uebp/CLAUDE.md).
     declare(ed, table)
     for var in table:
-        net.replicate(bp, var)
+        if var.rep != NONE:
+            net.replicate(bp, var)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")
     _apply_defaults(bp, defaults(table))

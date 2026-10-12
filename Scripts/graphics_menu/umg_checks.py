@@ -16,6 +16,8 @@ from graphics_menu import settings_rows as S
 from ui_art.slot_ghosts import ghost_name
 from graphics_menu import umg_consts as C
 from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT, EXIT_ROW_LABEL
+from graphics_menu.tune_tab import READ_ONLY_HINT
+from graphics_menu.tune_tabs import TABS
 from graphics_menu.umg_author import toolset
 
 BEL = unreal.BlueprintEditorLibrary
@@ -64,10 +66,11 @@ def row_labels(asset, stack):
 
 def text_literal(node):
     """A Text pin's literal as the words it holds: the pin reads back as
-    NSLOCTEXT("", "<key>", "<words>"), or empty when unset."""
+    NSLOCTEXT("", "<key>", "<words>"), or empty when unset. An apostrophe
+    in the words comes back escaped."""
     raw = _value(node, "InText")
     m = re.search(r'"([^"]*)"\)\s*$', raw)
-    return m.group(1) if m else raw
+    return (m.group(1) if m else raw).replace("\\'", "'")
 
 
 def _title(n):
@@ -352,11 +355,13 @@ def check_hud_graph(check, nodes):
           "the first row single player or resume, the Single Player page's new "
           "game or continue game, the last row exit game or save and exit, "
           "the mode under the title, and the rows that need a game, or the "
-          "title, say so; and the death menu's hint as a client of a server",
+          "title, say so; the death menu's hint as a client of a server; and each "
+          "gameplay tuning tab's hint line, its own words or why its rows are read-only",
           literal == {C.DEBUG_ON, C.DEBUG_OFF, C.START_ROW_LABEL, C.RESUME_ROW_LABEL,
                       C.CONTINUE_ROW_LABEL, C.IN_GAME_ONLY, C.SINGLE_ROW_LABEL, C.TITLE_ONLY,
                       EXIT_ROW_LABEL, C.QUIT_ROW_LABEL, C.MODE_SINGLE_TEXT,
-                      C.MODE_MULTI_TEXT, C.DEATH_HINT_SERVER, ""}, str(sorted(literal)))
+                      C.MODE_MULTI_TEXT, C.DEATH_HINT_SERVER, "", READ_ONLY_HINT,
+                      *(tab.hint_text for tab in TABS if tab.gameplay)}, str(sorted(literal)))
 
     # The loot window's rows set a brush too, out of the body's LootIcons
     # (loot_checks.py checks that one).

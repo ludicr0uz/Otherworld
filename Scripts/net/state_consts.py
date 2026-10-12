@@ -7,7 +7,9 @@ builds them, state_graph.py is how a graph reaches them.
                               and of other players, "is dead")
     BP_OtherworldGameState    one per world, replicated: what every machine
                               reads the same (debug mode, the difficulty,
-                              the world's clock)
+                              the world's clock, whether the developer's
+                              tuning is allowed here); and, on the server
+                              alone, the tuned tables waiting to be applied
 
 The GameMode keeps what only the server reads (the gun-drop streams, the
 spawn counter: combat/game_state.py): a client has no GameMode. The noises
@@ -20,7 +22,7 @@ the probes share.
 
 from combat.difficulty import DIFFICULTY_VAR
 from combat.game_state import DEBUG_MODE_VAR, KILL_COUNT_VAR, PLAYER_DEAD_VAR
-from uebp.vars import BOOL, FLOAT, INT, REPLICATED, Var
+from uebp.vars import BOOL, FLOAT, INT, REPLICATED, Var, array
 
 # Beside the health component whose death graph writes them: the weapons
 # build makes both, and forest_generator/asset_sources.py names one builder
@@ -63,7 +65,24 @@ WorldClockOffset = Var(WORLD_CLOCK_OFFSET_VAR, FLOAT, 0.0, rep=REPLICATED)
 WorldDayLength = Var(WORLD_DAY_LENGTH_VAR, FLOAT, 0.0, rep=REPLICATED)
 WorldNightLength = Var(WORLD_NIGHT_LENGTH_VAR, FLOAT, 0.0, rep=REPLICATED)
 WORLD_CLOCK = (WorldClockOffset, WorldDayLength, WorldNightLength)
-GAME_TABLE = (DebugMode, Difficulty, *WORLD_CLOCK)
+# The developer's tuning may change this world's gameplay tables (M32): true
+# in single player, on a server only one started with -AllowDevTuning. The
+# machine that owns the GameState writes it once, at BeginPlay
+# (graphics_menu/game_tuner.py, from the C++ ServerAllowsDevTuning); every
+# client's tuning tabs read it, and the server asks it again before it takes
+# a table (combat/weapon_component/tune_ask.py).
+DEV_TUNING_VAR = "DevTuning"
+DevTuning = Var(DEV_TUNING_VAR, BOOL, False, rep=REPLICATED)
+# The tables a client's tab sent and the server took, one per gameplay tab,
+# in combat/ask_consts.TUNE_TABLES order: an inbox, on the server alone. The
+# server's tuner (BP_GameTuner, a component of this Blueprint) empties each
+# into its own table and applies it; empty = nothing waiting.
+TunedGuns = Var("TunedGuns", array(FLOAT))
+TunedMonsters = Var("TunedMonsters", array(FLOAT))
+TunedWorld = Var("TunedWorld", array(FLOAT))
+TunedPlayer = Var("TunedPlayer", array(FLOAT))
+TUNED = (TunedGuns, TunedMonsters, TunedWorld, TunedPlayer)
+GAME_TABLE = (DebugMode, Difficulty, *WORLD_CLOCK, DevTuning, *TUNED)
 
 # The GameMode's class defaults that name the two.
 GAME_STATE_PROP = "game_state_class"

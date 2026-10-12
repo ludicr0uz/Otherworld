@@ -422,7 +422,7 @@ by the weapons build and named on the GameMode (`state.py`):
 | home | holds | who writes | who reads |
 |---|---|---|---|
 | `BP_OtherworldPlayerState` (one per player, replicated to all) | `NpcKillCount`, `PlayerDead` | the server: the death graph (`combat/death.py`) | that player's HUD, through its owning controller |
-| `BP_OtherworldGameState` (one, replicated) | `DebugMode`, `Difficulty`; the world's clock (M30): `WorldClockOffset`, `WorldDayLength`, `WorldNightLength` | the machine that owns it: the HUD's writes are behind `HasAuthority` of the GameState; the clock's are the server's `BP_DayNightCycle`'s | every machine: the HUD, the weapon component, the consume ability, the wanderers' AI; each client's `BP_DayNightCycle` |
+| `BP_OtherworldGameState` (one, replicated) | `DebugMode`, `Difficulty`; `DevTuning` and the four tuning inboxes `Tuned…` (M32, not replicated: "What differs by mode"); the world's clock (M30): `WorldClockOffset`, `WorldDayLength`, `WorldNightLength` | the machine that owns it: the HUD's writes are behind `HasAuthority` of the GameState; the clock's are the server's `BP_DayNightCycle`'s | every machine: the HUD, the weapon component, the consume ability, the wanderers' AI; each client's `BP_DayNightCycle` |
 | the GameMode (the server alone) | the spawn counter, the gun-drop streams, the combat trace's switch | the server | the server |
 | `UOtherworldPopulation`, a world subsystem (M29) | each creature's budget, its living wanderers, when each player is next owed one | the server (it is not a budget in single player or on a client) | its own pass |
 | `UOtherworldNoiseList`, a world subsystem (M28) | the recent noises, one per maker | the server (`MakeNoise` does nothing with no GameMode) | the server's AI controllers (`HearNoise`) |
@@ -457,10 +457,19 @@ difference is added there, with its reason, in the same commit, and copied here)
 | pause (title menu, M, loot window) | pauses the world, as today | never pauses; the menu is an overlay |
 | the character save | the local `OtherworldProfile` slot, written by the client | a file on the server keyed to the player; the client writes none |
 | death | as today: the profile is deleted, back to the title | gear onto a corpse, respawn |
-| dev settings tabs and cheats | available | read-only unless the server allows them |
+| dev settings tabs and cheats | available | the gameplay tables (guns, monsters, world, player) are the server's: read-only, saying why, unless it was started with `-AllowDevTuning`, and then a change is sent to it (`AskTune`) and applied there; sound and graphics stay local; the all-guns cheat gives nothing (M32) |
 | wanderer population | the level's fixed count | a budget that follows the players |
 | what is left in the world (an item set down or thrown, wood cut, a body, a campfire) | stays until it is taken (a body 60 s, a fire 180 s, as before) | each kind also has a lifetime and a cap: an item lies 20 minutes, and past the cap the oldest of the kind goes |
 | the title menu | the game opens on it, paused: Single Player and Multiplayer are chosen there | none: a connected client is in its game, however it joined (the title or an address on the command line). Leaving, a failed join or a dropped connection returns the process to standalone, and so to the title |
+
+**Dev tuning** (M32, done). `GameState.DevTuning` is the one question, written by the
+machine that owns the GameState from `UOtherworldNetLibrary::ServerAllowsDevTuning`; the
+HUD reads it before a gameplay tab's cell moves, and `AskTune` (a reliable Server event of
+the weapon component, behind the RPC guard like the rest) reads it again on the server,
+which is the check that counts: `probe_net_dev_tuning.py` sends the event past the menu and
+the server refuses it. The server's applier is `BP_GameTuner`
+(`Scripts/graphics_menu/CLAUDE.md`, "The tuning tabs by mode"). A probe starts a server
+that allows it with `uepy.py --net --server-arg AllowDevTuning`.
 
 **Pause** (M5, done). Every `SetGamePaused` in the game is authored by `net/pause.py`, and
 no builder names `FN_SET_PAUSED` itself:

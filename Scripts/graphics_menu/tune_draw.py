@@ -24,6 +24,7 @@ from graphics_menu.cursor import (
     author_back_row, author_button_row, author_row_cursor, author_widget_click)
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.tune_consts import GUN_TAB, TUNE_DASH
+from graphics_menu.tune_mode import author_hint
 from graphics_menu.tune_scroll import author_scroll_drag
 from graphics_menu.ui_graph import mark_rows, member, part, row_value, set_shown, show_if
 from graphics_menu.umg_consts import ROW_CARET, WBP_MENU_ROW, WBP_PAUSE_MENU
@@ -145,6 +146,7 @@ def author_tune_panel(ed, in_execs, tab=GUN_TAB):
     flow = [flow]
     if tab.visible_rows:
         flow = _author_follow(ed, tab, box, flow, made)
+    flow = author_hint(ed, tab, part(ed, WBP_PAUSE_MENU, tab.hint_widget), flow, made)
     saved = part(ed, WBP_PAUSE_MENU, tab.saved_text)
     tails = show_if(ed, saved, _get(ed, tab.saved_var, made), flow)
     return [closed, *tails]

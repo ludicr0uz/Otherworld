@@ -21,6 +21,7 @@ from combat.weapon_component.inventory import _author_wc_begin_play
 from combat.weapon_component.knife import axe_clip_defaults
 from combat.weapon_component.stance import STAND
 from combat.weapon_component.asks import author_asks
+from combat.weapon_component.tune_ask import author_tune_ask
 from combat.weapon_component.look import author_set_look, replicate_look
 from combat.weapon_component.look_vars import TABLE as LOOK_TABLE
 from combat.record_vars import TABLE as RECORD_TABLE
@@ -129,6 +130,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # What a screen asks of the component: one event each (combat/ask_consts.py).
     # The slots' keys call theirs, and the upkeep the view's two (view.py).
     author_asks(ed)
+    author_tune_ask(ed)
     author_draw_worn_event(ed)      # before the wears, which call it by name
     author_wear_event(ed)
     author_consume_event(ed)

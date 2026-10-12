@@ -352,6 +352,52 @@ stays held, as with a pick-up; asking twice adds nothing.
   cheat's item comes through a cast; its refresh follows no `Set EquippedIndex`).
 - **Probe:** `uepy.py --game --probe Scripts/probes/probe_dev_all_guns.py` writes the request
   flag (no keyboard in a probe). Taking the row by hand needs a play session.
+- **Single player only (M32).** The request is lowered on any machine, but the guns are given
+  only where the HUD's machine has authority over the GameState
+  (`net/state_graph.owned_game_state`): a client's HUD spawning items would make ghosts the
+  server never heard of. A server that allows tuning still grants none; that would be an
+  `Ask…` event of its own.
+
+## The tuning tabs by mode (M32; `tune_mode.py`, `game_tuner.py`, `game_tuner_consts.py`)
+
+Four tabs tune the game (`TuneTab.gameplay`, which names the tab's entry of
+`combat/ask_consts.TUNE_TABLES`: GUN, MONSTER, WORLD, PLAYER); SOUND and GRAPHICS tune this
+machine and are the same in both modes. Whether the game may be tuned is one replicated bool
+on the GameState, `DevTuning`, written at BeginPlay by the machine that owns it from the
+native `ServerAllowsDevTuning` (`Source/CLAUDE.md`): true in single player, and on a server
+only one started with `-AllowDevTuning`.
+
+| | single player | client, server allows | client, server refuses |
+|---|---|---|---|
+| a nudge of a stat on a gameplay tab | the cell moves; the table is kept (`tune_keep`) | the cell moves; `AskTune(table index, the whole table)` goes to the server; nothing is kept | nothing moves, nothing is touched |
+| the hint line | the tab's own | the tab's own | `tune_tab.READ_ONLY_HINT`, which says why |
+| the kept table at BeginPlay | loaded | not loaded (a Branch on IsStandalone in `tune_keep.author_load_tab`) | not loaded |
+
+- **The server's half is `BP_GameTuner`,** a component of `BP_OtherworldGameState` built by
+  this build (`game_tuner.install_game_tuner` adds it; the weapons build must have run). It
+  holds the four tables under the HUD's own variable names, so the tabs' apply fragments
+  author the same nodes in either graph. Tick, with authority: an inbox of the GameState
+  (`state_consts.TUNED`, written by `AskTune` only where `DevTuning`) that is as long as its
+  table replaces the table and raises its Touched flag, and is emptied either way; then the
+  applies run, the guns' and the player's once per `BP_ThirdPersonCharacter` in the world
+  (`tune_tick.author_onto_pawn`, `player_tune_tick.author_onto_pawn`).
+- **In single player the tuner applies nothing:** no inbox is ever written, so nothing is
+  touched, and the HUD's own applies are the ones that run, as before M32.
+- **What a server tune does not reach:** the other clients' own copies of a gun's numbers or
+  a speed (theirs change when the server's value replicates or corrects them, not before),
+  and the other clients' tabs, which go on showing their own tables. The client that tuned
+  applies its table to its own copies at once.
+- **The whole table is sent,** the world tab's hour cell with it, so a nudge of the day's
+  length also sets the server's clock to the client's reading of it.
+- **The guns tab's grip rows are read-only with the rest** on a server that refuses, though
+  they tune only this machine's picture.
+- **Enter's save runs Python** (`tune_save`), which a shipped client does not have; in the
+  editor binary it writes the client's own CSV, never the server's.
+- **Verified by** `tune_mode_checks.py` (the gate before each gameplay tab's cell write, the
+  send, the hint, the standalone load, the tuner) and `combat/verify/asks.check_tune_ask`.
+- **Probes:** `probe_net_dev_tuning.py`, one file for both cases
+  (`uepy.py --net --clients 2 [--server-arg AllowDevTuning] --probe …`: the nightly sweep
+  runs the refusing case only), and `probe_dev_tuning_single.py` for single player.
 
 ## The loot window (`loot_*.py`, `wbp_loot.py`)
 

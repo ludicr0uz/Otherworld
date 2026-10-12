@@ -82,7 +82,11 @@ fi
 # them (Scripts/dev/devteam/session.py).
 if printf '%s\n' "$files" | grep -q '^Scripts/dev/.*\.py$'; then
     testlog=$(mktemp)
-    if python3 -m unittest discover -s Scripts/dev/tests > "$testlog" 2>&1; then
+    # Without git's own variables: a hook run from a linked worktree is handed
+    # GIT_DIR, and the tests that `git init` a scratch repository then wrote
+    # into this one's config instead (core.bare, user.name, core.hooksPath).
+    if env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX \
+            python3 -m unittest discover -s Scripts/dev/tests > "$testlog" 2>&1; then
         tail -1 "$testlog" | sed 's/^/pre-commit: dev unit tests: /'
     else
         tail -25 "$testlog"

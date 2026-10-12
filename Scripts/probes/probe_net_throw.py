@@ -17,8 +17,12 @@ into a tree, every machine sees it lodged there, and client 2 takes it out.
                second axe in its inventory, and sees none left in the tree
     server     the same actor is in client 2's inventory, out of the world;
                a second take of it is refused; a throw asked for at ten times
-               the item's speed leaves at the item's own
+               the item's speed leaves at the item's own, and flies a second
     client 1   sees no axe in the tree, and has none
+    client 1,  each see that last item for the whole of its flight (task R1):
+    client 2   shown, at five or more places before it lies still. The axe's
+               own flight to the trunk is 0.15 s, two places at the item's
+               10 Hz, so the count is taken on the long one
 
 ThrowKeyForced, ThrowClickForced and InteractForced stand in for the keys.
 Single player's check is probes/probe_throw_strike.py, which throws the same
@@ -56,6 +60,8 @@ SPARE_HEALTH = 100000.0
 SAME_PLACE_CM = 15.0      # a client's copy of the lodged axe, from the server's
 STOOD_CM = 60.0           # a client is where the server stood it
 CHEST_UP_CM = 110.0       # where on the trunk the reticle is put
+FLIGHT_PLACES = 5         # a client's copy of an item in the air, seen at this many places
+APART_CM = 5.0            # two places are different this far apart
 
 
 def _await(ready, seconds=WAIT):
@@ -88,6 +94,24 @@ def _in_world(p):
     """The axes this machine shows lying or lodged in the world."""
     return [a for a in _items(p, AXE)
             if p.get(a, IV.Dropped) and not a.get_editor_property("hidden")]
+
+
+def _watching(p, sample, ready, seconds=WAIT):
+    """``ready`` awaited, with ``sample()`` taken every frame of the wait."""
+    done = _await(ready, seconds)
+
+    def poll():
+        sample()
+        return done()
+    return poll
+
+
+def _flying(p):
+    """Where this client shows each of the server's items in the air: sent to
+    it, shown, of the world's and not yet lying."""
+    return [a.get_actor_location() for a in _items(p)
+            if not a.has_authority() and not a.get_editor_property("hidden")
+            and p.get(a, IV.InWorld) and not p.get(a, IV.Dropped)]
 
 
 # ─── the server ──────────────────────────────────────────────────────────────
@@ -198,7 +222,10 @@ def probe_server(p):
                 "item's own", p.get(wc2, THROWN_VAR) == held
                 and speed <= top * THROW_SPEED_SLACK + 1.0,
                 f"{speed:.0f} cm/s, the item's {top:.0f}")
-    p.post("judged")
+        # It flies free for a second, away from the tree: each client watches.
+        yield _await(lambda: p.get(wc2, THROWN_VAR) is None, 10.0)
+        yield 0.5
+    p.post("judged", held is not None)
 
 
 # ─── the clients ─────────────────────────────────────────────────────────────
@@ -270,11 +297,24 @@ def probe_client(p):
                 f"{(mine.get_actor_location() - rest).length():.0f} cm from it")
         p.post("taken")
 
-    yield _await(lambda: p.posted("client 2", "taken"), 90.0)
-    yield _await(lambda: not _in_world(p), 10.0)
+    # From here the server's last throw may be in the air: every frame is read.
+    places = []
+
+    def sample():
+        for at in _flying(p):
+            if not places or (at - places[-1]).length() > APART_CM:
+                places.append(at)
+    yield _watching(p, sample, lambda: p.posted("client 2", "taken"), 90.0)
+    yield _watching(p, sample, lambda: not _in_world(p), 10.0)
     p.check(f"{p.where} sees no axe left in the tree once it is taken",
             not _in_world(p), f"{len(_in_world(p))} still shown")
     if p.client == 1:
         p.check("...and client 1 has none: its axe is client 2's now",
                 len(_axes(p, wc)) == mine_axes - 1, f"{len(_axes(p, wc))} axe(s)")
-    yield _await(lambda: p.posted("server", "judged"), 30.0)
+    yield _watching(p, sample, lambda: p.posted("server", "judged") is not None, 30.0)
+    if p.posted("server", "judged"):
+        span = (places[-1] - places[0]).length() if places else 0.0
+        p.check(f"{p.where} sees the item the server threw last for the whole of its "
+                f"flight: shown, at {FLIGHT_PLACES} or more places before it lies still",
+                len(places) >= FLIGHT_PLACES,
+                f"{len(places)} place(s) over {span:.0f} cm")

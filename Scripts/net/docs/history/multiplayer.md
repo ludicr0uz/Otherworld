@@ -1456,3 +1456,41 @@ harness (`uepy.py --net --clients 2 --bots N --probe Scripts/probes/probe_net_lo
   fail each other, and the checks that put a hip round into a wanderer come and go from run
   to run (`probe_headshot`'s chest, which its rounds also missed on the build before A4,
   and `probe_bullet_impact`'s blood, which failed one run of two here).
+
+## A thrown item on the other clients: it is the rate (R1, 2026-10-12)
+
+The report: in online play another player's thrown axe shows once in mid-air and then at
+rest. Three suspects: the item's dormancy at the release (it is carried `DORM_DormantAll`,
+and `author_into_world` calls `SetReplicates(true)` on it in that state), a client's hide
+until `InWorld` arrives, and the item's rate (`net/relevancy_consts.py` `ITEM`, 10 Hz).
+
+- **Measured** (`uepy.py --net --clients 2 --probe Scripts/probes/probe_net_throw.py`, the
+  probe sampling every frame: on the server the item's `NetDormancy`, `Dormant` and place
+  while it is `Thrown`; on each client every copy sent to it, its hidden flag, `InWorld`,
+  `Dropped` and place):
+
+  | throw | on the server | on client 1 and client 2 |
+  |---|---|---|
+  | client 1's axe at a trunk 4 m off (1800 cm/s) | 5 frames, 0.12 s in the air; `DORM_Awake` and `Dormant` false on every one, the release's included | the copy is there shown and `InWorld` from its first frame, at 2 places 0.10 s apart, then `Dropped` in the trunk at 0.17 s |
+  | a shotgun never replicated before, thrown free by `Server_Throw` (1100 cm/s, 20° up) | 35 frames, 1.1 s in the air, `DORM_Awake` on every one | shown and `InWorld` from its first frame, at 11 places 0.10-0.11 s apart, then `Dropped` where it fell |
+
+- **The finding: the rate alone.** The item's Tick wakes it in the frame of the release,
+  before the server's next send, so no connection ever takes it in asleep: a channel
+  closed after the first send would not have carried the ten that followed. No copy was
+  hidden on any frame it existed. A client is sent the flight every 0.10 s, which is
+  `ITEM`'s 10 Hz, and an axe thrown at something 4 m away is in the air for 0.12-0.15 s:
+  one or two places, then the rest. That is what was seen. Throws are short, so the
+  hop is nearly all of the flight.
+- **So nothing in `combat/item_world.py` changed.** The fix this points at is the
+  position stream itself, which is R2's (the flight run on every machine from the
+  release); the rate was not raised here.
+- **The other way into the world does start replicating a dormant item, and means to:**
+  `_author_enter_world` (the item's own Tick: set down, placed, left by a kill, cut from
+  a tree) calls `SetReplicates(true)` on an item that is `Dropped`, so `DormantAll`, and
+  follows it with `FlushNetDormancy`. It lies still: sent once, where it lies, and its
+  channel closed is the design (A2). Not measured here: an item that still moves after
+  it is `Dropped` would not be sent moving.
+- **Proof:** `probe_net_throw.py` has the check on the long flight, on both clients (the
+  axe's own flight is too short to hold five places at 10 Hz): "sees the item the server
+  threw last for the whole of its flight: shown, at 5 or more places before it lies
+  still", 12 places over 13.0 m; with `--lag 120` 11 over 12.0 m, 8/8, 6/6 and 4/4.

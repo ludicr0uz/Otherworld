@@ -215,6 +215,11 @@ judges it from its own copy. `combat/strike_vars.py` has the picture.
 | `Server_Take(Item)` (E on an item) | the item exists and is `Dropped`, the taker alive and within reach of it, a slot free | into the taker's inventory; the record tells the client |
 
 - M20 melee, the guard, the throw and the take: docs/history/multiplayer.md#m20
+- **A thrown item is sent to the other clients for its whole flight, at the item's 10 Hz**
+  (R1, measured: it is awake from the frame of the release and never hidden). A short
+  throw is in the air 0.12-0.15 s, so a client shows it at one or two places and then at
+  rest; that is the rate, not dormancy. R2 replaces the position stream:
+  docs/history/multiplayer.md ("A thrown item on the other clients").
 
 ## Picking up, dropping and looting (M23, done)
 

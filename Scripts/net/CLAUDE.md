@@ -317,6 +317,37 @@ module that owns the action.
 - M28 noise for several players: docs/history/multiplayer.md#m28
 - M29 wanderer population by mode: docs/history/multiplayer.md#m29
 
+## One world clock (M30, done)
+
+- **The server's `BP_DayNightCycle` keeps the time of day; a client's shows it.** The cycle
+  is placed in the level and does not replicate, so each machine has one. Its Tick starts
+  at a Switch Has Authority (`world/world_clock.py`): with authority (a server, single
+  player) `Clock` advances by the frame's time, as it always did; a client sets its
+  `Clock`, and its two lengths, from the GameState every frame.
+- **What replicates is three numbers on `BP_OtherworldGameState`, written only when they
+  stop being true:** `WorldClockOffset` (the Clock when the server's world time was 0,
+  wrapped into the cycle), `WorldDayLength`, `WorldNightLength`. A client's
+  `Clock = (WorldClockOffset + GetServerWorldTimeSeconds) % cycle`: the engine's GameState
+  already keeps every client's estimate of the server's world time. While the clock only
+  runs the offset is a constant, so nothing is sent per frame; a write to the server's
+  `Clock` (the random start, the WORLD SETTINGS dial, a probe) shows as a gap over 0.05 s
+  and is published once. `WorldDayLength` 0 means "not published yet": a client waits.
+- **So on the server `Clock` is still a variable to write; on a client a write does
+  nothing** (the next frame is the server's again). That is the WORLD SETTINGS tab's row of
+  "What differs by mode": a client's dial shows the server's hour and moves nothing.
+- **The start hour is drawn with authority only** (`net/random_consts.py`). The night's
+  cold was the server's already (M26).
+- **The wind** has no state but where in its sway it is, which the materials read off
+  their own machine's time. `MPC_Wind.TimeOffset` is added to it; the cycle writes it on
+  every machine, each frame, as the server's world time (wrapped at an hour, to stay a
+  small float: one skip an hour) less this machine's. 0 in single player's first hour.
+  Its strength and speed stay each machine's graphics settings.
+- **Proved:** `uepy.py --net --clients 2 --probe Scripts/probes/probe_net_world_clock.py`
+  (every process reads its Clock at the same wall instants: through a minute, and after the
+  server moves its clock 137 s, each client is within 0.08 s of the server and of the other
+  client); `--game` with the same file is single player's arm. `world/verify/clock.py`.
+- M30 one world clock: docs/history/multiplayer.md#m30
+
 ## Random rolls (M17, done)
 
 Chance that changes the game is rolled once, by the machine that owns the state, and the
@@ -358,7 +389,7 @@ by the weapons build and named on the GameMode (`state.py`):
 | home | holds | who writes | who reads |
 |---|---|---|---|
 | `BP_OtherworldPlayerState` (one per player, replicated to all) | `NpcKillCount`, `PlayerDead` | the server: the death graph (`combat/death.py`) | that player's HUD, through its owning controller |
-| `BP_OtherworldGameState` (one, replicated) | `DebugMode`, `Difficulty` | the machine that owns it: the HUD's writes are behind `HasAuthority` of the GameState | every machine: the HUD, the weapon component, the consume ability, the wanderers' AI |
+| `BP_OtherworldGameState` (one, replicated) | `DebugMode`, `Difficulty`; the world's clock (M30): `WorldClockOffset`, `WorldDayLength`, `WorldNightLength` | the machine that owns it: the HUD's writes are behind `HasAuthority` of the GameState; the clock's are the server's `BP_DayNightCycle`'s | every machine: the HUD, the weapon component, the consume ability, the wanderers' AI; each client's `BP_DayNightCycle` |
 | the GameMode (the server alone) | the spawn counter, the gun-drop streams, the combat trace's switch | the server | the server |
 | `UOtherworldPopulation`, a world subsystem (M29) | each creature's budget, its living wanderers, when each player is next owed one | the server (it is not a budget in single player or on a client) | its own pass |
 | `UOtherworldNoiseList`, a world subsystem (M28) | the recent noises, one per maker | the server (`MakeNoise` does nothing with no GameMode) | the server's AI controllers (`HearNoise`) |

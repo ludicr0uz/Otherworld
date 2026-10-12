@@ -3,7 +3,8 @@
 `Scripts/build_day_night.py` builds `T_NightSkyStars`, `M_DayNightSky` and `BP_DayNightCycle`
 (all under `/Game/World`) and puts one cycle actor into every generated level.
 `Scripts/verify_day_night.py` checks it, and `Scripts/probes/probe_day_night.py`,
-`probe_night_sky.py` and `probe_night_cold.py` run it in a game. The module map is in `__init__.py`.
+`probe_night_sky.py`, `probe_night_cold.py` and `probe_net_world_clock.py` (a server and two
+clients) run it in a game. The module map is in `__init__.py`.
 
 ```bash
 python3 Scripts/dev/uepy.py Scripts/build_day_night.py Scripts/verify_day_night.py
@@ -28,7 +29,8 @@ to `Saved/Screenshots/MacEditor`: the only way to see the stars without playing.
   an item lying on the ground glimmers. It is the actor's `ItemHighlight`. See "The item
   highlight" below.
 - **A level starts at a random time of day:** with `RANDOM_START` (the actor's `RandomStart`),
-  BeginPlay sets `Clock` to `RandomFloatInRange(0, day + night)`. With it off, `Clock`'s default
+  BeginPlay sets `Clock` to `RandomFloatInRange(0, day + night)`, with authority only (a
+  client's clock is the server's: "One clock" below). With it off, `Clock`'s default
   `START_CLOCK_S` (20 s, just after sunrise) is where it starts.
 - The two lengths, `Clock`, the night's cold, the item highlight and `RandomStart` are also Instance Editable on the placed actor, so
   one level can differ.
@@ -68,6 +70,29 @@ to `Saved/Screenshots/MacEditor`: the only way to see the stars without playing.
   would pop at dusk. The SkyLight captures the dome, so the ambient light follows the sky.
 - **`import_<Level>.py` rebuilds a level from scratch.** Re-run `build_day_night.py` after it,
   as with `place_forage.py`.
+
+## One clock (`world_clock.py`, M30)
+
+- **Only a machine with authority keeps time:** a server, and single player. The Tick
+  starts at a Switch Has Authority. The authority arm advances `Clock` by the frame's time
+  and publishes it on the GameState when what is there is out of date
+  (`WorldClockOffset`, `WorldDayLength`, `WorldNightLength`; `net/state_consts.py`); the
+  remote arm, a client's, sets its two lengths and
+  `Clock = (WorldClockOffset + the server's world time) % cycle` from the GameState. Every
+  arm joins at `Set IsDay`, and the rest of the Tick reads `Clock` and knows no difference.
+  Why an offset, and what replicates when: `Scripts/net/CLAUDE.md`, "One world clock".
+- **Write `Clock` on the machine with authority.** There it stands and reaches every client
+  within a frame or two of replication. On a client it lasts one frame; so does a write to
+  `DayLengthSeconds` or `NightLengthSeconds`. A `--net` probe that wants an hour sets it on
+  the server.
+- **A new step that changes the game goes behind authority** (the night's cold); one that
+  only draws or sounds runs everywhere, off `Clock` and `DayAmount`.
+- **The wind's time:** both arms store the server's world time (wrapped at
+  `WIND_WRAP_S`, an hour) less this machine's in `WindTimeOffset`, and a Tick step writes
+  it to `MPC_Wind.TimeOffset`, which the wind's materials add to their time
+  (`forest_import/wind.py`). 0 in single player until the first wrap.
+- **Checks:** `world/verify/clock.py`; `probes/probe_net_world_clock.py` with `--net
+  --clients 2`, and with `--game` for single player's arm.
 
 ## The forest's sound (`Sound/sound_world.py`)
 

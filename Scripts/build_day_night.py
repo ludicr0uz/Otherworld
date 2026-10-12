@@ -31,6 +31,7 @@ from world.level_placement import place_day_night                 # noqa: E402
 from world.night_cold import author_night_cold                    # noqa: E402
 from world.paths import DAY_NIGHT_BP_PATH                         # noqa: E402
 from world.sky_material import build_sky_material                 # noqa: E402
+from world.world_clock import author_wind_time                    # noqa: E402
 from world.star_texture import build_star_texture                 # noqa: E402
 
 LEVELS = sorted(
@@ -47,6 +48,7 @@ def build_blueprint():
     declare_variables(ed)
     tick, chain = build_graph(bp, ed)
     author_ambience(ed, chain)
+    author_wind_time(ed, chain)
     # Before the cold, whose chain stops at a level with no player.
     author_item_highlight(ed, chain)
     author_night_cold(ed, tick, chain)

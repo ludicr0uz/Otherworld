@@ -773,7 +773,7 @@ the ask, predicting ---------->    Server_Fire / _Punch /        Multicast_<Name
 | `npc/ward_roar.py` | state | held off by fire: when the first roar comes (it stands for it) | the AIController, as the patrol |
 | `combat/weapon_component/firing.py` | state | where in the gun's cloud a round or a pellet goes | inside `Server_Fire`, which only the server runs (single player: a plain call); the owning client draws nothing, and what the pellets did replicates as health |
 | `combat/weapon_component/chop.py` | state | where the wood lands beside the trunk, and how it lies | the weapon component of whoever chops, on the server alone: the chop hangs off the server's blow, and the wood it leaves replicates |
-| `world/day_night_graph.py` | state | the time of day a level starts at | every machine's own BP_DayNightCycle at BeginPlay; one clock, the server's, replicated (**M30**) |
+| `world/day_night_graph.py` | state | the time of day a level starts at | the server's BP_DayNightCycle at BeginPlay, behind its authority switch (done, M30) |
 | `Sound/play.py` | cosmetic | which take of a sound plays (every sound with more than one) | wherever the sound plays |
 | `combat/hit_reaction.py` | cosmetic | which of the three front flinches a blow from the front plays | every machine's copy of the health component, off its own Tick |
 | `combat/weapon_component/recoil.py` | cosmetic | the kick's sideways drift, on the view of the player who fired | the owning client: it turns its own controller, as the mouse does |
@@ -821,6 +821,39 @@ the ask, predicting ---------->    Server_Fire / _Punch /        Multicast_<Name
   the budget), and the cost at 64 players.
 
 <a id="m28"></a>
+
+<a id="m30"></a>
+## One world clock (M30, done, 2026-10-11)
+
+- **Before:** every process ran its own `BP_DayNightCycle`, each drawing its own start
+  hour: day on one client, night on another.
+- **Built:** `world/world_clock.py` is the head of the cycle's Tick. With authority the
+  clock advances as before and is published on `BP_OtherworldGameState`
+  (`WorldClockOffset`, `WorldDayLength`, `WorldNightLength`; `net/state_consts.py`) only
+  when what is there is out of date by more than 0.05 s or a length differs; a client
+  takes the lengths and `Clock = (offset + GetServerWorldTimeSeconds) % cycle`. The
+  BeginPlay draw of the start hour is behind an authority switch. The wind's materials add
+  `MPC_Wind.TimeOffset` to their time (`forest_import/wind.py`; the two tree masters
+  re-patched, `M_ProcFoliage` rebuilt), which the cycle writes from `WindTimeOffset`.
+- **Why an offset and not the clock:** a replicated clock is a write a frame, and a
+  client's sky would step at the replication rate. The server's world time is replicated
+  by the engine already, so one constant is enough, and the client's sky is as smooth as
+  its own frames.
+- **Why the server still accumulates `Clock`:** the dial of the WORLD SETTINGS tab and nine
+  probes write it. The publish is the comparison that notices.
+- **Proved:** `probe_net_world_clock.py`, a server and two clients on `Lvl_Probe_50m`:
+  server 4/4 (its clock ran 59.99 s in 60 s; the published offset stood still through the
+  minute, then moved by the 137 s the clock was moved), each client 7/7 (within 0.078 s of
+  the server and the other client through the minute and after the jump; its own write of
+  +100 s did nothing; the server's lengths; the wind's time within 0.078 s). `--game`:
+  4/4 (the clock advances with the world's time, a write stands, the wind's offset is 0).
+  `verify_day_night.py` 99/99 (was 90: the `clock` section).
+- **Not proven:** what the wind looks like on two screens (`-nullrhi` draws nothing; the
+  probe reads the collection's scalar); a client under `--lag` (the engine's estimate of
+  the server's time is not corrected for the ping, so a client is behind by about its
+  one-way delay: far inside a second); a server up for days (the world time is a double;
+  the wind's is wrapped at an hour for the float the collection holds).
+
 ## Noise for several players (M28, done, 2026-10-11)
 
 - **Built:** `Source/Otherworld` `OtherworldNoise.h/.cpp`: `UOtherworldNoiseList` (a world

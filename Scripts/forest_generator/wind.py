@@ -50,7 +50,12 @@ MPC_NAME = "MPC_Wind"
 MPC_PATH = f"{MPC_DIR}/{MPC_NAME}"
 PARAM_STRENGTH = "Strength"
 PARAM_SPEED = "Speed"
-MPC_DEFAULTS = {PARAM_STRENGTH: 1.0, PARAM_SPEED: 1.0}
+# Seconds added to the material's own Time before Speed scales it: what puts
+# every machine of a server at one point of the wind. BP_DayNightCycle writes
+# it each frame (world/world_clock.py); 0, the default, is this machine's own
+# time, which is what a level without a cycle and the editor's viewport show.
+PARAM_TIME_OFFSET = "TimeOffset"
+MPC_DEFAULTS = {PARAM_STRENGTH: 1.0, PARAM_SPEED: 1.0, PARAM_TIME_OFFSET: 0.0}
 
 # The materials with wind, and which part each carries.
 PROC_FOLIAGE = "/Game/Forest/Procedural/M_ProcFoliage"   # grass, rebuilt whole

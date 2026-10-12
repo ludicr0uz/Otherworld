@@ -156,7 +156,7 @@ owning client: read input  --Server RPC-->  server: validate, change state
 | kill count, per player | GameMode | PlayerState (done, M7: `BP_OtherworldPlayerState`) |
 | `PlayerDead` | GameMode | PlayerState (done, M7) |
 | team | none | PlayerState (team id), GameState (roster) |
-| debug flags, the difficulty, the day's clock | GameMode, `BP_DayNightCycle` | GameState / a replicated actor (debug mode and the difficulty done, M7: `BP_OtherworldGameState`; the clock is M30) |
+| debug flags, the difficulty, the day's clock | GameMode, `BP_DayNightCycle` | GameState / a replicated actor (debug mode and the difficulty done, M7: `BP_OtherworldGameState`; the clock done, M30: the server's cycle keeps it, three numbers on the GameState give it to every client's) |
 | the noise record | GameMode | stays on the server (only AI reads it), as a list: `UOtherworldNoiseList`, a native world subsystem (M28) |
 | gun-drop random streams, spawn counter | GameMode | stay on the GameMode: server only is right |
 | health, inventory, slots, ammo, worn garments | components, unreplicated | the same components, server-owned and replicated |
@@ -438,7 +438,7 @@ the rest of Phases 2–7 fits the Python-builder workflow once task 2 exists.
 20. Server-only random rolls for loot, gun drops and on-hit effects. (Done, M17:
     `Scripts/net/CLAUDE.md`, "Random rolls": every draw is audited as state or
     cosmetic in `net/random_consts.py`; spread, the wood's spot and the start hour
-    move with M19, M25 and M30.)
+    moved with M19, M25 and M30.)
 
 **Phase 5 — Weapons and inventory** (the largest phase; `weapon_component` alone is about
 55 modules)
@@ -482,7 +482,7 @@ the rest of Phases 2–7 fits the Python-builder workflow once task 2 exists.
 28. A population budget across the map: spawn near players, despawn far from them.
 29. Noise as a list or a spatial query.
 30. A server-owned day and night clock, campfires and dropped items; cleanup rules for
-    what piles up.
+    what piles up. (The clock done, M30: `Scripts/net/CLAUDE.md`, "One world clock".)
 
 **Phase 7 — Teams**
 

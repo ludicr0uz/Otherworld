@@ -2,11 +2,12 @@
 
 BeginPlay destroys every actor tagged STATIC_SKY_TAG (the level's own light,
 sky light, fog, clouds and dome), gives the dome a dynamic material and, with
-RandomStart, sets Clock to a random point in the whole cycle (so a game
-starts at a random time of day).
+RandomStart and authority, sets Clock to a random point in the whole cycle (so
+a game starts at a random time of day; a client's comes from the server).
 
-Tick advances Clock and derives everything else from it, the same sums as
-world_config.sun_state():
+Tick takes Clock from where this machine's comes from (world_clock.py: the
+server and single player advance it, a client reads the GameState) and derives
+everything else from it, the same sums as world_config.sun_state():
 
   angle      0-180 across the day, 180-360 across the night
   sun        pitch -SUN_MAX*sin(angle), yaw SUNRISE_YAW + angle
@@ -42,10 +43,11 @@ from uebp.nodes.actor import (
     FN_FORWARD_OF, FN_LIGHT_INTENSITY, FN_MID_SCALAR, FN_MID_VECTOR, FN_SKY_INTENSITY)
 from uebp.nodes.math import (
     FN_ADD_FF, FN_COLOR_LERP, FN_DEG_SIN, FN_LESS_FF, FN_MAKE_COLOR, FN_MAKE_ROT,
-    FN_MAP_CLAMPED, FN_MUL_FF, FN_NEGATE_V, FN_PERCENT_FF, FN_RANDOM_FLOAT, FN_VEC_TO_COLOR)
-from uebp.nodes.palette import MACRO_FOR_EACH
+    FN_MAP_CLAMPED, FN_MUL_FF, FN_NEGATE_V, FN_RANDOM_FLOAT, FN_VEC_TO_COLOR)
+from uebp.nodes.palette import MACRO_FOR_EACH, MACRO_SWITCH_AUTHORITY
 from uebp.nodes.system import FN_WITH_TAG
 from world import day_night_vars as DV
+from world.world_clock import author_clock_source
 from uebp import props as EP
 
 PP_CLASS_PATH = "/Script/Engine.PostProcessComponent"
@@ -106,7 +108,7 @@ def _set_var(ed, chain, name, value_pin):
 
 def _author_begin_play(ed, begin):
     """Destroy the level's tagged sky rig, make the dome's dynamic material,
-    then (RandomStart) pick the starting clock."""
+    then (RandomStart, with authority) pick the starting clock."""
     chain = _Chain(then(begin))
     found = chain.step(_call(ed, FN_WITH_TAG, Tag=STATIC_SKY_TAG))
     loop = ed.add_macro_node(MACRO_FOR_EACH)
@@ -124,6 +126,11 @@ def _author_begin_play(ed, begin):
 
     pick = chain.step(ed.add_branch_node())
     _connect(_get(ed, RANDOM_START_VAR), _pin(pick, "Condition"))
+    # The draw is the server's (net/random_consts.py): a client's cycle is
+    # given its clock, and a second draw would be a second sky until then.
+    owns = ed.add_macro_node(MACRO_SWITCH_AUTHORITY)
+    _connect(chain.then, _pin(owns, "execute"))
+    chain.then = out(owns, "Authority")
     total = out(_call(ed, FN_ADD_FF,
                        A=_get(ed, DV.DayLengthSeconds),
                        B=_get(ed, DV.NightLengthSeconds)))
@@ -132,16 +139,18 @@ def _author_begin_play(ed, begin):
 
 
 def _author_clock(ed, tick, chain):
-    """Advance Clock, set IsDay; return (clock, day_len, sin(angle), sun_elev) pins."""
+    """This machine's Clock (world_clock.py), then IsDay and DayAmount;
+    return (angle, sin(angle), sun_elev) pins."""
     day_len = _get(ed, DV.DayLengthSeconds)
     total = out(_call(ed, FN_ADD_FF, A=day_len, B=_get(ed, DV.NightLengthSeconds)))
-    ahead = out(_call(ed, FN_ADD_FF, A=_get(ed, DV.Clock), B=out(tick, "DeltaSeconds")))
-    wrapped = out(_call(ed, FN_PERCENT_FF, A=ahead, B=total))
-    _set_var(ed, chain, DV.Clock, wrapped)
+    first, *rest = author_clock_source(ed, tick, chain.then)
+    chain.then = first
 
     clock = _get(ed, DV.Clock)
     is_day = out(_call(ed, FN_LESS_FF, A=clock, B=day_len))
-    _set_var(ed, chain, IS_DAY_VAR, is_day)
+    joined = _set_var(ed, chain, IS_DAY_VAR, is_day)
+    for tail in rest:     # every arm of the clock's source goes on from here
+        _connect(tail, _pin(joined, "execute"))
 
     # angle = map(clock, 0..day -> 0..180) + map(clock, day..total -> 0..180)
     first = _call(ed, FN_MAP_CLAMPED, Value=clock, InRangeA=0.0,

@@ -49,5 +49,10 @@ MoonDiscScale = Var("MoonDiscScale", FLOAT, 1.0)
 LOOK_SCALES = (SunScale, MoonScale, StarScale, AmbientScale, FogScale, SunDiscScale,
                MoonDiscScale)
 
+# What MPC_Wind.TimeOffset is written from: the server's world time less this
+# machine's, so every machine's grass and trees are at one point of the wind
+# (world_clock.py). 0 in single player.
+WindTimeOffset = Var("WindTimeOffset", FLOAT, 0.0)
+
 # In the order they have always been declared: the floats, the bools, the sky.
-TABLE = (*CONFIG, DayAmount, *LOOK_SCALES, IsDay, RandomStart, SkyMaterial)
+TABLE = (*CONFIG, DayAmount, *LOOK_SCALES, IsDay, RandomStart, SkyMaterial, WindTimeOffset)

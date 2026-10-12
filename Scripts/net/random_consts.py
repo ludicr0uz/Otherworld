@@ -70,11 +70,11 @@ AUDIT = (
          "where the wood lands beside the trunk, and how it lies",
          "the weapon component of whoever chops, on the server alone: the "
          "chop hangs off the server's blow, and the wood it leaves replicates", ""),
-    # --- state, still drawn by the machine that acts ------------------------
     Roll("world/day_night_graph.py", STATE,
          "the time of day a level starts at",
-         "every machine's own BP_DayNightCycle at BeginPlay; one clock, the "
-         "server's, replicated", "M30"),
+         "the server's BP_DayNightCycle at BeginPlay, behind its authority "
+         "switch; a client's cycle takes its clock from the GameState "
+         "(world/world_clock.py)", ""),
     # --- cosmetic: each machine's own ---------------------------------------
     Roll("Sound/play.py", COSMETIC,
          "which take of a sound plays (every sound with more than one)",

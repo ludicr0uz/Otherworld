@@ -140,7 +140,9 @@ the day/night cycle actor.
   performance trade; tune it by eye.
 - **Wind is world-position offset** (`wind.py`, `forest_import/wind.py`), scaled by
   `MPC_Wind.Strength` and `.Speed`, which the graphics menu sets
-  (`Scripts/graphics_menu/CLAUDE.md`, "Wind"):
+  (`Scripts/graphics_menu/CLAUDE.md`, "Wind"). Its time is the material's own plus
+  `MPC_Wind.TimeOffset`, which `BP_DayNightCycle` writes so that every machine of a server
+  is at one point of the sway (`Scripts/world/CLAUDE.md`, "One clock"); 0 as built:
   - **Nothing is pushed straight along `DIRECTION`**, which is only the prevailing wind. Each
     clump's and each tree's heading veers off it: by a field that drifts over the ground (two
     crossing wave trains, `GUST_HEADINGS`, so it changes in patches) plus an angle of the

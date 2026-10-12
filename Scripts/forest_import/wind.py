@@ -39,7 +39,7 @@ def _log(msg):
 
 
 def ensure_collection():
-    """MPC_Wind with its two scalars at their defaults. Returns it."""
+    """MPC_Wind with its scalars at their defaults. Returns it."""
     eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
     if eas.does_asset_exist(W.MPC_PATH):
         mpc = eas.load_asset(W.MPC_PATH)
@@ -121,8 +121,11 @@ class _Graph:
                                    self.mul(t, self.const(hz)), phase))
 
     def time(self):
-        """Seconds x MPC_Wind.Speed."""
-        return self.mul(self.expr(unreal.MaterialExpressionTime), self.param(W.PARAM_SPEED))
+        """(Seconds + MPC_Wind.TimeOffset) x MPC_Wind.Speed: the offset is
+        what makes it the server's time on a client (world/world_clock.py)."""
+        shared = self.add(self.expr(unreal.MaterialExpressionTime),
+                          self.param(W.PARAM_TIME_OFFSET))
+        return self.mul(shared, self.param(W.PARAM_SPEED))
 
     def field(self, t, pos, hz, cm, cross_cm):
         """Two wave trains crossing on GUST_HEADINGS, -1..1: it varies in

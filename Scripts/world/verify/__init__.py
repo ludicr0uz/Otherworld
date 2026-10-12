@@ -8,9 +8,11 @@ SECTIONS order, on combat.verify.common's check() ledger.
   stars       the star catalogue, the sky's frame, the stars' size beside the
               moon, T_NightSkyStars
   blueprint   BP_DayNightCycle: defaults, components, the graph's key nodes
+  clock       one world clock: who advances Clock, who reads it, what the
+              server publishes on the GameState, the wind's time
   ambience    the three beds on the cycle, and the Tick's fade between two
   levels      what build_day_night.py put in each generated level
   var_tables  BP_DayNightCycle's variables against its table (uebp/verify_vars.py)
 """
 
-SECTIONS = ("config", "sky", "stars", "blueprint", "ambience", "levels", "var_tables")
+SECTIONS = ("config", "sky", "stars", "blueprint", "clock", "ambience", "levels", "var_tables")

@@ -6,7 +6,8 @@ builds them, state_graph.py is how a graph reaches them.
                               that player's alone (the kills, of wanderers
                               and of other players, "is dead")
     BP_OtherworldGameState    one per world, replicated: what every machine
-                              reads the same (debug mode, the difficulty)
+                              reads the same (debug mode, the difficulty,
+                              the world's clock)
 
 The GameMode keeps what only the server reads (the gun-drop streams, the
 spawn counter: combat/game_state.py): a client has no GameMode. The noises
@@ -19,7 +20,7 @@ the probes share.
 
 from combat.difficulty import DIFFICULTY_VAR
 from combat.game_state import DEBUG_MODE_VAR, KILL_COUNT_VAR, PLAYER_DEAD_VAR
-from uebp.vars import BOOL, INT, REPLICATED, Var
+from uebp.vars import BOOL, FLOAT, INT, REPLICATED, Var
 
 # Beside the health component whose death graph writes them: the weapons
 # build makes both, and forest_generator/asset_sources.py names one builder
@@ -46,7 +47,23 @@ PLAYER_TABLE = (Kills, Dead, PlayerKills)
 DebugMode = Var(DEBUG_MODE_VAR, BOOL, False, rep=REPLICATED)
 # The world's difficulty (combat/difficulty.py; 0 is EASY).
 Difficulty = Var(DIFFICULTY_VAR, INT, 0, rep=REPLICATED)
-GAME_TABLE = (DebugMode, Difficulty)
+# The world's clock (M30; world/world_clock.py). The server's BP_DayNightCycle
+# owns the time of day and publishes it here as three numbers that change only
+# when someone moves the clock or a length: a client's cycle works its own
+# Clock out from them and the server's world time, which the engine's
+# GameState already replicates. Nothing is sent per frame.
+#   WorldClockOffset   the cycle's Clock when the server's world time was 0,
+#                      wrapped into the cycle: Clock = (offset + time) % cycle
+#   WorldDayLength     the server's DayLengthSeconds; 0 until it has published
+#   WorldNightLength   the server's NightLengthSeconds
+WORLD_CLOCK_OFFSET_VAR = "WorldClockOffset"
+WORLD_DAY_LENGTH_VAR = "WorldDayLength"
+WORLD_NIGHT_LENGTH_VAR = "WorldNightLength"
+WorldClockOffset = Var(WORLD_CLOCK_OFFSET_VAR, FLOAT, 0.0, rep=REPLICATED)
+WorldDayLength = Var(WORLD_DAY_LENGTH_VAR, FLOAT, 0.0, rep=REPLICATED)
+WorldNightLength = Var(WORLD_NIGHT_LENGTH_VAR, FLOAT, 0.0, rep=REPLICATED)
+WORLD_CLOCK = (WorldClockOffset, WorldDayLength, WorldNightLength)
+GAME_TABLE = (DebugMode, Difficulty, *WORLD_CLOCK)
 
 # The GameMode's class defaults that name the two.
 GAME_STATE_PROP = "game_state_class"

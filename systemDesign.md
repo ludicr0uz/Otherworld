@@ -90,7 +90,9 @@ change. The forest has day and night beds faded by the clock.
 **The world** (`Scripts/world/CLAUDE.md`, `Scripts/forest_generator/CLAUDE.md`). Two
 generated maps, `Lvl_Forest_200m` (the editor's startup map) and `Lvl_Forest_1000m` (what a
 packaged game plays). A clock turns the sun and moon; day and night are 4 minutes each for
-now, the night moonlit under the real stars, and a level starts at a random hour. At night
+now, the night moonlit under the real stars, and a level starts at a random hour. The clock
+has one owner: the server's (single player's own), which every client's sky and wind follow
+through the GameState (`Scripts/net/CLAUDE.md`, "One world clock"). At night
 the player's temperature falls; a campfire warms them. Grass and trees sway in a wind the
 graphics tab tunes.
 

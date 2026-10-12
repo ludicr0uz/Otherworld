@@ -61,6 +61,8 @@ builders, verifiers excluded (*verified*).
   dozens of players firing, the wanderers heard only the loudest shot on the server.
 - **Ten wanderers, respawned 75–100 m from the player start** (`NPC_COUNT = 10`,
   `forest_generator/npc_placement.py`). Both numbers are built round one player.
+  *Fixed by M29:* on a server the count is a budget per player under a cap for the
+  server, held by `UOtherworldPopulation`; single player keeps both numbers.
 - **Each wanderer checks one player per heartbeat.** Checking 64 needs a distance pre-filter.
 - **Per-actor distance ticks.** `BP_AmmoPickup` measures its distance to the player every
   frame; with many players and items that becomes overlap events.

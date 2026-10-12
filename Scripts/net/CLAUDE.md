@@ -305,9 +305,17 @@ module that owns the action.
   world subsystem written only where there is a GameMode. Each player's shot and steps keep
   an entry of their own for 0.6 s; a wanderer hears the nearest that reaches it and hunts
   its maker (`probes/probe_net_noise.py`, a server and two clients).
-- Owned by `Scripts/npc/CLAUDE.md` ("Who it hunts", "Heard and seen on every machine").
+- **How many there are is a budget on a server** (M29): `UOtherworldPopulation`, a native
+  world subsystem that runs only under a GameMode whose net mode is not standalone. Each
+  player has up to a cap of each creature within a range, spawned in the respawn band out of
+  every player's sight and destroyed when no player is within the range, under a cap for
+  the server; single player keeps the level's count and its 10 s replacement, which a
+  server no longer runs (`probes/probe_net_population.py`).
+- Owned by `Scripts/npc/CLAUDE.md` ("Who it hunts", "Heard and seen on every machine",
+  "Population by mode").
 - M27 wanderers among several players: docs/history/multiplayer.md#m27
 - M28 noise for several players: docs/history/multiplayer.md#m28
+- M29 wanderer population by mode: docs/history/multiplayer.md#m29
 
 ## Random rolls (M17, done)
 
@@ -352,6 +360,7 @@ by the weapons build and named on the GameMode (`state.py`):
 | `BP_OtherworldPlayerState` (one per player, replicated to all) | `NpcKillCount`, `PlayerDead` | the server: the death graph (`combat/death.py`) | that player's HUD, through its owning controller |
 | `BP_OtherworldGameState` (one, replicated) | `DebugMode`, `Difficulty` | the machine that owns it: the HUD's writes are behind `HasAuthority` of the GameState | every machine: the HUD, the weapon component, the consume ability, the wanderers' AI |
 | the GameMode (the server alone) | the spawn counter, the gun-drop streams, the combat trace's switch | the server | the server |
+| `UOtherworldPopulation`, a world subsystem (M29) | each creature's budget, its living wanderers, when each player is next owed one | the server (it is not a budget in single player or on a client) | its own pass |
 | `UOtherworldNoiseList`, a world subsystem (M28) | the recent noises, one per maker | the server (`MakeNoise` does nothing with no GameMode) | the server's AI controllers (`HearNoise`) |
 
 - **Reach them with `state_graph.py`,** never a hand-made cast: `game_state`,

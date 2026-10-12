@@ -119,6 +119,10 @@ def _fed_by(node, pin, var):
                for q in PIN.list_connected_pins(BEL.find_input_pin(node, pin)))
 
 
+def _exec_sources(node):
+    return [PIN.get_owning_node(q) for q in BEL.find_execute_pin(node).list_connected_pins()]
+
+
 def check_respawn_delay():
     # The replacement comes RESPAWN_DELAY seconds after the death, not with it.
     # The wait is a variable so a probe can shorten it (probe_respawn_delay.py).
@@ -136,6 +140,17 @@ def check_respawn_delay():
     check("the replacement is spawned only after that wait",
           len(spawns) == 1 and all(n.get_path_name() in after for n in spawns),
           f"{len(spawns)} spawn(s) of RespawnClass")
+    # In single player only: on a server the population budget sends the next
+    # one (M29), and a replacement here as well would be one too many.
+    gates = [g for w in waits for r in _exec_sources(w) for g in _exec_sources(r)]
+    check("...and only in single player: the wait sits behind a Branch on IsStandalone "
+          "(a server's count is the population budget's)",
+          len(gates) == 1 and ["IsStandalone"] == [
+              "".join(str(BEL.get_node_title(PIN.get_owning_node(q))).split())
+              for q in PIN.list_connected_pins(BEL.find_input_pin(gates[0], "Condition"))]
+          and all(PIN.get_owning_node(q) in [r for w in waits for r in _exec_sources(w)]
+                  for q in BEL.find_then_pin(gates[0]).list_connected_pins()),
+          f"{len(gates)} gate(s)")
     # Read after the wait, or the band is round where the player was at the kill.
     asks = by_pins(hg, "Point", "QueryExtent") + by_pins(hg, "Origin", "Radius")
     check("...and so is every respawn point chosen",

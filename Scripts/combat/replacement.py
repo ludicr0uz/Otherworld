@@ -1,4 +1,5 @@
-"""The dead wanderer's replacement: BP_HealthComponent's fragment that waits
+"""The dead wanderer's replacement, in single player (on a server the
+population budget sends the next one, M29): BP_HealthComponent's fragment that waits
 RESPAWN_DELAY seconds after a death, then picks a point in the respawn band
 around the player, seats it on the ground and spawns the same creature there.
 The band's numbers and why they are what they are live in respawn.py.
@@ -17,7 +18,8 @@ from uebp.nodes.ai import FN_PROJECT_NAV, FN_RANDOM_NAV
 from uebp.nodes.math import (
     FN_ADD_VV, FN_FORWARD, FN_MAKE_ROT, FN_MAKE_TRANSFORM, FN_MUL_VF, FN_RANDOM_FLOAT)
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_SPAWN
-from uebp.nodes.system import FN_DELAY, FN_IS_VALID, FN_IS_VALID_CLASS, FN_TRACE
+from uebp.nodes.system import (
+    FN_DELAY, FN_IS_STANDALONE, FN_IS_VALID, FN_IS_VALID_CLASS, FN_TRACE)
 from combat import health_vars as HV
 
 
@@ -31,6 +33,15 @@ def _author_replacement(ed, exec_in):
     one of ten is recoverable and visible; dropping a replacement through the
     floor is neither.
     """
+    # In single player only (the mode table's population row): on a server the
+    # count is a budget that follows the players, and it is the budget that
+    # sends the next one (Source/Otherworld/Public/OtherworldPopulation.h).
+    alone = _node(ed, FN_IS_STANDALONE)
+    single = ed.add_branch_node()
+    _connect(out(alone), _pin(single, "Condition"))
+    _connect(exec_in, _pin(single, "execute"))
+    exec_in = then(single)
+
     cls_get = ed.add_get_member_variable_node(HV.RespawnClass)
     can_respawn = _node(ed, FN_IS_VALID_CLASS)
     _connect(out(cls_get, HV.RespawnClass), _pin(can_respawn, "Class"))
@@ -251,5 +262,5 @@ def _author_replacement(ed, exec_in):
         f"bearings are tried before falling back to any navigable point near "
         f"the player). The replacement carries the same component, so the "
         f"cycle sustains itself with nothing tracking it.",
-        [cls_get, can_respawn, respawns] + made +
+        [alone, single, cls_get, can_respawn, respawns] + made +
         [anywhere, salvaged, use_any, chosen, xform, spawn])

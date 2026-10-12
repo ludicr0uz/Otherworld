@@ -13,11 +13,12 @@ from npc.paths import (
 )
 from npc.graph import _log
 from uebp.graph import (
-    BEL, BGE, _assets, _connect, _create_blueprint, _node, _palette, _set, then)
+    BEL, BGE, _assets, _connect, _create_blueprint, _node, _palette, _set, out, then)
 from uebp.layout import arrange
 from uebp.vars import declare
 from npc import controller_vars as NV
 from npc.drawn import draws
+from npc.population import author_population
 from npc.sight_cone import _author_sight_cone
 from npc.step_task import build_step_task, clear_step_task
 from npc.steps import _author_steps
@@ -110,6 +111,9 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
         [possess, run])
 
     senses = _author_steps(ed, key, melee_anim)
+    # Possession also tells the population budget this one exists
+    # (npc/population.py); after the steps, which declare the Tune variables.
+    author_population(ed, then(run), out(possess, "PossessedPawn"))
     # Debug mode's sight cone, on a Tick of its own (npc/sight_cone.py).
     _author_sight_cone(ed)
 

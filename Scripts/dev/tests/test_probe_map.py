@@ -103,6 +103,9 @@ class VerifiersFor(unittest.TestCase):
     def test_a_verifier_maps_to_itself_and_levels_to_their_own(self):
         f = probe_map.verifiers_for
         self.assertEqual(f(["Scripts/verify_survival.py"]), ["Scripts/verify_survival.py"])
+        # A package's check module is not a script: its suite runs it.
+        self.assertEqual(f(["Scripts/npc/verify_population.py"]),
+                         ["Scripts/verify_npc_blueprints.py"])
         self.assertEqual(f(["Scripts/generated_levels/Lvl_Probe_50m/forest.py"]),
                          ["Scripts/generated_levels/Lvl_Probe_50m/verify_Lvl_Probe_50m.py"])
         levels = f(["Scripts/forest_generator/trees.py"])

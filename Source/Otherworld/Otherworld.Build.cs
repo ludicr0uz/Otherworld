@@ -10,6 +10,6 @@ public class Otherworld : ModuleRules
 		// blob changes whenever a source is added.
 		bUseUnity = false;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "NetCore", "ReplicationGraph", "InputCore", "EnhancedInput" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "NetCore", "ReplicationGraph", "InputCore", "EnhancedInput", "NavigationSystem" });
 	}
 }

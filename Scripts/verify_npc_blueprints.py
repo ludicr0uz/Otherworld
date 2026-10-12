@@ -41,6 +41,7 @@ from npc.verify_voice import run as run_voice                     # noqa: E402
 from npc.verify_vars import run as run_vars                       # noqa: E402
 from npc.verify_target import run as run_target                   # noqa: E402
 from npc.verify_body_fx import run as run_body_fx                 # noqa: E402
+from npc.verify_population import run as run_population           # noqa: E402
 
 run()
 run_tree()
@@ -55,6 +56,7 @@ run_on_hit()
 run_vars()
 run_target()
 run_body_fx()
+run_population()
 unreal.log_warning(f"[VERIFY] {len(PASS)} passed, {len(FAIL)} failed")
 for f in FAIL:
     unreal.log_warning(f"[VERIFY]   FAILED: {f}")

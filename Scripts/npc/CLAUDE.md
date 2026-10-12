@@ -42,7 +42,8 @@ the wendigo's hunt and the fire that holds it off, and the fire that draws a zom
 `Scripts/probes/probe_npc_behavior_tree.py` proves the trees run in the game.
 
 Respawn, the world-floor net and the `[NPC-SPAWN]`/`[NPC-FELL]` numbering are in
-`BP_HealthComponent`. See `Scripts/combat/CLAUDE.md`.
+`BP_HealthComponent`. See `Scripts/combat/CLAUDE.md`. That respawn is single player's; on a
+server the count is a budget ("Population by mode" below).
 
 ## The brain: a Behavior Tree per controller (`tree.py`, `steps.py`, `step_task.py`)
 
@@ -500,6 +501,41 @@ controller plays nothing itself: it picks the take or the clip and hands it to i
     `RunSpeed × TuneRunSpeed / stock [× TunePatrolSpeed]`, where stock is the creature's built
     run speed, so the level's per-instance gait survives the tuning. The Chase and Stroll steps
     write it every pass (after their move order); aggro and the setup no longer do.
+- **Population by mode** (M29). Single player: the level's fixed count, and a kill replaced
+  10 s later (`combat/replacement.py`, now behind a Branch on `IsStandalone`). On a server
+  the count is a budget held by the native `UOtherworldPopulation`, a tickable world
+  subsystem (`Source/CLAUDE.md`), which runs only with a GameMode and a net mode that is
+  not standalone:
+  - Each AI controller registers its pawn on possession (`population.author_population`,
+    `RegisterWanderer`; node paths `uebp/nodes/population.py`) with three numbers of the
+    monster tuning table: `TunePopPerPlayer` (`pop_per_player`: zombie 8, wendigo 2),
+    `TunePopServerCap` (`pop_server_cap`: 40, 10), `TunePopDespawn` (`pop_despawn_cm`:
+    20000), whose stock values are `forest_generator/npc_population.py`; and the band and
+    the delay as literals (`NPC_SPAWN_MIN/MAX_DISTANCE_CM`, `NPC_RESPAWN_DELAY_S`). A
+    class's numbers are those of the last pawn registered; the menu's monster tuning
+    reaches them through the next one possessed.
+  - Once a second, per creature class: a living wanderer with no player within the range
+    is destroyed (nothing is removed while no player is connected: a server boots before
+    anyone joins). Then, for each living player with fewer than the budget within the
+    range, once that has lasted the delay, one is spawned: a random bearing in the band,
+    projected onto the navmesh and seated on the ground, at least the band's near edge
+    from every player, and refused where a player faces within 75 degrees of it with a
+    clear Visibility line (8 tries a pass).
+  - **The budget per player is the smaller of the table's and what the level placed** of
+    that class (`IsNetStartupActor`), so a 200 m level with 8 zombies and 2 wendigos keeps
+    its cast; players standing together share one budget's worth, and the living total
+    never passes the server cap. The range must stay above the band's far edge (the row's
+    floor is that plus 5 m) and above the 150 m a character is relevant for
+    (`net/relevancy_consts.CHARACTER`), or one would vanish in sight.
+  - A probe reads and drives it through `unreal.OtherworldPopulationLibrary`:
+    `population_is_budget`, `population_count(cls)`, `population_spawned`,
+    `population_removed`, `population_nearest_spawn`, and `set_population_budget(cls, …)`,
+    which overrides the table (and the level's count) for that class.
+  - `verify_population.py` holds the graph, the table's rows and the stock numbers;
+    `probes/probe_net_population.py` (a server and two clients) the count following two
+    players far apart, then together; its `--game` arm that single player registers
+    nothing. Not proven in play: the level's-count rule and the 10 s delay (the probe
+    overrides the budget), and the cost at 64 players (a pass is players x wanderers).
 - **Noise** is a list of recent noises, one entry per maker (M28): the native
   `UOtherworldNoiseList`, a world subsystem (`Source/CLAUDE.md`), written by `MakeNoise`
   (`combat/noise.py`) and asked by `HearNoise` (`senses._author_hearing`; the node paths are

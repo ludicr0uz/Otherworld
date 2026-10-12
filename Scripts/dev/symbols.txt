@@ -2233,7 +2233,7 @@ combat/record_vars.py:103: TRIM_PARAMS
 combat/record_vars.py:104: AMMO_UNKNOWN
 combat/record_vars.py:107: VIEW_WORN
 combat/record_vars.py:108: WORN_PARAMS
-combat/replacement.py:24: _author_replacement
+combat/replacement.py:26: _author_replacement
 combat/respawn.py:42: RESPAWN_BAND
 combat/respawn.py:43: RESPAWN_NAV_SNAP
 combat/respawn.py:46: RESPAWN_DELAY
@@ -2838,14 +2838,15 @@ combat/verify/headshot.py:24: check_headshot_stamp
 combat/verify/health.py:37: check_native
 combat/verify/health.py:59: check_health_death_respawn
 combat/verify/health.py:116: _fed_by
-combat/verify/health.py:122: check_respawn_delay
-combat/verify/health.py:153: RESPAWN_POINT_SETTER
-combat/verify/health.py:158: check_spawn_numbering
-combat/verify/health.py:191: check_damage_stamp
-combat/verify/health.py:211: check_kill_counter
-combat/verify/health.py:234: check_dying
-combat/verify/health.py:324: check_corpse
-combat/verify/health.py:395: check_world_edge
+combat/verify/health.py:122: _exec_sources
+combat/verify/health.py:126: check_respawn_delay
+combat/verify/health.py:168: RESPAWN_POINT_SETTER
+combat/verify/health.py:173: check_spawn_numbering
+combat/verify/health.py:206: check_damage_stamp
+combat/verify/health.py:226: check_kill_counter
+combat/verify/health.py:249: check_dying
+combat/verify/health.py:339: check_corpse
+combat/verify/health.py:410: check_world_edge
 combat/verify/heat.py:46: MEL
 combat/verify/heat.py:50: HEATED
 combat/verify/heat.py:56: OTHERS
@@ -4298,16 +4299,16 @@ dev/uepylib/probe_map.py:56: WEAPONS
 dev/uepylib/probe_map.py:57: LEVELS
 dev/uepylib/probe_map.py:59: VERIFIER_RULES
 dev/uepylib/probe_map.py:87: verifiers_for
-dev/uepylib/probe_map.py:108: _suite_order
-dev/uepylib/probe_map.py:113: systems_for
-dev/uepylib/probe_map.py:126: changed_paths
-dev/uepylib/probe_map.py:136: _literal
-dev/uepylib/probe_map.py:143: ENTRY_POINTS
-dev/uepylib/probe_map.py:147: NET_CLIENTS
-dev/uepylib/probe_map.py:150: declared
-dev/uepylib/probe_map.py:161: probe_kind
-dev/uepylib/probe_map.py:176: clients_needed
-dev/uepylib/probe_map.py:186: plan
+dev/uepylib/probe_map.py:113: _suite_order
+dev/uepylib/probe_map.py:118: systems_for
+dev/uepylib/probe_map.py:131: changed_paths
+dev/uepylib/probe_map.py:141: _literal
+dev/uepylib/probe_map.py:148: ENTRY_POINTS
+dev/uepylib/probe_map.py:152: NET_CLIENTS
+dev/uepylib/probe_map.py:155: declared
+dev/uepylib/probe_map.py:166: probe_kind
+dev/uepylib/probe_map.py:181: clients_needed
+dev/uepylib/probe_map.py:191: plan
 dev/uepylib/remote.py:18: DISCOVERY_SECONDS
 dev/uepylib/remote.py:19: DISCOVERY_POLL
 dev/uepylib/remote.py:22: remote_module
@@ -4516,6 +4517,9 @@ forest_generator/npc_placement.py:541: _segment_blockers
 forest_generator/npc_placement.py:563: spawn_band
 forest_generator/npc_placement.py:594: place_npcs
 forest_generator/npc_placement.py:686: place_npc
+forest_generator/npc_population.py:20: NPC_POP_PER_PLAYER
+forest_generator/npc_population.py:27: NPC_POP_SERVER_CAP
+forest_generator/npc_population.py:35: NPC_POP_DESPAWN_CM
 forest_generator/npc_stalk.py:76: NPC_STALK_ROAR
 forest_generator/npc_stalk.py:82: NPC_STALK_ROAR_S
 forest_generator/npc_stalk.py:83: NPC_STALK_ROAR_BLEND_S
@@ -6416,7 +6420,7 @@ npc/character.py:143: build_variant_blueprint
 npc/chase.py:21: _author_chase
 npc/combat_trace.py:30: _author_concat
 npc/combat_trace.py:50: _author_melee_trace
-npc/controller.py:34: build_ai_controller_blueprint
+npc/controller.py:35: build_ai_controller_blueprint
 npc/controller_vars.py:23: TABLE
 npc/controller_vars.py:26: HIT
 npc/controller_vars.py:29: STEPS
@@ -6443,18 +6447,18 @@ npc/graph.py:11: class _Graph
 npc/graph.py:88: _mesh_object
 npc/melee.py:40: _melee_montage_object
 npc/melee.py:44: _author_melee
-npc/monster_tuning.py:43: CSV_PATH
-npc/monster_tuning.py:44: CREATURE_COLUMN
-npc/monster_tuning.py:53: MONSTER_STATS
-npc/monster_tuning.py:90: MONSTER_COLUMNS
-npc/monster_tuning.py:91: TUNED_VAR
-npc/monster_tuning.py:94: _variant
-npc/monster_tuning.py:101: stock_run_speed
-npc/monster_tuning.py:108: stock_specs
-npc/monster_tuning.py:144: read_table
-npc/monster_tuning.py:158: monster_specs
-npc/monster_tuning.py:164: format_value
-npc/monster_tuning.py:169: write_table
+npc/monster_tuning.py:48: CSV_PATH
+npc/monster_tuning.py:49: CREATURE_COLUMN
+npc/monster_tuning.py:58: MONSTER_STATS
+npc/monster_tuning.py:99: MONSTER_COLUMNS
+npc/monster_tuning.py:100: TUNED_VAR
+npc/monster_tuning.py:103: _variant
+npc/monster_tuning.py:110: stock_run_speed
+npc/monster_tuning.py:117: stock_specs
+npc/monster_tuning.py:156: read_table
+npc/monster_tuning.py:170: monster_specs
+npc/monster_tuning.py:176: format_value
+npc/monster_tuning.py:181: write_table
 npc/paths.py:9: NPC_DIR
 npc/paths.py:10: AI_BP_PATH
 npc/paths.py:11: NPC_BP_PATH
@@ -6542,6 +6546,9 @@ npc/paths.py:233: step_task_path
 npc/patrol.py:21: _author_walk_speed
 npc/patrol.py:87: _author_patrol_setup
 npc/patrol.py:146: _author_patrol_step
+npc/population.py:19: BUDGET_PINS
+npc/population.py:22: BAND_PINS
+npc/population.py:26: author_population
 npc/roar.py:21: roar_object
 npc/roar.py:32: _author_bellow
 npc/senses.py:32: class _Maker
@@ -6645,6 +6652,9 @@ npc/verify_drawn.py:149: check_drawn_tree
 npc/verify_drawn.py:179: check_drawn
 npc/verify_on_hit.py:25: check_settings
 npc/verify_on_hit.py:37: check_on_hit
+npc/verify_population.py:20: WANTED
+npc/verify_population.py:23: check_budget
+npc/verify_population.py:34: check_population
 npc/verify_sight_cone.py:23: _gates
 npc/verify_sight_cone.py:36: check_sight_cone
 npc/verify_stalk.py:47: _result
@@ -7665,6 +7675,22 @@ probes/probe_net_player_state.py:61: _is
 probes/probe_net_player_state.py:65: _client_names
 probes/probe_net_player_state.py:106: _drawn
 probes/probe_net_player_state.py:114: _corner
+probes/probe_net_population.py:41: TIMEOUT
+probes/probe_net_population.py:42: WAIT
+probes/probe_net_population.py:44: RANGE_CM
+probes/probe_net_population.py:45: BAND_CM
+probes/probe_net_population.py:46: DELAY_S
+probes/probe_net_population.py:47: SEEN_DEG
+probes/probe_net_population.py:48: APART_CM
+probes/probe_net_population.py:49: POP
+probes/probe_net_population.py:52: _await
+probes/probe_net_population.py:57: _controllers
+probes/probe_net_population.py:63: _bodies
+probes/probe_net_population.py:70: _gap
+probes/probe_net_population.py:74: _near
+probes/probe_net_population.py:78: _still
+probes/probe_net_population.py:87: _sees
+probes/probe_net_population.py:103: _stand
 probes/probe_net_pvp.py:63: NO_RESPAWN_S
 probes/probe_net_pvp.py:64: STEPS
 probes/probe_net_pvp.py:65: SHOTS
@@ -9068,6 +9094,14 @@ uebp/nodes/palette.py:81: NODE_CAST_WEAPON
 uebp/nodes/palette.py:82: NODE_MAKE_EVENT_DATA
 uebp/nodes/palette.py:85: NODE_SWITCH_NET_FAILURE
 uebp/nodes/palette.py:87: NODE_ENUM_TO_STRING
+uebp/nodes/population.py:7: POPULATION_LIBRARY
+uebp/nodes/population.py:12: FN_REGISTER_WANDERER
+uebp/nodes/population.py:15: FN_SET_POPULATION_BUDGET
+uebp/nodes/population.py:17: FN_POPULATION_IS_BUDGET
+uebp/nodes/population.py:19: FN_POPULATION_COUNT
+uebp/nodes/population.py:20: FN_POPULATION_SPAWNED
+uebp/nodes/population.py:21: FN_POPULATION_REMOVED
+uebp/nodes/population.py:22: FN_POPULATION_NEAREST_SPAWN
 uebp/nodes/pose.py:6: POSE_LIBRARY
 uebp/nodes/pose.py:11: FN_THROTTLE_SERVER_POSE
 uebp/nodes/pose.py:14: FN_SERVER_POSE_EVERY_FRAMES
@@ -9527,6 +9561,15 @@ Source/Otherworld/Public/OtherworldNoise.h:110: UFUNCTION static bool HearNoise(
 Source/Otherworld/Public/OtherworldNoise.h:115: UFUNCTION static TArray<FOtherworldNoise> NoisesHeld(const UObject* WorldContext
 Source/Otherworld/Public/OtherworldNoise.h:119: UFUNCTION static int32 NoisesMade(const UObject* WorldContextObject);
 Source/Otherworld/Public/OtherworldNoise.h:122: UFUNCTION static int32 NoisesRefused(const UObject* WorldContextObject);
+Source/Otherworld/Public/OtherworldPopulation.h:65: UCLASS class OTHERWORLD_API UOtherworldPopulation : public UTickableWorldSubs
+Source/Otherworld/Public/OtherworldPopulation.h:112: UCLASS class OTHERWORLD_API UOtherworldPopulationLibrary : public UBlueprintF
+Source/Otherworld/Public/OtherworldPopulation.h:123: UFUNCTION static void RegisterWanderer(const UObject* WorldContextObject, APawn*
+Source/Otherworld/Public/OtherworldPopulation.h:128: UFUNCTION static void SetPopulationBudget(const UObject* WorldContextObject, TSu
+Source/Otherworld/Public/OtherworldPopulation.h:133: UFUNCTION static bool PopulationIsBudget(const UObject* WorldContextObject);
+Source/Otherworld/Public/OtherworldPopulation.h:137: UFUNCTION static int32 PopulationCount(const UObject* WorldContextObject, TSubcl
+Source/Otherworld/Public/OtherworldPopulation.h:140: UFUNCTION static int32 PopulationSpawned(const UObject* WorldContextObject);
+Source/Otherworld/Public/OtherworldPopulation.h:143: UFUNCTION static int32 PopulationRemoved(const UObject* WorldContextObject);
+Source/Otherworld/Public/OtherworldPopulation.h:147: UFUNCTION static float PopulationNearestSpawn(const UObject* WorldContextObject)
 Source/Otherworld/Public/OtherworldReplicationGraph.h:17: UCLASS class OTHERWORLD_API UOtherworldReplicationGraphNode_ForConnection : p
 Source/Otherworld/Public/OtherworldReplicationGraph.h:47: UCLASS class OTHERWORLD_API UOtherworldReplicationGraph : public UReplication
 Source/Otherworld/Public/OtherworldRpcGuard.h:20: UCLASS class OTHERWORLD_API UOtherworldRpcGuard : public UActorComponent

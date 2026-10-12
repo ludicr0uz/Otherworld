@@ -74,6 +74,9 @@ THE CONTROLLER'S STEPS (one fragment per concern)
                taken in turn among the living players near it on patrol, kept
                once Aggro, replaced by the nearest when they die or leave; the
                hurt sense's blame of whoever struck
+  population   the controller's word to the server's population budget (M29,
+               C++): on possession it registers its wanderer with the
+               creature's TunePop* caps; nothing in single player
   body_vars    BP_ForestWanderer's two Multicast events, their parameters and
                its two counters, named once
   body_fx      ...the events themselves (a voice, a clip: on every machine),
@@ -106,6 +109,8 @@ CHECKS (Scripts/verify_npc_blueprints.py)
   verify_on_hit  what a landed swing leaves on the player: the roll, the apply
   verify_target  who it hunts: the turn among the players near it, the Target
                  kept and replaced, the blame, and no step asking for a player
+  verify_population  the server's budget: the controller's RegisterWanderer on
+                 possession, its TunePop* numbers, and that they make a budget
   verify_body_fx its sounds and clips on every machine: the body's Multicasts,
                  and no controller playing one of its own
 

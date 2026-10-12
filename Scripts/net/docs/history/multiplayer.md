@@ -794,6 +794,32 @@ the ask, predicting ---------->    Server_Fire / _Punch /        Multicast_<Name
   read on every body exactly what the server rolled (matched by `NpcId`), one canteen at
   most. `--game` runs its single-player arm; `probe_bleeding.py` is the on-hit roll's.
 
+<a id="m29"></a>
+## Wanderer population by mode (M29, done, 2026-10-11)
+
+- **Built:** `Source/Otherworld` `OtherworldPopulation.h/.cpp`: `UOtherworldPopulation` (a
+  tickable world subsystem) and `UOtherworldPopulationLibrary`; the module now depends on
+  `NavigationSystem`. `npc/population.py` registers each wanderer from its controller's
+  possession; `combat/replacement.py` puts the 10 s replacement behind `IsStandalone`.
+  Three columns joined the monster tuning table (`pop_per_player`, `pop_server_cap`,
+  `pop_despawn_cm`), stock values in `forest_generator/npc_population.py`: zombie 8 near a
+  player and 40 on the server, wendigo 2 and 10, removed beyond 200 m.
+- **Decided:** native, like the noise list, because a pass is players x wanderers and
+  belongs to no one actor. A player's budget is the smaller of the table's and what the
+  level placed. Players together share one budget's worth. Nothing is removed while no
+  player is connected. A refill waits the single-player respawn delay, per player and
+  creature. The band and the delay are not table columns.
+- **Proved:** `uepy.py --net --clients 2 --probe Scripts/probes/probe_net_population.py`:
+  server 11/11, each client 1/1 (85 s). With the stock numbers the level's ten stand; a
+  10 cm range removes all ten; a budget of 2 under a cap of 3 gives exactly 3; with the
+  cap at 10 and the players 140 m apart there are 2 by each and 4 alive; none spawned
+  nearer than 15 m (the band set) nor stands in a player's clear view; the second player
+  beside the first leaves 2; sent back, 4. Each client sees zombies and holds no budget.
+  `--game`: 2/2 (not a budget, nothing registered, the level's ten). `verify_npc_blueprints`
+  583/583 (was 567), `verify_weapons_and_combat` 2591/2591 (was 2590).
+- **Not proved:** the level's-count rule and the 10 s delay in play (the probe overrides
+  the budget), and the cost at 64 players.
+
 <a id="m28"></a>
 ## Noise for several players (M28, done, 2026-10-11)
 

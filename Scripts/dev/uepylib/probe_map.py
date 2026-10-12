@@ -86,13 +86,18 @@ VERIFIER_RULES = (
 
 def verifiers_for(paths):
     """The verifier scripts (repo-relative, under Scripts/) the paths map to,
-    in suite order, each once. A path that is a verifier maps to itself."""
+    in suite order, each once. A path that is a verifier's entry point maps
+    to itself."""
     out = []
     for path in paths:
         path = path.replace(os.sep, "/")
         found = ()
         base = os.path.basename(path)
-        if path.startswith("Scripts/") and base.startswith("verify_") and base.endswith(".py"):
+        # An entry point, not a package's check module (npc/verify_target.py):
+        # that one is run by its suite, which the rules below name.
+        entry = path.count("/") == 1 or path.startswith("Scripts/generated_levels/")
+        if (path.startswith("Scripts/") and entry and base.startswith("verify_")
+                and base.endswith(".py")):
             found = (path[len("Scripts/"):],)
         else:
             for rule, scripts in VERIFIER_RULES:

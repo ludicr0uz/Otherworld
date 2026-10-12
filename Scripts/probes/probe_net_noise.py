@@ -28,7 +28,7 @@ Single player runs the same staging with its one player and one zombie.
 combat/verify/noise.py and npc/verify.py hold the graphs.
 """
 
-SYSTEMS = ('npc', 'net', 'combat')
+SYSTEMS = ('npc', 'net', 'weapons')
 
 import time
 

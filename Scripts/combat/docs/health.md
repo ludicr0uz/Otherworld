@@ -17,7 +17,9 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     player's. `DeathPlayed` is each machine's "the death path has run" latch.
   - `verify/damage.py`; `probes/probe_net_health.py` (two clients, and `--game`).
 
-- **A replacement comes `RESPAWN_DELAY` (10 s, `npc_placement.NPC_RESPAWN_DELAY_S`) after the death.**
+- **A replacement comes `RESPAWN_DELAY` (10 s, `npc_placement.NPC_RESPAWN_DELAY_S`) after the death,
+  in single player only** (a Branch on `IsStandalone`, M29: a server's count is a budget,
+  `Scripts/npc/CLAUDE.md`, "Population by mode").
   - The death path runs to its end first (count, corpse, collapse); the wanderer's arm then waits
     on a `Delay` and spawns (`replacement._author_replacement`). The player's location is read
     after the wait.

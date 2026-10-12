@@ -55,8 +55,11 @@ hears a noise hunts whoever made it. A
 burning campfire draws patrolling zombies within 200 m. A wendigo hunts before it chases:
 roars, comes in tree to tree round the player, charges from 10 m, charges at once if the
 player runs 30 m or shoots it; fire held out keeps it circling and eventually drives it off
-for a while; its blow has a 33% chance of a 3-minute bleed. A killed wanderer is replaced
-10 s later, 75-100 m away, and leaves a ragdoll corpse that can be looted (`Scripts/loot/CLAUDE.md`:
+for a while; its blow has a 33% chance of a 3-minute bleed. In single player a killed wanderer is replaced
+10 s later, 75-100 m away; on a server the count is a budget instead (M29): each player has up
+to the level's count of each creature near them, sent in 75-100 m away where no player is
+looking, taken out when no player is within 200 m, under a cap for the whole server
+(`Scripts/npc/CLAUDE.md`, "Population by mode"). Either way a dead one leaves a ragdoll corpse that can be looted (`Scripts/loot/CLAUDE.md`:
 loot tables, Tab kneels and opens the loot window).
 
 **The HUD and the one menu** (`Scripts/graphics_menu/CLAUDE.md`). UMG screens on an `AHUD`:
@@ -551,6 +554,7 @@ each of these outlives every actor that touches it, the player's own components 
 | variable | on | written by | read by |
 |---|---|---|---|
 | `NpcSpawnCount` | the GameMode (server only) | each wanderer's `BeginPlay` | the next wanderer, for its number |
+| the wanderer population (a server's only) | `UOtherworldPopulation`, a world subsystem that does nothing in single player | each AI controller on possession (`RegisterWanderer`, with its creature's budget) | its own pass, once a second: who is removed, who is spawned |
 | the noise list | `UOtherworldNoiseList`, a world subsystem (written on the server only) | whatever made a noise (`MakeNoise`) | every controller's hearing (`HearNoise`) |
 | `NpcKillCount`, `PlayerKillCount`, `PlayerDead` | `BP_OtherworldPlayerState`, replicated | the death path on the server, a kill credited only when `DamagedByPlayer` or the striker was a player | that player's HUD and death menu |
 | `DebugMode` | `BP_OtherworldGameState`, replicated | the HUD's BeginPlay and the menu's debug row, where the machine owns the GameState | the weapon component (tracers), the HUD, the wanderers' AI (cones) |

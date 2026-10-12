@@ -11,7 +11,9 @@ reads, so a value tuned in a game and saved lands in the Blueprints the next
 time build_npc_blueprints.py runs, then build_graphics_menu.py (the HUD's
 copy of the table), and git shows what moved.
 
-The "hunt:" rows are how a wendigo stalks (forest_generator/npc_stalk.py) and
+The "server:" rows are the population budget a server keeps
+(forest_generator/npc_population.py, task M29): single player keeps the
+level's count and reads none of them. The "hunt:" rows are how a wendigo stalks (forest_generator/npc_stalk.py) and
 the "fire:" rows what a burning stick does to it (npc_ward.py). Every
 creature has the columns, since the tab is one table, but only the graphs of
 one that hunts (NPC_STALK_ROAR) or fears fire (NPC_WARD_FEARS) read them: on
@@ -27,7 +29,10 @@ import os
 from forest_generator.npc_agro import agro_for
 from forest_generator.npc_placement import (
     NPC_ACCEPTANCE_RADIUS_CM, NPC_MELEE_DAMAGE, NPC_MELEE_INTERVAL_S,
-    NPC_MELEE_RANGE_CM, NPC_RUN_SPEED_CMS, NPC_VARIANTS,
+    NPC_MELEE_RANGE_CM, NPC_RUN_SPEED_CMS, NPC_SPAWN_MAX_DISTANCE_CM, NPC_VARIANTS,
+)
+from forest_generator.npc_population import (
+    NPC_POP_DESPAWN_CM, NPC_POP_PER_PLAYER, NPC_POP_SERVER_CAP,
 )
 from forest_generator.npc_stalk import (
     NPC_STALK_CATCH_UP_CM, NPC_STALK_CHARGE_CM, NPC_STALK_FLED_CM,
@@ -86,6 +91,10 @@ MONSTER_STATS = (
      NPC_WARD_TURN_FLOOR_S),
     ("ward_hold_s", "TuneWardHold", "fire: gives up after (s)", 1.0, 1.0),
     ("ward_flee_s", "TuneWardFlee", "fire: runs away for (s)", 1.0, 0.0),
+    ("pop_per_player", "TunePopPerPlayer", "server: near one player, at most", 1.0, 0.0),
+    ("pop_server_cap", "TunePopServerCap", "server: alive at once, at most", 1.0, 0.0),
+    ("pop_despawn_cm", "TunePopDespawn", "server: removed beyond (cm)", 500.0,
+     NPC_SPAWN_MAX_DISTANCE_CM + 500.0),
 )
 MONSTER_COLUMNS = tuple(s[0] for s in MONSTER_STATS)
 TUNED_VAR = {s[0]: s[1] for s in MONSTER_STATS}
@@ -138,6 +147,9 @@ def stock_specs(key):
         "ward_turn_max_s": NPC_WARD_TURN_MAX_S,
         "ward_hold_s": NPC_WARD_HOLD_S,
         "ward_flee_s": NPC_WARD_FLEE_S,
+        "pop_per_player": NPC_POP_PER_PLAYER[key],
+        "pop_server_cap": NPC_POP_SERVER_CAP[key],
+        "pop_despawn_cm": NPC_POP_DESPAWN_CM,
     }
 
 

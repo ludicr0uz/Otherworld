@@ -12,6 +12,7 @@
   npc_stalk           How a wendigo hunts: it roars, comes in round the player from tree to tree, hiding behind each, and charges ...
   npc_strafe          What a hunting wanderer does between two swings: it gives ground and steps round the player instead of ...
   npc_voice           Who keeps quiet until it hunts: a wendigo on patrol makes no sound
+  npc_population      How many wanderers a server keeps: the budget that follows the players (per player, per server, the range)
   npc_ward            Fire holds a wendigo off: while the player holds a lit stick out at it, it does not attack
   terrain             Procedural terrain mesh generator (pure Python, no Unreal dependency)
   tree_cells          How far trees are drawn, and the cells they are planted in

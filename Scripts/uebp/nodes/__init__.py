@@ -25,6 +25,8 @@ Scripts/dev/check_node_catalog.py.
               client's side and the death path on (W3)
   noise.py    the game's own noise list (C++, Source/Otherworld): a noise
               added for the wanderers to hear, and a listener's question (M28)
+  population.py  the wanderers' population budget (C++, Source/Otherworld): a
+              wanderer registered with its creature's caps; a server's alone (M29)
   guard.py    the game's own RPC guard (C++, Source/Otherworld): what every
               Server event asks first, and the shot of its AimPoint (A5)
   level.py    the game's own net library (C++, Source/Otherworld): whether an

@@ -21,7 +21,7 @@ import unreal
 from clothing.ground_model import MODEL
 from clothing.placement import TEST_TAG
 from clothing.specs import GARMENTS
-from combat.glimmer_tuning import GLIMMER
+from combat.glimmer_tuning import GLIMMER, GLIMMER_DELAY_S
 from combat.wear_tuning import WORN_MESH_VAR
 
 # The test garments are placed on it.
@@ -70,7 +70,8 @@ def _lies_as_mesh(p, garment, item):
 
 def probe(p):
     yield lambda: p.pawn() is not None
-    yield SETTLE
+    # An item glimmers only once it has lain there a while (combat/glimmer.py).
+    yield GLIMMER_DELAY_S + SETTLE
     world, player, pc = p.world(), p.pawn(), p.controller()
     placed = {a.get_class().get_path_name(): a for a in
               unreal.GameplayStatics.get_all_actors_with_tag(world, TEST_TAG)}

@@ -9,6 +9,7 @@ from uebp.vars import (
     struct,
 )
 from combat.chop_tuning import CHOPS_VAR
+from combat.glimmer_tuning import GLIMMER_WAIT_VAR
 from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
 from combat.light_tuning import LIGHTS_VAR
 from combat.seat_tuning import HAS_SIGHTS_VAR
@@ -105,6 +106,9 @@ Dormant = Var("Dormant", BOOL, False)
 DisplayName = Var("DisplayName", STRING)
 PelletCount = Var("PelletCount", INT)
 Dropped = Var("Dropped", BOOL, rep=REPLICATED)
+# How long the item has lain Dropped, up to glimmer_tuning.GLIMMER_DELAY_S: its
+# glimmer shows from there (glimmer.py). Each machine counts its own.
+GlimmerWait = Var(GLIMMER_WAIT_VAR, FLOAT, 0.0)
 # Ammunition. UsesAmmo false means the other four are never read (the
 # consumables), and the fire gate short-circuits on it. InfiniteReserve is the
 # pistol: a real magazine to reload, over a reserve that is never charged and
@@ -218,7 +222,7 @@ TABLE = (
     FireSound, DryFireSound, ReloadSound, HandleSounds, UseSounds, AimPose, TwoHanded, AdsZoom, Scoped, ShotVolume,
     AdsZoomSpeed, AdsZoomInSeconds, AdsRaiseSeconds,
     Lodged, InWorld, Dormant,
-    DisplayName, PelletCount, Dropped, UsesAmmo, MagazineSize, Loaded, Reserve,
+    DisplayName, PelletCount, Dropped, GlimmerWait, UsesAmmo, MagazineSize, Loaded, Reserve,
     InfiniteReserve, Automatic, Consumable, Melee, Chops, Lights, HasSights, Burns, Lit,
     Heats, Hot, ClothingSlot, WornPart, WornMesh, Slot, WeaponKind, BurnOutTime, CoolTime, HeatMaterial, UsePose,
     SupportPoint, SpreadShoulderScale, SpreadCrouchScale, SpreadProneScale,

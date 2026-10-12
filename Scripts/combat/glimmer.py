@@ -13,12 +13,19 @@ the sprite component an item carries, and the Tick fragment that shows it.
                                 Highlight
     Glimmer                     a MaterialBillboardComponent on BP_WeaponItem's
                                 Body, hidden as built
-    author_glimmer              Tick: Glimmer.SetVisibility(Dropped)
+    author_glimmer              Tick: GlimmerWait counts the seconds the item
+                                has been Dropped (0 while it is not), and
+                                Glimmer.SetVisibility(GlimmerWait >=
+                                GLIMMER_DELAY_S)
+    author_glimmer_after        BeginPlay of a thing always on the ground (the
+                                ammo pickup): the same wait, once, by a Delay
 
 Dropped is written in half a dozen places (the drop, the throw's landing, a
 kill's gun, the pick-up, wearing), and on some items by default. So nothing
 there is told about the glimmer: the item shows it by its own flag, every
-Tick. SetVisibility does nothing when nothing changed.
+Tick. SetVisibility does nothing when nothing changed. For the same reason
+the wait is a count and not a stamp of when the item fell: an item spawned
+already Dropped (a kill's gun, the level's own) was never seen to fall.
 
 A child with a Tick of its own (heat.py's blades, stick.py) overrides the
 base's, so each of those calls author_glimmer at the tail of its own chain;
@@ -34,17 +41,21 @@ import unreal
 from combat import item_vars as IV
 from combat.item_world import author_world_view
 from combat.glimmer_tuning import (
-    GLIMMER, GLIMMER_COLOUR, GLIMMER_EMISSIVE, GLIMMER_FAR_CM, GLIMMER_HALF_SIZE_CM,
+    GLIMMER, GLIMMER_COLOUR, GLIMMER_DELAY_S, GLIMMER_EMISSIVE, GLIMMER_FAR_CM,
+    GLIMMER_HALF_SIZE_CM,
     GLIMMER_LIFT_CM, GLIMMER_NEAR_CM, GLIMMER_PERIOD_S, GLIMMER_PULL_CM,
     GLIMMER_RAY_THIN, GLIMMER_REST,
     GLIMMER_SHARPNESS, HIGHLIGHT_DEFAULT, MAT_ITEM_GLIMMER, MPC_ITEM_GLIMMER,
     MPC_NAME, PARAM_HIGHLIGHT,
 )
 from combat.log import _log
+from uebp.g import _G
 from uebp.graph import (
-    _add_component, _assets, _component_object, _connect, _drop_components, _must_load,
-    _node, _pin, then)
+    _add_component, _assets, _component_object, _drop_components, _must_load, _set, out,
+    then)
 from uebp.nodes.actor import FN_SET_VISIBILITY
+from uebp.nodes.math import FN_ADD_FF, FN_FMIN, FN_GE_FF, FN_SELECT_FF
+from uebp.nodes.system import FN_DELAY, FN_DELTA_SECONDS
 
 MEL = unreal.MaterialEditingLibrary
 
@@ -207,22 +218,43 @@ def add_glimmer(bp, parent_handle, visible=False):
 
 
 def author_glimmer(ed, exec_ins):
-    """Tick: the Glimmer sprite shows while the item is Dropped. ``exec_ins``
-    are the exec pins it runs off (the Tick's, or every tail of a child's own
-    chain). Returns the exec pin a chain goes on from."""
-    def get(name):
-        return _pin(ed.add_get_member_variable_node(name), name, is_input=False)
-
+    """Tick: the Glimmer sprite shows once the item has been Dropped for
+    GLIMMER_DELAY_S. ``exec_ins`` are the exec pins it runs off (the Tick's, or
+    every tail of a child's own chain). Returns the exec pin a chain goes on
+    from."""
     # First what a client's copy of a replicated item shows at all
     # (item_world.py): here because every child's Tick calls this.
     exec_ins = author_world_view(ed, exec_ins)
-    show = _node(ed, FN_SET_VISIBILITY)
-    _connect(get(GLIMMER), _pin(show, "self"))
-    _connect(get(IV.Dropped), _pin(show, "bNewVisibility"))
-    for e in exec_ins:
-        _connect(e, _pin(show, "execute"))
+    g = _G(ed)
+    # The count, stored before it is read: its chain is pure, and would be
+    # worked out again for every reader.
+    longer = g.call(FN_ADD_FF, A=g.get(IV.GlimmerWait), B=out(g.call(FN_DELTA_SECONDS)))
+    capped = g.call(FN_FMIN, A=out(longer))
+    _set(capped, "B", GLIMMER_DELAY_S)
+    count = g.call(FN_SELECT_FF, A=out(capped), bPickA=g.get(IV.Dropped))
+    counted = g.put(IV.GlimmerWait, out(count), exec_ins)
+    waited = g.call(FN_GE_FF, A=g.get(IV.GlimmerWait))
+    _set(waited, "B", GLIMMER_DELAY_S)
+    show = g.call(FN_SET_VISIBILITY, [counted], self=g.get(GLIMMER),
+                  bNewVisibility=out(waited))
     ed.add_comment_to_nodes(
-        f"An item lying on the ground glimmers: the {GLIMMER} sprite shows "
-        f"while it is {IV.Dropped}. Whether any glimmer shines at all is "
-        f"{MPC_NAME}.{PARAM_HIGHLIGHT}, the WORLD SETTINGS tab's row.", [show])
+        f"An item lying on the ground glimmers, {GLIMMER_DELAY_S:g} s after it "
+        f"came to lie there: {IV.GlimmerWait} counts the seconds it has been "
+        f"{IV.Dropped} (none while it is not), and the {GLIMMER} sprite shows "
+        f"from {GLIMMER_DELAY_S:g}. Whether any glimmer shines at all is "
+        f"{MPC_NAME}.{PARAM_HIGHLIGHT}, the WORLD SETTINGS tab's row.", g.made)
     return then(show)
+
+
+def author_glimmer_after(ed, exec_in):
+    """BeginPlay of a thing that is on the ground all its life: its Glimmer
+    sprite, hidden as built, shows GLIMMER_DELAY_S later. Returns nothing: the
+    Delay is the last of its chain."""
+    g = _G(ed)
+    wait = g.call(FN_DELAY, [exec_in])
+    _set(wait, "Duration", GLIMMER_DELAY_S)
+    show = g.call(FN_SET_VISIBILITY, [then(wait)], self=g.get(GLIMMER))
+    _set(show, "bNewVisibility", True)
+    ed.add_comment_to_nodes(
+        f"It glimmers {GLIMMER_DELAY_S:g} s after it fell, as an item does "
+        "(combat/glimmer.py).", g.made)

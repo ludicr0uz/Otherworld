@@ -1,10 +1,12 @@
 """The item highlight: an item lying on the ground glimmers, one that is
 carried does not, and the WORLD SETTINGS tab's row switches every glimmer.
 
-  - every Dropped item in the level shows its Glimmer sprite, and no carried
-    one does (the issued knife, axe and stick among them: each has a Tick of
+  - every Dropped item in the level shows its Glimmer sprite once it has
+    lain there GLIMMER_DELAY_S (and none of those the probe is in time to see
+    does before), and no carried one does (the issued knife, axe and stick among them: each has a Tick of
     its own, which overrides the base item's);
-  - an item that becomes Dropped starts to glimmer, and stops when it is taken
+  - an item that becomes Dropped starts to glimmer GLIMMER_DELAY_S later and
+    not before, and stops at once when it is taken
     (the flag is written on a carried knife, a gun and a stick, and cleared on
     a forage item: the drop, the throw and the pick-up write nothing else);
   - the cycle writes MPC_ItemGlimmer.Highlight from its ItemHighlight, on as
@@ -28,11 +30,13 @@ import shutil
 
 import unreal
 
-from combat.glimmer_tuning import GLIMMER_PERIOD_S, MPC_ITEM_GLIMMER, PARAM_HIGHLIGHT
+from combat.glimmer_tuning import (
+    GLIMMER_DELAY_S, GLIMMER_PERIOD_S, GLIMMER_WAIT_VAR, MPC_ITEM_GLIMMER, PARAM_HIGHLIGHT)
 from combat.paths import ITEM_BP_PATH, ITEM_CLASS_PATH
 from graphics_menu import world_tune_consts as WC
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR
 from graphics_menu import hud_vars as MV
+from probes.probe_hot_blade import _wanderers
 from world.day_night_blueprint import ITEM_HIGHLIGHT_VAR
 from world.paths import DAY_NIGHT_CLASS_PATH
 from world.world_tuning import CSV_PATH, ITEM_HIGHLIGHT_ROW, WORLD_STATS, read_table
@@ -42,11 +46,16 @@ TAB = WC.WORLD_TAB
 DROPPED = "Dropped"
 WRITABLE = ([(HUD_BP_PATH, v) for v in (TAB.open_var, TAB.row_var, TAB.nudge_var,
                                         TAB.save_var, MV.MenuOpen)]
-            + [(ITEM_BP_PATH, DROPPED)])
+            + [(ITEM_BP_PATH, v) for v in (DROPPED, GLIMMER_WAIT_VAR)])
 HIGHLIGHT_TAB_ROW = 1 + WORLD_STATS.index(ITEM_HIGHLIGHT_ROW)
 SETTLE = 0.15          # game seconds: a Tick of the item, or of the cycle
 SHOTS = bool(os.environ.get("OW_GLIMMER_SHOTS"))
 SHOT_BURST = 4
+# World time crawls in a headless game (docs/headless_runs.md), so the delay
+# is waited out whole once, by the level's own items. After that an item's
+# count is seen to run and is then put this short of the delay.
+SHORT = 0.3
+TIMEOUT = 150.0        # wall seconds
 
 
 def _live_hud(p):
@@ -77,6 +86,16 @@ def _nudge(p, hud, step):
     p.set(hud, TAB.nudge_var, step)
     yield lambda: p.get(hud, TAB.nudge_var) == 0
     yield SETTLE        # the HUD's apply, then the cycle's Tick
+
+
+def _nearly(p, item):
+    """An item just Dropped: its count is seen to run from 0, then is put
+    SHORT of the delay."""
+    yield SETTLE
+    ran = p.get(item, GLIMMER_WAIT_VAR)
+    p.check(f"...{item.get_class().get_name()}'s count of its seconds on the ground runs",
+            0.0 < ran < 1.0 and not _glimmers(item), f"{ran:.3f} after {SETTLE:g} s")
+    p.set(item, GLIMMER_WAIT_VAR, GLIMMER_DELAY_S - SHORT)
 
 
 def _shots(p, cycle, ground):
@@ -111,11 +130,22 @@ def _run(p):
     yield lambda: _live_hud(p) is not None
     yield SETTLE
     hud, cycle = _live_hud(p), p.actor_of(DAY_NIGHT_CLASS_PATH)
+    # The wait is longer than the pack takes to reach the player, and world
+    # time stops for the dead.
+    for ctrl in _wanderers(p):
+        ctrl.get_controlled_pawn().destroy_actor()
     items = _items(p)
     ground = [i for i in items if i.get_editor_property(DROPPED)]
     carried = [i for i in items if not i.get_editor_property(DROPPED)]
+    # The level's own items have lain there since the level opened: whichever
+    # has not yet counted the delay out must still be dark.
+    early = [i.get_name() for i in ground
+             if p.get(i, GLIMMER_WAIT_VAR) < GLIMMER_DELAY_S and _glimmers(i)]
+    p.check(f"no item glimmers before it has lain {GLIMMER_DELAY_S:g} s on the ground",
+            len(ground) > 0 and not early, f"{len(ground)} on the ground, early: {early[:5]}")
+    yield GLIMMER_DELAY_S + SETTLE
     dark = [i.get_name() for i in ground if not _glimmers(i)]
-    p.check("every item lying on the ground glimmers",
+    p.check("every item lying on the ground glimmers after that",
             len(ground) > 0 and not dark, f"{len(ground)} on the ground, without: {dark[:5]}")
     lit = [i.get_name() for i in carried if _glimmers(i)]
     p.check("no carried item does",
@@ -133,12 +163,18 @@ def _run(p):
             p.check(f"a carried {word.lower()} to drop", False, "none carried")
             continue
         p.set(item, DROPPED, True)
-        yield SETTLE
+        yield from _nearly(p, item)
+        early, counted = _glimmers(item), p.get(item, GLIMMER_WAIT_VAR)
+        yield SHORT + SETTLE
         on = _glimmers(item)
         p.set(item, DROPPED, False)
         yield SETTLE
-        p.check(f"the {word.lower()} glimmers once it is Dropped, and not once it is taken",
-                on and not _glimmers(item), f"dropped {on}, taken {_glimmers(item)}")
+        p.check(f"the {word.lower()} glimmers {GLIMMER_DELAY_S:g} s after it is Dropped, not "
+                "before, and not once it is taken",
+                on and not early and counted < GLIMMER_DELAY_S
+                and not _glimmers(item) and p.get(item, GLIMMER_WAIT_VAR) == 0.0,
+                f"short of it {early} (counted {counted:.2f}), after {on}, "
+                f"taken {_glimmers(item)}")
 
     taken = ground[0]
     p.set(taken, DROPPED, False)
@@ -146,8 +182,13 @@ def _run(p):
     off = not _glimmers(taken)
     p.set(taken, DROPPED, True)
     yield SETTLE
-    p.check("an item taken off the ground stops glimmering, and glimmers again put back",
-            off and _glimmers(taken), f"taken off {off}, back {_glimmers(taken)}")
+    again = _glimmers(taken)
+    yield from _nearly(p, taken)
+    yield SHORT + SETTLE
+    p.check("an item taken off the ground stops glimmering, and put back glimmers again "
+            "only after the wait",
+            off and not again and _glimmers(taken),
+            f"taken off {off}, at once {again}, back {_glimmers(taken)}")
 
     p.check("the cycle's ItemHighlight is on as built, and the collection's switch with it",
             p.get(cycle, ITEM_HIGHLIGHT_VAR) == 1.0 and _switch(p) == 1.0,

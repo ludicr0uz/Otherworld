@@ -4,7 +4,7 @@
 import unreal
 
 from combat.dirty import OTHER, mark_change_sites
-from combat.glimmer import add_glimmer
+from combat.glimmer import add_glimmer, author_glimmer_after
 from combat.log import _log
 from net.players import nearest_living_player, player_pin
 from uebp.graph import (
@@ -65,6 +65,10 @@ def build_ammo_pickup(rebuild=True):
     eas = _assets()
     bp = _create_blueprint(AMMO_BP_PATH, unreal.Actor)
 
+    # The graph is wiped before the components are rebuilt, for stick.py's
+    # reason: its node names the Glimmer component.
+    ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
+    tick, begin = _events(ed, rebuild)
     _drop_components(bp, {"Pack", "ShellA", "ShellB"})
     root = _add_component(bp, _root_handle(bp), unreal.SceneComponent, "Pack")
     # Two of them, because two is what a kill drops and the pickup should look
@@ -81,17 +85,19 @@ def build_ammo_pickup(rebuild=True):
         except Exception as exc:                                  # noqa: BLE001
             _log(f"  note: could not set NoCollision on {name}: {exc}")
 
-    # It is only ever on the ground, so its glimmer is built showing.
-    add_glimmer(bp, root, visible=True)
-
-    ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
-    tick, begin = _events(ed, rebuild)
+    # It is only ever on the ground: its glimmer shows a while after it
+    # falls (BeginPlay, below), with no flag to read.
+    add_glimmer(bp, root)
     declare(ed, AV.TABLE)
+    # The components are variables of the class only once it has compiled.
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_AmmoPickup failed to compile")
 
     # --- BeginPlay: tidy yourself away eventually ---------------------------
     life = _node(ed, FN_LIFESPAN)
     _set(life, "InLifespan", AMMO_PICKUP_LIFETIME)
     _connect(then(begin), _pin(life, "execute"))
+    author_glimmer_after(ed, then(life))
 
     # --- Tick: spin, then check the distance --------------------------------
     # The spin is what makes a 10 cm object findable on a forest floor at night;

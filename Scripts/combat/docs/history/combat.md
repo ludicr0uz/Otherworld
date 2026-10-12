@@ -117,10 +117,19 @@ A heading here is the heading the text stood under there.
 <a id="an-item-on-the-ground-glimmers"></a>
 - **An item on the ground glimmers** (`glimmer.py`, numbers in `glimmer_tuning.py`): the
   item highlight. `BP_WeaponItem` carries `Glimmer`, a `MaterialBillboardComponent` on
-  `Body`, hidden as built, and its Tick's step is `Glimmer.SetVisibility(Dropped)` (after
-  what a client's copy of a replicated item shows at all: `item_world.py`).
+  `Body`, hidden as built, and its Tick's step shows it once the item has been `Dropped`
+  for `GLIMMER_DELAY_S`, 5 s (after what a client's copy of a replicated item shows at
+  all: `item_world.py`).
   `Dropped` is written in half a dozen places, so none of them is told: the item shows the
-  sprite by its own flag. `BP_AmmoPickup` is built with its sprite showing.
+  sprite by its own flag.
+  - **The first glimmer comes 5 s after the item comes to lie there.** The item's
+    `GlimmerWait` counts the seconds it has been `Dropped`, up to the delay, and is 0
+    while it is not: `Set GlimmerWait = SelectFloat(FMin(GlimmerWait + dt, 5), 0, Dropped)`,
+    then `Glimmer.SetVisibility(GlimmerWait >= 5)`. A count and not a stamp of the fall,
+    because an item spawned already `Dropped` (a kill's gun, the level's own) is never
+    seen to fall; each machine counts its own, so a client joining late waits 5 s too.
+    `BP_AmmoPickup`, on the ground all its life, is built with its sprite hidden and
+    shows it by a `Delay` of the same 5 s on BeginPlay (`author_glimmer_after`).
   - **A child with a Tick of its own overrides the base's** (the knife and the axe:
     `heat.build_heated_model`; the stick), so each calls `author_glimmer` at the tail of
     its own chain. `verify/glimmer.py` finds a child whose wired Tick lacks the step, and
@@ -129,8 +138,9 @@ A heading here is the heading the text stood under there.
     `weapon_items.KEEP`. A builder that clears "every other component" must leave it.
   - **The look is `M_ItemGlimmer`:** unlit, additive, one Custom node drawing a four-rayed
     star that appears and is gone every 3 s (it rests at nothing), each item out of step
-    (the phase is its place in the world), only near: whole within 5.5 m of the camera
-    and nothing past 8.5 m (about 3 m and 6 m ahead of the character; a material cannot
+    (the phase is its place in the world), only near: whole within 7.15 m of the camera
+    and nothing past 11.05 m (30% further than the 5.5 m and 8.5 m it was built with;
+    about 4.5 m and 8.5 m ahead of the character; a material cannot
     know the pawn, and the camera stands 2.6 m behind it), through `EyeAdaptationInverse`, so it reads the same at noon and
     at midnight. World-position offset lifts the sprite 10 cm and pulls it 12 cm towards
     the camera, so the ground, the grass and the item's own model do not swallow it.
@@ -140,7 +150,11 @@ A heading here is the heading the text stood under there.
     builds it on; the day/night cycle writes it from the WORLD SETTINGS tab's row
     (`world/item_highlight.py`). It is a sprite, not an overlay material: the overlay slot
     is the hot blade's.
-  - `probes/probe_item_glimmer.py` runs it in a game.
+  - `probes/probe_item_glimmer.py` runs it in a game. It destroys the wanderers first:
+    the pack kills a player standing still about 6 s in, and world time stops for the
+    dead, so a wait of the delay never ended. It waits the 5 s out whole once (the
+    level's own items), and after that puts an item's count 0.3 s short of the delay.
+    `probe_clothing_ground.py` waits the delay before it reads a garment's glimmer.
 
 <a id="the-shot-and-the-reload-are"></a>
 - **The shot and the reload are server requests** (M19; `shot_vars.py`,

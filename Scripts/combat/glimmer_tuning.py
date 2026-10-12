@@ -49,7 +49,13 @@ GLIMMER_RAY_THIN = 7.0
 # Only an item the character is near glimmers. The material measures from the
 # camera (it has no way to know the pawn), which stands camera.CAMERA_ARM
 # (2.6 m) behind the character: whole within GLIMMER_NEAR_CM of the camera,
-# fading to nothing at GLIMMER_FAR_CM, so about 3 m and 6 m ahead of the
-# character.
-GLIMMER_NEAR_CM = 550.0
-GLIMMER_FAR_CM = 850.0
+# fading to nothing at GLIMMER_FAR_CM, so about 4.5 m and 8.5 m ahead of the
+# character (5.5 m and 8.5 m of the camera until both were taken 30% further).
+GLIMMER_NEAR_CM = 715.0
+GLIMMER_FAR_CM = 1105.0
+# An item does not glimmer the moment it lands: only once it has lain on the
+# ground this long. GLIMMER_WAIT_VAR is the item's count of those seconds
+# (item_vars.py), run by its Tick while it is Dropped and zeroed while it is
+# not; the ammo pickup, on the ground all its life, waits once from BeginPlay.
+GLIMMER_DELAY_S = 5.0
+GLIMMER_WAIT_VAR = "GlimmerWait"

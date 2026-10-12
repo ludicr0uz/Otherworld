@@ -5,7 +5,8 @@ proves the game runs them. Every wanderer's brain is a BehaviorTreeComponent
 on its own BT_*, and its Pulse step has run (health applied, patrol set up)
 -- nothing but the tree calls it. Then one wanderer is put beside the player,
 where its touch sense fires: Aggro flips on the controller AND the Blackboard
-(the Hunt branch's gate), and the Hunt branch swings at the player. Last, its pawn is marked Dead:
+(the Hunt branch's gate), and the Hunt branch swings at the player, who is
+its Target; its body plays the swing's clip and a voice. Last, its pawn is marked Dead:
 the Pulse step makes it a corpse and stops the tree.
 """
 
@@ -16,8 +17,9 @@ import unreal
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH
 from npc.paths import (
     AGGRO_REASON_VAR, AGGRO_VAR, BB_AGGRO_KEY, BB_REASON_KEY, CORPSE_VAR,
-    NEXT_PATROL_VAR, PATROL_READY_VAR, STATS_APPLIED_VAR,
+    NEXT_PATROL_VAR, PATROL_READY_VAR, STATS_APPLIED_VAR, TARGET_VAR,
 )
+from npc import body_vars as BV
 from combat import health_vars as HV
 
 WRITABLE = [(HEALTH_BP_PATH, HV.Dead)]
@@ -75,6 +77,16 @@ def probe(p):
     p.check("the Hunt branch runs: Chase, then Swing at the player in reach",
             p.get(ctrl, "NextAttackTime") > 0.0,
             f"NextAttackTime {p.get(ctrl, 'NextAttackTime'):.2f}")
+
+    # In single player the one player is the Target (npc/target.py), and the
+    # body's Multicasts are plain calls (npc/body_fx.py): heard and seen here.
+    got = p.get(ctrl, TARGET_VAR)
+    p.check("...its Target is the player", bool(got) and got.get_name() == player.get_name(),
+            got.get_name() if got else "no one")
+    yield lambda: p.get(npc, BV.ClipsPlayed) > 0
+    p.check("...and the swing's clip and a voice are played by its body",
+            p.get(npc, BV.ClipsPlayed) > 0 and p.get(npc, BV.VoicesPlayed) > 0,
+            f"clips {p.get(npc, BV.ClipsPlayed)}, voices {p.get(npc, BV.VoicesPlayed)}")
 
     health = p.component(npc, HEALTH_CLASS_PATH)
     p.set(health, "Dead", True)

@@ -58,7 +58,7 @@ from npc.graph import _log
 from uebp.graph import _assets
 from npc.paths import (
     BB_AGGRO_KEY, BB_PATH, BB_REASON_KEY, STEP_CHASE, STEP_DRAWN, STEP_PRESENT,
-    STEP_PULSE, STEP_STALK, STEP_STROLL, STEP_SWING, STEP_VAR, STEP_WARD,
+    STEP_PULSE, STEP_STALK, STEP_STROLL, STEP_SWING, STEP_TARGET, STEP_VAR, STEP_WARD,
 )
 
 _KEY_TYPES = {BB_AGGRO_KEY: "BlackboardKeyType_Bool",
@@ -169,7 +169,8 @@ def fill_tree(bt, bb, task_class, senses, stalks=False, wards=False,
     if wards:
         attack = [(_composite(bt, sel, "Engage", [
             step(STEP_WARD), (_composite(bt, seq, "Attack", attack), [])]), [])]
-    hunt = _composite(bt, seq, "Hunt", attack + [(_wait(bt, "Re-path"), [])])
+    hunt = _composite(bt, seq, "Hunt",
+                      [step(STEP_TARGET)] + attack + [(_wait(bt, "Re-path"), [])])
     feel = _composite(bt, sel, "Senses", [step(s) for s in senses])
     notice = _composite(bt, seq, "Notice", [step(STEP_PRESENT), (feel, [])])
     wander = step(STEP_STROLL)

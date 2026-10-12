@@ -11,23 +11,22 @@ from npc.paths import (
     ATTACK_VOICES_VAR, HEALTH_BP_PATH, HEALTH_CLASS_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR,
     MELEE_SLOT)
 from npc.graph import _log
-from net.players import nearest_living_player, player_pin
+from npc.target import target, target_pin
 from uebp.graph import (
     BEL, _assets, _connect, _loose_pin, _node, _palette, _pin, _resolve, _set, else_, out,
     then)
 from npc.block import _author_block_check
 from npc.combat_trace import _author_melee_trace
 from Sound.play import _author_random_sound
+from npc.body_fx import _author_clip, heard_by_all
 from npc.tuned import tuned
 from survival.on_hit_graph import _author_on_hit
 from uebp.nodes.actor import (
-    FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GET_INSTIGATOR_CONTROLLER, FN_GET_PAWN,
-    FN_PLAY_SLOT)
+    FN_ACTOR_LOC, FN_GET_COMP, FN_GET_INSTIGATOR_CONTROLLER, FN_GET_PAWN)
 from uebp.nodes.math import (
     FN_ADD_FF, FN_AND, FN_DISTANCE, FN_GE_FF, FN_LE_FF, FN_NORMAL, FN_SUB_VV)
-from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH
+from uebp.nodes.palette import NODE_CAST_HEALTH
 from uebp.nodes.system import FN_TIME_SECONDS
-from uebp import props as EP
 from npc import controller_vars as NV
 
 
@@ -113,8 +112,8 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     self_loc = keep(_node(ed, FN_ACTOR_LOC))
     _connect(out(self_pawn), _pin(self_loc, "self"))
 
-    player = keep(nearest_living_player(ed, out(self_loc)))
-    player_out = player_pin(player)
+    player = keep(target(ed))
+    player_out = target_pin(player)
     player_loc = keep(_node(ed, FN_ACTOR_LOC))
     _connect(player_out, _pin(player_loc, "self"))
 
@@ -158,31 +157,16 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     _connect(then(swing), _pin(arm, "execute"))
 
     # --- play the swing ------------------------------------------------------
-    # The montage goes through the pawn's own AnimInstance, so it animates
-    # whichever body this controller happens to possess rather than assuming
-    # BP_ForestWanderer.
+    # The montage goes to the body's Multicast_Clip (npc/body_fx.py): the
+    # controller is the server's alone, and a clip it played into its own
+    # copy of the body was a swing no client saw.
     # ...and is heard: one of its AttackVoices as the swing starts, whether
     # or not it lands. Empty on a creature with none: silence.
-    snarl, snarled = _author_random_sound(ed, ATTACK_VOICES_VAR, out(self_loc), then(arm))
+    snarl, snarled = _author_random_sound(ed, ATTACK_VOICES_VAR, out(self_loc), then(arm),
+                                          play=heard_by_all(ed))
     made.extend(snarl)
-    as_char = keep(_palette(ed, NODE_CAST_CHARACTER))
-    _connect(out(self_pawn), _pin(as_char, "Object"))
-    _connect(snarled, _pin(as_char, "execute"))
-    char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
-
-    mesh = keep(ed.add_get_member_variable_node(EP.MESH, "/Script/Engine.Character"))
-    _connect(char_out, _pin(mesh, "self"))
-
-    anim = keep(_node(ed, FN_ANIM_INSTANCE))
-    _connect(out(mesh, "Mesh"), _pin(anim, "self"))
-
-    montage = keep(_node(ed, FN_PLAY_SLOT))
-    _connect(out(anim), _pin(montage, "self"))
-    _set(montage, "Asset", melee_anim or _melee_montage_object())
-    _set(montage, "SlotNodeName", MELEE_SLOT)
-    _set(montage, "BlendInTime", NPC_MELEE_BLEND_S)
-    _set(montage, "BlendOutTime", NPC_MELEE_BLEND_S)
-    _connect(then(as_char), _pin(montage, "execute"))
+    swung = _author_clip(ed, keep, snarled, melee_anim or _melee_montage_object(),
+                         NPC_MELEE_BLEND_S, MELEE_SLOT)
 
     # --- land the hit --------------------------------------------------------
     comp = keep(_node(ed, FN_GET_COMP))
@@ -191,7 +175,7 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
 
     hit = keep(_palette(ed, NODE_CAST_HEALTH))
     _connect(out(comp), _pin(hit, "Object"))
-    _connect(then(montage), _pin(hit, "execute"))
+    _connect(swung, _pin(hit, "execute"))
     as_health = _loose_pin(hit, "AsBPHealthComponent", is_input=False)
 
     # --- the bearing: which way the swing comes from -----------------------
@@ -249,7 +233,7 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     # smears around the listener, from the target it is one solid thump in
     # front of them.
     thud, after_thud = _author_random_sound(ed, HIT_SOUNDS_VAR, out(player_loc),
-                                            list(trace_tails))
+                                            list(trace_tails), play=heard_by_all(ed))
     made.extend(thud)
 
     # --- and the timers it starts over --------------------------------------
@@ -268,7 +252,7 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     # stands still forever.  A cast's failure pin left dangling is exactly that
     # bug, and it only shows up in a level where the player has no health
     # component.
-    for tail in (*after_effects, out(hit, "CastFailed"), out(as_char, "CastFailed")):
+    for tail in (*after_effects, out(hit, "CastFailed")):
         _connect(tail, BEL.find_execute_pin(delay))
 
     return made

@@ -53,7 +53,8 @@ Wanderer (selector)
   Alive (sequence)
     Pulse            [possessed? no: fail] → [dead? corpse, StopLogic] → stats → patrol setup
     Act (selector)
-      Hunt [BB Aggro is set]    Chase (between swings: step off and round : MoveToActor : MoveToLocation) → Swing → Wait 0.5
+      Hunt [BB Aggro is set]    Target (kept while they live, else the nearest living; no one: fail) →
+                                Chase (between swings: step off and round : MoveToActor : MoveToLocation) → Swing → Wait 0.5
                                 (the wendigo: Approach (selector): Stalk, Chase → Swing → Wait 0.5,
                                  and ahead of it all: Engage (selector): Ward, Attack (sequence):
                                  Approach, Swing → Wait 0.5)
@@ -397,12 +398,75 @@ Wanderer (selector)
 | `NPC_RESPAWN_DELAY_S` | 10 | how long a kill leaves the pack one short; must stay under the corpse's 60 s (`combat/docs/health.md`) |
 | `NPC_MELEE_DAMAGE` / `_INTERVAL_S` | 10 / 1.5 | balanced for the **pack** (~67 dps if all ten connect) |
 
+## Who it hunts: `Target` (`target.py`, M27)
+
+"The player" in every line of this file is the controller's `Target`, a pawn chosen among
+every living player (`net/players.py`: `LivingPlayers`) and kept. No step asks for a player
+itself, and none reads player 0: a new fragment reads `target(ed)` / `target_pin(node)`.
+
+- **On patrol the candidate takes turns** (`BT_PlayerPresent`, Notice's head). Each pass
+  it gathers the living players within `NPC_TARGET_SCAN_CM` (60 m, `npc_agro.py`) into
+  `TargetNear` and takes the next one (`TargetScan`), so the senses fire at whoever they
+  are true of: a player in the sight cone is seen though another stands closer behind its
+  back. With 64 players on the map it still asks about the two or three near it, one a
+  pass (0.5 s each: with three near, a touch is felt within 1.5 s). No one that near: the
+  nearest, however far, so a noise or a wound from far off is laid on someone. No one
+  living: the step fails and it strolls.
+- **Hurt, it turns on whoever struck it:** the hurt sense writes `Target` from the health
+  component's `LastInstigator` (`_author_blame`) before `Aggro` is set. The wendigo's rage
+  reads the same fragment, so a wendigo stalking one player and shot by another is
+  enraged at the one who shot.
+- **Aggro, it keeps them** (`BT_Target`, the Hunt sequence's first child): while `Target`
+  is among the living players nothing is written. Dead (`PlayerDead`) or gone (no pawn),
+  `Target` is the nearest living player, and the hunt starts over: a stalker's
+  `StalkRoarUntil`, `StalkLegUntil` and `StalkCharging` and the fire's `WardSince` go back
+  to zero, so a wendigo roars at the new one and stalks them. `Enraged` stays.
+- **No one living while Aggro:** `BT_Target` fails, so Chase, Swing, Stalk and Ward never
+  run with no `Target` (they did before M27, and each logged an `Accessed None`), the
+  pass falls through to Notice and Patrol, and it strolls, still Aggro. The first player
+  to live again is hunted.
+- **It does not turn on a nearer player, nor on one who shoots it while it hunts
+  another** (the senses are not asked while Aggro; only the wendigo's rage re-reads the
+  blow). A rule for either is a Branch in `_author_keep`.
+- **Drawn reads no player:** a fire draws a zombie to the fire (`DrawnTo`), whoever lit it.
+- `verify_target.py` holds the graphs; `probes/probe_net_npc_target.py` (`--net --clients
+  2`) has a zombie notice the nearer of two clients, keep them when the other steps
+  closer, turn on the other when they die, stroll with no one alive and hunt the first to
+  live again.
+
+## Heard and seen on every machine (`body_fx.py`, `body_vars.py`, M27)
+
+The AI controller exists on the server alone, with its sound arrays and its clips. So a
+controller plays nothing itself: it picks the take or the clip and hands it to its body,
+`BP_ForestWanderer`, which has two unreliable Multicast events.
+
+| event | called for | does, on every machine that has the body |
+|---|---|---|
+| `Multicast_Voice(Sound, Location)` | the growl on a timer, the cry at noticing, the snarl at a swing, the roar's voice, the thud of a blow that lands (at the player) | `VoicesPlayed` + 1, `PlaySoundAtLocation` |
+| `Multicast_Clip(Asset, SlotNodeName, BlendInTime, BlendOutTime)` | the swing, the roar | `ClipsPlayed` + 1, `PlaySlotAnimationAsDynamicMontage` on its mesh |
+
+- **In a step:** `_author_random_sound(..., play=heard_by_all(ed))` and
+  `_author_clip(ed, keep, exec_in, asset, blend_s, slot)`. Never a `PlaySoundAtLocation`
+  or a `GetAnimInstance` in a controller: only the server would hear or see it
+  (`verify_body_fx.py` fails one).
+- **The parameters carry the engine nodes' pin names,** so a check that finds a voice by
+  `{"Sound", "Location"}` or a clip by `{"Asset", "SlotNodeName"}` reads the call as it
+  read the node.
+- **Unreliable:** a lost one loses a sound or the sight of a swing. The blow is the
+  server's, in the step that called. The server plays the clip too: its pose is what a
+  shot is traced against. In single player a Multicast is a plain call, once.
+- **The body's events are built before the controllers** (`build_body_events`, first in
+  `ensure_npc_blueprints`): their graphs cast to the class and call its events.
+  `character.py` then writes the body's defaults onto the same Blueprint.
+- The two counters are per machine, not replicated: what a probe on a client reads.
+
 ## Patrol and agro (`patrol.py`, `senses.py`, `agro.py`)
 
 - **They spawn patrolling.** A patrolling NPC strolls within `patrol_radius_cm` of its spawn point
   (zombie 15 m, wendigo 30 m) at 30% of its own run speed, re-picking a point every
   `patrol_repick_*`.
-- **Aggro is a one-way switch:** once `Aggro` is set it is never cleared, and the NPC runs.
+- **Aggro is a one-way switch:** once `Aggro` is set it is never cleared, and the NPC runs
+  (at its `Target` while they live, then at the nearest living player: above).
   - It ends with the controller. A killed wanderer's replacement is a new pawn with a new
     controller and Blackboard, and the death menu's restart reopens the level, so neither
     comes back hunting: `probes/probe_respawn_calm.py` holds both. What does bring a fresh

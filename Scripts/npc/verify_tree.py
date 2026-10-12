@@ -32,7 +32,7 @@ from forest_generator.npc_ward import NPC_WARD_FEARS
 from npc.paths import (
     AI_BP_PATH, BB_AGGRO_KEY, BB_PATH, BB_REASON_KEY, SENSE_STEPS, STEP_CHASE,
     STEP_DRAWN, STEP_EVENT_PREFIX, STEP_PRESENT, STEP_PULSE, STEP_RESULT_VAR, STEP_STALK,
-    STEP_STROLL, STEP_SWING, STEP_VAR, STEP_WARD, step_task_path, tree_path,
+    STEP_STROLL, STEP_SWING, STEP_TARGET, STEP_VAR, STEP_WARD, step_task_path, tree_path,
 )
 from npc.verify import BEL, PIN, _close, _drivers, _ins, _lit, _sources, _title, check
 
@@ -59,7 +59,7 @@ def drawn(ai_path):
 def want_steps(ai_path):
     """The order a pre-order walk of this controller's tree meets the steps
     in: the priorities."""
-    return ([STEP_PULSE] + [STEP_WARD] * warded(ai_path)
+    return ([STEP_PULSE, STEP_TARGET] + [STEP_WARD] * warded(ai_path)
             + [STEP_STALK] * stalks(ai_path)
             + [STEP_CHASE, STEP_SWING, STEP_PRESENT]
             + [name for _, name in SENSE_STEPS]
@@ -136,6 +136,15 @@ def check_tree(ai_path):
 
     hunting = ([STEP_WARD] * warded(ai_path) + [STEP_STALK] * stalks(ai_path)
                + [STEP_CHASE, STEP_SWING])
+    # The hunt's head (npc/target.py): the Hunt sequence's own first child,
+    # so a pass with no one living never reaches the steps that read Target.
+    aim = above(STEP_TARGET)
+    check(f"{tag}: Target opens the hunt: first in the sequence under "
+          f"'{BB_AGGRO_KEY} is set', ahead of {', '.join(hunting)}",
+          len(aim) == 1 and isinstance(aim[0][-1][0], unreal.BTComposite_Sequence)
+          and _gates_on_aggro(aim[0][-1][1])
+          and order.index(STEP_TARGET) < min(order.index(s) for s in hunting)
+          and all(aim[0][-1][0] in [c for c, _ in up] for s in hunting for up in above(s)))
     hunt = [up for s in hunting for up in above(s)]
     check(f"{tag}: {', '.join(hunting[:-1])} and {hunting[-1]} run only under the "
           f"Blackboard's '{BB_AGGRO_KEY} is set'",
@@ -155,7 +164,7 @@ def check_tree(ai_path):
         check(f"{tag}: Ward and the attack share one selector, Ward first: held "
               f"off by fire, the pass never reaches {', '.join(hunting[1:])}",
               len(over) == 1 and isinstance(over[0], unreal.BTComposite_Selector)
-              and order[1] == STEP_WARD and len(inner) == len(hunting) - 1
+              and order[2] == STEP_WARD and len(inner) == len(hunting) - 1
               and all(over[0] in up and any(
                   isinstance(c, unreal.BTComposite_Sequence)
                   for c in up[up.index(over[0]) + 1:]) for up in inner))
@@ -185,7 +194,8 @@ def check_tree(ai_path):
 
 def _exits(start):
     """Every node reachable from ``start`` along exec wires that runs nothing
-    after it."""
+    after it. A loop's body is a side arm, not a way out: the step goes on
+    from its Completed pin (npc/target.py's scan of the living players)."""
     seen, todo, leaves = set(), [start], []
     while todo:
         n = todo.pop()
@@ -194,6 +204,7 @@ def _exits(start):
         seen.add(n.get_path_name())
         nxt = [PIN.get_owning_node(q) for p in BEL.list_output_pins(n)
                if "exec" in str(PIN.get_pin_type_display_string(p)).lower()
+               and str(PIN.get_pin_name(p)) != "LoopBody"
                for q in PIN.list_connected_pins(p)]
         if not nxt:
             leaves.append(n)

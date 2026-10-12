@@ -33,7 +33,7 @@ from forest_generator.npc_strafe import (
     NPC_STRAFE_MIN_ANGLE_DEG, NPC_STRAFE_MIN_DISTANCE_CM, NPC_STRAFE_SHARE,
     NPC_STRAFE_SPEED_SCALE,
 )
-from net.players import nearest_living_player, player_pin
+from npc.target import target, target_pin
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from npc.paths import (
     CHARACTER_CLASS_PATH, MOVEMENT_CLASS_PATH, STRAFE_DIST_VAR, STRAFE_FOR_VAR,
@@ -116,9 +116,9 @@ def _author_strafe(ed, exec_in, stock):
     self_pawn = keep(_node(ed, FN_GET_PAWN))
     self_loc = keep(_node(ed, FN_ACTOR_LOC))
     _connect(out(self_pawn), _pin(self_loc, "self"))
-    player = keep(nearest_living_player(ed, out(self_loc)))
+    player = keep(target(ed))
     player_loc = keep(_node(ed, FN_ACTOR_LOC))
-    _connect(player_pin(player), _pin(player_loc, "self"))
+    _connect(target_pin(player), _pin(player_loc, "self"))
     gap = keep(_node(ed, FN_DISTANCE))
     _connect(out(self_loc), _pin(gap, "V1"))
     _connect(out(player_loc), _pin(gap, "V2"))
@@ -188,7 +188,7 @@ def _author_strafe(ed, exec_in, stock):
     _connect(then(set_dist), _pin(set_for, "execute"))
 
     # --- eyes on the player, whichever way the feet go -----------------------
-    watch, watching = _author_facing(ed, [then(set_for), else_(pick)], player_pin(player))
+    watch, watching = _author_facing(ed, [then(set_for), else_(pick)], target_pin(player))
     made.extend(watch)
 
     # --- the point: round the player from here, and out ----------------------

@@ -10,15 +10,16 @@ import unreal
 
 from forest_generator.npc_placement import NPC_VARIANTS
 from forest_generator.npc_stalk import NPC_STALK_ROAR
+from npc import body_vars as BV
 from npc import controller_vars as NV
 from npc.drawn import draws
-from npc.paths import AI_BP_PATH, step_task_path
+from npc.paths import AI_BP_PATH, NPC_BP_PATH, step_task_path
 from npc.verify import check
 from npc.ward import wards
 from survival.on_hit import ON_HIT_TABLE
 from uebp.verify_vars import check_table
 
-EVERY = (NV.TABLE + NV.HIT + NV.STEPS + NV.AGRO + NV.STATS + NV.CORPSE + NV.SIGHT_CONE
+EVERY = (NV.TABLE + NV.HIT + NV.STEPS + NV.AGRO + NV.TARGET + NV.STATS + NV.CORPSE + NV.SIGHT_CONE
          + NV.STRAFE + NV.TUNED + ON_HIT_TABLE)
 
 
@@ -34,6 +35,7 @@ def controller_table(key):
 
 
 def run():
+    check_table(unreal.load_asset(NPC_BP_PATH), BV.TABLE, check)
     made = [(AI_BP_PATH, NPC_VARIANTS[0].key)]
     made += [(variant.ai_blueprint, variant.key) for variant in NPC_VARIANTS]
     for path, key in made:

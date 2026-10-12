@@ -16,8 +16,8 @@ say PlayerDead (combat/death.py writes it on the server; it replicates), so
 the answer is the same on every machine that has the pawn. The players are
 the GameState's PlayerArray, which a client has too.
 
-Which player a wanderer hunts is the nearest, asked afresh at every read;
-choosing one and keeping them is task M27's.
+Which player a wanderer hunts is not asked here at every read: it chooses
+one among these and keeps them (npc/target.py, task M27).
 
 build_weapons_and_combat.py calls build_players() after build_state().
 """

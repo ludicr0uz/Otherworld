@@ -291,6 +291,19 @@ module that owns the action.
     player's copy.
 - M21 everyone sees and hears the fight: docs/history/multiplayer.md#m21
 
+## Wanderers among several players (M27, done)
+
+- **All of a wanderer's AI is the server's:** the AIController, its Behavior Tree and its
+  variables exist there alone. A client gets the body: its movement by replication, its
+  sounds and clips by two unreliable Multicasts of the body (`npc/body_fx.py`:
+  `Multicast_Voice`, `Multicast_Clip`). A controller never plays a sound or a clip itself.
+- **Each wanderer hunts one player, chosen and kept** (`npc/target.py`): on patrol its
+  senses are asked about the living players within 60 m, one a pass in turn; Aggro, it
+  keeps that `Target` until they die or leave, then takes the nearest living player and
+  starts its hunt over. With no one living it strolls, still Aggro.
+- Owned by `Scripts/npc/CLAUDE.md` ("Who it hunts", "Heard and seen on every machine").
+- M27 wanderers among several players: docs/history/multiplayer.md#m27
+
 ## Random rolls (M17, done)
 
 Chance that changes the game is rolled once, by the machine that owns the state, and the
@@ -319,8 +332,9 @@ the weapons build), through `players.py`'s fragments. Never author a `GetPlayerP
 | the living player nearest a point | `nearest_living_player(ed, point)`, read with `player_pin(node)` | a pure node: asked again at every read, as `GetPlayerPawn` was |
 
 - **Nearest is None while no one lives.** Put the read behind a Branch of its own
-  (`combat/ammo_pickup.py`, `combat/replacement.py`). The wanderers' steps sit behind the
-  tree's player-present step (`npc/agro.py`), which asks whether `LivingPlayers` is empty.
+  (`combat/ammo_pickup.py`, `combat/replacement.py`).
+- **A wanderer asks neither in its steps** (M27): it chooses a `Target` among the living
+  players and keeps them (`npc/target.py`; `Scripts/npc/CLAUDE.md`, "Who it hunts").
 - M9 who is nearby: docs/history/multiplayer.md#m9
 
 ## Where state lives (M7, done)

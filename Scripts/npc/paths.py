@@ -193,10 +193,20 @@ BB_PATH = f"{NPC_DIR}/BB_ForestWanderer"
 BB_AGGRO_KEY = "Aggro"
 BB_REASON_KEY = "AggroReason"
 STEP_RESULT_VAR = "StepResult"      # on the controller, written by every step
+
+# Who this wanderer means by "the player" (npc/target.py): the one it is
+# testing its senses against on patrol, the one it hunts once Aggro. Every
+# step reads it, and none asks for a player itself.
+TARGET_VAR = "Target"
+TARGET_NEAR_VAR = "TargetNear"      # the living players within the scan, this pass
+TARGET_SCAN_VAR = "TargetScan"      # whose turn among them
+# What a verifier sees on a read of it (BEL.get_node_title).
+TARGET_TITLE = f"Get {TARGET_VAR}"
 STEP_VAR = "Step"                   # on the task, instance editable
 STEP_EVENT_PREFIX = "BT_"
 
 STEP_PULSE = "Pulse"          # possessed? corpse? stats, voice, patrol setup
+STEP_TARGET = "Target"        # the hunt's head: keep the target, or switch
 STEP_WARD = "Ward"            # held off by fire: circle, or run; fails to attack
 STEP_STALK = "Stalk"          # a stalker's roar and legs; fails once it charges
 STEP_CHASE = "Chase"          # the move order at the player

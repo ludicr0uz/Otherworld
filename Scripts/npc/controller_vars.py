@@ -13,6 +13,7 @@ from npc import paths as P
 from npc.monster_tuning import MONSTER_STATS
 
 _ACTOR = obj("/Script/Engine.Actor")
+_PAWN = obj("/Script/Engine.Pawn")
 
 # Each NPC's swing timer. Zero is the right default -- it means "may attack
 # immediately" -- which is just as well, since add_member_variable's own
@@ -32,6 +33,10 @@ AGRO = (Var(P.AGGRO_VAR, BOOL), Var(P.PATROL_READY_VAR, BOOL),
         Var(P.AGGRO_REASON_VAR, STRING),
         Var(P.RUN_SPEED_VAR, FLOAT), Var(P.NEXT_PATROL_VAR, FLOAT),
         Var(P.PATROL_HOME_VAR, VECTOR), Var(P.PATROL_TARGET_VAR, VECTOR))
+
+# npc/target.py: no one yet, and the first turn.
+TARGET = (Var(P.TARGET_VAR, _PAWN), Var(P.TARGET_NEAR_VAR, array(_PAWN)),
+          Var(P.TARGET_SCAN_VAR, INT))
 
 # npc/tuned.py: one float per MONSTER_STATS row.
 TUNED = tuple(Var(var, FLOAT) for _col, var, *_rest in MONSTER_STATS)

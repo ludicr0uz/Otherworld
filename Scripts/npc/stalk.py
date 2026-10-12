@@ -70,7 +70,7 @@ from forest_generator.npc_stalk import (
     NPC_STALK_STALLED_CMS,
 )
 from npc.graph import _Graph
-from net.players import nearest_living_player, player_pin
+from npc.target import target, target_pin
 from uebp.graph import _connect, _pin, else_, out, then
 from npc.paths import (
     ENRAGED_VAR, STALK_ARRIVED_VAR,
@@ -81,6 +81,7 @@ from npc.patrol import _author_walk_speed
 from npc.roar import _author_bellow
 from npc.senses import _author_hurt
 from Sound.play import _author_random_sound
+from npc.body_fx import heard_by_all
 from npc.stalk_cover import _author_cover, declare_cover_vars
 from npc.strafe import _author_facing
 from npc.tuned import tuned_pin
@@ -109,7 +110,8 @@ def _author_rage(g, exec_in, pins, result):
     read, shot, unhurt = _author_hurt(g.ed, [else_(raged)])
     g.made.extend(read)
     step = g.put(ENRAGED_VAR, shot, literal="true")
-    sound, step = _author_random_sound(g.ed, VOICES_VAR, pins["self_loc"], step)
+    sound, step = _author_random_sound(g.ed, VOICES_VAR, pins["self_loc"], step,
+                                       play=heard_by_all(g.ed))
     g.made.extend(sound)
     _connect(step, result(False))
     return unhurt
@@ -248,14 +250,14 @@ def _author_stalk(ed, exec_in, result, roar_anim, stock):
     self_pawn = g.call(FN_GET_PAWN)
     self_loc = g.call(FN_ACTOR_LOC)
     _connect(out(self_pawn), _pin(self_loc, "self"))
-    player = g.keep(nearest_living_player(ed, out(self_loc)))
+    player = g.keep(target(ed))
     player_loc = g.call(FN_ACTOR_LOC)
-    _connect(player_pin(player), _pin(player_loc, "self"))
+    _connect(target_pin(player), _pin(player_loc, "self"))
     gap = g.call(FN_DISTANCE_2D)
     _connect(out(self_loc), _pin(gap, "V1"))
     _connect(out(player_loc), _pin(gap, "V2"))
     now = g.call(FN_TIME_SECONDS)
-    pins = dict(self_pawn=out(self_pawn), self_loc=out(self_loc), player=player_pin(player),
+    pins = dict(self_pawn=out(self_pawn), self_loc=out(self_loc), player=target_pin(player),
                 player_loc=out(player_loc), gap=out(gap), now=out(now))
 
     # --- hurt by the player: no hunt, now or ever -----------------------------
@@ -293,7 +295,8 @@ def _author_stalk(ed, exec_in, result, roar_anim, stock):
     step = g.put(STALK_CHARGING_VAR, charge + [lost], literal="true")
     # It roars as it breaks into the charge: the voice alone, no clip and no
     # stand, so the pass still fails and Chase gives its order at once.
-    sound, step = _author_random_sound(g.ed, VOICES_VAR, pins["self_loc"], step)
+    sound, step = _author_random_sound(g.ed, VOICES_VAR, pins["self_loc"], step,
+                                       play=heard_by_all(g.ed))
     g.made.extend(sound)
     _connect(step, result(False))
     ahead, step = _author_facing(ed, picked, None)

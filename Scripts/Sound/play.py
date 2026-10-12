@@ -11,11 +11,15 @@ from uebp.nodes.system import FN_PLAY_SOUND
 
 # ─── Playing one of several sounds ──────────────────────────────────────────
 
-def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None, source=None):
+def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None, source=None,
+                         play=None):
     """Play a random element of the ``var_name`` sound array at ``at_pin``,
     at ``volume_pin`` if one is given (the stance's StepVolume). ``source``
     is the array's pin where it is not this graph's own variable (an item's
     takes, read off the item). ``exec_in`` is one exec pin, or several.
+    ``play(sound pin, at pin, exec pin, keep)`` plays the take where a
+    PlaySoundAtLocation here would be heard on this machine alone (a
+    wanderer's controller: npc/body_fx.py); it returns the exec pin after.
 
     Returns ``(nodes, then_pin)``.  The array is guarded on its own length:
     RandomIntegerInRange(0, -1) against an empty array feeds Array_Get an index
@@ -63,19 +67,23 @@ def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None, source=
     _connect(table_out, _pin(pick, "TargetArray"))
     _connect(out(which), _pin(pick, "Index"))
 
-    play = keep(_node(ed, FN_PLAY_SOUND))
-    _connect(out(pick, "Item"), _pin(play, "Sound"))
-    _connect(at_pin, _pin(play, "Location"))
-    _connect(then(have), _pin(play, "execute"))
-    if volume_pin is not None:
-        _connect(volume_pin, _pin(play, "VolumeMultiplier"))
+    if play is not None:
+        played = play(out(pick, "Item"), at_pin, then(have), keep)
+    else:
+        sound = keep(_node(ed, FN_PLAY_SOUND))
+        _connect(out(pick, "Item"), _pin(sound, "Sound"))
+        _connect(at_pin, _pin(sound, "Location"))
+        _connect(then(have), _pin(sound, "execute"))
+        if volume_pin is not None:
+            _connect(volume_pin, _pin(sound, "VolumeMultiplier"))
+        played = then(sound)
 
     # A join node so the caller has ONE exec to carry on from whether or not
     # there was a sound to play. Without it the empty-array path dangles and
     # the chase loop ends the first time a wanderer tries to speak.
     join = keep(ed.add_branch_node())
     _set(join, "Condition", True)
-    _connect(then(play), _pin(join, "execute"))
+    _connect(played, _pin(join, "execute"))
     _connect(else_(have), _pin(join, "execute"))
     return made, then(join)
 

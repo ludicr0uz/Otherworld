@@ -70,6 +70,14 @@ THE CONTROLLER'S STEPS (one fragment per concern)
                state between patrol and hunt. A campfire burning within
                200 m and it walks there at its patrol walk and stands by it;
                none, and the step fails to the stroll
+  target       who "the player" is (M27): the controller's Target, a candidate
+               taken in turn among the living players near it on patrol, kept
+               once Aggro, replaced by the nearest when they die or leave; the
+               hurt sense's blame of whoever struck
+  body_vars    BP_ForestWanderer's two Multicast events, their parameters and
+               its two counters, named once
+  body_fx      ...the events themselves (a voice, a clip: on every machine),
+               built before the controllers, and how a step calls them
   agro         the notice and patrol steps: player present, one per sense, stroll
   sight_cone   debug mode: the Tick that draws the sight (aggro) cone, as
                senses.py tests it, yellow on patrol and red on the hunt
@@ -96,6 +104,10 @@ CHECKS (Scripts/verify_npc_blueprints.py)
                  the walk, the stand, and its place in the tree
   verify_voice   who growls on patrol: the wendigo's voice waits for Aggro
   verify_on_hit  what a landed swing leaves on the player: the roll, the apply
+  verify_target  who it hunts: the turn among the players near it, the Target
+                 kept and replaced, the blame, and no step asking for a player
+  verify_body_fx its sounds and clips on every machine: the body's Multicasts,
+                 and no controller playing one of its own
 
 THE BODY
   character    BP_ForestWanderer and one child Blueprint per creature (each

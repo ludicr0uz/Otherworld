@@ -3,7 +3,8 @@ player, one step per sense, and the stroll. The switch itself (Aggro set:
 hunt) is the tree's Blackboard decorator, and the priority order of the
 senses is the order of its Senses selector.
 
-    BT_PlayerPresent: [player exists?] yes: succeed / no: fail
+    BT_PlayerPresent: this pass's candidate among the living players
+        (npc/target.py); someone: succeed / no one: fail
     BT_Hurt, BT_Sight, BT_Touch, BT_Sound                    (senses.py)
         yes -> AggroReason = <sense>
             -> Aggro = true
@@ -12,8 +13,9 @@ senses is the order of its Senses selector.
         no  -> fail (the selector tries the next sense)
     BT_Stroll: the patrol step, then the walking speed        (patrol.py)
 
-Nothing sets Aggro back to false: once a wanderer has found the player it
-hunts for the rest of its life, which is the old behaviour. A "lose interest"
+Nothing sets Aggro back to false: once a wanderer has found a player it
+hunts for the rest of its life (that player while they live, then the nearest:
+npc/target.py), which is the old behaviour. A "lose interest"
 rule would be a new AgroSettings field and a branch at the top of the yes arm.
 
 The per-creature numbers are the controller's Tune* variables (npc/tuned.py),
@@ -28,7 +30,6 @@ from npc import controller_vars as NV
 from combat.game_state import DEBUG_MODE_VAR, NOISE_TIME_VAR
 from combat.paths import GAME_MODE_BP_PATH
 from net.state_consts import GAME_STATE_CLASS_PATH
-from net.players import living_players
 from net.state_graph import game_state
 from forest_generator.npc_agro import AGRO_LOG_PREFIX
 from npc.graph import _log
@@ -41,10 +42,10 @@ from npc.paths import (
     STEP_PRESENT, STEP_STROLL,
 )
 from Sound.play import _author_random_sound
+from npc.body_fx import heard_by_all
 from npc.senses import _author_hearing, _author_hurt, _author_sight, _author_touch
+from npc.target import _author_candidate
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_PAWN
-from uebp.nodes.array import FN_ARR_LEN
-from uebp.nodes.math import FN_GREATER_II
 from uebp.nodes.ai import FN_BB_SET_BOOL, FN_BB_SET_STRING, FN_GET_BLACKBOARD
 from uebp.nodes.system import (
     FN_CONCAT, FN_DISPLAY_NAME, FN_WARN)
@@ -95,7 +96,8 @@ def _author_enter_agro(ed, reasons, chase_in):
     pawn = keep(_node(ed, FN_GET_PAWN))
     here = keep(_node(ed, FN_ACTOR_LOC))
     _connect(out(pawn), _pin(here, "self"))
-    cried, after_cry = _author_random_sound(ed, AGGRO_VOICES_VAR, out(here), then(flip))
+    cried, after_cry = _author_random_sound(ed, AGGRO_VOICES_VAR, out(here), then(flip),
+                                            play=heard_by_all(ed))
     made.extend(cried)
     after = [after_cry]
 
@@ -159,25 +161,6 @@ def _author_tell_blackboard(ed, done_in):
     return made, _pin(flag, "execute")
 
 
-def _author_player_present(ed, exec_in, yes_in, no_in):
-    """No living player (before possession, between a death and a restart,
-    everyone dead): no sense can say anything, so the tree goes on to the
-    patrol. Every step after this one reads the nearest of them
-    (net/players.py), who is there while this says so."""
-    living, players = living_players(ed, [exec_in])
-    count = _node(ed, FN_ARR_LEN)
-    _connect(players, _pin(count, "TargetArray"))
-    there = _node(ed, FN_GREATER_II)
-    _connect(out(count), _pin(there, "A"))
-    _set(there, "B", 0)
-    present = ed.add_branch_node()
-    _connect(out(there), _pin(present, "Condition"))
-    _connect(then(living), _pin(present, "execute"))
-    _connect(then(present), yes_in)
-    _connect(else_(present), no_in)
-    return [living, count, there, present]
-
-
 def _author_agro_steps(ed, step, result, stock):
     """Author the tree's notice and patrol steps as controller events.
 
@@ -192,7 +175,11 @@ def _author_agro_steps(ed, step, result, stock):
     the step names of the senses authored, in priority order.
     """
     made = []
-    made += _author_player_present(ed, step(STEP_PRESENT), result(True), result(False))
+    # No living player (before possession, between a death and a restart,
+    # everyone dead): no sense can say anything, so the tree goes on to the
+    # patrol. Otherwise the senses below are asked about this pass's
+    # candidate, the controller's Target (npc/target.py).
+    made += _author_candidate(ed, step(STEP_PRESENT), result(True), result(False))
 
     noise = _noise_record_exists()
     if not noise:

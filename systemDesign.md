@@ -46,7 +46,10 @@ pants and boots they wear. A pick-up goes to a free weapon slot of its kind, els
 else empty hands.
 
 **The wanderers** (`Scripts/npc/CLAUDE.md`). Ten zombies and wendigos on Behavior Trees:
-patrol until they notice the player, then chase and melee, sidestepping between swings. A
+patrol until they notice a player, then chase and melee, sidestepping between swings. Each
+hunts one player, chosen among the living ones near it and kept until they die or leave,
+then the nearest; its AI runs on the server alone and its sounds and clips reach every
+machine by Multicast. A
 burning campfire draws patrolling zombies within 200 m. A wendigo hunts before it chases:
 roars, comes in tree to tree round the player, charges from 10 m, charges at once if the
 player runs 30 m or shoots it; fire held out keeps it circling and eventually drives it off

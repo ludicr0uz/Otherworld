@@ -15,7 +15,7 @@ for each creature in npc_placement.NPC_VARIANTS:
 
       Wanderer (selector)
         Alive (sequence): Pulse, then Act (selector):
-          Hunt [Blackboard Aggro is set]: Chase, Swing, Wait 0.5
+          Hunt [Blackboard Aggro is set]: Target, Chase, Swing, Wait 0.5
             (the wendigo: Approach (selector): Stalk, Chase -- then the same)
           Notice: PlayerPresent, then Senses (selector): Hurt, Sight, Touch, Sound
           Patrol: Stroll, Wait 0.5
@@ -33,6 +33,9 @@ for each creature in npc_placement.NPC_VARIANTS:
 
   BP_ForestWanderer    (parent Character)     — the body: mannequin mesh,
       running movement speed, and the controller above auto-possessing it.
+      Its two Multicast events (npc/body_fx.py) are what a controller's
+      step plays a sound or a clip through, so every machine hears and
+      sees it; they are built first, since the controllers call them.
 
 The numbers (run speed, melee range/damage/interval, spawn band) all live in
 forest_generator/npc_placement.py, which imports no `unreal`, so the host-side
@@ -58,6 +61,7 @@ for _name in [m for m in sys.modules if m.split(".")[0] in ("uebp", "net", "npc"
 from combat.server_anim import patch_server_anim                # noqa: E402
 from combat.server_anim_consts import WANDERER                  # noqa: E402
 from forest_generator.npc_placement import NPC_VARIANTS          # noqa: E402
+from npc.body_fx import build_body_events                       # noqa: E402
 from npc.character import (                                     # noqa: E402
     build_npc_blueprint, build_variant_blueprint,
 )
@@ -81,6 +85,8 @@ def ensure_npc_blueprints(force=False):
         _log("NPC blueprints already exist — reusing")
         return eas.load_asset(NPC_BP_PATH)
 
+    # The body's Multicast events first: the controllers' graphs call them.
+    build_body_events()
     ai_bp = build_ai_controller_blueprint(rebuild=force)
     return build_npc_blueprint(ai_bp)
 

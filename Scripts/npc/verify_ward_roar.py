@@ -14,7 +14,7 @@ is probes/probe_wendigo_ward_roar.py's.
 
 import unreal
 
-from net.players_consts import NEAREST_TITLE
+from npc.paths import TARGET_TITLE
 from forest_generator.npc_placement import NPC_VARIANTS
 from forest_generator.npc_stalk import NPC_STALK_ROAR
 from forest_generator.npc_ward import (
@@ -125,7 +125,7 @@ def check_bellow(tag, until, key):
     check(f"{tag}: a roar stops it and faces the player, with no move order, "
           f"and the pass succeeds",
           len(stops) == 1 and len(looks) == 1 and looks[0] in _exec_reach(stops[0])
-          and _titles(_feeders(looks[0], "NewFocus")) == {NEAREST_TITLE}
+          and _titles(_feeders(looks[0], "NewFocus")) == {TARGET_TITLE}
           and not _titled(roar, "SimpleMoveToLocation")
           and _ends(BEL.find_then_pin(until)) == {True})
     clip = NPC_STALK_ROAR.get(key)
@@ -157,7 +157,8 @@ def check_blow(tag, everything, fears):
           f"{WARD_SINCE_VAR} back to 0, after the damage is written",
           len(mine) == 1 and _zero(mine[0], WARD_SINCE_VAR) and len(landed) >= 1
           and all(mine[0] in _exec_reach(w) for w in landed)
-          and len(clears) == 2,
+          # ...the flight's own, and a switch of Target's (npc/target.py).
+          and len(clears) == 3,
           f"{len(mine)} in BT_{STEP_SWING}, {len(clears)} in all, "
           f"{len(landed)} damage writes")
 

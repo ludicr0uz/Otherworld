@@ -17,7 +17,8 @@ is probes/probe_wendigo_stalk.py's.
 
 import unreal
 
-from net.players_consts import NEAREST_TITLE
+from npc.body_vars import BODY_CAST_TITLE
+from npc.paths import TARGET_TITLE, TARGET_VAR
 from forest_generator.npc_placement import NPC_MELEE_RANGE_CM, NPC_VARIANTS
 from forest_generator.npc_stalk import (
     NPC_STALK_ARC_DEG, NPC_STALK_ARRIVE_CM, NPC_STALK_CATCH_UP_CM,
@@ -117,7 +118,7 @@ def check_roar(tag, own, key):
     check(f"{tag}: ...standing, and facing the player",
           len(stops) == 1 and len(stamps) == 1 and stops[0] in _exec_reach(stamps[0])
           and len(looks) == 1 and looks[0] in _exec_reach(stops[0])
-          and _titles(_feeders(looks[0], "NewFocus")) == {NEAREST_TITLE})
+          and _titles(_feeders(looks[0], "NewFocus")) == {TARGET_TITLE})
     waits = [b for b in _titled(own, "Branch")
              if {"float < float", "GetTimeSeconds", f"Get {STALK_ROAR_UNTIL_VAR}"}
              == _titles(_sources(b, "Condition"))]
@@ -200,17 +201,25 @@ def check_rage(tag, own, event, cdo):
           and heads[0] in _exec_reach(event) and bool(hunt)
           and all(n in _exec_reach(heads[0]) for n in hunt))
     marks = _titled(own, f"Set {ENRAGED_VAR}")
-    hurts = [d for m in marks for d in _drivers(m)]
+    hurts = [b for b in _titled(own, "Branch")
+             if _titles(_feeders(b, "Condition")) == {f"Get {DAMAGED_BY_PLAYER_VAR}"}]
     casts = [c for h in hurts for c in _drivers(h)]
+    shot = [n for h in hurts for a in _after(BEL.find_then_pin(h)) for n in _exec_reach(a)]
     check(f"{tag}: what enrages it is the hurt sense's flag "
           f"({DAMAGED_BY_PLAYER_VAR}), read next, on every pass",
           len(marks) == 1 and _is(marks[0], ENRAGED_VAR, True)
-          and len(hurts) == 1 and _title(hurts[0]) == "Branch"
-          and marks[0] in _after(BEL.find_then_pin(hurts[0]))
-          and _titles(_feeders(hurts[0], "Condition")) == {f"Get {DAMAGED_BY_PLAYER_VAR}"}
+          and len(hurts) == 1 and marks[0] in shot
           and len(heads) == 1 and len(casts) == 1
           and casts[0] in _after(BEL.find_else_pin(heads[0])),
           f"{[_title(h) for h in hurts]}")
+    # The hurt sense's blame (npc/target.py): between the flag and the rage.
+    blames = [n for n in shot if _title(n) == f"Set {TARGET_VAR}"]
+    check(f"{tag}: ...and it turns on whoever struck it: {TARGET_VAR} is the pawn "
+          f"of the blow's instigator, written before it is {ENRAGED_VAR}",
+          len(blames) == 1 and len(marks) == 1 and marks[0] in _exec_reach(blames[0])
+          and {"Get LastInstigator", "Get Controlled Pawn"}
+          <= _titles(_sources(blames[0], TARGET_VAR)),
+          f"{sorted(_titles(_sources(blames[0], TARGET_VAR))) if blames else blames}")
     after = _exec_reach(marks[0]) if len(marks) == 1 else []
     voices = [v for v in _with(after, "Sound", "Location")
               if f"Get {VOICES_VAR}" in _titles(_sources(v, "Sound"))]
@@ -247,7 +256,7 @@ def check_charge(tag, own, event):
     check(f"{tag}: ...roaring as it breaks into the charge: one of its voices, "
           f"the once, with no clip and no stand, so Chase runs on that pass",
           len(voices) == 1 and len(ends) == 1
-          and all(_title(n) == "Branch" for n in after
+          and all(_title(n) in ("Branch", BODY_CAST_TITLE) for n in after
                   if n not in flags + voices + ends),
           f"{sorted(_title(n) for n in after)}")
     still = [g for g in gates if _title(g) == "Branch"
@@ -278,7 +287,7 @@ def _fled_gates(own):
             if any(_title(t) == "float > float" and _fed(t, "B", "stalk_fled_cm")
                    and any(_title(d) == "Distance2D (Vector)"
                            and _titles(_feeders(d, "V1")) == {"Get Actor Location"}
-                           and NEAREST_TITLE in _titles(_sources(d, "V1"))
+                           and TARGET_TITLE in _titles(_sources(d, "V1"))
                            and _titles(_feeders(d, "V2")) == {f"Get {STALK_ORIGIN_VAR}"}
                            for d in _feeders(t, "A"))
                    for t in _feeders(b, "Condition"))]
@@ -292,7 +301,7 @@ def check_fled(tag, own):
           f"and nothing else writes it",
           len(stamps) == 1 and len(roars) == 1 and stamps[0] in _exec_reach(roars[0])
           and _titles(_feeders(stamps[0], STALK_ORIGIN_VAR)) == {"Get Actor Location"}
-          and NEAREST_TITLE in _titles(_sources(stamps[0], STALK_ORIGIN_VAR)))
+          and TARGET_TITLE in _titles(_sources(stamps[0], STALK_ORIGIN_VAR)))
     gates = _fled_gates(own)
     waits = [b for b in _titled(own, "Branch")
              if {"float < float", "GetTimeSeconds", f"Get {STALK_ROAR_UNTIL_VAR}"}
@@ -338,7 +347,7 @@ def check_catch_up(tag, own):
     check(f"{tag}: ...it runs straight at them, facing the way it runs",
           len(runs) == 1 and _title(runs[0]) == "SimpleMoveToLocation"
           and _titles(_feeders(runs[0], "Goal")) == {"Get Actor Location"}
-          and NEAREST_TITLE in _titles(_sources(runs[0], "Goal"))
+          and TARGET_TITLE in _titles(_sources(runs[0], "Goal"))
           and len(_titled(far, "ClearFocus")) == 1
           and runs[0] in _exec_reach(_titled(far, "ClearFocus")[0]))
     speeds = _titled(far, "Set MaxWalkSpeed")

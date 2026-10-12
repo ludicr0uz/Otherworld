@@ -57,7 +57,7 @@ from forest_generator.npc_ward import (
     NPC_WARD_STALLED_CMS,
 )
 from npc.graph import _Graph, _log
-from net.players import nearest_living_player, player_pin
+from npc.target import target, target_pin
 from uebp.graph import BEL, _assets, _connect, _loose_pin, _palette, _pin, else_, out, then
 from npc.paths import (
     STALK_CHARGING_VAR, STALK_LEG_UNTIL_VAR, STALK_ROAR_UNTIL_VAR,
@@ -257,9 +257,9 @@ def _author_ward(ed, exec_in, result, roar_anim, stock, restalks):
     self_pawn = g.call(FN_GET_PAWN)
     self_loc = g.call(FN_ACTOR_LOC)
     _connect(out(self_pawn), _pin(self_loc, "self"))
-    player = g.keep(nearest_living_player(ed, out(self_loc)))
+    player = g.keep(target(ed))
     player_loc = g.call(FN_ACTOR_LOC)
-    _connect(player_pin(player), _pin(player_loc, "self"))
+    _connect(target_pin(player), _pin(player_loc, "self"))
     gap = g.call(FN_DISTANCE_2D)
     _connect(out(self_loc), _pin(gap, "V1"))
     _connect(out(player_loc), _pin(gap, "V2"))
@@ -268,7 +268,7 @@ def _author_ward(ed, exec_in, result, roar_anim, stock, restalks):
     bearing = g.call(FN_NORMAL_2D)
     _connect(g.op(FN_SUB_VV, out(self_loc), out(player_loc)), _pin(bearing, "A"))
     now = g.call(FN_TIME_SECONDS)
-    pins = dict(self_pawn=out(self_pawn), self_loc=out(self_loc), player=player_pin(player),
+    pins = dict(self_pawn=out(self_pawn), self_loc=out(self_loc), player=target_pin(player),
                 player_loc=out(player_loc), gap=out(gap), bearing=out(bearing),
                 now=out(now))
 

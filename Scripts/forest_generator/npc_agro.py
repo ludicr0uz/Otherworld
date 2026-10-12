@@ -70,6 +70,13 @@ class AgroSettings:
     patrol_repick_max_s: float
 
 
+# How far off a player can be and still be someone a patrolling wanderer
+# tests its senses against (npc/target.py). Each pass it tests one of the
+# living players inside this, in turn, so with 64 players on the map a wanderer
+# still asks about the two or three near it. Well past the widest sight (35 m)
+# and touch; a noise or a wound from further off is laid on the nearest player.
+NPC_TARGET_SCAN_CM = 6000.0
+
 NPC_AGRO = {
     # The yardstick. 20 m of sight at night in a dense forest, a normal field
     # of view, normal ears, and a small beat: 15 m, so a pack's members stay

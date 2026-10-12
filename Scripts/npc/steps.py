@@ -57,13 +57,15 @@ from npc.melee import _author_melee
 from npc.monster_tuning import monster_specs, stock_run_speed
 from npc.patrol import _author_patrol_setup, _author_walk_speed
 from npc.paths import (
+    STALK_CHARGING_VAR, STALK_LEG_UNTIL_VAR, STALK_ROAR_UNTIL_VAR,
     STEP_CHASE, STEP_DRAWN, STEP_EVENT_PREFIX, STEP_PULSE, STEP_RESULT_VAR,
-    STEP_STALK, STEP_SWING, STEP_WARD, WARD_SINCE_VAR,
+    STEP_STALK, STEP_SWING, STEP_TARGET, STEP_WARD, WARD_SINCE_VAR,
 )
 from npc.roar import roar_object
 from npc.stalk import _author_stalk, declare_stalk_vars
 from npc.stats import _author_stats_and_voice
 from npc.strafe import _author_strafe, declare_strafe_vars
+from npc.target import _author_keep, declare_target_vars
 from npc.tuned import declare_tuned_vars
 from npc.ward import _author_ward, declare_ward_vars, wards
 from survival.on_hit import melee_attack, on_hit_effects
@@ -194,6 +196,26 @@ def _author_drawn_step(ed, steps, key):
         f"step fails and it strolls.", made)
 
 
+def _author_target_step(ed, steps, key, warded):
+    """BT_Target, the hunt's head: after the Stalk and Ward steps' variables
+    are declared, since a switch starts both over."""
+    restart = []
+    if key in NPC_STALK_ROAR:
+        restart += [(STALK_ROAR_UNTIL_VAR, 0.0), (STALK_LEG_UNTIL_VAR, 0.0),
+                    (STALK_CHARGING_VAR, "false")]
+    if warded:
+        restart += [(WARD_SINCE_VAR, 0.0)]
+    made = _author_keep(ed, steps.event(STEP_TARGET), steps.result(True),
+                        steps.result(False), restart)
+    ed.add_comment_to_nodes(
+        "BT_Target, the hunt's first step: the Target it hunts is kept while "
+        "they are among the living players. Dead or gone, it turns on the "
+        "nearest living player"
+        + (", and the hunt starts over (it roars at them)" if restart else "")
+        + "; with no one living the step fails and the pass falls through to "
+        "the patrol.", made)
+
+
 def _author_steps(ed, key, melee_anim):
     """Author every step event into creature ``key``'s controller graph.
     Its numbers are read off the Tune* variables (npc/tuned.py); ``spec``
@@ -203,6 +225,7 @@ def _author_steps(ed, key, melee_anim):
     dropped when the GameMode has no noise record)."""
     declare(ed, NV.STEPS)
     _declare_agro_vars(ed)
+    declare_target_vars(ed)
     declare_tuned_vars(ed)
     declare_strafe_vars(ed)
     declare_on_hit_vars(ed)
@@ -233,6 +256,7 @@ def _author_steps(ed, key, melee_anim):
         _author_ward_step(ed, steps, key)
     if draws(key):
         _author_drawn_step(ed, steps, key)
+    _author_target_step(ed, steps, key, warded)
 
     stock = stock_run_speed(key)
     strafe, to_chase, strafed = _author_strafe(ed, steps.event(STEP_CHASE), stock)

@@ -21,7 +21,7 @@ from combat.game_state import (
 )
 from combat.paths import GAME_MODE_CLASS_PATH
 from combat.tuning import COMBAT
-from net.players import nearest_living_player, player_pin
+from npc.target import _author_blame, target, target_pin
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from npc.paths import HEALTH_CLASS_PATH
 from npc.tuned import tuned
@@ -62,10 +62,10 @@ def _locations(k):
     pawn = k.fn(FN_GET_PAWN)
     here = k.fn(FN_ACTOR_LOC)
     _connect(k.out(pawn), _pin(here, "self"))
-    player = k(nearest_living_player(k.ed, k.out(here)))
+    player = k(target(k.ed))
     there = k.fn(FN_ACTOR_LOC)
-    _connect(player_pin(player), _pin(there, "self"))
-    return pawn, k.out(here), player_pin(player), k.out(there)
+    _connect(target_pin(player), _pin(there, "self"))
+    return pawn, k.out(here), target_pin(player), k.out(there)
 
 
 def _branch(k, condition, exec_in):
@@ -96,7 +96,11 @@ def _author_hurt(ed, exec_in):
     _connect(_loose_pin(as_health, "AsBPHealthComponent", is_input=False),
              _pin(flag, "self"))
     hurt = _branch(k, k.out(flag, DAMAGED_BY_PLAYER_VAR), [then(as_health)])
-    return k.made, then(hurt), [else_(hurt), out(as_health, "CastFailed")]
+    # It turns on whoever struck it, not on this pass's candidate.
+    blame, blamed = _author_blame(
+        ed, then(hurt), _loose_pin(as_health, "AsBPHealthComponent", is_input=False))
+    k.made.extend(blame)
+    return k.made, blamed, [else_(hurt), out(as_health, "CastFailed")]
 
 
 def _author_sight(ed, exec_in):

@@ -9,7 +9,7 @@ from forest_generator.npc_placement import NPC_VARIANTS
 from forest_generator.npc_stalk import NPC_STALK_ROAR
 from npc.paths import (
     AI_BP_PATH, HIT_SOUNDS_VAR, REACTIONS_VAR, STEP_CHASE, STEP_DRAWN, STEP_PRESENT, STEP_PULSE,
-    STEP_STALK, STEP_STROLL, STEP_SWING, STEP_WARD, VOICES_VAR, step_task_path, tree_path,
+    STEP_STALK, STEP_STROLL, STEP_SWING, STEP_TARGET, STEP_WARD, VOICES_VAR, step_task_path, tree_path,
 )
 from npc.graph import _log
 from uebp.graph import (
@@ -157,7 +157,7 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     # the stroll (npc/drawn.py).
     stalks, warded, drawn = key in NPC_STALK_ROAR, wards(key), draws(key)
     task = build_step_task(bp, step_task_path(path),
-                           [STEP_PULSE] + [STEP_WARD] * warded
+                           [STEP_PULSE, STEP_TARGET] + [STEP_WARD] * warded
                            + [STEP_STALK] * stalks
                            + [STEP_CHASE, STEP_SWING, STEP_PRESENT]
                            + senses + [STEP_DRAWN] * drawn + [STEP_STROLL])

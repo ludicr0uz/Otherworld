@@ -11,6 +11,7 @@ from npc.paths import (
 )
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
 from Sound.play import _author_random_sound
+from npc.body_fx import heard_by_all
 from npc.tuned import tuned
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_GET_PAWN
 from uebp.nodes.math import FN_ADD_FF, FN_GE_FF, FN_NEQ_FF, FN_RANDOM_FLOAT
@@ -162,7 +163,8 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max, quiet_on_patrol=
     for tail in tails:
         _connect(tail, _pin(speak, "execute"))
 
-    voiced, after_voice = _author_random_sound(ed, VOICES_VAR, where_out, then(speak))
+    voiced, after_voice = _author_random_sound(ed, VOICES_VAR, where_out, then(speak),
+                                               play=heard_by_all(ed))
     made.extend(voiced)
 
     gap = keep(_node(ed, FN_RANDOM_FLOAT))

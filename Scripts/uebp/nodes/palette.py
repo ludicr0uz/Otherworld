@@ -56,6 +56,7 @@ NODE_CREATE_WIDGET = "UserInterface|CreateWidget"
 
 NODE_BREAK_EVENT_DATA = "Utilities|Struct|BreakGameplayEventData"
 NODE_CAST_CHAR = "Utilities|Casting|CastToBP_ThirdPersonCharacter"
+NODE_CAST_WANDERER = "Utilities|Casting|CastToBP_ForestWanderer"
 NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
 NODE_CAST_CONSUMABLE = "Utilities|Casting|CastToBP_ConsumableItem"
 NODE_CAST_CYCLE = "Utilities|Casting|CastToBP_DayNightCycle"

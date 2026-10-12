@@ -794,6 +794,43 @@ the ask, predicting ---------->    Server_Fire / _Punch /        Multicast_<Name
   read on every body exactly what the server rolled (matched by `NpcId`), one canteen at
   most. `--game` runs its single-player arm; `probe_bleeding.py` is the on-hit roll's.
 
+<a id="m27"></a>
+## Wanderers among several players (M27, done, 2026-10-11)
+
+- **Built:** `npc/target.py` (the controller's `Target`, `TargetNear`, `TargetScan`; the
+  steps `BT_PlayerPresent` and the new `BT_Target`, first in the Hunt sequence; the hurt
+  sense's blame), `npc/body_fx.py` and `body_vars.py` (`BP_ForestWanderer`'s
+  `Multicast_Voice` and `Multicast_Clip`, the first graph that Blueprint has had).
+  Six step modules (chase, melee, senses, stalk, strafe, ward) read `Target` where each
+  called `NearestLivingPlayer` at every read; seven sound calls and the two clip calls
+  (swing, roar) go to the body's Multicasts.
+- **Before:** a wanderer's sounds and its swing and roar clips were played by the
+  AIController, so on a server no client heard a growl or saw a swing: only the body's
+  movement reached it. With no living player an aggro wanderer's hunt steps still ran and
+  read no one (the `Accessed None` lines A1 counted, 142-235 a run).
+- **Verifier:** `verify_npc_blueprints.py` 561 checks (506 before): `verify_target.py`,
+  `verify_body_fx.py`, the tree's new step, the body's variable table.
+- **Measured** (`uepy.py --net --clients 2 --probe
+  Scripts/probes/probe_net_npc_target.py`, the 200 m level, 68 s): a calm zombie stood
+  with one client 1.5 m off and the other 30 m off notices the nearer and its `Target` is
+  that client; with the other client moved beside it and its own stepped 7 m back it
+  keeps its `Target` and goes after them (three passes on: 146 cm from the hunted, 722 cm
+  from the other); the hunted client's PlayerState marked `PlayerDead`, `Target` is the
+  other client and it swings at them; both dead, `Target` is no one, it is still Aggro,
+  no clip is played and the run logs no `Accessed None`; the first marked alive again is
+  hunted. Each client's copies of the wanderers had played 9 voices and 4 clips (the
+  server's copy of the staged one: 8 and 3 a moment earlier). Single player:
+  `probe_npc_behavior_tree.py` reads the one player as `Target` and the body's counters
+  after a swing (1 clip, 4 voices).
+- **Not proven in play:** a wendigo's hunt starting over at a switch (the roar at the new
+  target) is held by the verifier's graph check alone; a target who leaves (their pawn
+  destroyed) takes the same arm as one who dies, and only the death was staged.
+- **Left for later:** the noise record is still one, the loudest (M28); the population
+  does not follow the players (the later tasks of this phase). `BT_PlayerPresent` walks
+  the PlayerArray once a pass per calm wanderer, and `BT_Target` once per aggro one: with
+  64 players and ten wanderers that is 20 walks a second, where each step's pure read
+  walked it several times a pass before.
+
 <a id="m9"></a>
 ## Who is nearby (M9, done)
 

@@ -44,7 +44,8 @@ _author_* fragment per concern, each in its own module:
               its glass
   head_hide   down the sights: the player's own head bone is hidden past
               SightSeat HEAD_HIDE_SEAT, whatever gun is held, and shown again
-              off them (the eye point is inside or beside the head)
+              off them (the eye point is inside or beside the head); a
+              MetaHuman skin's Face and grooms go OwnerNoSee instead
   breath      SwayRate copied off Held (behind IsValid); the hold breath key
               down the sights: Breath, BreathHeld, Winded and BreathScale
   sway        down the sights: the view drifts on two slow sines (the control

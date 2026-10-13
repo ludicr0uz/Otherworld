@@ -68,6 +68,12 @@ RETICLE_HIDE_LOOK = 0.9
 # just after it has left, so the body is not seen headless from behind.
 HEAD_HIDE_SEAT = 0.8
 
+# The component tag on what is drawn of the head by a component of its own:
+# a MetaHuman skin's Face and its grooms (metahuman_body.py). A hidden bone
+# does not reach a groom's strands, so past HEAD_HIDE_SEAT these are out of
+# their owner's view instead (OwnerNoSee: body_parts.author_head_parts_no_see).
+HEAD_PART_TAG = "HeadPart"
+
 # The camera's near plane (cm): nothing nearer the eye is drawn, and what
 # straddles it is cut open. It is the engine's, set for every view in
 # Config/DefaultEngine.ini ([/Script/Engine.Engine] NearClipPlane, read at

@@ -161,14 +161,30 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - Not `OwnerNoSee` (the scope's way, below): the arms and the gun are the sight picture.
   - A hidden bone is drawn at zero scale, with its children. The pose, the sockets and the
     physics bodies are untouched (`PBO_None`), so the head can still be hit.
-  - It is not per-view: the body's shadow is headless meanwhile.
+  - It is not per-view: a mannequin skin's shadow is headless meanwhile.
+  - **The MetaHuman's Face and its six grooms go out of their owner's view instead**
+    (`OwnerNoSee`, on the same two arms; `body_parts.author_head_parts_no_see`). A groom is
+    not skinned: a hidden bone does not reach its strands, and the hair stood by itself in
+    front of the sight camera. `metahuman_body.py` tags the seven `HeadPart`
+    (`seat_tuning.HEAD_PART_TAG`) and sets `bCastHiddenShadow` on them; the loops over the
+    parts under the mannequin Branch on the tag (`ComponentHasTag`), so the body, the arms
+    and the garments are never touched, and the hidden bone skips the tagged seven (a face
+    with its bone hidden would cast no shadow, whatever its flag). Per view: other players
+    see the whole character. Strand hair honours `OwnerNoSee` (seen in a windowed run: the
+    hair is drawn carried and gone on the sights).
+  - **A new component that draws the head alone** (a hat or glasses drawn on the body, which
+    none is today: only the jacket, the pants and the boots have a worn mesh) takes the tag
+    and `bCastHiddenShadow` where it is made, and needs nothing else.
+  - The dead gate needs no line for them: its `SetOwnerNoSee(false)` is on every part.
   - **0.8, not sooner:** the camera comes from behind, and a head hidden early is a headless
     body seen from the boom. Probed: the nearest the camera comes to a head still drawn is
     30 cm (the pistol, passing beside it), 37–52 cm on the long guns.
   - The dead gate shows it (`dead.py`), since the Tick that would no longer runs: a player
     killed down the sights leaves a corpse with a head.
   - `probes/probe_head_hide.py` raises the sights on every item in the bag that has a sight
-    line, so a gun added later is covered unnamed, then kills the player down them.
+    line, so a gun added later is covered unnamed, then kills the player down them. It holds
+    the Face and the grooms to the same rule frame by frame, and to being visible to
+    everyone else meanwhile.
 - **The camera's near plane is 2 cm, so the hands are not cut open** (`NEAR_CLIP_CM` in
   `seat_tuning.py`; `Config/DefaultEngine.ini`, `[/Script/Engine.Engine] NearClipPlane`):
   - **Why:** the eye is on the gun, and the shotgun's right thumb is 6 cm from it, in the

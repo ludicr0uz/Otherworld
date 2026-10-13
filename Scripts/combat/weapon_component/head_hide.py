@@ -3,6 +3,8 @@
     if SightSeat > HEAD_HIDE_SEAT:  OwnerMesh.HideBoneByName(skin.head)
     else:                           OwnerMesh.UnHideBoneByName(skin.head)
     ...and the same on every skinned mesh under OwnerMesh (body_parts.py)
+    ...but the head's own parts (a MetaHuman skin's Face and its grooms,
+       HEAD_PART_TAG): SetOwnerNoSee(true) on the first arm, (false) on the other
 
 The sight camera sits at the held gun's eye point (sights.py), a few
 centimetres behind its rear sight. A gun at the shoulder has the head right
@@ -16,7 +18,23 @@ HideBoneByName, not OwnerNoSee (the scope's way, sights.py): the arms and the
 gun are the sight picture and must stay. A hidden bone is a render-side zero
 scale on that bone and its children; the game thread's pose, the sockets and
 the physics bodies (PBO_None: hit_bodies.py's head stays where it is) are
-untouched. It is not per-view, so the body's shadow is headless meanwhile.
+untouched. It is not per-view, so a mannequin skin's shadow is headless
+meanwhile.
+
+A groom is not skinned: its strands hang off the face by a binding and a
+hidden bone does not reach them, so the hair stood in front of the sight
+camera by itself. The Face and the six grooms are a whole component each
+with nothing of the sight picture in it, so they go out of their owner's
+view the per-view way (OwnerNoSee): other players see the whole character,
+and with bCastHiddenShadow (metahuman_body.py) the owner's shadow keeps
+its head. The hidden bone therefore skips them: it would take the face out
+of the shadow too. It still takes the head end of everything else under
+the mannequin (the body's neck, a hood).
+
+After sights.py, which writes OwnerNoSee on every part each frame for the
+scope: past HEAD_HIDE_SEAT this arm has the last word on the head's parts.
+SCOPE_HIDE_BLEND is past HEAD_HIDE_SEAT, so the other arm's false never
+shows a face the scope has hidden.
 
 Read off SightSeat, the camera's own share of the sights (seat.py), after
 sights.py has written it this frame -- on both of its arms, so with empty
@@ -28,9 +46,9 @@ runs for a dead owner.
 import unreal
 
 from uebp.graph import _assets, _connect, _node, _pin, _set, else_, out, then
-from combat.seat_tuning import HEAD_HIDE_SEAT, SEAT_VAR
+from combat.seat_tuning import HEAD_HIDE_SEAT, HEAD_PART_TAG, SEAT_VAR
 from combat.skin import player_skin
-from combat.weapon_component.body_parts import author_parts_bone
+from combat.weapon_component.body_parts import author_head_parts_no_see, author_parts_bone
 from uebp.nodes.actor import FN_HIDE_BONE, FN_UNHIDE_BONE
 from uebp.nodes.math import FN_GREATER_FF
 from combat.weapon_component import vars as WV
@@ -93,8 +111,11 @@ def _author_head_hide(ed, exec_ins):
     _set(hide, "PhysBodyOption", PHYS_BODY_OP)
     _connect(then(on_sights), _pin(hide, "execute"))
     hidden = author_parts_bone(ed, keep, then(hide), FN_HIDE_BONE, head_bone(),
-                               phys_body_op=PHYS_BODY_OP)
+                               phys_body_op=PHYS_BODY_OP, skip_tag=HEAD_PART_TAG)
+    # The head's own parts (the Face, the grooms): out of this view alone.
+    hidden = author_head_parts_no_see(ed, keep, hidden, True)
     shown = _author_head_shown(ed, keep, else_(on_sights))
+    shown = author_head_parts_no_see(ed, keep, shown, False)
 
     ed.add_comment_to_nodes(
         f"Down the sights (SightSeat > {HEAD_HIDE_SEAT:g}) the player's own "
@@ -103,6 +124,8 @@ def _author_head_hide(ed, exec_ins):
         "picture. Whatever gun is held, so no weapon needs an eye point that "
         "clears the head. Render only: the pose and the hit bodies stay. "
         "Shown again the frame the camera is back off the gun. A MetaHuman "
-        "skin's face and body under the mannequin: the same, by the same "
-        "bone name (body_parts.py).", made)
+        "skin's body and garments under the mannequin: the same, by the same "
+        f"bone name (body_parts.py). Its face and grooms ({HEAD_PART_TAG}) are "
+        "OwnerNoSee instead: strands do not follow a hidden bone, and this "
+        "way the owner's shadow keeps its head.", made)
     return (hidden, shown)

@@ -33,6 +33,7 @@ from asset_pipeline.metahuman_paths import (
     GROOMS,
 )
 from combat.log import _log
+from combat.seat_tuning import HEAD_PART_TAG
 from uebp.graph import _add_component, _component_object, _drop_components, _find_handle
 
 BODY, FACE, META, LOD_SYNC = "Body", "Face", "MetaHuman", "LODSync"
@@ -75,6 +76,18 @@ def _skeletal(bp, parent, name, mesh, anim_bp=None):
     return handle, comp
 
 
+def _head_part(comp, name):
+    """Mark a component that draws the head alone. Down the sights the
+    weapon component takes these out of their owner's view by the tag
+    (weapon_component/head_hide.py); the shadow they still cast then is
+    what keeps the owner's shadow its head."""
+    comp.set_editor_property("component_tags", [unreal.Name(HEAD_PART_TAG)])
+    comp.set_editor_property("cast_hidden_shadow", True)
+    if ([str(t) for t in comp.get_editor_property("component_tags")] != [HEAD_PART_TAG]
+            or not comp.get_editor_property("cast_hidden_shadow")):
+        raise RuntimeError(f"{name} did not take the {HEAD_PART_TAG} tag and its shadow")
+
+
 def _garment_slot(bp, parent, name):
     """An undressed garment component: the name the LOD sync and the
     MetaHuman component know, with no mesh on it and nothing drawn."""
@@ -106,7 +119,8 @@ def install(bp, mannequin_handle, retarget=None):
     # copied so it does not pull the skin in under the clothes the body no
     # longer wears (build_metahuman_retarget.py).
     body_comp.set_editor_property("override_materials", [_must(BODY_MATERIAL_BARE)])
-    face, _face_comp = _skeletal(bp, body, FACE, FACE_MESH, FACE_ANIM_BP)
+    face, face_comp = _skeletal(bp, body, FACE, FACE_MESH, FACE_ANIM_BP)
+    _head_part(face_comp, FACE)
     for name in CLOTHING:
         _garment_slot(bp, body, name)
     for name, (groom, binding) in GROOMS.items():
@@ -114,6 +128,7 @@ def install(bp, mannequin_handle, retarget=None):
         comp.set_editor_property("groom_asset", _must(groom))
         comp.set_editor_property("binding_asset", _must(binding))
         comp.set_editor_property("use_attach_parent_bound", True)
+        _head_part(comp, name)
 
     meta = _component_object(_add_component(bp, mannequin_handle,
                                             unreal.MetaHumanComponentUE, META))

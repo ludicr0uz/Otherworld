@@ -164,6 +164,10 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   bare and dressed by `probe_scope_hide.py`, `probe_head_hide.py` and
   `probe_net_death.py`'s standalone arm; a probe dresses its player with
   `probes/dressed.py` `put_on`.
+- **The hat and the glasses need no hide down the sights:** neither is drawn on the body
+  (no worn mesh), so nothing of them can stand in the sight picture. One drawn on the head
+  later takes `seat_tuning.HEAD_PART_TAG` and `bCastHiddenShadow` on its component, as the
+  Face and the grooms have (`combat/docs/aiming.md`, "the player's own head is hidden").
 - **On a server every client draws it itself** (K5). The dedicated server draws no one;
   the classes worn reach the owner in the record and everyone else in `WornClasses`
   beside `HandClass` (`Scripts/net/CLAUDE.md`, "Clothing"), and each client's view

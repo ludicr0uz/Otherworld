@@ -6,7 +6,11 @@ the sights key), for every item in the bag that has a sight line -- so a gun
 added later is covered without being named here. Frame by frame through the
 raise and the release:
 
-  - the head is hidden exactly while SightSeat is past HEAD_HIDE_SEAT;
+  - the head is hidden exactly while SightSeat is past HEAD_HIDE_SEAT: its
+    bone on the mannequin and on what is skinned under it, and the head's own
+    parts (a MetaHuman skin's Face and its six grooms, which a hidden bone
+    does not reach) out of their owner's view, OwnerNoSee -- still visible to
+    everyone else, and still casting their shadow;
   - until it goes, the camera is still well behind it (the body is never seen
     with the head filling the view, nor headless from far behind): the nearest
     the camera came to a head still drawn is reported;
@@ -35,7 +39,8 @@ import unreal
 from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
-from combat.seat_tuning import HEAD_HIDE_SEAT, SEAT_VAR, SIGHTS_FORCED_VAR
+from asset_pipeline.metahuman_paths import GROOMS
+from combat.seat_tuning import HEAD_HIDE_SEAT, HEAD_PART_TAG, SEAT_VAR, SIGHTS_FORCED_VAR
 from combat.skin import skin_of_mesh
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.sights import SIGHT_LINE_MIN_CM
@@ -88,16 +93,26 @@ class _Watch:
         self.wrong = []
         self.nearest = float("inf")
 
+    def _gone(self):
+        """Is each piece of the head out of the owner's view: the bone on the
+        mannequin and on every skinned mesh under it (a MetaHuman skin's
+        body, a garment: weapon_component/body_parts.py), and the head's own
+        parts (its Face and grooms) by OwnerNoSee."""
+        return ([m.is_bone_hidden_by_name(self.head)
+                 for m in _skinned(self.mesh, self.head)]
+                + [bool(c.get_editor_property("owner_no_see"))
+                   for c in _head_parts(self.mesh)])
+
     def hidden(self):
-        """On the mannequin, and on every skinned mesh drawn under it (a
-        MetaHuman skin's body and face: weapon_component/body_parts.py)."""
-        return all(m.is_bone_hidden_by_name(self.head)
-                   for m in _skinned(self.mesh, self.head))
+        return all(self._gone())
+
+    def shown(self):
+        return not any(self._gone())
 
     def sample(self):
         seat = self.p.get(self.wc, SEAT_VAR)
         self.frames += 1
-        if self.hidden() != (seat > HEAD_HIDE_SEAT):
+        if not (self.hidden() if seat > HEAD_HIDE_SEAT else self.shown()):
             self.wrong.append(round(seat, 3))
         if not self.hidden():
             gap = (self.cam.get_world_location()
@@ -106,11 +121,27 @@ class _Watch:
         return seat
 
 
+def _head_parts(mesh):
+    """The components that draw the head alone (metahuman_body.py tags them)."""
+    return [c for c in mesh.get_children_components(True)
+            if c.component_has_tag(HEAD_PART_TAG)]
+
+
 def _skinned(mesh, head):
-    """The mannequin and the skinned meshes under it that have the head bone."""
+    """The mannequin and the skinned meshes under it that have the head
+    bone, but the head's own parts: those go by OwnerNoSee."""
     return [mesh] + [c for c in mesh.get_children_components(True)
                      if isinstance(c, unreal.SkinnedMeshComponent)
-                     and c.get_bone_index(head) >= 0]
+                     and c.get_bone_index(head) >= 0
+                     and not c.component_has_tag(HEAD_PART_TAG)]
+
+
+def _seen_by_others(mesh):
+    """The head's parts are hidden per view only: none is invisible or
+    hidden in game, and each casts its shadow while out of its owner's view."""
+    return [c.get_name() for c in _head_parts(mesh)
+            if not c.is_visible() or c.get_editor_property("hidden_in_game")
+            or not c.get_editor_property("cast_hidden_shadow")]
 
 
 def _drawn(mesh):
@@ -159,6 +190,16 @@ def _run(p):
         return
     p.check(f"the player's mesh has the head bone ({head})",
             mesh.get_bone_index(head) >= 0, str(mesh.get_bone_index(head)))
+    if _drawn(mesh) is not mesh:
+        # A MetaHuman skin: the Face and every groom, hair first.
+        names = sorted(c.get_name() for c in _head_parts(mesh))
+        p.check(f"the MetaHuman's Face and its {len(GROOMS)} grooms are the head's "
+                f"own parts ({HEAD_PART_TAG})", names == sorted(["Face", *GROOMS]),
+                str(names))
+        strands = [c.get_name() for c in _head_parts(mesh)
+                   if c.get_class().get_name() == "GroomComponent"]
+        p.check("...the grooms GroomComponents, which no hidden bone reaches",
+                sorted(strands) == sorted(GROOMS), str(strands))
     p.set(hud, DEV_GUNS_REQUEST_VAR, True)
     yield lambda: not p.get(hud, DEV_GUNS_REQUEST_VAR)
     bag = p.get(wc, "Inventory")
@@ -197,9 +238,10 @@ def _run(p):
     p.set(health, "Health", 0.0)
     yield lambda: p.get(wc, OWNER_DEAD_VAR)
     yield 0.1
-    p.check("killed down the sights, the corpse has its head",
-            p.get(wc, OWNER_DEAD_VAR) and not watch.hidden(),
-            f"OwnerDead {p.get(wc, OWNER_DEAD_VAR)}, hidden {watch.hidden()}")
+    p.check("killed down the sights, the corpse has its head, its face and "
+            "its hair",
+            p.get(wc, OWNER_DEAD_VAR) and watch.shown(),
+            f"OwnerDead {p.get(wc, OWNER_DEAD_VAR)}, gone {watch._gone()}")
     p.check("...and its body and its jacket are back in its owner's view, the "
             "jacket still on it",
             not _drawn(mesh).get_editor_property("owner_no_see")
@@ -216,7 +258,7 @@ def _guns(p, wc, mesh, cam, head, bag, guns, tag, garment):
         gun = bag[index].get_class().get_name()[3:-2]
         yield from _equip(p, wc, index)
         watch = _Watch(p, wc, mesh, cam, head)
-        p.check(f"{tag}{gun}: carried, the head is drawn", not watch.hidden())
+        p.check(f"{tag}{gun}: carried, the head is drawn", watch.shown())
         yield from _raise(p, wc, watch)
         p.check(f"{tag}{gun}: down the sights the head is hidden",
                 watch.hidden(), f"SightSeat {p.get(wc, SEAT_VAR):.3f}")
@@ -225,6 +267,9 @@ def _guns(p, wc, mesh, cam, head, bag, guns, tag, garment):
         p.check(f"{tag}{gun}: ...before the camera, coming from behind, was within "
                 f"{CLEAR_CM:g} cm of it", watch.nearest > CLEAR_CM,
                 f"nearest to a head still drawn {watch.nearest:.1f} cm")
+        p.check(f"{tag}{gun}: ...its face and grooms out of this view alone: "
+                "visible to everyone else, and casting their shadow",
+                not _seen_by_others(mesh), str(_seen_by_others(mesh)))
         scoped = bag[index].get_editor_property("Scoped")
         p.check(f"{tag}{gun}: ...and the rest of the body is "
                 + ("behind the scope's glass" if scoped else "still drawn: the "
@@ -241,5 +286,5 @@ def _guns(p, wc, mesh, cam, head, bag, guns, tag, garment):
         back = _Watch(p, wc, mesh, cam, head)
         p.set(wc, SIGHTS_FORCED_VAR, False)
         yield lambda: back.sample() < HOME
-        p.check(f"{tag}{gun}: sights down, the head is back", not back.hidden()
+        p.check(f"{tag}{gun}: sights down, the head is back", back.shown()
                 and not back.wrong, str(back.wrong[:6]))

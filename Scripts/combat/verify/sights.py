@@ -44,6 +44,22 @@ def _feeds(pin, limit=250):
     return seen
 
 
+def _tag_gated(node):
+    """Run by a Branch on a component tag: body_parts.py's filter, the
+    head's own parts (head_hide.py) or everything but them."""
+    return bool(_tag_gates(node))
+
+
+def _tag_gates(node):
+    """(the Branch on a component tag that runs ``node``, the arm it is on)."""
+    pin = BEL.find_input_pin(node, "execute")
+    return [(PIN.get_owning_node(q), str(PIN.get_pin_name(q)))
+            for q in (PIN.list_connected_pins(pin) if pin else [])
+            if "Condition" in in_pins(PIN.get_owning_node(q))
+            and any("Tag" in in_pins(f) for f in _feeds(
+                BEL.find_input_pin(PIN.get_owning_node(q), "Condition"), 4))]
+
+
 def _ran_by(node):
     """The nodes whose exec output runs this one."""
     pin = BEL.find_input_pin(node, "execute")
@@ -320,7 +336,10 @@ def check_sight_camera():
     no_see = [n for n in wg if "bNewOwnerNoSee" in in_pins(n)
               and "Get OwnerMesh" in {_title(PIN.get_owning_node(q)) for q in
                                       PIN.list_connected_pins(BEL.find_input_pin(n, "self"))}]
-    parts = [n for n in wg if "bNewOwnerNoSee" in in_pins(n) and n not in no_see]
+    # ...but the pair on the head's own parts alone (head_hide.py, held to
+    # its rule by verify/head_hide.py), which a Branch on their tag runs.
+    parts = [n for n in wg if "bNewOwnerNoSee" in in_pins(n) and n not in no_see
+             and not _tag_gated(n)]
     fed = [n for n in no_see
            if PIN.list_connected_pins(BEL.find_input_pin(n, "bNewOwnerNoSee"))]
     def _src(n, pin):

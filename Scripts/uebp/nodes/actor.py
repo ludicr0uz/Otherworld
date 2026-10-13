@@ -145,6 +145,8 @@ FN_SET_PITCH_SCALE = "/Script/Engine.PlayerController.SetDeprecatedInputPitchSca
 FN_SET_YAW_SCALE = "/Script/Engine.PlayerController.SetDeprecatedInputYawScale"
 FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
 
+FN_COMP_HAS_TAG = "/Script/Engine.ActorComponent.ComponentHasTag"
+
 FN_CREATE_MID = "/Script/Engine.PrimitiveComponent.CreateDynamicMaterialInstance"
 FN_SET_COLLISION = "/Script/Engine.PrimitiveComponent.SetCollisionEnabled"
 FN_SET_MAX_DRAW = "/Script/Engine.PrimitiveComponent.SetCullDistance"

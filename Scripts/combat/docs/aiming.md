@@ -326,15 +326,15 @@ in game `probes/probe_carry.py`.
   `Lowered` too.
 - **A long gun is carried in both hands** (`carry_pose.py`, `carry_pose_consts.py`,
   `weapon_component/carry_weights.py`, `verify/carry_pose.py`): with the rifle, the sniper or
-  the shotgun lowered, standing, the upper body is the Animation Starter Pack's rifle carry
-  (`Scripts/asset_pipeline/CLAUDE.md`), the gun at the hip some 15 degrees under the horizon
-  standing, walking and jogging, across the body at a sprint.
+  the shotgun lowered, standing or crouched, the upper body is the Animation Starter Pack's
+  rifle carry (`Scripts/asset_pipeline/CLAUDE.md`), the gun at the hip some 15 degrees under
+  the horizon standing, walking, jogging and crouched, across the body at a sprint.
   - It is not a montage. In `ABP_WeaponLayers` a blend by `CarryPose` sits on the aim slot's
     **source alone** (the layered blend's base stays the stance blends' pose): a slot with no
     montage hands its source on, so the carry reaches the body from `spine_01` up through
     the blend that was already there, and the ready pose, a throw or a pick-up plays over it
     and blends back to it. No second layered blend, and the legs are the motion matching's.
-  - `CarryPose -> Lowered AND HandPose == CarryFor AND Stance == 0 AND NOT Searching AND NOT
+  - `CarryPose -> Lowered AND HandPose == CarryFor AND NOT Stance == PRONE AND NOT Searching AND NOT
     sliding AND NOT in a traversal`; `CarrySprint -> the movement's IsSprinting`, both eased
     by `pose_weights.py` on every machine. `CarryFor` is the rifle's ready pose, which the
     three long guns share (`weapon_specs`): the pistol, the SMG, the knife and empty hands
@@ -344,13 +344,23 @@ in game `probes/probe_carry.py`.
     (`CARRY_JOG_FULL_CM_S`), then the sprint's by `CarrySprint`. Measured retargeted: the
     grip hand 29 cm under the ready pose's (40 at the sprint), the left hand within 3 cm of
     where the ready pose has it against the right, so no IK holds it.
-  - Crouched it is off (the gun rides in the hand as before; a later task), and prone the
-    gun is up. The stand-in shot origin (below) is unchanged.
+  - **Crouched it is the pack's crouched pair** (`Crouch_Idle_Rifle_Hip`,
+    `Crouch_Walk_Fwd_Rifle_Hip` by `GroundSpeed`, all of the walk's from
+    `CARRY_CROUCH_WALK_FULL_CM_S`), blended over the standing carry by `PoseCrouch`: the
+    body poses' own weight, already eased to `Stance == CROUCH` on every machine, so the
+    carry changes with the body and nothing new is declared or replicated. The layered
+    blend lays the slot's pose on in mesh space, so the chest leans as the crouched clip
+    has it over the sample's crouched legs. Measured in game (`probe_carry.py`): the
+    shotgun's barrel 14 degrees down at rest and creeping, the hands 35 cm apart against
+    33 raised.
+  - Prone the gun is up (`Lowered` is false). The stand-in shot origin (below) is
+    unchanged.
   - A checkout without the pack has no carry: the skin's three fields are None
     (`skin._gas_skin` says so in the build's log), the variables exist and nothing weights
     them.
   - In game: `probes/probe_carry.py` (the weights, the barrel, the hands, the sprint, the
-    crouch) and, for another player's copy, `probes/probe_net_look.py`.
+    crouch at rest, creeping and aimed) and, for another player's copy,
+    `probes/probe_net_look.py`.
 - **The carry runs where the keys are.** On another machine's copy of the player `Lowered`
   is the mirror's, off the replicated `LookLowered`, and the pose the equip and the
   keep-alive play is `HandPose`: `Held.AimPose` locally, the replicated `LookPose` on a

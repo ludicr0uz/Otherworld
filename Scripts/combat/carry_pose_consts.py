@@ -17,6 +17,9 @@ CARRY_SPRINT_BLEND_SPEED = 6.0
 # it, standing and walking, the standing clip is blended in. Not the tuned
 # jog speed (a menu row, 0.5 to 4 m/s): a walk is half way there.
 CARRY_JOG_FULL_CM_S = 250.0
+# The same for the crouched carry's walk: the crouch goes at 0.45 of the jog
+# (180 cm/s at the default pace), and half of that is already a walk.
+CARRY_CROUCH_WALK_FULL_CM_S = 120.0
 
 # BP_WeaponComponent's CarryFor: the ready pose whose guns are carried so (the
 # rifle's, which the sniper and the shotgun are held in too). HandPose is

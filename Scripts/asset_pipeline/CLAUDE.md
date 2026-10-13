@@ -369,8 +369,9 @@ reverse instead (`Scripts/combat/docs/stance.md`).
 
 Epic's pack, which the user added at `/Game/AnimStarterPack` (git-ignored, as its copies
 are; `fab_library.json`, licence Standard). It is on the UE4 mannequin
-(`UE4_Mannequin/Mesh/SK_Mannequin`). The game plays three of its clips, the rows of
-`asp_paths.CLIPS`: `Idle_Rifle_Hip`, `Jog_Fwd_Rifle` and `Sprint_Fwd_Rifle`, the upper body
+(`UE4_Mannequin/Mesh/SK_Mannequin`). The game plays five of its clips, the rows of
+`asp_paths.CLIPS`: `Idle_Rifle_Hip`, `Jog_Fwd_Rifle` and `Sprint_Fwd_Rifle`, and crouched
+`Crouch_Idle_Rifle_Hip` and `Crouch_Walk_Fwd_Rifle_Hip`, the upper body
 of a player carrying a rifle or a shotgun (`Scripts/combat/docs/aiming.md`, "The carry").
 
 - **One import path:** `uepy.py Scripts/asset_pipeline/import_asp.py` retargets every row
@@ -385,6 +386,10 @@ of a player carrying a rifle or a shotgun (`Scripts/combat/docs/aiming.md`, "The
   down; the jog 1.47 s, (-24, 16, 97), 15 degrees down; the sprint 0.97 s, (-18, 27, 85),
   the gun across the body to the left and 23 to 39 degrees down. The left hand stays
   within 3 cm of its place in the ready pose, against the right hand, in all three.
+  The crouched idle 6.3 s, `hand_r` (-26, 4, 45) with the pelvis at 33; the crouched walk
+  1.9 s, (-28, 5, 66) with the pelvis at 57: against `spine_01` both have the hand where
+  the standing idle does, within 6 cm, and the hands 34 to 35 cm apart (33 in the ready
+  pose).
 - **Why not Lyra's:** its `MM_Rifle_Idle_Hipfire` is its ADS idle with the hands 0 to 8 cm
   lower and the gun level, its rifle jog takes the left hand 17 to 20 cm off the gun, and
   it has no sprint.

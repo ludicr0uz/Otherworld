@@ -44,10 +44,15 @@ UEFN_PREFIX = f"A_{PLAYER_FAMILY}_"
 CARRY_IDLE = f"{GAME_ROOT}/Idle_Rifle_Hip"
 CARRY_JOG = f"{GAME_ROOT}/Jog_Fwd_Rifle"
 CARRY_SPRINT = f"{GAME_ROOT}/Sprint_Fwd_Rifle"
+# The same crouched: the pack's rifle at the hip over a crouch, at rest and
+# at the crouch's walk.  The upper body's too: the legs are the sample's
+# crouch set.
+CARRY_CROUCH_IDLE = f"{GAME_ROOT}/Crouch_Idle_Rifle_Hip"
+CARRY_CROUCH_WALK = f"{GAME_ROOT}/Crouch_Walk_Fwd_Rifle_Hip"
 
 # Every clip of the pack the game plays.  A later one is a row here and a
 # re-run of import_asp.py.
-CLIPS = (CARRY_IDLE, CARRY_JOG, CARRY_SPRINT)
+CLIPS = (CARRY_IDLE, CARRY_JOG, CARRY_SPRINT, CARRY_CROUCH_IDLE, CARRY_CROUCH_WALK)
 
 
 def uefn_clip(source):

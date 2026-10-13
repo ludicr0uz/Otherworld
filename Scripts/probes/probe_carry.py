@@ -7,8 +7,9 @@ hangs in the locomotion's hand, the barrel at the ground. The shotgun, a long
 gun, is in the carry (combat/carry_pose.py): CarryPose is up on the weapon
 layers, the barrel a little under the horizon, the left hand as far from the
 right as in the ready pose (on the gun), standing, jogging and at a sprint,
-where CarrySprint brings the sprint's own carry; raised, crouched or sliding
-out of it CarryPose is down again. The
+where CarrySprint brings the sprint's own carry; crouched it stays up, at rest
+and creeping, the barrel in the same band and the hands as far apart, over the
+crouched clips (PoseCrouch); raised, CarryPose is down again. The
 probes' stand-in for an aim key (RaiseForced) brings the ready pose up and the
 barrel level, with the muzzle near where a lowered gun's shot starts; letting
 go lowers it. A forced shot raises it too, and it comes
@@ -34,6 +35,7 @@ import time
 import unreal
 
 from combat.anim_blueprint import AIM_SLOT
+from combat.body_pose import POSE_CROUCH
 from combat.carry_pose_consts import CARRY_FOR_VAR, CARRY_POSE, CARRY_SPRINT
 from combat.carry_tuning import (
     CARRY_GRIP, CARRY_RAISE_HOLD_S, LOWERED_VAR, RAISE_FORCED_VAR,
@@ -41,6 +43,7 @@ from combat.carry_tuning import (
 from combat.paths import ITEM_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.skin import SKINS
 from combat.sprint_tuning import SPRINT_FORCED_VAR
+from combat.weapon_component.stance import CROUCH, STAND
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from graphics_menu.profile_consts import PROFILE_SLOT
 from combat import item_vars as IV
@@ -64,6 +67,7 @@ HAND_RISE_CM = 15.0     # how far the hand comes up with the gun
 CARRY_DEG = (3.0, 35.0)
 CARRY_HANDS_CM = 8.0
 SPRINT_S = 1.2
+CREEP_S = 1.0
 SHOTS = bool(os.environ.get("OW_CARRY_SHOTS"))
 WALL_WAIT_S = 20.0      # a headless game's clock is slow: bound waits by the wall
 
@@ -157,17 +161,61 @@ def _sprint(p, player, wc, layers, held, label):
     return [h for _, h in late]
 
 
-def _crouched(p, wc, layers, label):
-    """Crouched, a long gun rides as it did: the carry is the standing body's."""
-    p.set(wc, "Stance", 1)
-    yield _until(lambda: p.get(layers, CARRY_POSE) < 0.05)
-    p.check(f"{label}, crouched: {CARRY_POSE} is down (the carry is the standing "
-            "body's)", p.get(layers, CARRY_POSE) < 0.05,
-            f"{p.get(layers, CARRY_POSE):.2f}")
-    p.set(wc, "Stance", 0)
-    yield _until(lambda: p.get(layers, CARRY_POSE) > 0.95)
-    p.check("...and standing up brings it back", p.get(layers, CARRY_POSE) > 0.95,
-            f"{p.get(layers, CARRY_POSE):.2f}")
+def _crouched(p, player, wc, anim, layers, held, label, up_apart):
+    """Crouched, a long gun is carried too: the crouched clips' carry, at
+    rest and creeping. ``up_apart``: the hands' distance in the ready pose."""
+    p.set(wc, "Stance", CROUCH)
+    yield _until(lambda: p.get(layers, POSE_CROUCH) > 0.98)
+    yield SETTLE_S
+    yield from _shot(p)
+    pitch, apart = _barrel_pitch(p, held), _hands_apart(player)
+    p.check(f"{label}, crouched at rest: {CARRY_POSE} stays up over the crouched "
+            f"clip ({POSE_CROUCH}), lowered, no ready pose",
+            p.get(layers, CARRY_POSE) > 0.98 and p.get(layers, POSE_CROUCH) > 0.98
+            and p.get(wc, LOWERED_VAR) and not _posing(anim, held),
+            f"{CARRY_POSE} {p.get(layers, CARRY_POSE):.2f}, "
+            f"{POSE_CROUCH} {p.get(layers, POSE_CROUCH):.2f}")
+    p.check(f"...the barrel {CARRY_DEG[0]:g} to {CARRY_DEG[1]:g} deg under the horizon "
+            f"and the left hand on the gun (within {CARRY_HANDS_CM:g} cm of the ready "
+            "pose's distance)",
+            _in_carry_band(pitch) and abs(apart - up_apart) < CARRY_HANDS_CM,
+            f"{pitch:+.1f} deg, hands {apart:.1f} cm apart against {up_apart:.1f}")
+    t0 = unreal.GameplayStatics.get_time_seconds(p.world())
+    fastest, seen = [0.0], []
+
+    def creep():
+        player.add_movement_input(player.get_actor_forward_vector(), 1.0)
+        seen.append((_barrel_pitch(p, held), _hands_apart(player),
+                     p.get(layers, CARRY_POSE)))
+        fastest[0] = max(fastest[0], player.get_velocity().length())
+        return unreal.GameplayStatics.get_time_seconds(p.world()) - t0 >= CREEP_S
+    yield _until(creep)
+    late = seen[len(seen) // 2:]
+    median = sorted(s[0] for s in late)[len(late) // 2]
+    p.check(f"{label}, creeping crouched: still carried, the barrel in the band "
+            "and the left hand on the gun",
+            fastest[0] > 50.0 and p.get(wc, "Stance") == CROUCH
+            and min(s[2] for s in late) > 0.98 and _in_carry_band(median)
+            and all(abs(s[1] - up_apart) < CARRY_HANDS_CM for s in late),
+            f"{fastest[0]:.0f} cm/s, median {median:+.1f} deg, hands "
+            f"{min(s[1] for s in late):.1f}..{max(s[1] for s in late):.1f} cm apart")
+    yield _until(lambda: player.get_velocity().length() < 5.0)
+    p.set(wc, RAISE_FORCED_VAR, True)
+    yield _until(lambda: _posing(anim, held) and p.get(layers, CARRY_POSE) < 0.05)
+    p.check(f"{label}, crouched and aimed: raised, the ready pose plays and "
+            f"{CARRY_POSE} is down",
+            not p.get(wc, LOWERED_VAR) and _posing(anim, held)
+            and p.get(layers, CARRY_POSE) < 0.05, f"{p.get(layers, CARRY_POSE):.2f}")
+    p.set(wc, RAISE_FORCED_VAR, False)
+    yield _until(lambda: not _posing(anim, held) and p.get(layers, CARRY_POSE) > 0.95)
+    p.set(wc, "Stance", STAND)
+    yield _until(lambda: p.get(layers, POSE_CROUCH) < 0.02)
+    yield SETTLE_S
+    p.check("...and standing up, the carry is the standing one again",
+            p.get(layers, CARRY_POSE) > 0.95 and p.get(layers, POSE_CROUCH) < 0.02
+            and _in_carry_band(_barrel_pitch(p, held)),
+            f"{CARRY_POSE} {p.get(layers, CARRY_POSE):.2f}, "
+            f"{_barrel_pitch(p, held):+.1f} deg")
 
 
 def _gun(p, player, wc, anim, layers, label, index):
@@ -275,7 +323,7 @@ def _gun(p, player, wc, anim, layers, label, index):
     p.check(f"{label}, the aim let go: lowered again",
             p.get(wc, LOWERED_VAR) and not _posing(anim, held))
     if carried:
-        yield from _crouched(p, wc, layers, label)
+        yield from _crouched(p, player, wc, anim, layers, held, label, up_apart)
 
     # A shot raises it, and it stays up until the hold has passed.
     loaded = p.get(held, "Loaded")

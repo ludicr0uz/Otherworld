@@ -2,7 +2,7 @@
 CarrySprint ease towards (carry_pose.py owns the nodes they weight;
 pose_weights.py eases them, on every machine's copy).
 
-    CarryPose   -> Lowered AND HandPose == CarryFor AND Stance == STAND
+    CarryPose   -> Lowered AND HandPose == CarryFor AND NOT Stance == PRONE
                    AND NOT Searching AND NOT sliding AND NOT in a traversal
     CarrySprint -> the movement's IsSprinting
 
@@ -13,9 +13,10 @@ so the carry is theirs alone, and the pistol, the knife and empty hands keep
 the locomotion's arms. Both travel to the other machines already (LookLowered,
 LookPose), so another player's copy carries with nothing new replicated.
 
-Standing only: crouched, the gun rides as it did (a later task), prone it is
-up. Not while searching a body, sliding or in a traversal, which pose the
-whole body themselves.
+Standing and crouched (which clips, carry_pose.py chooses by PoseCrouch);
+prone the gun is up (Lowered is false there, and the crawl's arms are its
+own if it ever were not). Not while searching a body, sliding or in a
+traversal, which pose the whole body themselves.
 """
 
 from combat.carry_pose_consts import CARRY_FOR_VAR, CARRY_POSE, CARRY_SPRINT
@@ -25,15 +26,12 @@ from combat.gas_moves_tuning import DOING_VAR
 from combat.weapon_component import vars as WV
 from combat.weapon_component.carry import TRAVERSAL_CLASS
 from combat.weapon_component.look_vars import HandPose
-from combat.weapon_component.stance import STANCE_VAR
+from combat.weapon_component.stance import PRONE, STANCE_VAR
 from uebp.g import _G
 from uebp.graph import _pin, out
 from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNER
 from uebp.nodes.math import FN_AND, FN_EQ_II, FN_EQ_OO, FN_NOT
 from uebp.nodes.move import FN_IS_SPRINTING
-
-# GetStance's answer for standing, and FN_EQ_II's default B.
-STAND = 0
 
 
 def carry_targets(ed, sliding=None):
@@ -49,10 +47,8 @@ def carry_targets(ed, sliding=None):
 
     owner = out(g.call(FN_GET_OWNER))
     long_gun = out(g.call(FN_EQ_OO, A=g.get(HandPose), B=g.get(CARRY_FOR_VAR)))
-    # B is left at its default, which is STAND (a literal equal to a pin's
-    # default is not saved, and reads back empty from disk).
-    standing = out(g.call(FN_EQ_II, A=g.get(STANCE_VAR)))
-    on = both(both(g.get(LOWERED_VAR), long_gun), standing)
+    upright = never(out(g.call(FN_EQ_II, A=g.get(STANCE_VAR), B=PRONE)))
+    on = both(both(g.get(LOWERED_VAR), long_gun), upright)
     on = both(on, never(g.get(WV.Searching)))
     if sliding is not None:
         on = both(on, never(sliding))

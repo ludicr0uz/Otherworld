@@ -107,9 +107,9 @@ def check_stance_graph():
     # A crawl by direction (P2) is eight players where the forward one was,
     # under seven blends more.
     dirs = 7 if crawl_by_direction(skin) else 0
-    # A long gun's carry (carry_pose.py, checked by verify.carry_pose) is three
-    # blends and three players of the same classes, after the stances.
-    carry = 3 if skin.carry_idle else 0
+    # A long gun's carry (carry_pose.py, checked by verify.carry_pose) is five
+    # blends and five players of the same classes, after the stances.
+    carry = 5 if skin.carry_idle else 0
     blends = 5 - (2 if crouch_on() else 0) + (1 if slide_on() else 0) + dirs + carry
     # A prone idle is a player where the held crawl was an evaluator.
     idle = 1 if skin.prone_idle else 0
@@ -118,7 +118,7 @@ def check_stance_graph():
           f"{2 - idle} evaluator(s)"
           + (" (no crouch clip: the crouch is the motion matching's)" if crouch_on() else "")
           + (" (and the slide's)" if slide_on() else "")
-          + (" (and the carry's three of each)" if carry else ""),
+          + (" (and the carry's five of each)" if carry else ""),
           sorted(_cls(n) for n in ours) == sorted([BLEND_CLASS] * blends
                                                   + [PLAYER_CLASS] * players
                                                   + [EVALUATOR_CLASS] * (2 - idle)),

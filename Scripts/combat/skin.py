@@ -161,12 +161,14 @@ class PlayerSkin:
     pickup: str = None
     # A long gun's carry (carry_pose.py): the upper body's pose while the
     # rifle, the sniper or the shotgun is in hand and nothing holds it up,
-    # standing, at a jog and at a sprint (the Animation Starter Pack's,
-    # asset_pipeline/import_asp.py). All three or none: without them the gun
-    # rides in the locomotion's own hand.
+    # standing, at a jog and at a sprint, and crouched at rest and walking
+    # (the Animation Starter Pack's, asset_pipeline/import_asp.py). All five
+    # or none: without them the gun rides in the locomotion's own hand.
     carry_idle: str = None
     carry_jog: str = None
     carry_sprint: str = None
+    carry_crouch_idle: str = None
+    carry_crouch_walk: str = None
     # A carried item's hand is closed as the pistol pose closes it
     # (hold_pose.closed_fist). Where that pose does not close the index, the
     # ready pose its index is taken from instead; None where it does.
@@ -318,6 +320,9 @@ SKIN_METAHUMAN = dataclasses.replace(
 GAS_ANIMS = f"/Game/Sourced/Characters/Anims/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
 GAS_UAL_ANIMS = f"/Game/Sourced/Quaternius/UAL/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
 _NO_DIRECTIONS = dict.fromkeys(DIRECTION_FIELDS)
+# The carry's clips (carry_pose.py), standing first: all five or none.
+CARRY_FIELDS = ("carry_idle", "carry_jog", "carry_sprint", "carry_crouch_idle",
+                "carry_crouch_walk")
 # The crawl of a checkout that has no Free Animation Library (_gas_skin):
 # Mixamo's zombie crawl, the prone_crawl role of player_clips.csv.
 GAS_CRAWL_WITHOUT_FAL = MIXAMO.player_clip("prone_crawl")
@@ -350,7 +355,9 @@ SKIN_GAS = dataclasses.replace(
     pickup=f"{GAS_UAL_ANIMS}UAL2_Farm_Harvest",
     carry_idle=ASP.uefn_clip(ASP.CARRY_IDLE),
     carry_jog=ASP.uefn_clip(ASP.CARRY_JOG),
-    carry_sprint=ASP.uefn_clip(ASP.CARRY_SPRINT))
+    carry_sprint=ASP.uefn_clip(ASP.CARRY_SPRINT),
+    carry_crouch_idle=ASP.uefn_clip(ASP.CARRY_CROUCH_IDLE),
+    carry_crouch_walk=ASP.uefn_clip(ASP.CARRY_CROUCH_WALK))
 
 
 # Every skin there is, most specific first: what a running game, which has no
@@ -425,12 +432,12 @@ def _gas_skin(eas):
              "— the forward crawl plays whichever way the player goes. Run "
              "asset_pipeline/import_fal.py.")
         skin = dataclasses.replace(skin, **_NO_DIRECTIONS)
-    if not all(eas.does_asset_exist(p) for p in (skin.carry_idle, skin.carry_jog, skin.carry_sprint)):
+    if not all(eas.does_asset_exist(getattr(skin, f)) for f in CARRY_FIELDS):
         # As Lyra: a Fab pack the user adds by hand.
-        _log(f"note: {skin.carry_idle} or the jog's or the sprint's is not here — a "
+        _log(f"note: {skin.carry_idle} or another of the carry's five is not here — a "
              "long gun rides in the locomotion's hand. Add the Animation Starter Pack "
              f"({ASP.CONTENT_DIR}) and run asset_pipeline/import_asp.py.")
-        skin = dataclasses.replace(skin, carry_idle=None, carry_jog=None, carry_sprint=None)
+        skin = dataclasses.replace(skin, **dict.fromkeys(CARRY_FIELDS))
     return _without_missing_clips(skin, eas, "the MetaHuman", "retarget_to_uefn.py")
 
 

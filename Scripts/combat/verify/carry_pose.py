@@ -1,10 +1,10 @@
 """verify.carry_pose -- a long gun's carry (combat/carry_pose.py): the weapon
 layers' AnimGraph blends the Animation Starter Pack's rifle carry onto the aim
 slot's source alone, by CarryPose, standing or jogging by GroundSpeed and the
-sprint's by CarrySprint; the clips are on the worn skeleton, in place, with
-the hands under the ready pose's; and the component eases the two weights,
-CarryPose only for the pose the long guns share. probes/probe_carry_pose.py
-shows the same in the game.
+sprint's by CarrySprint, and the crouched pair by PoseCrouch; the clips are on
+the worn skeleton, in place, with the hands under the ready pose's; and the
+component eases the two weights, CarryPose only for the pose the long guns
+share, standing or crouched. probes/probe_carry.py shows the same in the game.
 
 A skin without the clips is checked to have no carry blend and no weight
 written.
@@ -13,9 +13,10 @@ written.
 from asset_pipeline.rig_util import _bone_world
 from combat.anim_blueprint import AIM_SLOT, _slot_name
 from combat.carry_pose import carry_fields
+from combat.body_pose import POSE_CROUCH
 from combat.carry_pose_consts import (
-    CARRY_BLEND_SPEED, CARRY_FOR_VAR, CARRY_JOG_FULL_CM_S, CARRY_POSE, CARRY_SPRINT,
-    CARRY_SPRINT_BLEND_SPEED,
+    CARRY_BLEND_SPEED, CARRY_CROUCH_WALK_FULL_CM_S, CARRY_FOR_VAR, CARRY_JOG_FULL_CM_S,
+    CARRY_POSE, CARRY_SPRINT, CARRY_SPRINT_BLEND_SPEED,
 )
 from combat.gas_moves import slide_on, traversal_on
 from combat.gas_moves_tuning import DOING_VAR
@@ -23,6 +24,7 @@ from combat.skin import player_skin
 from combat.stance_clips import BLEND_CLASS, PLAYER_CLASS
 from combat.verify.common import BEL, PIN, check, graph, load, num_pin
 from combat.verify.fixtures import w, wg
+from combat.weapon_component.stance import PRONE
 from combat.weapon_specs import _weapon_specs
 from uebp.pose_share import fed as linked
 
@@ -96,9 +98,15 @@ def check_carry_graph():
     check("...over the stance blends' pose (on A), which is still the layered "
           "blend's base",
           onward == sorted([BLEND_CLASS, LAYERED_CLASS]), str(onward))
-    carry = _up(mix, "B")
+    by_stance = _up(mix, "B")
+    carry, low = _up(by_stance, "A"), _up(by_stance, "B")
+    check(f"...the carry is the crouched one by {POSE_CROUCH} over the standing one",
+          _cls(by_stance) == BLEND_CLASS
+          and _title(_up(by_stance, "Alpha")) == f"Get {POSE_CROUCH}"
+          and _cls(carry) == BLEND_CLASS and _cls(low) == BLEND_CLASS,
+          f"{_title(_up(by_stance, 'Alpha'))}: {_cls(carry)}, {_cls(low)}")
     moving, sprint = _up(carry, "A"), _up(carry, "B")
-    check(f"...the carry is the sprint's clip by {CARRY_SPRINT} over the moving one",
+    check(f"...the standing one is the sprint's clip by {CARRY_SPRINT} over the moving one",
           _cls(carry) == BLEND_CLASS and _title(_up(carry, "Alpha")) == f"Get {CARRY_SPRINT}"
           and _cls(sprint) == PLAYER_CLASS and _clip_of(sprint) == skin.carry_sprint,
           f"{_title(_up(carry, 'Alpha'))} <- {_clip_of(sprint)}")
@@ -111,9 +119,19 @@ def check_carry_graph():
           and scale is not None and abs(scale - 1.0 / CARRY_JOG_FULL_CM_S) < 1e-6
           and (_clip_of(idle), _clip_of(jog)) == (skin.carry_idle, skin.carry_jog),
           f"{_clip_of(idle)}, {_clip_of(jog)}, x{scale}")
-    players = [n for n in (idle, jog, sprint) if _cls(n) == PLAYER_CLASS]
+    rest, creep = _up(low, "A"), _up(low, "B")
+    speed = _behind(BEL.find_input_pin(low, "Alpha")) if low else []
+    scale = next((num_pin(n, "B") for n in speed if num_pin(n, "B")), None)
+    check("...the crouched one is the crouched clip at rest, the crouch walk's by "
+          f"GroundSpeed (all of it from {CARRY_CROUCH_WALK_FULL_CM_S:g} cm/s)",
+          "Get GroundSpeed" in {_title(n) for n in speed}
+          and scale is not None and abs(scale - 1.0 / CARRY_CROUCH_WALK_FULL_CM_S) < 1e-6
+          and (_clip_of(rest), _clip_of(creep))
+          == (skin.carry_crouch_idle, skin.carry_crouch_walk),
+          f"{_clip_of(rest)}, {_clip_of(creep)}, x{scale}")
+    players = [n for n in (idle, jog, sprint, rest, creep) if _cls(n) == PLAYER_CLASS]
     check("...each looping at its own rate",
-          len(players) == 3 and all(
+          len(players) == 5 and all(
               abs(n.get_editor_property("node").get_editor_property("play_rate") - 1.0) < 1e-6
               and n.get_editor_property("node").get_editor_property("loop_animation")
               for n in players))
@@ -168,10 +186,21 @@ def check_carry_weights():
     wants = {"Get Lowered", "Get HandPose", f"Get {CARRY_FOR_VAR}", "Get Stance",
              "Get Searching"} | ({f"Get {DOING_VAR}"} if traversal_on() else set())
     calls = {"IsSliding"} if slide_on() else set()
-    check(f"...{CARRY_POSE} targets Lowered AND HandPose == {CARRY_FOR_VAR} AND standing, "
-          "not searching" + (", not sliding" if slide_on() else "")
+    check(f"...{CARRY_POSE} targets Lowered AND HandPose == {CARRY_FOR_VAR} AND a "
+          "stance, not searching" + (", not sliding" if slide_on() else "")
           + (", not in a traversal" if traversal_on() else ""),
           wants <= reads and calls <= reads, str(sorted((wants | calls) - reads)))
+    stance = next((n for n in behind if _title(n) == "Get Stance"), None)
+    told = [PIN.get_owning_node(p) for p in
+            PIN.list_connected_pins(BEL.find_output_pin(stance, "Stance"))] if stance else []
+    told = [n for n in told if n in behind]
+    nots = [PIN.get_owning_node(p) for n in told
+            for p in PIN.list_connected_pins(BEL.find_output_pin(n, "ReturnValue"))]
+    check("...the stance being any but prone (NOT Stance == PRONE): standing and "
+          "crouched both carry",
+          len(told) == 1 and num_pin(told[0], "B") == PRONE
+          and [_title(n) for n in nots] == ["NOT Boolean"],
+          f"B {num_pin(told[0], 'B') if told else None}, then {[_title(n) for n in nots]}")
     sprint = {_title(n) for n in
               _behind(BEL.find_input_pin(writes[CARRY_SPRINT][0], CARRY_SPRINT))}
     check(f"...{CARRY_SPRINT} targets the movement's own IsSprinting, which every "

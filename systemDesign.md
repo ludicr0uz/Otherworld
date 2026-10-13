@@ -24,7 +24,7 @@ are found as drops (Fab models; the pistol is a 1911, the shotgun a pump-action 
 Game Animation Sample's motion matching on a hidden UEFN mannequin, nothing hand-animated;
 the sprint, prone, aim-walk, slide and stamina are the C++ movement component's, predicted
 on the owning client and decided by the server (`Source/CLAUDE.md`). The player jogs at
-4 m/s and sprints at 6 (forwards only), carries a gun lowered until something raises it (a rifle, a sniper or a shotgun in both hands at the hip, the Animation Starter Pack's rifle carry over the motion matching's legs, standing to sprinting; a pistol in the jog's own arm), aims over the shoulder or down a gun's sights, holds
+4 m/s and sprints at 6 (forwards only), carries a gun lowered until something raises it (a rifle, a sniper or a shotgun in both hands at the hip, the Animation Starter Pack's rifle carry over the motion matching's legs, standing to sprinting and crouched; a pistol in the jog's own arm), aims over the shoulder or down a gun's sights, holds
 breath down the sights, reloads, eats, blocks, punches, stabs with the knife, chops with the
 axe (every third blow on a tree leaves wood), lights a campfire with matches and wood,
 lights the stick at a fire and holds it out as a torch, heats a blade at a fire (cauterises a
@@ -124,7 +124,7 @@ can hurt players; a player kill is counted apart from monster kills.
 traversable block is placed in either map) and is unproven as a client of a server. The
 guns' ready poses and the weapon layers' clips are retargeted from Lyra, Mixamo,
 Quaternius and the Animation Starter Pack, none played by hand. The long gun's carry is
-the standing body's only: crouched, a long gun still rides in the jog's arm. Each package's `CLAUDE.md` lists the feel checks that
+the standing and the crouched body's; prone, a gun is held up. Each package's `CLAUDE.md` lists the feel checks that
 still need a play session.
 
 ---

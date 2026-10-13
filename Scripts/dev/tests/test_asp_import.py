@@ -23,9 +23,10 @@ class AspImport(unittest.TestCase):
             self.assertTrue(copy.startswith(asp_paths.UEFN_DIR + "/" + asp_paths.UEFN_PREFIX))
             self.assertTrue(copy.endswith(clip.rsplit("/", 1)[1]))
 
-    def test_the_carry_is_three_clips_of_the_table(self):
-        carry = (asp_paths.CARRY_IDLE, asp_paths.CARRY_JOG, asp_paths.CARRY_SPRINT)
-        self.assertEqual(len(set(carry)), 3)
+    def test_the_carry_is_five_clips_of_the_table(self):
+        carry = (asp_paths.CARRY_IDLE, asp_paths.CARRY_JOG, asp_paths.CARRY_SPRINT,
+                 asp_paths.CARRY_CROUCH_IDLE, asp_paths.CARRY_CROUCH_WALK)
+        self.assertEqual(len(set(carry)), 5)
         for clip in carry:
             self.assertIn(clip, asp_paths.CLIPS)
 
@@ -46,6 +47,10 @@ class AspImport(unittest.TestCase):
             self.assertGreater(speed, 0.0)
         # The jog's clip is all in by the jog's speed (4 m/s), and not at a creep.
         self.assertTrue(100.0 <= C.CARRY_JOG_FULL_CM_S <= 400.0)
+        # The crouch walk's is all in under the crouch's own pace (0.45 of the
+        # jog's 4 m/s), and under the standing carry's.
+        self.assertTrue(50.0 <= C.CARRY_CROUCH_WALK_FULL_CM_S <= 180.0)
+        self.assertLess(C.CARRY_CROUCH_WALK_FULL_CM_S, C.CARRY_JOG_FULL_CM_S)
 
 
 if __name__ == "__main__":

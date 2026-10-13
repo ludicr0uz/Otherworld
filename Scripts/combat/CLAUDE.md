@@ -26,10 +26,11 @@ The defaults are all rebindable on the settings screen:
 - A gun is **carried lowered** and comes up into its ready pose while an aim key or the
   guard is held, and for a shot or a reload (`weapon_component/carry.py`, `docs/aiming.md`).
   A pistol or an SMG rides in the jog's own arm; a **long gun** (rifle, sniper, shotgun) is
-  carried in both hands at the hip, standing, walking, jogging and sprinting: three clips of
-  the Animation Starter Pack blended onto the aim slot's source by `CarryPose`
+  carried in both hands at the hip, standing, walking, jogging and sprinting, and crouched
+  at rest and creeping: five clips of the Animation Starter Pack blended onto the aim
+  slot's source by `CarryPose`, the crouched pair chosen by `PoseCrouch`
   (`carry_pose.py`, `weapon_component/carry_weights.py`; `docs/aiming.md`, "The carry").
-  Crouched and prone are not part of it yet.
+  Prone is not part of it (the gun is up there).
 - Right click aims **over the shoulder**, middle click aims **down the sights** (both held).
   Only a gun has sights (`HasSights`): with anything else in hand the middle click is the
   **use key** (`weapon_component/use.py`) and does not aim at all

@@ -12,7 +12,8 @@ own character is doing; client 2 and the server then look at THEIR copy of
 that character (weapon_component/look.py): the stance and the capsule, the
 aim mode, the gun raised or lowered, the hand's pose and that it is playing,
 the upper body's pitch, and the long gun's carry (CarryPose, combat/carry_pose.py:
-up with the shotgun at rest, standing, and down for everything else).
+up with the shotgun at rest, standing and crouched, and down for everything
+else).
 
 The rifle is not an issued item, and nothing hands a client of a server one
 yet (the cheat is single player's, a drop is a one-in-ten roll), so the
@@ -231,10 +232,11 @@ def _act(p, pawn, wc, other):
         yield from _await(lambda: all(p.posted(w, f"saw {name}") for w in watchers))
     carry = {n: p.posted("client 1", f"did {n}")["carry"] for n in done}
     if p.get(wc, CARRY_FOR_VAR) is not None:
-        p.check("client 1's own long gun is in the carry at rest, standing, and never "
-                "raised, crouched or with a pistol in hand",
-                carry["standing"] > 0.9 and carry["the shotgun, carried"] > 0.9
-                and max(carry[n] for n in ("crouched", "a pistol, lowered",
+        p.check("client 1's own long gun is in the carry at rest, standing and "
+                "crouched, and never raised or with a pistol in hand",
+                min(carry[n] for n in ("standing", "crouched",
+                                       "the shotgun, carried")) > 0.9
+                and max(carry[n] for n in ("a pistol, lowered",
                                            "a long gun again (the shotgun), raised")) < 0.1,
                 str({k: round(v, 2) for k, v in carry.items()}))
     held = {n: p.posted("client 1", f"did {n}")["pose"] for n in done}

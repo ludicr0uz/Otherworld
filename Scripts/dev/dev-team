@@ -151,6 +151,15 @@ the session. After the session ends, dev-team adds ``Time:`` and ``Tokens:``
 trailers to the task's last commit (a gate fix included), amending only the
 message, and never a commit that is already on a remote branch.
 
+**The task log.** Every task written up, done or failed, adds a row to
+Saved/DevTeam/task_log.csv (a spreadsheet; devteam/tasklog.py): when it ran,
+effort and model, its time in all and by stage (devteam/timing.py: the model
+thinking and writing, editor scripts, verifiers, probe launches, the commit
+hook, the gate's sweeps, limit waits, ...), its tokens and its cost by kind,
+and the session's own summary, decisions and challenges, which its report
+ends with. The same time, cost and token breakdown is printed under each task
+as it finishes and beside each task in the list the run ends with.
+
 Logs go to Saved/DevTeam/<timestamp>/: the raw stream-json transcript of every
 task, each task's sweep output, run.log (what the terminal showed) and
 progress.md with each task's report and gate table. ``claude --resume
@@ -177,7 +186,7 @@ sys.path.insert(1, os.path.dirname(HERE))        # Scripts/: asset_pipeline
 
 from devteam import (                                               # noqa: E402
     awake, baseline_cache, fab, final, limits, nightly, pause, probe_gate,
-    probe_record, scope,
+    probe_record, scope, tasklog,
 )
 from devteam.accounting import git_head                             # noqa: E402
 from devteam.session import DEFAULT_MODEL                           # noqa: E402
@@ -461,10 +470,8 @@ def run(args, task_file, todo, triage_cost, run_dir, progress, meter, pauser):
         except KeyboardInterrupt:
             print("\ndev-team: interrupted -- the final probes were not swept")
     print(f"\ndev-team: finished {clock()} -- ${total_cost:.2f} total, progress in {progress}")
-    for task, status in outcomes:
-        print(f"  {status:>11}  {task.title}")
-    for task in todo:
-        print(f"  {'not run':>11}  {task.title}")
+    print("\n".join(tasklog.printout(outcomes, todo)))
+    print(f"  task log: {os.path.join(os.path.dirname(run_dir), tasklog.NAME)}")
     return 0 if all(s == "done" for _t, s in outcomes) and not todo and probes_ok else 1
 
 

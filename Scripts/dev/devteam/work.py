@@ -14,6 +14,7 @@ import time
 
 from devteam import (
     baseline_cache, brief, fab, gate, limits, pause, probe_gate, probe_record, scope,
+    tasklog, timing,
 )
 from devteam.trace import shown, step
 from devteam.accounting import (
@@ -104,6 +105,8 @@ def sweep(label, log_path, pauser=None, probe_set=None, warm=False, timings=None
         timings[label] = (f"{time.time() - started:.0f}s ({'warm' if warm else 'cold'}"
                           + (f", {len(suites)} of {len(gate.sweep_targets(ROOT))} suites"
                              if suites is not None else "") + ")")
+    timing.spend(timings, "baseline sweep" if label == "baseline" else "after sweeps",
+                 time.time() - started)
     if rows is None:
         print(f"    gate: {label} sweep failed to run ({time.time() - started:.0f}s)")
     else:
@@ -187,7 +190,9 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
     log_path = os.path.join(run_dir, f"task-{n:02d}.jsonl")
     sweep_log = os.path.join(run_dir, f"task-{n:02d}-sweeps.txt")
     brief_path, notes_path = brief.paths(run_dir, n)   # what outlives a compaction
-    timings = {}
+    # The gate table's sweep times and the task's clock (devteam/timing.py).
+    timings = timing.Stages(timing.path(run_dir, n), resume=parked is not None)
+    timings.begin()
     env = session_env(os.environ, SERVE_DIR)
     ask = dict(interactive=args.interactive)
     baseline = parked.get("baseline") if parked else None
@@ -200,34 +205,38 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
         if pauser and pauser.requested:
             raise pause.Paused(stage, result, baseline, reports)
 
+    def wait(**how):
+        with timing.timed(timings, "limit wait"):
+            limits.wait(meter, pauser, **how)
+
+    def run(cmd):
+        with timing.timed(timings, timing.SESSION):
+            return run_session(cmd, ROOT, log_path, env, meter.see, pauser)
+
     def session(prompt, opts, **how):
         """One session -- waited for when the session limit is spent, and
         when the limit stops it part way, waited for again and resumed (or
         started over, if it had not begun). Returns (ok, report, result)."""
-        limits.wait(meter, pauser)
+        wait()
         if pauser and pauser.requested:        # paused while waiting: nothing ran
             return False, "", {"session_id": how.get("resume"), "interrupted": True}
         brief.add(brief_path, prompt)
         step("session " + ("resuming" if how.get("resume") else "starting")
              + f"  (transcript: {shown(log_path, ROOT)})")
-        ok, report, result = run_session(build_cmd(prompt, args.permission_mode, **how, **opts),
-                                         ROOT, log_path, env, meter.see, pauser)
+        ok, report, result = run(build_cmd(prompt, args.permission_mode, **how, **opts))
         while limits.limited(result):
             print(f"    the session limit stopped this session ({limits.clock(time.time())})")
-            limits.wait(meter, pauser, refused=True)
+            wait(refused=True)
             if pauser and pauser.requested:
                 break
             if result.get("session_id"):
                 again = dict(how, resume=result["session_id"])
                 again.pop("name", None)
-                ok, report, more = run_session(
-                    build_cmd(build_limit_resumed_prompt(args.commit), args.permission_mode,
-                              **again, **opts), ROOT, log_path, env, meter.see, pauser)
+                ok, report, more = run(build_cmd(build_limit_resumed_prompt(args.commit),
+                                                 args.permission_mode, **again, **opts))
                 result = merge_results(result, more)
             else:
-                ok, report, result = run_session(
-                    build_cmd(prompt, args.permission_mode, **how, **opts),
-                    ROOT, log_path, env, meter.see, pauser)
+                ok, report, result = run(build_cmd(prompt, args.permission_mode, **how, **opts))
         return ok, report, result
 
     def ensure_committed(ok, reports, result, head0, tree0):
@@ -256,7 +265,7 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
                 baseline = sweep("baseline", sweep_log, pauser, probes, warm=True,
                                  timings=timings)
             baseline_cache.save(ROOT, files, baseline, ran)
-        limits.wait(meter, pauser)
+        wait()
         paused("start")
         prompt = build_prompt(task, n, total, progress,
                               gate.table(baseline) if baseline else None, notes_path)
@@ -328,8 +337,9 @@ def run_one(task, n, total, args, run_dir, progress, cache, meter, pauser=None,
 
 def write_up(task, n, ok, args, before, reports, result, gate_table, run_dir, progress,
              note=""):
-    """Print a finished task's outcome, record it in progress.md and put the
-    time and token trailers on its commit. Returns (status, cost)."""
+    """Print a finished task's outcome, record it in progress.md and the task
+    log (devteam/tasklog.py), and put the time and token trailers on its
+    commit. Returns (status, cost); the record is left on ``task.record``."""
     cost = result.get("total_cost_usd") or 0.0
     status = "done" if ok else "FAILED"
     tokens = describe_tokens(token_usage(result), cost)
@@ -338,17 +348,21 @@ def write_up(task, n, ok, args, before, reports, result, gate_table, run_dir, pr
     if before and after and after != before:
         after = tag_commit(ROOT, before, after, took, tokens)
     commits = f", commits {before}..{after}" if after and after != before else ""
-    print(f"    {status} in {took}, ${cost:.2f}{commits}  (log: {run_dir})")
-    print(f"    tokens {tokens}")
+    effort = (f"{task.effort or args.effort or 'default'}"
+              + (f" (triage: {task.triage})" if task.triage else ""))
+    record = tasklog.record_task(task, n, status + note, effort, args.model, result,
+                                 reports, run_dir, ROOT, before, after)
+    whole = describe_time(record["seconds"] * 1000)
+    print(f"    {status} in {whole} (session {took}), ${cost:.2f}{commits}  (log: {run_dir})")
+    print("\n".join(tasklog.lines(record)))
     report = "\n\n".join(r for r in reports if r)
     if report:
         print("    " + report.replace("\n", "\n    "))
     with open(progress, "a") as f:
         f.write(f"\n## Task {n}: {status}{note}\n\n{task.text}\n\n"
                 f"Session: {result.get('session_id', '?')}{commits}\n"
-                f"Time: {took}\nTokens: {tokens}\n"
-                f"Effort: {task.effort or args.effort or 'default'}"
-                + (f" (triage: {task.triage})" if task.triage else "") + "\n\n"
+                f"Time: {whole} (session {took})\nTokens: {tokens}\nEffort: {effort}\n"
+                + "\n".join(tasklog.lines(record, indent="")) + "\n\n"
                 + (f"### Verifier gate\n\n{gate_table}\n\n" if gate_table else "")
                 + f"### Report\n\n{report or '(no report)'}\n")
     return status, cost

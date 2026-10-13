@@ -118,7 +118,17 @@ needed one.
 
 End with a short report: what changed, how you verified it, and anything left \
 undone. If you could not complete the task, make the first line of the report \
-"{fail} <reason>"."""
+"{fail} <reason>". Close the report with three sections, each under its own \
+heading line exactly as written here, which dev-team copies into its task log \
+(a spreadsheet the user reads, so plain sentences, no tables):
+Summary:
+<two or three sentences: what was accomplished, as the user would see it>
+Decisions:
+<one line per choice you made that the user might have made otherwise, with \
+its reason; "none" if there was none>
+Challenges:
+<one line per problem that cost you time and how you got past it; "none" if \
+there was none>"""
 
 PROMPT = """\
 Your task ({n} of {total}):

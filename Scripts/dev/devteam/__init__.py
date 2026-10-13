@@ -40,4 +40,12 @@ Unit-tested in Scripts/dev/tests (everything but the process launching).
   brief  What a session must still know once its context has been compacted: the
          prompts dev-team sent it and its own notes, kept in the run directory
          and printed back by a hook after each compaction
+
+  tasklog  The task completion log, Saved/DevTeam/task_log.csv: a spreadsheet
+           row per finished task (time by stage, tokens and cost by kind,
+           effort, the session's summary, decisions and challenges), and the
+           same breakdown as dev-team prints it
+  timing   Where a task's time went: dev-team's own clock (sweeps, limit
+           waits, sessions) and the transcript's (each tool call by what it
+           ran), added up stage by stage
 """

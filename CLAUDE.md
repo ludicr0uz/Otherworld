@@ -41,6 +41,11 @@ package's `CLAUDE.md`; it adds to this file only a rule that applies in every pa
        which writes the record (`dev-team probes` lists it) and a report under
        `Saved/DevTeam/probes-<stamp>/`. A probe that fails in its batch is re-run alone and
        the solo verdict stands (`devteam/probe_gate.py`).
+     - Every task it writes up adds a row to `Saved/DevTeam/task_log.csv` (a spreadsheet;
+       `devteam/tasklog.py`): time in all and by stage (`devteam/timing.py`), tokens and cost
+       by kind, effort, and the session's summary, decisions and challenges, read from the
+       `Summary:` / `Decisions:` / `Challenges:` sections its report ends with. The same
+       breakdown is printed under each task and in the list a run ends with.
      - Their unit tests: `python3 -m unittest discover -s Scripts/dev/tests`. Run them after
        changing anything in `Scripts/dev` or `Scripts/probes`.
    - `Scripts/probes/` holds probes: checks that run inside a headless game (see below).

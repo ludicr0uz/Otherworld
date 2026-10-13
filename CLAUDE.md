@@ -78,6 +78,7 @@ package's `CLAUDE.md`; it adds to this file only a rule that applies in every pa
 | predicted movement: sprint, prone and the aim-walk, their speeds and the stamina, decided by the player's C++ movement component on the owning client and the server alike; what a graph may hand it and read off it, the reparented player character, the correction count | `combat/player_move.py`, `uebp/nodes/move.py`, `probes/probe_net_move_states.py` | `Source/CLAUDE.md` ("Predicted movement"), `Scripts/combat/docs/stance.md` |
 | the C++ modules: the `Otherworld` runtime module (the player's movement component; the history of hit boxes and the rewound shot trace; the load test's counters; the RPC guard; the weapon component's native parent, `UOtherworldWeaponComponentBase`, which holds the shot's server half: `Server_Fire`, the pellets' traces and their damage, W1; and the reload: `Server_Reload`, `ReloadNow` and how many rounds move, W2; the health component's, `UOtherworldHealthComponent`: `TakeHit`, `Die`, `Health` and `Dead` as RepNotify properties, the events `OnHealthChanged` and `OnDied` the graph hangs on, W3), the editor-only `OtherworldEditor` (what the builders need and Python cannot reach) and the Editor, Game, Client and Server targets; the compile command, its time and the Xcode it needs | `Source/Otherworld/Otherworld.Build.cs`, `Source/OtherworldEditor/`, `Source/*.Target.cs` | `Source/CLAUDE.md` |
 | the two modes on the title: the Single Player and Multiplayer pages, the server address, joining and leaving a server, the reason a join failed, the session kept on the GameInstance | `graphics_menu/mode_tick.py`, `net/game_instance.py`, `probes/probe_net_title.py` | `Scripts/graphics_menu/CLAUDE.md` ("The two modes"), `Scripts/net/CLAUDE.md` |
+| the asset browser: one HTML page of every static and skeletal mesh in the project (found by the asset registry at each run, nothing listed), in tabs (environment, structures, weapons, items, clothing, characters), its picture (photographed in the editor, lit outside it), its triangles (Nanite and LOD 0), size, and the levels that use it; the category and the kind guessed from the path (`map_assets/kinds.py`) | `build_map_asset_browser.py --open` (run outside the editor), `scan_map_assets.py` | `Scripts/map_assets/__init__.py` |
 | multiplayer conventions: authority, where state lives, Server events and the RPC guard, `Fx_`/`Multicast_` pairs, relevancy, what a dedicated server poses, writing a `--net` probe, the numbers at scale | `net/`, `probes/probe_net_*.py` | `Scripts/net/CLAUDE.md` |
 | networked Blueprints: Server / Client / Multicast custom events, Replicated and RepNotify variables, actors and components that replicate, the nodes that ask which machine this is | `uebp/net.py`, `dev/check_net_authoring.py` | `Scripts/uebp/CLAUDE.md` |
 | multiplayer: the strategy (`serversupportsysdesign.md`; section 4.8 is the rule that single player and multiplayer both ship, from one code path, chosen on the title menu), the task queue (`Scripts/dev/plans/multiplayer_tasks.md`), the GCP build VM and the engine source build | `Scripts/server/gcp/vm_create.sh`, `engine_clone.sh`, `engine_build.sh`, `vm.sh` | `Scripts/server/gcp/CLAUDE.md` |
@@ -178,6 +179,14 @@ Official models, animations and Megascans come from Fab through the Fab plugin
   utilities, console commands or the network for a person to look at. `--promote` copies a
   clean pack to the same `/Game` path and never overwrites; `--verify` compares `Content/`
   with what was scanned. Code plugins are out of its scope.
+- **A raw download has no `Content/`** (a listing taken as FBX, OBJ, GLB or USD: meshes and
+  textures in the launcher's `VaultCache/FabLibrary/<Title>-<id>/`). It is checked and
+  copied to `assets/cache/fab/raw/` by `fab_raw_scan.py <part of its name> --stage`
+  (`--list` shows what the launcher holds; `--parts` keeps a kit's objects apart), then
+  imported to `/Game/Fab/<Title>` by `uepy.py Scripts/asset_pipeline/fab_raw_import.py`,
+  which records the listing too. Materials are guessed from the textures' file names and a
+  USD stage comes in as its parts: read the `LOOK` lines of the log
+  (`Scripts/asset_pipeline/fab_raw/__init__.py` is the map).
 - **What's been acquired** is `Scripts/asset_pipeline/fab_library.json` (tracked: the
   restore recipe, since the imported assets are not committed). The user records an
   addition with `fab_library.py --add <name> --url <listing> --at /Game/<folder>`.

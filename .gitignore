@@ -75,6 +75,21 @@ Content/Python/__pycache__/
 # Scripts/asset_pipeline/import_lyra.py retargets from them.
 /Content/Sourced/Lyra/
 
+# The Fab asset library: packs and raw downloads kept on disk to pick from,
+# not part of the game until something in it is used. Scripts/asset_pipeline/
+# fab_library.json records each one and fab_scan.py / fab_raw_scan.py put it
+# back. To ship one item, copy or move it into a committed folder (or add a
+# `!` line for its folder here) so it goes through Git LFS with the game.
+/Content/Fab/
+/Content/AnimStarterPack/
+/Content/FP_AKS74U_Animation/
+/Content/FreeAnimationLibrary/
+/Content/FreeLadderAnimationSet/
+/Content/Light_Foliage/
+/Content/Megaplant_Library/
+/Content/PN_GrassLibrary/
+/Content/Survival_Character/
+
 # Generator sidecars: megabytes apiece, and fully determined by the seed.
 Scripts/generated_levels/*/grass_*.json
 Scripts/generated_levels/*/*.obj

@@ -16,6 +16,11 @@ Host-side (no ``unreal``):
     fab_scan.py                 entry point: scan a downloaded Fab pack, then copy it
                                 into Content/ (the checks: fab_intake/, which has
                                 its own map; tests: dev/tests/test_fab_intake.py)
+    fab_raw_scan.py             entry point: check a raw Fab download (FBX, OBJ,
+                                GLB, USD: meshes and textures, no Content/) and
+                                stage it in assets/cache/fab/raw/ (the work:
+                                fab_raw/, which has its own map; tests:
+                                dev/tests/test_fab_raw.py)
     import_gas.py               entry point: copy the Game Animation Sample's
                                 motion-matching set into Content/GAS (the list:
                                 gas_manifest.txt; what was cut: gas_manifest_cut.txt;
@@ -103,6 +108,8 @@ Editor-side, in pipeline order:
     bound_look.py               entry point (tooling): photograph the bound body,
                                 the per-body one and Quinn in the same clip poses
     import_ui_art.py            entry point: HUD art PNGs -> textures
+    fab_raw_import.py           entry point: import every staged raw Fab item
+                                into /Game/Fab/<Item> (fab_raw/editor_import.py)
     fab_index.py                entry point: index Fab content -> assets/cache/fab/
     fab_inventory.py            describe a folder's assets from registry tags
 

@@ -1,6 +1,46 @@
 {
   "items": [
     {
+      "name": "1911 Pistol - High Poly",
+      "content": "/Game/Fab/1911_Pistol_High_Poly",
+      "url": "https://www.fab.com/listings/488b4223-0481-4e0c-8ead-445f63bd96bd",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "Stein Games; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Animation Starter Pack",
+      "content": "/Game/AnimStarterPack",
+      "url": "https://www.fab.com/listings/98ff449d-79db-4f54-9303-75486c4fb9d9",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "vault pack AnimStarterPack48; licence not recorded yet"
+    },
+    {
+      "name": "CC0 - Axe",
+      "content": "/Game/Fab/CC0_Axe",
+      "url": "https://www.fab.com/listings/f0adac8a-36ff-4b81-866e-a3862b1e5392",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "plaggy; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Chullo Hat",
+      "content": "/Game/Fab/Chullo_Hat",
+      "url": "https://www.fab.com/listings/22e3e640-d202-4574-beb9-2c6a7a2c710b",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "Paradoox; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "FPS Animation  Pack_AKS74U",
+      "content": "/Game/FP_AKS74U_Animation",
+      "url": "https://www.fab.com/listings/75e66639-af8e-4c88-9dc6-d183d2553a61",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "vault pack FPSAnimad04f3f6bcc62V1; licence not recorded yet"
+    },
+    {
       "name": "FPS Weapon Bundle",
       "content": "/Game/FPS_Weapon_Bundle",
       "url": "https://www.fab.com/listings/8aeb9c48-b404-4dcd-9e56-1d0ecedba7f5",
@@ -9,12 +49,164 @@
       "note": "Deadghost Interactive; Epic permanent free collection (Nov 2018); first-person weapon rigs"
     },
     {
+      "name": "Free Animation Library",
+      "content": "/Game/FreeAnimationLibrary",
+      "url": "https://www.fab.com/listings/481ef75b-892b-424f-a213-f1cc058c9c19",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "vault pack FreeAnimd61b5f5d32dcV1; licence not recorded yet"
+    },
+    {
+      "name": "Free Ladder Animation Set",
+      "content": "/Game/FreeLadderAnimationSet",
+      "url": "https://www.fab.com/listings/b195889b-1446-4a3b-8e46-1f5b38b04369",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "vault pack FreeLadd6e9d1205efbaV1; licence not recorded yet"
+    },
+    {
+      "name": "Light Foliage",
+      "content": "/Game/Light_Foliage",
+      "url": "https://www.fab.com/listings/30e6c98c-6634-4b7e-b142-2c3cdfde6e1e",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "vault pack LightFolc7b512491a87V5; licence not recorded yet"
+    },
+    {
       "name": "Lyra Starter Game",
       "content": "/Game/Sourced/Lyra",
       "url": "https://www.fab.com/listings/lyra-starter-game",
       "license": "",
       "added": "2026-10-08",
       "note": "unarmed punch, rifle and pistol hold sets, hit reacts"
+    },
+    {
+      "name": "M4 Modular Kit",
+      "content": "/Game/Fab/M4_Modular_Kit",
+      "url": "https://www.fab.com/listings/b5b0c0ba-5b45-4573-84d9-3d44e19d81ff",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "Karnaval; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Mauser 98K Karabiner Free Gun",
+      "content": "/Game/Fab/Mauser_98K_Karabiner_Free_Gun",
+      "url": "https://www.fab.com/listings/07cdcbaa-b6d7-4140-b4d5-62440c296952",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "EVOLVE Studio; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Megaplants: Aleppo Pine",
+      "content": "/Game/Megaplant_Library/Tree_Aleppo_Pine",
+      "url": "https://www.fab.com/listings/a441387b-c3e0-4982-82c4-5f661ccca6dd",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "vault pack Megaplanfbcc58c425ccV2; licence not recorded yet"
+    },
+    {
+      "name": "Megaplants: Beach Rose",
+      "content": "/Game/Megaplant_Library/Shrub_Beach_Rose",
+      "url": "https://www.fab.com/listings/d70e1181-f58e-4e8d-b22a-e6c1864770e8",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "vault pack Megaplan11cc3d334a41V2; licence not recorded yet"
+    },
+    {
+      "name": "Megaplants: Greasewood",
+      "content": "/Game/Fab/Megaplants_Greasewood",
+      "url": "https://www.fab.com/listings/1b8d0a76-276f-406e-9536-330243bb42cf",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "Quixel Megaplants; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Megaplants: Norway Spruce",
+      "content": "/Game/Megaplant_Library/Tree_Norway_Spruce",
+      "url": "https://www.fab.com/listings/f87364c9-10a2-4834-8566-a0291c717758",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "vault pack Megaplan6269b53162feV1; licence not recorded yet"
+    },
+    {
+      "name": "Modern Shotgun - Pump Action - Short - No Stock - High Poly",
+      "content": "/Game/Fab/Modern_Shotgun_Pump_Action_Short_No_Stock_High_Poly",
+      "url": "https://www.fab.com/listings/c6eb8f52-ae9b-4299-b9fa-22e0d0b240f8",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "Stein Games; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Puffer Jacket",
+      "content": "/Game/Fab/Puffer_Jacket",
+      "url": "https://www.fab.com/listings/3ab99daa-cf15-4ad6-8d72-fb6718f20704",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "Paradoox; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Puffer Jacket (238ed9ed)",
+      "content": "/Game/Fab/Puffer_Jacket_238ed9ed",
+      "url": "https://www.fab.com/listings/238ed9ed-33ed-4a9a-b7ca-86c53dc1da56",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "Paradoox; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Puffer Scan MEDPOLY",
+      "content": "/Game/Fab/Puffer_Scan_MEDPOLY",
+      "url": "https://www.fab.com/listings/de5a0f3e-251d-4ed3-bfcf-176ed1fd552a",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "EFX; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Sawed Off Shotgun - Double Barreled - High Poly",
+      "content": "/Game/Fab/Sawed_Off_Shotgun_Double_Barreled_High_Poly",
+      "url": "https://www.fab.com/listings/ad1be7d2-4100-42ae-9e9c-2473db382a02",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "Stein Games; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Shotgun - Pump Action - Wooden Stock - Hish Poly",
+      "content": "/Game/Fab/Shotgun_Pump_Action_Wooden_Stock_Hish_Poly",
+      "url": "https://www.fab.com/listings/1e1515dc-de8e-42d4-a7ff-f4845a7f7de4",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "Stein Games; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Survival Character",
+      "content": "/Game/Survival_Character",
+      "url": "https://www.fab.com/listings/11d20d01-b764-4936-8163-cb20d05c369e",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "vault pack Survival3478f1c714a4V1; licence not recorded yet"
+    },
+    {
+      "name": "temperate Vegetation: optimized Grass Library",
+      "content": "/Game/PN_GrassLibrary",
+      "url": "https://www.fab.com/listings/8b68642e-35f4-438e-82b4-799fc2228303",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "vault pack interactb6925a747911V3; licence not recorded yet"
+    },
+    {
+      "name": "Weapon Bundle",
+      "content": "/Game/Fab/Weapon_Bundle",
+      "url": "https://www.fab.com/listings/2e2241e7-b6be-496e-8c71-f55ac78e8a21",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "Andrew Ermakov; raw download, fab_raw_import.py"
+    },
+    {
+      "name": "Worn Crew Hat",
+      "content": "/Game/Fab/Worn_Crew_Hat",
+      "url": "https://www.fab.com/listings/05e5fa4f-6af7-44c3-bbab-12b9b257e8f0",
+      "license": "",
+      "added": "2026-10-12",
+      "note": "Kami Rapacz; raw download, fab_raw_import.py"
     }
   ]
 }

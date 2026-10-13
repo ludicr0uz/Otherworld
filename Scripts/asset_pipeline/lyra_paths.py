@@ -75,9 +75,13 @@ RELOAD_RIFLE = f"{ACTIONS}/MM_Rifle_Reload"
 # The pistol's and the SMG's (a machine pistol, held in the pistol's pose):
 # 2.0 s, the left hand to the belt and back under the grip.
 RELOAD_PISTOL = f"{ACTIONS}/MM_Pistol_Reload"
+# The shotgun's: 2.8 s, the left hand off the pump (54 cm from where it held
+# it, at the furthest) and back.
+RELOAD_SHOTGUN = f"{ACTIONS}/MM_Shotgun_Reload"
 
 # Every Lyra clip the game plays.  A later one is a row here and a re-run.
-CLIPS = (PUNCH, AIM_RIFLE, AIM_PISTOL, RELOAD_RIFLE, RELOAD_PISTOL)
+CLIPS = (PUNCH, AIM_RIFLE, AIM_PISTOL, RELOAD_RIFLE, RELOAD_PISTOL,
+         RELOAD_SHOTGUN)
 
 
 def uefn_clip(source):

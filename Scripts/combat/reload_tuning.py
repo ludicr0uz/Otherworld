@@ -1,10 +1,12 @@
 """The reload clips' numbers (weapon_component/reload_clip.py): Lyra's rifle
-reload, the magazine change the AKM and the sniper share, and its pistol
-reload, the pistol's and the SMG's. Constants only.
+reload, the magazine change the AKM and the sniper share, its pistol
+reload, the pistol's and the SMG's, and its shotgun reload, the shotgun's.
+Constants only.
 
 A clip is played whole, at the rate that fits it to its gun's reload (the
 rifle's 2.2 s over the AKM's 2.1 s and the sniper's 2.6 s; the pistol's
-2.0 s over the pistol's 1.2 s and the SMG's 1.9 s): the builder works the
+2.0 s over the pistol's 1.2 s and the SMG's 1.9 s; the shotgun's 2.8 s
+over the shotgun's 1.6 s): the builder works the
 rate out from the clip's length and the gun's row (gun_rows.gun_row, so a
 reload time changed in gun_tuning.csv is followed at the next build). The
 reload is still a deadline and not a state (tuning.py): the clip follows
@@ -14,12 +16,13 @@ nothing and nothing waits for it.
 # The guns whose reload plays a clip, by Blueprint: the row of gun_rows.py
 # its reload time is read from (its DisplayName), and the PlayerSkin field
 # its clip is. A magazine fed from below into a gun held in the rifle's
-# pose, or into the grip of one held in the pistol's.
+# pose, or into the grip of one held in the pistol's; the shotgun's own.
 RELOAD_CLIP_GUNS = {
     "BP_AssaultRifle": ("Rifle", "reload_rifle"),
     "BP_SniperRifle": ("Sniper", "reload_rifle"),
     "BP_Pistol": ("Pistol", "reload_pistol"),
     "BP_SMG": ("SMG", "reload_pistol"),
+    "BP_Shotgun": ("Shotgun", "reload_shotgun"),
 }
 
 RELOAD_BLEND_IN_S = 0.15    # over the ready pose the slot held

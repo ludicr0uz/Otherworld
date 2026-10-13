@@ -336,6 +336,8 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_lyra.py
 - **The pistols' reload** is `Actions/MM_Pistol_Reload` (`lyra_paths.RELOAD_PISTOL`,
   2.0 s, the left hand to the belt and back under the grip): the pistol's and the SMG's,
   the same way (`reload_pistol`).
+- **The shotgun's reload** is `Actions/MM_Shotgun_Reload` (`lyra_paths.RELOAD_SHOTGUN`,
+  2.8 s, the left hand off the pump and back), the same way (`reload_shotgun`).
 - **A checkout without Lyra** still wears the motion-matching skin: `combat/skin._gas_skin`
   falls back to the mannequin's `MM_Attack_01` on the UEFN skeleton
   (`retarget_to_uefn.py` still makes it) and says so in the build's log; the punch

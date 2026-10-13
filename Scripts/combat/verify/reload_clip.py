@@ -34,7 +34,8 @@ ROOT_MOTION = "enable_root_motion"
 # rifle's (it reaches for the pouch 0.6 s in, 87 cm from the right hand).
 HAND_TRAVEL_CM = 15.0
 # The skin's clips and the Lyra clip each is.
-SOURCES = {"reload_rifle": LYRA.RELOAD_RIFLE, "reload_pistol": LYRA.RELOAD_PISTOL}
+SOURCES = {"reload_rifle": LYRA.RELOAD_RIFLE, "reload_pistol": LYRA.RELOAD_PISTOL,
+           "reload_shotgun": LYRA.RELOAD_SHOTGUN}
 
 
 def _path(asset):
@@ -96,9 +97,9 @@ def check_clip():
                    if (pose in poses) != (name in [r[0] for r in rows])
                    or (pose in poses and poses.index(pose) != [r[0] for r in rows].index(name)))
     check("...which is what each of those guns is held in, and no other gun "
-          "(the shotgun reloads with its sound alone)", not wrong, f"wrong: {wrong}")
+          "(every gun has one)", not wrong, f"wrong: {wrong}")
     check(f"...each with its clip beside it ({WV.ReloadClips}: the rifle's for the AKM "
-          "and the sniper, the pistol's for the pistol and the SMG)",
+          "and the sniper, the pistol's for the pistol and the SMG, the shotgun's own)",
           clips == [r[2] for r in rows], str(clips))
     check(f"{WV.ReloadAnim} and {WV.ReloadPose} are the play's to write: none until a "
           "reload",

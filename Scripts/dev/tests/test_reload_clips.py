@@ -30,8 +30,11 @@ class ReloadClips(unittest.TestCase):
         self.assertEqual(R.RELOAD_CLIP_GUNS["BP_Pistol"][1], "reload_pistol")
         self.assertEqual(R.RELOAD_CLIP_GUNS["BP_SMG"][1], "reload_pistol")
 
+    def test_the_shotgun_reloads_with_its_own_clip(self):
+        self.assertEqual(R.RELOAD_CLIP_GUNS["BP_Shotgun"], ("Shotgun", "reload_shotgun"))
+
     def test_rate_ends_the_clip_with_the_reload(self):
-        for clip_s in (2.0, 2.2):
+        for clip_s in (2.0, 2.2, 2.833):
             for display, _field in R.RELOAD_CLIP_GUNS.values():
                 secs = gun_row(display)["reload_s"]
                 self.assertAlmostEqual(clip_s / R.reload_rate(clip_s, secs), secs)

@@ -1,5 +1,5 @@
 """The magazine change: the AKM and the sniper reload in one clip, the pistol
-and the SMG in another.
+and the SMG in another, the shotgun in its own.
 
 Each gun comes from the dev-all-guns request and is brought to hand as Q does
 (EquippedIndex + NeedsRefresh); its magazine is emptied and the reload key's
@@ -23,7 +23,8 @@ Server_Reload, the native ReloadNow, Reloaded, Fx_Reload.
     another gun taken   the pistol taken out mid-way through the AKM's reload
                         cuts the AKM's clip (the pistol has one of its own:
                         it is ReloadPose that is asked, not ReloadFor)
-    the shotgun         reloads, and plays no clip (its own is not made yet)
+    the shotgun         the same as the AKM, raised, lowered and down the
+                        sights, in Lyra's shotgun reload
 
 Any profile on disk is set aside first, so the game starts on the issued
 loadout, and put back at the end; the level's creatures are removed, since a
@@ -59,14 +60,14 @@ WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
             (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR),
             (ITEM_BP_PATH, IV.Loaded), (ITEM_BP_PATH, IV.Reserve)]
 AKM, SNIPER = "BP_AssaultRifle_C", "BP_SniperRifle_C"
-PISTOL, SMG = "BP_Pistol_C", "BP_SMG_C"
-OTHERS = ("BP_Shotgun_C",)
-RIFLE_CLIP, PISTOL_CLIP = "MM_Rifle_Reload", "MM_Pistol_Reload"
+PISTOL, SMG, SHOTGUN = "BP_Pistol_C", "BP_SMG_C", "BP_Shotgun_C"
+RIFLE_CLIP, PISTOL_CLIP, SHOTGUN_CLIP = (
+    "MM_Rifle_Reload", "MM_Pistol_Reload", "MM_Shotgun_Reload")
 SPARE = 50
-TIMEOUT = 300.0    # wall seconds: a dozen reloads of two seconds and more
+TIMEOUT = 360.0    # wall seconds: fifteen reloads of two seconds and more
 SAMPLE_S = 0.03
 START_S = 0.5      # by when the clip is in the slot after the key
-REACH_CM = 25.0    # how much further from the right hand the left must get
+REACH_CM = 25.0    # how far the left hand must get from where it held the gun
 SEATED = 0.99
 HELD_ON = 0.9      # SupportHand with the hand on the handguard
 SLOT_HELD = 0.9   # the slot's weight through the handover
@@ -124,6 +125,12 @@ def _hands_apart(mesh):
     return (mesh.get_socket_location("hand_l") - mesh.get_socket_location("hand_r")).length()
 
 
+def _left_hand(mesh):
+    """Where the left hand is in the right hand's frame (cm)."""
+    return unreal.MathLibrary.inverse_transform_location(
+        mesh.get_socket_transform("hand_r"), mesh.get_socket_location("hand_l"))
+
+
 def _now(p):
     return unreal.GameplayStatics.get_time_seconds(p.world())
 
@@ -155,14 +162,19 @@ def _press(p, wc, mesh, clip):
     return int(p.get(wc, "Reloads")) - count, _in_slot(mesh, clip)
 
 
-def _watch(p, wc, mesh, clip, weight=None):
-    """Sample until the pose's time has come (ReloadClipEnds): the widest the
-    hands got apart, whether the clip held the slot throughout, and the least
-    of ``weight()``."""
-    widest, held, least = _hands_apart(mesh), True, 1.0
+def _watch(p, wc, mesh, clip, weight=None, start=None):
+    """Sample until the pose's time has come (ReloadClipEnds): the furthest
+    the left hand got from ``start`` (where it was in the right hand's frame;
+    where it is now, if not given), whether the clip held the slot
+    throughout, and the least of ``weight()``.
+
+    Not how far apart the hands got: the shotgun's left hand starts out on
+    the pump, 33 cm from the right, and comes in to the receiver."""
+    start = start or _left_hand(mesh)
+    widest, held, least = 0.0, True, 1.0
     while _now(p) < float(p.get(wc, WV.ReloadClipEnds)) - 2 * SAMPLE_S:
         yield SAMPLE_S
-        widest = max(widest, _hands_apart(mesh))
+        widest = max(widest, (_left_hand(mesh) - start).length())
         held = held and _in_slot(mesh, clip)
         if weight:
             least = min(least, weight())
@@ -182,7 +194,7 @@ def _raised(p, wc, mesh, name, label, source):
         return
     p.check(f"{label}: raised, its ready pose is in {AIM_SLOT} and the reload's clip is not",
             _in_slot(mesh, pose) and not _in_slot(mesh, clip), str(pose))
-    before = _hands_apart(mesh)
+    before, start = _hands_apart(mesh), _left_hand(mesh)
     counted, came = yield from _press(p, wc, mesh, clip)
     p.check(f"{label}: the key reloads once, and the reload's clip is in {AIM_SLOT} with it",
             counted == 1 and came, f"{counted} reload(s), clip in slot: {came}")
@@ -198,10 +210,10 @@ def _raised(p, wc, mesh, name, label, source):
             f"({length:.2f} - {RELOAD_HANDOVER_S:g} s)",
             length - RELOAD_HANDOVER_S - START_S <= left <= length - RELOAD_HANDOVER_S + 0.05,
             f"{left:.2f} s from now")
-    widest, held, _ = yield from _watch(p, wc, mesh, clip)
-    p.check(f"{label}: the left hand leaves the gun: at least {REACH_CM:g} cm further from "
-            "the right than it was", widest - before >= REACH_CM,
-            f"{before:.0f} cm apart before, {widest:.0f} cm at the widest")
+    widest, held, _ = yield from _watch(p, wc, mesh, clip, start=start)
+    p.check(f"{label}: the left hand leaves the gun: at least {REACH_CM:g} cm from where "
+            "it held it, in the right hand's frame", widest >= REACH_CM,
+            f"{widest:.0f} cm at the furthest")
     p.check(f"{label}: ...and the clip stays in the slot until the pose's time: the "
             "keep-alive leaves it be", held)
     least, trace, t = 1.0, [], 0.0
@@ -298,8 +310,8 @@ def _run(p):
     wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
     mesh = p.pawn().get_editor_property("mesh")
     clips = tuple(p.get(wc, WV.ReloadClips))
-    if not p.check("the worn skin has the reload clips: the rifles' and the pistols'",
-                   len(set(clips)) == 2, str([c.get_name() for c in clips if c])):
+    if not p.check("the worn skin has the reload clips: the rifles', the pistols' and "
+                   "the shotgun's", len(set(clips)) == 3, str([c.get_name() for c in clips if c])):
         return
     _send_away(p)
     # No aim key is down in a probe: raise the gun as the key would.
@@ -318,15 +330,8 @@ def _run(p):
         yield from _sighted(p, wc, mesh, "the pistol")
         yield from _carried(p, wc, mesh, "the pistol")
     yield from _raised(p, wc, mesh, SMG, "the SMG", PISTOL_CLIP)
+    yield from _raised(p, wc, mesh, SHOTGUN, "the shotgun", SHOTGUN_CLIP)
+    if _held_name(p, wc) == SHOTGUN:
+        yield from _sighted(p, wc, mesh, "the shotgun")
+        yield from _carried(p, wc, mesh, "the shotgun")
     yield from _switched(p, wc, mesh)
-
-    for name in OTHERS:
-        if not (yield from _equip(p, wc, name)):
-            p.check(f"{name}: in the bag", False)
-            continue
-        counted, came = yield from _press(p, wc, mesh, clips)
-        yield 0.3
-        p.check(f"{name}: reloads, and plays no clip of the rifles' or the pistols'",
-                counted == 1 and not came and not _in_slot(mesh, clips),
-                f"{counted} reload(s), clip in slot: {came}")
-        yield float(p.get(p.get(wc, "Held"), IV.ReloadSeconds))

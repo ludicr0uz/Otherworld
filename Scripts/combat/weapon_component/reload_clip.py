@@ -1,6 +1,7 @@
 """The reload's clip: the magazine change of the AKM and the sniper (Lyra's
 MM_Rifle_Reload, PlayerSkin.reload_rifle) and of the pistol and the SMG (its
-MM_Pistol_Reload, PlayerSkin.reload_pistol), each retargeted onto the
+MM_Pistol_Reload, PlayerSkin.reload_pistol), and the shotgun's shells (its
+MM_Shotgun_Reload, PlayerSkin.reload_shotgun), each retargeted onto the
 player's skeleton by asset_pipeline/import_lyra.py; reload_tuning.py has the
 guns and the numbers.
 

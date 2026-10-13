@@ -364,20 +364,22 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
   on its first frame, and the keep-alive would too: both ask `picking_up()` first, as they
   ask about the throw's clip. Checked by `verify/pickup.check_pickup_clip`, played in
   `probes/probe_pickup_clip.py` (the hand drops 37 cm, with the knife held).
-- **Four guns change the magazine in a clip** (`weapon_component/reload_clip.py`,
+- **Every gun reloads in a clip** (`weapon_component/reload_clip.py`,
   `reload_tuning.py`): the AKM and the sniper in Lyra's `MM_Rifle_Reload`
   (`PlayerSkin.reload_rifle`, 2.2 s), the pistol and the SMG in its `MM_Pistol_Reload`
-  (`reload_pistol`, 2.0 s), played by `Fx_Reload` before the clack, so by the owner as its
+  (`reload_pistol`, 2.0 s), the shotgun in its `MM_Shotgun_Reload` (`reload_shotgun`,
+  2.8 s), played by `Fx_Reload` before the clack, so by the owner as its
   prediction and by the others at the server's word, into the upper-body slot. Which
   guns: `RELOAD_CLIP_GUNS`. The component holds a row for each in three arrays read by one
   index (`reload_defaults`): `ReloadFor`, the gun's ready clip, found by `HandPose`, which
   every machine's copy has (`Held` is the player's item only where the keys are);
   `ReloadClips`, its clip; `ReloadRates`, the rate that ends the clip with the gun's
   reload (the clip's length over the row's `reload_s` at the build: 1.05 the AKM, 0.85
-  the sniper, 1.67 the pistol, 1.05 the SMG; a reload time changed in the running game's
+  the sniper, 1.67 the pistol, 1.05 the SMG, 1.77 the shotgun; a reload time changed in the running game's
   tuning page is not followed until a build). The play writes `ReloadAnim` (the clip it
   chose, what the slot's readers ask for) and `ReloadPose` (the `HandPose` it was for).
-  The shotgun reloads with the sound alone. A fifth gun is a row of `RELOAD_CLIP_GUNS`.
+  A sixth gun is a row of `RELOAD_CLIP_GUNS`; one without a row reloads with its sound
+  alone.
   - **The slot is kept, then handed over.** The play stamps `ReloadClipEnds` (now + the
     clip's length - `RELOAD_HANDOVER_S`). Until then the keep-alive and the equip leave the
     clip be (`holding()`; the equip only while `HandPose` is still `ReloadPose`
@@ -393,12 +395,14 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
     ReloadHand)`, `ReloadHand` eased towards `holding()` (`author_hand_weight`), or the
     IK would pin the hand to the handguard (a pistol's to the right fist) through the
     magazine change.
-  - **Not done:** the gun's magazine does not leave the model; the fingers are Lyra's,
+  - **Not done:** the gun's magazine does not leave the model; the shotgun's clip is one
+    motion for the whole refill, at 1.77 times its speed, not a shell at a time; the fingers are Lyra's,
     not fitted; the sights are not lowered for it; not played on a server by a probe
     (the `Fx_`/`Multicast_` pair is the reload sound's own).
-  Checked by `verify/reload_clip.py`, played in `probes/probe_reload_clip.py` (the four
-  guns raised, the AKM and the pistol lowered and down the sights, the pistol taken out
-  mid-way through the AKM's; the shotgun plays none).
+  Checked by `verify/reload_clip.py`, played in `probes/probe_reload_clip.py` (the five
+  guns raised, the AKM, the pistol and the shotgun lowered and down the sights, the pistol
+  taken out mid-way through the AKM's; the left hand's leaving is measured in the right
+  hand's frame, since the shotgun's starts out on the pump and comes in).
 - **The punch is Lyra's pistol melee** (C1; `asset_pipeline/lyra_paths.PUNCH`, a straight
   right: Lyra has no unarmed attack). Nothing about the strike changed: the blow is still
   timed, `COMBAT.punch_impact_s` (0.3 s) after the swing, not notified, with the same

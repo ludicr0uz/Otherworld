@@ -201,8 +201,9 @@ def _both_modes(p, gi, profile, own):
             f"pending {p.get(wc, AC.EXIT_PENDING_VAR)}, {span:.2f} s, alone {T.alone(p)}, "
             f"called off at {p.get(wc, AC.EXIT_CALLED_OFF_VAR):.1f}, "
             f"health {p.get(health, HV.Health):.0f}")
-    p.check("...the character standing still meanwhile",
-            moves.movement_mode == unreal.MovementMode.MOVE_NONE, str(moves.movement_mode))
+    p.check("...the character standing meanwhile, its movement still walking",
+            moves.movement_mode == unreal.MovementMode.MOVE_WALKING and moves.velocity.length() < 1.0,
+            f"{moves.movement_mode}, {moves.velocity.length():.1f} cm/s")
     yield from T.wait(lambda: T.on_title(p), AC.EXIT_SECONDS + TRAVEL_S)
     left, waited = T.on_title(p), time.time() - asked
     p.check("the countdown over, the client is back on the title level: alone, "

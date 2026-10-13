@@ -190,14 +190,14 @@ def check_ask_save_exit():
         if _title(n) == "OR Boolean":
             return [l for pin in ("A", "B") for f in _feeders(n, pin) for l in leaves(f)]
         return [n]
-    branches = [b for n in hits for p in BEL.list_output_pins(n)
-                for q in PIN.list_connected_pins(p) for o in [PIN.get_owning_node(q)]
-                for p2 in BEL.list_output_pins(o) for q2 in PIN.list_connected_pins(p2)
-                for o2 in [PIN.get_owning_node(q2)]
-                for b in ([o2] if "Condition" in in_pins(o2) else
-                          [PIN.get_owning_node(q3) for p3 in BEL.list_output_pins(o2)
-                           for q3 in PIN.list_connected_pins(p3)])
-                if "Condition" in in_pins(b)]
+    def gated(n):
+        """The Branches a bool reaches, down through its ORs."""
+        nexts = [PIN.get_owning_node(q) for p in BEL.list_output_pins(n)
+                 for q in PIN.list_connected_pins(p)]
+        return [b for o in nexts
+                for b in ([o] if "Condition" in in_pins(o) else
+                          gated(o) if _title(o) == "OR Boolean" else [])]
+    branches = [b for n in hits for b in gated(n)]
     tips = [l for b in branches for c in _feeders(b, "Condition") for l in leaves(c)]
     moved = [l for l in tips if _title(l) == "float > float"
              and [_title(f) for f in _feeders(l, "A")] == ["Vector Length"]
@@ -211,27 +211,24 @@ def check_ask_save_exit():
           "the hit into one Branch",
           len(branches) == 1 and len(moved) == 1 and len(tapped) == 1
           and sorted(_title(l) for l in tips)
-          == ["Equal (Float)", "Get FireForced", "float > float", "float > float"],
+          == ["Equal (Float)", "Get FireForced", "NOT Boolean", "float > float",
+              "float > float"],
           f"{len(branches)} Branch; {[_title(l) for l in tips]}")
-    stops = [n for n in wg if "DisableMovement" in _title(n).replace(" ", "")]
-    waits = [b for n in stops for b in _feeders(n, "execute")
-             if f"Get {AC.EXIT_AT_VAR}" in {_title(g) for c in _feeders(b, "Condition")
-                                            for g in _feeders(c, "B")}]
-    check("the character can't move while the exit counts down "
-          "(DisableMovement every Tick it waits)",
-          len(stops) == 1 and len(waits) == 1,
-          f"{len(stops)} DisableMovement, {len(waits)} on the countdown's wait")
-    walks = [n for n in wg if "NewMovementMode" in in_pins(n)]
-    check("...and walks again when a hit calls the exit off",
-          len(walks) == 1 and "Walking" in pin_value(walks[0], "NewMovementMode")
-          and any(_title(f) == f"Set {AC.EXIT_CALLED_OFF_VAR}"
-                  for f in _feeders(walks[0], "execute")),
-          str([(pin_value(n, "NewMovementMode"), [_title(f) for f in _feeders(n, "execute")])
-               for n in walks]))
+    aloft = [_title(f) for l in tips if _title(l) == "NOT Boolean" for f in _feeders(l, "A")]
+    check("...and so does leaving the ground (the movement not IsMovingOnGround: a "
+          "jump, a climb, an exit asked for in the air)",
+          [t.replace(" ", "") for t in aloft] == ["IsMovingOnGround"], str(aloft))
+    stops = [n for n in wg if "DisableMovement" in _title(n).replace(" ", "")
+             or "NewMovementMode" in in_pins(n)]
+    check("the countdown never disables the movement or sets its mode: out of the "
+          "walking mode the Foot Placement node stops fitting the feet to the ground "
+          "(the legs snapped flat on a slope)",
+          not stops, f"{len(stops)} DisableMovement or SetMovementMode calls")
     dues = [n for n in wg if _title(n) == f"Set {AC.EXIT_DUE_VAR}"
             and pin_value(n, AC.EXIT_DUE_VAR) == "true"]
     over = [b for n in dues for s in _feeders(n, "execute") for b in _feeders(s, "execute")
-            if b in [x for st in stops for x in _feeders(st, "execute")]]
+            if f"Get {AC.EXIT_AT_VAR}" in {_title(g) for c in _feeders(b, "Condition")
+                                           for g in _feeders(c, "B")}]
     check(f"the time up, the component says so and no more ({AC.EXIT_DUE_VAR}: the "
           "save and the leaving are the watcher's)",
           len(dues) == 1 and len(over) == 1

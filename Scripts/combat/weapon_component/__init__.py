@@ -240,8 +240,9 @@ _author_* fragment per concern, each in its own module:
               Server event, with its refusals (dead, no body, out of reach,
               no room, no such row, not the item asked for)
   save_exit   AskSaveExit and the countdown it starts (ExitPending, ExitAt,
-              ExitDue): the owner stands still, a hit calls it off; first in
-              the upkeep, on every copy
+              ExitDue): a hit, a move, the trigger or leaving the ground
+              calls it off, and the movement is never disabled (the feet
+              stay fitted to the ground); first in the upkeep, on every copy
   recoil      view turn, kick, recovery
   shot_noise  the shot's noise for the wanderers (ShotVolume + a cone)
   sprint      the sprint key handed to the movement component (C++, which

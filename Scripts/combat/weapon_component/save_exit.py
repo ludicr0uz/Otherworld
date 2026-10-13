@@ -11,12 +11,23 @@
         last movement input: the character's input still reaches the pawn
         while its movement is disabled, and the movement component consumes
         it before it looks at the mode), OR the trigger pressed this frame
-        (the trigger's tap, trigger.py; a probe's FireForced too)
-            -> called off: ExitPending = false, ExitCalledOffAt = now, and
-               the owner walks again
+        (the trigger's tap, trigger.py; a probe's FireForced too), OR the
+        owner off the ground (its movement not walking: a jump, a climb, an
+        exit asked for in the air)
+            -> called off: ExitPending = false, ExitCalledOffAt = now
         ExitAt passed -> ExitPending = false, ExitDue = true
-        else the owner's CharacterMovement is disabled, every Tick, so the
-            character stands still for the whole countdown
+        else nothing: the character waits
+
+Nothing holds the character still, because nothing has to: whatever would
+move it calls the exit off, and one that was moving when it asked brakes to
+a stand by itself. Its movement stays in the walking mode on purpose. Until
+13 Oct 2026 the countdown disabled it every Tick (DisableMovement, the mode
+MOVE_None), and the motion matching's Foot Placement node reads that mode as
+"in the air" and stops fitting the feet to the ground: on a slope the legs
+snapped to the flat pose as the countdown began (one foot 39 cm off the
+ground it stood on, measured on a 25 degree slope) and back when it was
+called off. probes/probe_save_exit_legs.py holds the feet to where they
+stood. The stance keys still work during the countdown, in place.
 
 The component decides that the exit is due and nothing more. What leaving is
 belongs to whoever watches ExitDue: in single player the HUD writes the
@@ -33,7 +44,7 @@ on another copy), as the countdown is: ExitPending is written by AskSaveExit
 on the copy the HUD asked, and nothing replicates it.
 """
 
-from uebp.graph import _connect, _loose_pin, _palette, _pin, _set, out, then
+from uebp.graph import _connect, _loose_pin, _palette, _pin, out, then
 from uebp.g import _G
 from uebp.net import custom_event
 from combat.ask_consts import (
@@ -44,9 +55,9 @@ from combat.game_state import LAST_DAMAGE_VAR
 from combat.paths import HEALTH_CLASS_PATH
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from uebp.nodes.actor import (
-    FN_DISABLE_MOVEMENT, FN_GET_COMP, FN_GET_OWNER, FN_LAST_MOVE_INPUT, FN_SET_MOVEMENT_MODE,
+    FN_GET_COMP, FN_GET_OWNER, FN_LAST_MOVE_INPUT, FN_ON_GROUND,
 )
-from uebp.nodes.math import FN_ADD_FF, FN_GE_FF, FN_GREATER_FF, FN_OR, FN_VSIZE
+from uebp.nodes.math import FN_ADD_FF, FN_GE_FF, FN_GREATER_FF, FN_NOT, FN_OR, FN_VSIZE
 from uebp.nodes.palette import NODE_CAST_HEALTH, NODE_CAST_PAWN
 from uebp.nodes.system import FN_TIME_SECONDS
 
@@ -92,27 +103,25 @@ def _author_save_exit(ed, in_execs, tap):
     pawn = _loose_pin(as_pawn, "AsPawn", is_input=False)
     input_size = g.call(FN_VSIZE, A=out(g.call(FN_LAST_MOVE_INPUT, self=pawn)))
     moved = g.call(FN_GREATER_FF, A=out(input_size), B="0.0")
-    off_by = g.call(FN_OR, A=out(g.call(FN_OR, A=out(since), B=out(moved))), B=tap)
-    hit, unhurt = g.branch(out(off_by), [then(as_pawn)])
-
+    # Off the ground: the movement is the walking mode's no longer.
     moves = g.call(FN_GET_COMP, self=owner)
     _pin(moves, "ComponentClass").set_pin_value(MOVEMENT_CLASS_PATH)
+    aloft = g.call(FN_NOT, A=out(g.call(FN_ON_GROUND, self=out(moves))))
+    acted = g.call(FN_OR, A=out(g.call(FN_OR, A=out(since), B=out(moved))), B=tap)
+    off_by = g.call(FN_OR, A=out(acted), B=out(aloft))
+    hit, unhurt = g.branch(out(off_by), [then(as_pawn)])
+
     off = g.put(EXIT_PENDING_VAR, "false", [hit])
     off = g.put(EXIT_CALLED_OFF_VAR, now, [off])
-    walk = g.call(FN_SET_MOVEMENT_MODE, [off], self=out(moves))
-    _set(walk, "NewMovementMode", "MOVE_Walking")
 
     ripe = g.call(FN_GE_FF, A=now, B=g.get(EXIT_AT_VAR))
     leave, wait = g.branch(out(ripe), [unhurt, out(cast, "CastFailed"),
                                         out(as_pawn, "CastFailed")])
-    # Standing still while the countdown runs; leaving brings a fresh pawn, so
-    # only the called-off arm has to give the movement back.
-    still = g.call(FN_DISABLE_MOVEMENT, [wait], self=out(moves))
     due = g.put(EXIT_PENDING_VAR, "false", [leave])
     due = g.put(EXIT_DUE_VAR, "true", [due])
     ed.add_comment_to_nodes(
-        "Save and exit, counting down: the owner stands still; a hit since the "
-        "start, a move key or the trigger calls it off and they walk again; the "
-        "time up, ExitDue says the character may be saved and the player leave "
-        "(save_exit.py).", g.made)
-    return [then(walk), then(still), due, idle]
+        "Save and exit, counting down: a hit since the start, a move key, the "
+        "trigger or leaving the ground calls it off; the time up, ExitDue says "
+        "the character may be saved and the player leave. The movement is never "
+        "disabled: the feet stay fitted to the ground (save_exit.py).", g.made)
+    return [off, wait, due, idle]

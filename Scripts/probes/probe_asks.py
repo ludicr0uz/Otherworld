@@ -115,8 +115,9 @@ def _run(p):
             p.get(wc, AC.EXIT_PENDING_VAR) is True
             and abs(due - started - AC.EXIT_SECONDS) < 1e-3
             and p.get(hud, MV.MenuOpen) is False, f"{due - started:.2f} s")
-    p.check("...the character standing still meanwhile",
-            moves.movement_mode == unreal.MovementMode.MOVE_NONE, str(moves.movement_mode))
+    p.check("...the character standing meanwhile, its movement still walking",
+            moves.movement_mode == unreal.MovementMode.MOVE_WALKING and moves.velocity.length() < 1.0,
+            f"{moves.movement_mode}, {moves.velocity.length():.1f} cm/s")
     wc.call_method(AC.ASK_SAVE_EXIT)
     yield SETTLE
     p.check("...asked again while it runs, it does not start over",

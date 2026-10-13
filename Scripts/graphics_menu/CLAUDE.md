@@ -370,10 +370,18 @@ sync:
   like the weapon component's `Worn`, none where nothing is worn; a profile saved before
   it loads wearing nothing). **Never the location**; the verifier
   asserts BP_Profile has no other field.
-- **The character can't move during the countdown.** Every Tick it waits, the pawn's
-  `CharacterMovement` gets `DisableMovement` (keyed off `ExitPending`, not the ask, so the
-  probe's variable writes freeze it too). Looking around still works.
-- **A hit, a move key or the trigger calls it off**, and `SetMovementMode(Walking)` frees the pawn. A move key is the pawn's last movement input (it still reaches the pawn with its movement disabled), the trigger is the trigger's tap (`trigger.py`, FireForced too). A wanderer's swing stamps
+- **Nothing holds the character still during the countdown, and its movement is never
+  disabled.** Whatever would move it calls the exit off instead, and one that was moving
+  when it asked brakes to a stand. Until 13 Oct 2026 the countdown called
+  `DisableMovement` every Tick: the motion matching's Foot Placement node reads a movement
+  mode that is not walking as "in the air" and stops fitting the feet to the ground, so on
+  a slope the legs snapped flat as the countdown began and back when it ended (39 cm at
+  one foot on a 25 degree slope). `probes/probe_save_exit_legs.py` stands on a slope and
+  holds the feet where they stood. Looking around still works, and so do the stance keys.
+- **A hit, a move key, the trigger or leaving the ground calls it off.** A move key is the
+  pawn's last movement input, the trigger is the trigger's tap (`trigger.py`, FireForced
+  too), and off the ground is the movement not `IsMovingOnGround` (a jump, a climb, an
+  exit asked for in the air). A wanderer's swing stamps
   the player's `BP_HealthComponent.LastDamageTime` (`npc/melee.py`), and the countdown stops when
   that passes `ExitStartedAt`. The starvation
   drain lowers Health without stamping it, so it is not a hit. A death calls it off too
@@ -388,7 +396,7 @@ sync:
   loadout keeps the issued guns from being added after the saved ones.
 - **Death deletes the slot,** what was worn with the bag. `Health <= 0` on Tick, once (`ProfileForgotten`). Tick, not
   DrawHUD: the death pause comes after a 2.2 s settle, and a `-nullrhi` probe never draws.
-- **Probe:** `uepy.py --game --probe Scripts/probes/probe_save_exit.py`. It covers the freeze, a
+- **Probe:** `uepy.py --game --probe Scripts/probes/probe_save_exit.py`. It covers the stand, a
   hit, a move key and the trigger calling the exit off and freeing the pawn, the save, the reload and restore, a crafted inventory replacing the
   issued one, and the delete on death. It sets aside any real profile on disk and puts it back.
 - **Still needs a play session:** taking the row by hand and the 15 s at real speed (the probe

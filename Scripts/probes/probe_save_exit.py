@@ -1,5 +1,5 @@
-"""Save and exit: the character stands still while it counts down, a hit, a
-move key or the trigger calls it off and frees it, running out saves the profile and
+"""Save and exit: the character stands while it counts down, a hit, a
+move key or the trigger calls it off, running out saves the profile and
 reopens the level, the reopened game loads it, a saved inventory unlike the
 issued one replaces it, and dying deletes it.
 
@@ -9,9 +9,8 @@ X (a probe has no keyboard), with ExitAt a fraction of a second away rather
 than 15 s -- -nullrhi game time crawls. The key and the 15 s are the
 verifier's to check. A hit is a write of LastDamageTime, which is what a
 wanderer's swing stamps (npc/melee.py). A move key is the pawn's
-AddMovementInput, which is what the move action feeds it (the pawn takes it
-with its movement disabled; the movement component consumes it before it
-looks at the mode), and the trigger is FireForced, the probes' stand-in for
+AddMovementInput, which is what the move action feeds it (the pawn's last
+movement input is what the countdown reads), and the trigger is FireForced, the probes' stand-in for
 the fire key.
 
 Any profile already on disk is set aside first and put back at the end.
@@ -117,14 +116,12 @@ def _run(p):
     moves = pawn.get_editor_property("character_movement")
     _start_exit(p, wc, 100.0)
     yield 0.1
-    p.check("the character can't move while the exit counts down",
-            moves.movement_mode == unreal.MovementMode.MOVE_NONE,
-            str(moves.movement_mode))
+    p.check("the character stands while the exit counts down, its movement still "
+            "walking (disabled, the feet stop being fitted to the ground)",
+            moves.movement_mode == unreal.MovementMode.MOVE_WALKING and moves.velocity.length() < 1.0,
+            f"{moves.movement_mode}, {moves.velocity.length():.1f} cm/s")
     p.set(health, "LastDamageTime", p.time())
     yield 0.2
-    p.check("...and walks again once a hit calls it off",
-            moves.movement_mode == unreal.MovementMode.MOVE_WALKING,
-            str(moves.movement_mode))
     p.check("a hit during the countdown calls the exit off",
             not p.get(wc, EXIT_PENDING_VAR) and p.get(wc, EXIT_CALLED_OFF_VAR) > 0.0,
             f"pending {p.get(wc, EXIT_PENDING_VAR)}, "
@@ -134,8 +131,7 @@ def _run(p):
     # --- a move key calls it off too ---------------------------------------------
     _start_exit(p, wc, 100.0)
     yield 0.1
-    p.check("frozen again for the move test",
-            moves.movement_mode == unreal.MovementMode.MOVE_NONE, str(moves.movement_mode))
+    p.check("counting down again for the move test", p.get(wc, EXIT_PENDING_VAR) is True)
     pawn.add_movement_input(unreal.Vector(1.0, 0.0, 0.0), 1.0, False)
     yield 0.2
     p.check("a move key during the countdown calls the exit off",
@@ -149,8 +145,7 @@ def _run(p):
     # --- and so does the trigger ---------------------------------------------------
     _start_exit(p, wc, 100.0)
     yield 0.1
-    p.check("frozen again for the trigger test",
-            moves.movement_mode == unreal.MovementMode.MOVE_NONE, str(moves.movement_mode))
+    p.check("counting down again for the trigger test", p.get(wc, EXIT_PENDING_VAR) is True)
     p.set(wc, WV.FireForced, True)
     yield 0.1
     p.set(wc, WV.FireForced, False)

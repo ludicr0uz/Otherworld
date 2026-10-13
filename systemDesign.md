@@ -78,8 +78,9 @@ the gun, monster, world and player tables are the server's: a change is sent to 
 applied there, by `BP_GameTuner` on the GameState, only where the server was started with
 `-AllowDevTuning`, and the rows are read-only and say so otherwise; sound and graphics stay
 this machine's; M32, `Scripts/graphics_menu/CLAUDE.md`, "The tuning tabs by mode"), and Exit Game on the
-title or Save and Exit in play (a 15 s countdown, cancelled by a hit, a move or the
-trigger; saves stats, inventory and worn garments, not the location; death deletes the
+title or Save and Exit in play (a 15 s countdown, cancelled by a hit, a move, the
+trigger or leaving the ground, with the movement left walking so the feet stay fitted
+to the ground; saves stats, inventory and worn garments, not the location; death deletes the
 profile). Pausing is single player's alone; as a client of a server the same screens are
 overlays over a running world, and the menu has no first row there (Single Player on the
 title, Resume in single player). Every screen carries Ellivian Inc.'s confidentiality

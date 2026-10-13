@@ -21,4 +21,6 @@
   undergrowth_checks  Offline checks for the generated foliage meshes, the grass density tiers and the bushes
   verification        Pure-Python verification suite for generated forest levels
   wind                Wind in the grass and the trees: the numbers
+
+  tree_lods  Which levels plant the trees with a LOD chain and an impostor, and which mesh that is
 """

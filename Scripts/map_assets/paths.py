@@ -17,6 +17,11 @@ NO_PICTURES = os.path.join(OUT_DIR, "no_pictures")
 # (thumb_file), and the page shows the pictures from the folder beside it.
 PASSES_DIR = os.path.join(OUT_DIR, "passes")
 THUMB_DIR = os.path.join(OUT_DIR, "thumbs")
+# The turn: thumbs.py writes two passes per frame (spin_pass_file); shade.py
+# makes one strip of them per mesh (spin_file), frames side by side, and
+# deletes the passes, which are a megabyte a mesh.
+SPIN_PASSES_DIR = os.path.join(OUT_DIR, "spin_passes")
+SPIN_DIR = os.path.join(OUT_DIR, "spins")
 
 
 def _key(path):
@@ -30,3 +35,11 @@ def pass_file(path, name):
 
 def thumb_file(path):
     return f"{_key(path)}.png"
+
+
+def spin_pass_file(path, frame, name):
+    return f"{_key(path)}_{frame:02d}_{name}.png"
+
+
+def spin_file(path):
+    return f"{_key(path)}.webp"

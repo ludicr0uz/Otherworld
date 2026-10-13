@@ -175,5 +175,24 @@ class AtlasTest(unittest.TestCase):
         self.assertAlmostEqual(float(rgba[1, 3, 0]), float(rgba[3, 3, 0]), places=5)
 
 
+class TreeLodLevels(unittest.TestCase):
+    """forest_generator/tree_lods.py: which levels plant the LOD build."""
+
+    def test_only_a_named_level_plants_the_lod_build(self):
+        from forest_generator import tree_lods
+        self.assertTrue(tree_lods.plants_lods("Lvl_Forest_1000m"))
+        self.assertFalse(tree_lods.plants_lods("Lvl_Forest_200m"))
+        self.assertFalse(tree_lods.plants_lods(None))            # a caller with no level
+
+    def test_every_planted_tree_has_a_lod_build_to_plant(self):
+        from forest_generator import tree_lods
+        from forest_generator.tree_placement import DEFAULT_TREE_SPECS
+        built = {f"{job.path}.{job.asset_name}" for job in jobs.TREES}
+        for spec in DEFAULT_TREE_SPECS:
+            path = tree_lods.lod_mesh_path(spec.mesh_path)
+            self.assertIn(path, built, spec.name)
+            self.assertEqual(tree_lods.lod_mesh_path(path), path)
+
+
 if __name__ == "__main__":
     unittest.main()

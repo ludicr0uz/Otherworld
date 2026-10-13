@@ -30,9 +30,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from forest_generator.terrain import (
     generate_terrain_obj,
-    compute_grid,
-    make_elevation_fn,
-    get_exact_mesh_z,
 )
 from forest_generator.tree_placement import (
     scatter_trees,
@@ -158,11 +155,11 @@ def main():
     print(f"  Time of day: {lighting['label']}")
     print(f"  Trees: density x{args.tree_density:.2f}")
     if args.no_grass:
-        print(f"  Grass: disabled")
+        print("  Grass: disabled")
     else:
         print(f"  Grass: {args.grass_density:.2f}/m2, knee height {args.grass_height:.0f} cm")
     if args.no_npc:
-        print(f"  NPCs: disabled")
+        print("  NPCs: disabled")
     else:
         band_lo, band_hi, _clamped = spawn_band(
             world_size_cm,
@@ -205,7 +202,7 @@ def main():
 
     # ── Step 3: Scatter knee-high grass ──────────────────────────────────
     if args.no_grass:
-        print(f"\n[3/6] Grass generation disabled (--no-grass)")
+        print("\n[3/6] Grass generation disabled (--no-grass)")
         placed_grass = []
     else:
         print(f"\n[3/6] Scattering knee-high grass "
@@ -227,7 +224,7 @@ def main():
 
     # ── Step 3b: Scatter walk-through bushes ─────────────────────────────
     if args.no_bushes:
-        print(f"\n[3b/6] Bushes disabled (--no-bushes)")
+        print("\n[3b/6] Bushes disabled (--no-bushes)")
         placed_bushes = None
     else:
         print(f"\n[3b/6] Scattering bushes ({args.bush_clusters:g} thicket cells/ha)...")
@@ -240,7 +237,7 @@ def main():
 
     # ── Step 4: Place the wandering NPCs ─────────────────────────────────
     if args.no_npc:
-        print(f"\n[4/6] NPCs disabled (--no-npc)")
+        print("\n[4/6] NPCs disabled (--no-npc)")
         placed_npcs = []
     else:
         print(f"\n[4/6] Placing {args.npc_count} wandering NPC(s)...")
@@ -288,7 +285,7 @@ def main():
               f"{nav_bounds['terrain_max_z_cm']:.0f})")
 
     # ── Step 5: Run verification ─────────────────────────────────────────
-    print(f"\n[5/6] Running verification suite...")
+    print("\n[5/6] Running verification suite...")
     report = run_all_checks(
         level_name=level_name,
         world_size_cm=world_size_cm,
@@ -327,7 +324,7 @@ def main():
               f"({os.path.getsize(grass_data_path):,} bytes)")
 
 
-    print(f"\n[6/6] Writing Unreal import script...")
+    print("\n[6/6] Writing Unreal import script...")
     ue_script_path = os.path.join(output_dir, f"import_{level_name}.py")
     _write_unreal_import_script(
         ue_script_path,
@@ -363,13 +360,13 @@ def main():
     print(f"       Verify → {ue_verify_path}")
 
     print(f"\n{'═' * 60}")
-    print(f"  ✅ Generation complete!")
-    print(f"")
-    print(f"  To import into Unreal Editor:")
+    print("  ✅ Generation complete!")
+    print("")
+    print("  To import into Unreal Editor:")
     print(f"  \"{UE_CMD}\" \"{UPROJECT}\" \\")
     print(f"    -ExecutePythonScript=\"{ue_script_path}\" -NoUI -stdout")
-    print(f"")
-    print(f"  To verify in Unreal (collision, materials, actors):")
+    print("")
+    print("  To verify in Unreal (collision, materials, actors):")
     print(f"  \"{UE_CMD}\" \"{UPROJECT}\" \\")
     print(f"    -ExecutePythonScript=\"{ue_verify_path}\" -NoUI -stdout")
     print(f"{'═' * 60}\n")
@@ -480,16 +477,8 @@ def _write_unreal_import_script(
             "scale": round(t.scale, 3),
         })
 
-    # Build the elevation function source so the verify script can use it
-    elev_fn = make_elevation_fn(world_size_cm)
-
-    # UV tiling scales with world size (target ~10m per tile for micro)
-    micro_tiling = max(5.0, world_size_cm / 500.0)
-    macro_tiling = max(1.0, world_size_cm / 16000.0)
-
     # Lighting preset is embedded as JSON so the Unreal script stays data-driven
     lighting_json = json.dumps(lighting)
-    tod_key = lighting["key"]
     tod_label = lighting["label"]
     stars_texture = STARS_TEXTURE_PATH
 
@@ -846,7 +835,7 @@ def _write_unreal_import_script(
         from forest_import import tree_assets
         tree_assets.ensure_tree_assets()
         trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
-                                 editor_asset_sub)
+                                 editor_asset_sub, level=LEVEL_NAME)
 
         # ── 5a. Build the generated grass and bush meshes ────────────────────
         # Opaque Nanite patches and bushes, rebuilt in place every import --
@@ -1320,7 +1309,7 @@ def _write_unreal_verify_script(
             sys.path.insert(0, r"{scripts_dir}")
         from forest_import import trees as trees_import
         trees_import.verify_trees(check, actors, EXPECTED_SPEC_COUNTS,
-                                  EXPECTED_TREE_COUNT)
+                                  EXPECTED_TREE_COUNT, level=LEVEL_NAME)
         from forest_import import tree_assets
         tree_assets.verify_tree_assets(check)
 

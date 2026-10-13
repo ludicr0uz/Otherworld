@@ -216,7 +216,11 @@ GENERATED = (
              "forest_import/foliage_assets.py, which the level import runs. "
              "Trees/ -- the tree meshes the levels plant, cut-down copies of "
              "the scans -- is built from forest_generator/tree_meshes.py by "
-             "forest_import/tree_assets.py, which the level import also runs.",
+             "forest_import/tree_assets.py, which the level import also runs. "
+             "TreesLOD/ -- the same trees with a LOD chain and an impostor, "
+             "which the 1 km map plants (forest_generator/tree_lods.py) -- is "
+             "built from Trees/ by Scripts/build_game_ready_mesh.py trees, "
+             "outside the editor and before the level import.",
     ),
     AssetSource(
         dest="Content/Sourced/Characters",

@@ -477,6 +477,9 @@ Perception.
    the meshes' auto-built fallbacks have no leaf triangles, so classic rendering draws
    bare trees. Past 60 m (`TREE_LEAF_MASK_DISTANCE_CM`, via `nanite_pixel_programmable_distance`)
    the leaves are drawn without their opacity mask, which is far cheaper on Nanite.
+   The 1 km map is the exception (`forest_generator/tree_lods.py`): its cells hold the
+   same trees' other build, `/Game/Forest/TreesLOD`, with no Nanite, three mesh LODs and
+   an impostor from 110 m (`Scripts/build_game_ready_mesh.py trees`, `mesh_lod/`).
 5b. **Grass** — transforms are *not* inlined (tens of thousands of them); the script reads
    `grass_<Level>.json`, whose instances are flat rounded arrays
    `[spec_idx, x, y, z, yaw, pitch, roll, height_mul, width_mul, target_h_cm]` against an

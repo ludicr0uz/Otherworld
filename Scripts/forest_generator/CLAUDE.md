@@ -24,6 +24,7 @@ The generator's code lives in this package. The level-side import code is in
 | `terrain.py` | heightfield and OBJ |
 | `tree_placement.py` | `DEFAULT_TREE_SPECS` and the scatter (`MIN_TREE_SPACING_CM` 150, checked through a spatial hash) |
 | `tree_meshes.py` | the meshes the trees are planted from: a recipe per species (`TREE_MESH_RECIPES`) that cuts a scan down. `forest_import/tree_assets.py` builds them under `/Game/Forest/Trees`; the level import calls it |
+| `tree_lods.py` | which levels plant the trees' other build, a LOD chain ending in an impostor (`TREE_LOD_LEVELS`: the 1 km map), and where that mesh is |
 | `grass_placement.py` | `DEFAULT_GRASS_SPECS` and a stratified scatter |
 | `npc_placement.py` | NPC numbers (see `Scripts/npc/CLAUDE.md`) |
 | `npc_agro.py` | sense and patrol numbers |
@@ -40,6 +41,7 @@ The generator's code lives in this package. The level-side import code is in
   - it is the `EditorStartupMap`: the debug map.
 - **`Lvl_Forest_1000m`** (`--size 1000`, tree density 0.5):
   - 1,700 trees, ~1.1 M grass clumps;
+  - its trees are the LOD build, not the Nanite one ("Rendering gotchas", below);
   - it is the `GameDefaultMap`: what a packaged or standalone run boots;
   - the `.umap` is 161 MB;
   - the import takes about a minute. `uepy.py` reports that the editor stopped responding, but
@@ -136,6 +138,23 @@ the day/night cycle actor.
   - `get_number_verts` and `get_num_triangles` report the fallback's count, not the mesh's.
   - Trees fade out at 250–300 m × `r.ViewDistanceScale`. Collision and the navmesh still cover
     every tree.
+- **The 1 km map plants a second build of the same five trees,** under
+  `/Game/Forest/TreesLOD`: no Nanite, three mesh LODs (about 40 k, 16 k and 6 k triangles,
+  starting at 0, 30 and 60 m) and from 110 m an impostor, three crossed cards with a picture
+  of the tree.
+  - `tree_lods.py` names the levels (`TREE_LOD_LEVELS`); `forest_import/trees.py` swaps the
+    mesh when it plants and checks the other set of things when it verifies. A level changes
+    build by a line there and a re-import. The 200 m and probe levels stay on Nanite.
+  - The meshes are built from `/Game/Forest/Trees` by
+    `python3 Scripts/build_game_ready_mesh.py trees`, outside the editor (`mesh_lod/`; about
+    2.5 minutes, skipped until a setting changes). The level import does not build them: it
+    stops, naming that command, if one is missing. After a tree's recipe changes, run it with
+    `--force` and re-import the level.
+  - A cell's instances change LOD together, at the distance for the middle of that cell's
+    scales (`FHierarchicalStaticMeshSceneProxy`, `AverageScale`), so the same species can
+    switch a third nearer or further from one cell to the next.
+  - The Nanite settings on a cell (`disallow_nanite`, the leaf mask distance) do not apply
+    to these and are not set; the cull distances are the same.
 - **Past `TREE_LEAF_MASK_DISTANCE_CM` (60 m), leaves draw without their opacity mask.** This is a
   performance trade; tune it by eye.
 - **Wind is world-position offset** (`wind.py`, `forest_import/wind.py`), scaled by

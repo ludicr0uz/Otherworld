@@ -62,7 +62,8 @@ class PageTest(unittest.TestCase):
         scan = {"scanned": "2026-10-12 19:00", "meshes": [
             _mesh("/Game/Forest/Meshes/SM_ForestRock_01", 420),
             dict(_mesh("/Game/Fab/CC0_Axe/SM_Axe"), size_cm="</script>")]}
-        html = page.render(scan, {"/Game/Forest/Meshes/SM_ForestRock_01": "ab.png"})
+        html = page.render(scan, {"/Game/Forest/Meshes/SM_ForestRock_01": "ab.png"},
+                           {"/Game/Forest/Meshes/SM_ForestRock_01": "ab.webp"})
         body = html.split('<script id="scan" type="application/json">')[1]
         raw = body.split("</script>")[0]
         meshes = json.loads(raw)["meshes"]
@@ -70,6 +71,7 @@ class PageTest(unittest.TestCase):
                          [("Environment", "rock"), ("Weapons", "melee")])
         self.assertEqual(meshes[1]["size_cm"], "</script>")
         self.assertEqual([m["thumb"] for m in meshes], ["thumbs/ab.png", ""])
+        self.assertEqual([m["spin"] for m in meshes], ["spins/ab.webp", ""])
         self.assertNotIn("__SCAN__", html)
 
 

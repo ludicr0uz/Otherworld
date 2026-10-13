@@ -17,10 +17,12 @@ Three steps, and this script runs them all:
               with its triangle counts and the levels that use it
               -> assets/generated/map_assets/meshes.json
               and each mesh photographed, as base colour and normals
-              (about a second a mesh; only the new and the changed ones
-              after the first run) -> assets/generated/map_assets/passes/
+              (only the new and the changed ones after the first run),
+              once for its picture -> assets/generated/map_assets/passes/
+              and from 16 sides for its turn -> .../spin_passes/
     2. shade  map_assets/shade.py, here (Pillow + numpy): the passes lit
               into a picture -> assets/generated/map_assets/thumbs/
+              and the turn into one strip -> .../spins/ (its passes deleted)
     3. page   map_assets/page.py, here
               -> assets/generated/map_assets/map_asset_browser.html
 
@@ -58,8 +60,11 @@ def main():
     elif not os.path.isfile(SCAN_JSON):
         sys.exit(f"no scan at {SCAN_JSON}: run once without --no-editor")
     with open(SCAN_JSON) as fh:
-        thumbs = shade.shade_all([m["path"] for m in json.load(fh)["meshes"]])
-    path, counts = page.build(thumbs)
+        paths = [m["path"] for m in json.load(fh)["meshes"]]
+    thumbs = shade.shade_all(paths)
+    # A mesh with no picture (a translucent one) has an empty turn too.
+    spins = {p: name for p, name in shade.spin_all(paths).items() if p in thumbs}
+    path, counts = page.build(thumbs, spins)
     print(f"{sum(counts.values())} meshes, {len(thumbs)} with a picture: "
           + ", ".join(f"{n} {c.lower()}" for c, n in counts.items()))
     print(path)

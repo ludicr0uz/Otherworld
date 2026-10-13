@@ -350,7 +350,7 @@ from forest_import import trees as trees_import
 from forest_import import tree_assets
 tree_assets.ensure_tree_assets()
 trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
-                         editor_asset_sub)
+                         editor_asset_sub, level=LEVEL_NAME)
 
 # ── 5a. Build the generated grass and bush meshes ────────────────────
 # Opaque Nanite patches and bushes, rebuilt in place every import --

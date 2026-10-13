@@ -9,6 +9,11 @@ A mesh's picture is a file in the folder beside the page (shade.py writes
 them; ``thumbs`` is {path: file name}), so the page and that folder move
 together. A mesh without one gets an empty tile.
 
+A click on a picture opens it large, and there the mesh turns: its turn is
+one strip of view.SPIN_FRAMES frames side by side (``spins`` is {path: file
+name}, in the other folder beside the page), shown a frame at a time as the
+pointer drags. A mesh with a picture and no strip is shown still.
+
 A mesh's bar is its triangles against the heaviest mesh on show, so the bars
 rescale with the filter.
 """
@@ -17,7 +22,8 @@ import json
 import os
 
 from map_assets.kinds import CATEGORIES, classify, pack_of
-from map_assets.paths import PAGE_HTML, SCAN_JSON, THUMB_DIR
+from map_assets.paths import PAGE_HTML, SCAN_JSON, SPIN_DIR, THUMB_DIR
+from map_assets.view import SPIN_FRAMES
 
 TEMPLATE = r"""<!doctype html>
 <html lang="en">
@@ -100,7 +106,29 @@ td small.cat { display: block; color: var(--muted); font-size: 11.5px; }
 td.pic { width: 76px; padding: 4px 4px 4px 10px; }
 td.pic img, td.pic div { display: block; width: 64px; height: 64px; border-radius: 6px;
   background: var(--row); }
-td.pic img { object-fit: contain; cursor: zoom-in; }
+td.pic img { object-fit: contain; }
+td.pic button { display: block; padding: 0; border: 0; background: none; border-radius: 6px;
+  cursor: zoom-in; }
+td.pic button:focus-visible, #viewClose:focus-visible { outline: 2px solid var(--accent);
+  outline-offset: 2px; }
+#view { width: min(92vw, 640px, calc(100vh - 150px)); padding: 16px; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .4); }
+#view::backdrop { background: rgba(0, 0, 0, .55); }
+#stage { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden;
+  background: var(--row); border-radius: 8px; touch-action: none; user-select: none; }
+#stage.turns { cursor: grab; }
+#stage.turns:active { cursor: grabbing; }
+#stage img, #viewSpin { position: absolute; inset: 0; width: 100%; height: 100%; }
+#stage img { object-fit: contain; }
+#viewSpin { background-repeat: no-repeat; }
+.cap { display: flex; gap: 12px; align-items: baseline; margin-top: 12px; padding-right: 0; }
+.cap b { font-weight: 650; word-break: break-all; }
+.cap span, .hint { color: var(--muted); font-size: 12.5px; }
+.cap span { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#viewClose { position: absolute; top: 22px; right: 22px; width: 30px; height: 30px;
+  font: 18px/1 inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 50%; cursor: pointer; }
 #big { position: fixed; z-index: 3; width: 280px; height: 280px; padding: 12px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, .28); pointer-events: none; }
@@ -134,6 +162,12 @@ td.pic img { object-fit: contain; cursor: zoom-in; }
   <div class="empty" id="empty" hidden>No mesh matches these filters.</div>
 </div>
 <div id="big" hidden><img alt=""></div>
+<dialog id="view" aria-labelledby="viewName">
+  <div id="stage"><img id="viewStill" alt="" draggable="false"><div id="viewSpin" hidden></div></div>
+  <div class="cap"><b id="viewName"></b><span id="viewMeta"></span></div>
+  <div class="hint" id="viewHint"></div>
+  <button id="viewClose" aria-label="Close">&times;</button>
+</dialog>
 <div id="toast" role="status">Path copied</div>
 <script id="scan" type="application/json">__SCAN__</script>
 <script>
@@ -227,7 +261,7 @@ function render() {
   });
   const max = rows.reduce((a, m) => Math.max(a, m.triangles), 1);
   $("rows").innerHTML = rows.map(m => `<tr>
-    <td class="pic">${m.thumb ? `<img loading="lazy" src="${esc(m.thumb)}" alt="${esc(m.name)}">` : "<div></div>"}</td>
+    <td class="pic">${m.thumb ? `<button data-open="${esc(m.path)}" title="Enlarge${m.spin ? " and turn" : ""}"><img loading="lazy" src="${esc(m.thumb)}" alt="${esc(m.name)}"></button>` : "<div></div>"}</td>
     <td class="name"><button data-path="${esc(m.path)}" title="Copy path">${esc(m.name)}</button>${m.nanite ? '<span class="tag">Nanite</span>' : ""}${m.type === "skeletal" ? `<span class="tag bones" title="Skeletal mesh">${m.bones} bones</span>` : ""}<small>${esc(m.path)}</small></td>
     <td>${esc(m.pack)}</td>
     <td>${m.kind}<small class="cat">${m.category}</small></td>
@@ -278,7 +312,75 @@ $("rows").addEventListener("mouseover", e => {
   big.hidden = false;
 });
 $("rows").addEventListener("mouseout", e => { if (e.target.tagName === "IMG") $("big").hidden = true; });
+// The large view. A turn is a strip of scan.spin_frames frames; a frame is
+// shown by sliding the strip, so a drag never waits for a file.
+const byPath = new Map(meshes.map(m => [m.path, m]));
+const view = { path: "", frame: 0, turns: false, drag: null };
+
+function showFrame(frame) {
+  const n = scan.spin_frames;
+  view.frame = ((frame % n) + n) % n;
+  $("viewSpin").style.backgroundPosition = `${100 * view.frame / (n - 1)}% 0`;
+}
+
+function openView(m) {
+  const still = $("viewStill"), spin = $("viewSpin");
+  $("big").hidden = true;
+  view.path = m.path;
+  view.turns = false;
+  view.drag = null;
+  $("stage").classList.remove("turns");
+  $("viewName").textContent = m.name;
+  $("viewMeta").textContent = `${fmt(m.triangles)} triangles · ${m.kind}`;
+  $("viewHint").textContent = m.spin ? "Loading the turn…" : "This mesh has no turn: run the build again to shoot one.";
+  still.src = m.thumb;
+  still.alt = m.name;
+  still.hidden = false;
+  spin.hidden = true;
+  if (m.spin) {
+    const strip = new Image();
+    strip.onload = () => {
+      if (view.path !== m.path) return;
+      spin.style.backgroundImage = `url("${m.spin}")`;
+      spin.style.backgroundSize = `${scan.spin_frames * 100}% 100%`;
+      showFrame(0);
+      spin.hidden = false;
+      still.hidden = true;
+      view.turns = true;
+      $("stage").classList.add("turns");
+      $("viewHint").textContent = "Drag sideways, or press ← and →, to turn it. Esc closes.";
+    };
+    strip.onerror = () => { if (view.path === m.path) $("viewHint").textContent = "The turn's file is missing: " + m.spin; };
+    strip.src = m.spin;
+  }
+  $("view").showModal();
+}
+
+$("stage").addEventListener("pointerdown", e => {
+  if (!view.turns) return;
+  $("stage").setPointerCapture(e.pointerId);
+  view.drag = { x: e.clientX, frame: view.frame };
+});
+$("stage").addEventListener("pointermove", e => {
+  if (!view.drag) return;
+  // One width of the stage is one whole turn; the near side follows the pointer.
+  const step = $("stage").clientWidth / scan.spin_frames;
+  showFrame(view.drag.frame + Math.round((e.clientX - view.drag.x) / step));
+});
+for (const type of ["pointerup", "pointercancel"]) $("stage").addEventListener(type, () => { view.drag = null; });
+$("view").addEventListener("keydown", e => {
+  if (!view.turns || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+  e.preventDefault();
+  showFrame(view.frame + (e.key === "ArrowRight" ? 1 : -1));
+});
+$("view").addEventListener("click", e => {
+  const box = $("view").getBoundingClientRect();
+  const outside = e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom;
+  if (e.target === $("viewClose") || (e.target === $("view") && outside)) $("view").close();
+});
 $("rows").addEventListener("click", e => {
+  const opener = e.target.closest("[data-open]");
+  if (opener) return openView(byPath.get(opener.dataset.open));
   const path = e.target.dataset.path;
   if (!path || !navigator.clipboard) return;
   navigator.clipboard.writeText(path).then(() => {
@@ -303,11 +405,12 @@ render();
 """
 
 
-def render(scan, thumbs=None):
+def render(scan, thumbs=None, spins=None):
     """The page's HTML for a scan ({"scanned": ..., "meshes": [...]}). Each
-    mesh is given its pack, its category and its kind."""
-    folder = os.path.basename(THUMB_DIR)
+    mesh is given its pack, its category, its kind, its picture and its turn."""
+    folder, spin_folder = os.path.basename(THUMB_DIR), os.path.basename(SPIN_DIR)
     scan["categories"] = list(CATEGORIES)
+    scan["spin_frames"] = SPIN_FRAMES
     for mesh in scan["meshes"]:
         mesh["pack"] = pack_of(mesh["path"])
         mesh["category"], mesh["kind"] = classify(mesh["path"])
@@ -315,16 +418,18 @@ def render(scan, thumbs=None):
         mesh.setdefault("bones", 0)
         name = (thumbs or {}).get(mesh["path"])
         mesh["thumb"] = f"{folder}/{name}" if name else ""
+        name = (spins or {}).get(mesh["path"])
+        mesh["spin"] = f"{spin_folder}/{name}" if name else ""
     # "</" would end the script element the JSON sits in.
     data = json.dumps(scan, separators=(",", ":")).replace("</", "<\\/")
     return TEMPLATE.replace("__SCAN__", data)
 
 
-def build(thumbs=None):
+def build(thumbs=None, spins=None):
     """Write PAGE_HTML from SCAN_JSON. Returns (path, {category: meshes})."""
     with open(SCAN_JSON) as fh:
         scan = json.load(fh)
     with open(PAGE_HTML, "w") as fh:
-        fh.write(render(scan, thumbs))
+        fh.write(render(scan, thumbs, spins))
     counts = {c: sum(m["category"] == c for m in scan["meshes"]) for c in CATEGORIES}
     return PAGE_HTML, {c: n for c, n in counts.items() if n}

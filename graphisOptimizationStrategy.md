@@ -188,3 +188,38 @@ The small fir of step 1 read as thin poles, so the fir is `fir_tree_01_a` again,
 | High | 252 ms (4 fps) | 56 ms (18 fps) | 95 ms (10.5 fps) |
 
 The tall fir costs about 4 ms at Medium over the small one, and cutting it further does not get that back: at 2.5% of the cards and 30% of the area it was still 3 ms over. A tree that size fills the screen. On these trees tree coarseness 2 saves about 2 ms at Medium and coarseness 4 about 6 ms (60 fps).
+
+## LOD chain and impostors on the 1 km map (2026-10-12)
+
+The "next thing to build" above is built. `Scripts/build_game_ready_mesh.py trees` (`Scripts/mesh_lod/`) cuts each of the five trees into a second build under `/Game/Forest/TreesLOD`: no Nanite, three mesh LODs (about 40 k, 16 k and 6 k triangles, starting at 0, 30 and 60 m) and from 110 m an impostor of three crossed cards. `Lvl_Forest_1000m` now plants that build (`forest_generator/tree_lods.py`); the 200 m and probe levels stay on Nanite. Cells and cull distances are unchanged.
+
+Same spot as before (the densest cluster, noon, 720p, no editor open), one probe run on the level as committed and on the level re-imported:
+
+| Preset | Nanite trees | LOD trees |
+|---|---|---|
+| Low | 16.7 ms (60 fps) | 15.9 ms (63 fps) |
+| Medium | 22.4 ms (45 fps) | 21.0 ms (48 fps) |
+| Medium, trees hidden | 12.8 ms | 12.0 ms |
+| High | 99.7 ms (10 fps) | 46.3 ms (22 fps) |
+
+These two columns compare with each other, not with the tables above: the game has changed since 1 October (Low was 11.0 ms then).
+
+What the measurements say:
+
+- **High halves.** It draws the full 300 m, and that is where the impostors and the low LODs do their work.
+- **Low and Medium are within noise.** The trees-hidden row differs by 0.8 ms between the two runs, which is most of the gap; at the spawn clearing Medium showed no difference. The 2 to 5 ms the fallback measurement promised did not appear at Medium.
+- **Trees are still about 9 ms of a 21 ms Medium frame** on either build.
+
+What it costs in looks:
+
+- **Close up the trees are coarser than the Nanite ones:** fewer, larger, brighter leaves and a thinner crown. LOD0 is 40 k triangles against the Nanite tree's 33–240 k.
+- **Firs at middle distance (LOD1 and LOD2) show bare boughs** sticking out of the needles.
+- **The impostors at long range read well.** `SM_IslandTree_02`'s shows several trunks, because its trunk leans off the pivot.
+
+Pictures of both builds from five viewpoints: `assets/generated/mesh_lod/level_compare/` (`nanite_*.png`, `lod_*.png`; git-ignored).
+
+Not measured: night, Retina-equivalent pixels, the distance each LOD actually switches at, and chopping a tree in the new level.
+
+Open choice: the close-range look is not paid for at Low and Medium. Building LOD0 from the full source (`--set lod0_triangles=250000`, then a re-import) should bring trees within 30 m close to the Nanite ones; whether the High gain survives that depends on how much of it comes from the distant trees, which is not yet measured. The other option is to take the level back to Nanite (remove it from `TREE_LOD_LEVELS` and re-import) and keep the LOD build for a High-only or lower-end path.
+
+`probe_perf_audit_1km.py` no longer runs to the end: it waits for the Low preset at start, and the game starts on the saved preset. These numbers came from a scratch probe that sets each preset itself.

@@ -205,7 +205,7 @@ if r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts" not in sy
     sys.path.insert(0, r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts")
 from forest_import import trees as trees_import
 trees_import.verify_trees(check, actors, EXPECTED_SPEC_COUNTS,
-                          EXPECTED_TREE_COUNT)
+                          EXPECTED_TREE_COUNT, level=LEVEL_NAME)
 from forest_import import tree_assets
 tree_assets.verify_tree_assets(check)
 

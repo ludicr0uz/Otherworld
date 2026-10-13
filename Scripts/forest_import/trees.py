@@ -12,6 +12,12 @@ long blamed here, are about 1.5 ms of it). So the meshes planted are not the
 scans but cut-down copies of them -- forest_generator/tree_meshes.py -- and the
 scans themselves are never planted or written to.
 
+A level named in forest_generator/tree_lods.py is planted from the other
+build of the same trees instead: no Nanite, a LOD chain ending in an impostor
+(/Game/Forest/TreesLOD, built by Scripts/build_game_ready_mesh.py). Its cells
+are the same cells with the same cull distances; the Nanite settings below do
+not apply to them and are left alone.
+
 ``disallow_nanite`` on the component would draw the mesh's fallback instead.
 The scans' own fallbacks had no leaves left (the simplifier deletes small
 disconnected cards first), so every tree rendered bare; the copies are built
@@ -29,13 +35,15 @@ import unreal
 from forest_generator.tree_cells import (
     TREE_CELL_MAX_DRAW_CM, TREE_CULL_END_CM, TREE_CULL_START_CM,
     TREE_LEAF_MASK_DISTANCE_CM, cell_label, cell_of, spec_of_label)
+from forest_generator.tree_lods import (
+    BUILD_COMMAND, MIN_TREE_LODS, lod_mesh_path, plants_lods)
 
 
 def _log(msg):
     unreal.log_warning(f"[GEN] {msg}")
 
 
-def _spawn_cell(actor_sub, label, mesh, materials):
+def _spawn_cell(actor_sub, label, mesh, materials, lods=False):
     actor = actor_sub.spawn_actor_from_class(unreal.Actor, unreal.Vector(0, 0, 0))
     actor.set_actor_label(label)
     comp = unreal.HierarchicalInstancedStaticMeshComponent(actor)
@@ -45,10 +53,11 @@ def _spawn_cell(actor_sub, label, mesh, materials):
     comp.set_collision_enabled(unreal.CollisionEnabled.QUERY_AND_PHYSICS)
     comp.set_mobility(unreal.ComponentMobility.STATIC)
     comp.set_editor_property("cast_shadow", True)
-    comp.set_editor_property("disallow_nanite", False)
-    # Leaves drawn unmasked (solid) past this distance -- see tree_cells.py.
-    comp.set_editor_property("nanite_pixel_programmable_distance",
-                             TREE_LEAF_MASK_DISTANCE_CM)
+    if not lods:
+        comp.set_editor_property("disallow_nanite", False)
+        # Leaves drawn unmasked (solid) past this distance -- see tree_cells.py.
+        comp.set_editor_property("nanite_pixel_programmable_distance",
+                                 TREE_LEAF_MASK_DISTANCE_CM)
     # Render culling only: collision (and so the navmesh) is unaffected.
     comp.set_editor_property("instance_start_cull_distance", TREE_CULL_START_CM)
     comp.set_editor_property("instance_end_cull_distance", TREE_CULL_END_CM)
@@ -58,12 +67,14 @@ def _spawn_cell(actor_sub, label, mesh, materials):
     return comp
 
 
-def plant_trees(tree_data, configs, actor_sub, asset_sub):
+def plant_trees(tree_data, configs, actor_sub, asset_sub, level=None):
     """Plant ``tree_data`` (dicts with spec, x, y, z, yaw, scale).
 
-    ``configs`` maps spec name -> {"mesh": path, "mats": [paths]}.
-    Returns (trees planted, cell actors spawned).
+    ``configs`` maps spec name -> {"mesh": path, "mats": [paths]}; ``level``
+    is the level's name, which says whether it takes the LOD build of each
+    mesh (tree_lods.py). Returns (trees planted, cell actors spawned).
     """
+    lods = plants_lods(level)
     groups = defaultdict(list)       # (spec, cell) -> placements
     for td in tree_data:
         groups[(td["spec"], cell_of(td["x"], td["y"]))].append(td)
@@ -71,7 +82,15 @@ def plant_trees(tree_data, configs, actor_sub, asset_sub):
     assets = {}
     for spec in sorted({s for s, _ in groups}):
         config = configs.get(spec)
-        mesh = asset_sub.load_asset(config["mesh"]) if config else None
+        path = config["mesh"] if config else None
+        if path and lods:
+            path = lod_mesh_path(path)
+            if not asset_sub.does_asset_exist(path):
+                # Not built here: its impostor's textures are made outside
+                # the editor. Stop before a level without trees is saved.
+                raise RuntimeError(f"{level} plants {path}, which is not "
+                                   f"built. Run: {BUILD_COMMAND}")
+        mesh = asset_sub.load_asset(path) if path else None
         if not mesh:
             unreal.log_error(f"[GEN] Missing tree mesh for {spec}")
             continue
@@ -83,7 +102,7 @@ def plant_trees(tree_data, configs, actor_sub, asset_sub):
             continue
         mesh, mats = assets[spec]
         comp = _spawn_cell(actor_sub, cell_label(spec, cell), mesh,
-                           [m for m in mats if m])
+                           [m for m in mats if m], lods)
         cells += 1
         comp.add_instances([unreal.Transform(
             location=unreal.Vector(td["x"], td["y"], td["z"]),
@@ -91,15 +110,48 @@ def plant_trees(tree_data, configs, actor_sub, asset_sub):
             scale=unreal.Vector(td["scale"], td["scale"], td["scale"]))
             for td in placements], False, True, False)
         planted += len(placements)
-    _log(f"Planted {planted} trees in {cells} cells")
+    _log(f"Planted {planted} trees in {cells} cells"
+         + (", from the LOD build" if lods else ""))
     return planted, cells
 
 
 # ─── Verification ────────────────────────────────────────────────────────────
 
-def verify_trees(check, actors, expected_counts, expected_total):
+def _verify_nanite(check, spec, comps):
+    classic = [l for l, c in comps if c.get_editor_property("disallow_nanite")]
+    check(f"{spec} Renders Nanite", not classic,
+          str(classic[:3]))
+    unmasked = {c.get_editor_property("nanite_pixel_programmable_distance")
+                for _, c in comps}
+    check(f"{spec} Leaves Unmasked Past {TREE_LEAF_MASK_DISTANCE_CM / 100:g} m",
+          unmasked == {TREE_LEAF_MASK_DISTANCE_CM}, str(sorted(unmasked)))
+    mesh = comps[0][1].get_editor_property("static_mesh") if comps else None
+    settings = mesh.get_editor_property("nanite_settings") if mesh else None
+    check(f"{spec} Mesh Keeps Nanite Data",
+          bool(settings and settings.get_editor_property("enabled")))
+
+
+def _verify_lods(check, spec, comps):
+    meshes = {c.get_editor_property("static_mesh") for _, c in comps}
+    paths = sorted(m.get_path_name() if m else "None" for m in meshes)
+    check(f"{spec} Planted From The LOD Build",
+          bool(paths) and all(p == lod_mesh_path(p) for p in paths), str(paths[:3]))
+    mesh = next(iter(meshes), None)
+    count = mesh.get_num_lods() if mesh else 0
+    check(f"{spec} Mesh Has A LOD Chain", count >= MIN_TREE_LODS, f"({count} LODs)")
+    settings = mesh.get_editor_property("nanite_settings") if mesh else None
+    check(f"{spec} Mesh Has No Nanite Data",
+          bool(settings) and not settings.get_editor_property("enabled"))
+    # Its last LOD is the impostor: a handful of triangles.
+    last = mesh.get_num_triangles(count - 1) if count else -1
+    check(f"{spec} Last LOD Is The Impostor", 0 < last <= 64, f"({last} triangles)")
+
+
+def verify_trees(check, actors, expected_counts, expected_total, level=None):
     """Checks over the saved tree cells. ``check(name, ok, detail)`` is the
-    verify script's own harness, so these tally with everything else."""
+    verify script's own harness, so these tally with everything else.
+    ``level`` is the level's name: which build it plants (tree_lods.py)."""
+    lods = plants_lods(level)
     cells = defaultdict(list)
     for a in actors:
         label = a.get_actor_label()
@@ -122,13 +174,7 @@ def verify_trees(check, actors, expected_counts, expected_total):
         passable = [l for l, c in comps
                     if str(c.get_collision_profile_name()) != "BlockAll"]
         check(f"{spec} Collision Profile BlockAll", not passable, str(passable[:3]))
-        classic = [l for l, c in comps if c.get_editor_property("disallow_nanite")]
-        check(f"{spec} Renders Nanite", not classic,
-              str(classic[:3]))
-        unmasked = {c.get_editor_property("nanite_pixel_programmable_distance")
-                    for _, c in comps}
-        check(f"{spec} Leaves Unmasked Past {TREE_LEAF_MASK_DISTANCE_CM / 100:g} m",
-              unmasked == {TREE_LEAF_MASK_DISTANCE_CM}, str(sorted(unmasked)))
+        (_verify_lods if lods else _verify_nanite)(check, spec, comps)
         distances = {(c.get_editor_property("ld_max_draw_distance"),
                       c.get_editor_property("instance_start_cull_distance"),
                       c.get_editor_property("instance_end_cull_distance"))
@@ -137,10 +183,6 @@ def verify_trees(check, actors, expected_counts, expected_total):
               distances == {(TREE_CELL_MAX_DRAW_CM, TREE_CULL_START_CM,
                              TREE_CULL_END_CM)},
               str(sorted(distances)[:3]))
-        mesh = comps[0][1].get_editor_property("static_mesh") if comps else None
-        settings = mesh.get_editor_property("nanite_settings") if mesh else None
-        check(f"{spec} Mesh Keeps Nanite Data",
-              bool(settings and settings.get_editor_property("enabled")))
 
     check("Total Tree Instances", total == expected_total,
           f"(expected {expected_total}, got {total})")

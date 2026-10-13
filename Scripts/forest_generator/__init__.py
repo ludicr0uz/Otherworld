@@ -25,4 +25,6 @@
   tree_lods  Which levels plant the trees with a LOD chain and an impostor, and which mesh that is
 
   undergrowth_meshes  The meshes the grass and the bushes are planted from
+
+  low_leaves  Which trees have leaves low enough to walk into, so that passing one is heard as passing a bush is ...
 """

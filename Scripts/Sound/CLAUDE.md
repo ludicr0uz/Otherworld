@@ -160,7 +160,7 @@
   - The breath: `SprintSpent`, which is the run key held with `Stamina` run out
     (`sprint.py`'s latch), every `BREATH_S`. No key can be injected into a headless
     game, so only the verifier covers it (`verify/sound_states.py`).
-- **Going through a bush rustles** (`sound_world.py`, on `BP_FootstepComponent`, so the
+- **Going through a bush rustles, and brushing a tree's low leaves** (`sound_world.py`, on `BP_FootstepComponent`, so the
   player's and every wanderer's). A bush has no collision, so nothing overlaps it: at
   BeginPlay the component collects the level's bush components (`Bushes`: of the actors
   tagged as grass cells, the instanced components whose mesh is one of `BushMeshes`), and
@@ -172,7 +172,19 @@
     in the same instant as the step and at a footstep's range; a zombie's heavier step
     covered it and it was not heard to go through a bush. Now a bush crossed is two or
     three rustles, and they carry on `A_Att_Rustle` (below).
-  - `probes/probe_state_sounds.py` walks the player, and a zombie, out of a bush.
+  - **A tree with low leaves rustles too:** the pine sapling, whose needles start at the
+    knee (`forest_generator/low_leaves.py`: each tree's lowest leaf, measured, and the
+    rule, a species whose largest tree still has leaves under 1.8 m; the first island tree
+    is left out, with why). `LeafTreeMeshes` holds both builds of its mesh and `LeafTrees`
+    the level's components of them, found in the same BeginPlay walk. A tree cell has no
+    tag, so that walk is over every actor of the level, not the grass cells alone. The
+    walker asks them as it asks the bushes, from further off (`LEAF_REACH_CM`, 70 cm): a
+    bush is walked through, but a sapling's needles are thinly in its collision and stop
+    a walker 100-200 cm from the stem, so the rustle starts about 30 cm before the body
+    meets the tips and goes on for as long as they push on into them.
+  - `probes/probe_state_sounds.py` walks the player, and a zombie, out of a bush, the
+    player up to a sapling (silent on the way, rustling from its needles to where they
+    stop them) and under a tree with its leaves overhead (silent).
   - **Feel check (needs a play session):** whether a zombie in a bush 10-20 m off is heard,
     and whether the player's own rustle (the same takes, twice as often) is too much; the
     SOUND SETTINGS tab's bush rustle row is its volume.

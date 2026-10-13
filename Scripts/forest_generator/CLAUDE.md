@@ -139,6 +139,13 @@ the day/night cycle actor.
     `uepy.py --only footsteps Scripts/build_weapons_and_combat.py`: the footstep component
     holds the bush meshes for the rustle (`Scripts/Sound/CLAUDE.md`), and
     `verify_weapons_and_combat.py` fails until it is rebuilt.
+- **A tree with low leaves rustles as a bush does** (`low_leaves.py`: each tree's leaf slot
+  and lowest leaf, and the rule that picks the pine sapling alone). After a recipe or a
+  tree spec's scale changes, run its unit test (`dev/tests/test_low_leaves.py`) and the
+  same footsteps build: `verify_weapons_and_combat.py` measures each built mesh's lowest
+  leaf against the table. **A tree's leaves are in its collision:** it is cooked from the
+  Nanite fallback, which keeps about a tenth of them, so a sapling is pushed into, not
+  walked through.
 - **Trees are cut-down copies of dense scans.** The scans (0.14–4.2 M triangles, 13–112 MB) stay
   under `/Game/Forest/Scanned` as imported; the levels plant the copies under
   `/Game/Forest/Trees` (33–240 k triangles), in the same per-cell HISMs as the grass

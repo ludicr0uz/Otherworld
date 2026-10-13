@@ -12,8 +12,8 @@ from:
                                        component has a binding of its own on
                                        its Blueprint's copy of it: the
                                        wanderers' is Sound/sound_monsters.py
-    BP_FootstepComponent.RustleSounds  a bush gone through, by anyone
-                                       (the rustle, below)
+    BP_FootstepComponent.RustleSounds  a bush gone through, or a tree's low
+                                       leaves, by anyone (the rustle, below)
     BP_HealthComponent.HurtSounds      the player's grunt   (the voice, below)
     BP_HealthComponent.DeathSounds     the player's cry
     BP_HealthComponent.HeartbeatSounds the player's heart at low health
@@ -35,7 +35,7 @@ from combat.weapon_component import vars as WV
 from combat.weapon_component.slot_nodes import for_each, not_, op
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
 from forest_generator.bush_placement import DEFAULT_BUSH_SPECS
-from forest_generator.grass_cells import GRASS_TAG
+from forest_generator.low_leaves import low_leaf_mesh_paths
 from Sound.bind import defaults_for
 from Sound.play import _author_random_sound
 from Sound.sound_def import (
@@ -53,7 +53,7 @@ from uebp.nodes.math import (
     FN_ADD_FF, FN_AND, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_LESS_FF, FN_MUL_FF,
     FN_SUB_FF)
 from uebp.nodes.palette import NODE_CAST_INSTANCED, NODE_CAST_PAWN
-from uebp.nodes.system import FN_SET_VOLUME, FN_TIME_SECONDS, FN_WITH_TAG
+from uebp.nodes.system import FN_ALL_ACTORS, FN_SET_VOLUME, FN_TIME_SECONDS
 from world import day_night_vars as DV
 from world.day_night_graph import _call, _map
 from world.day_night_graph import _get as _dn_get
@@ -77,7 +77,8 @@ if not RUSTLE_FULL_CM < RUSTLE_HEARD_CM <= AUDIBLE_LIMIT_CM:
         f"{RUSTLE_FULL_CM:g} (full volume) and at most {AUDIBLE_LIMIT_CM:g}")
 ATT_RUSTLE = AttenuationProfile(
     "A_Att_Rustle", RUSTLE_FULL_CM, RUSTLE_HEARD_CM - RUSTLE_FULL_CM, linear=True)
-# A bush gone through: leaves brushed past, heard from further than a footstep.
+# A bush gone through, or the low leaves of a tree: leaves brushed past, heard
+# from further than a footstep.
 GRASS_RUSTLE = Sound("grass_rustle", "bush rustle", takes("grass_rustle"), ATT_RUSTLE)
 PLAYER_BREATH = Sound("player_breath", "player out of breath", takes("player_breath"), ATT_FOLEY)
 # Under the rest: the recording is loud, and it plays for as long as the
@@ -293,11 +294,13 @@ def _author_breath(ed, owner_out, exec_ins):
 # they go through a bush. A bush has no collision (it is walked through), so
 # nothing overlaps it: the walker asks the bushes themselves.
 #
-#     [BeginPlay] every actor tagged as a grass cell -> its instanced mesh
-#                 component -> Bushes, if its mesh is one of BushMeshes
+#     [BeginPlay] every actor -> its instanced mesh component -> Bushes, if
+#                 its mesh is one of BushMeshes; LeafTrees, if one of
+#                 LeafTreeMeshes
 #     [every RustleStrideCm of ground covered: RUSTLE_STRIDE_CM]
 #                 InBush = some component of Bushes has an instance whose
-#                 bounds reach within RUSTLE_REACH_CM of the walker
+#                 bounds reach within RUSTLE_REACH_CM of the walker, or some
+#                 component of LeafTrees one within LEAF_REACH_CM
 #                 -> one of RustleSounds there, at StepVolume
 #
 # The rustle has a measure of its own (RustleTravelled), half a footfall's
@@ -306,29 +309,53 @@ def _author_breath(ed, owner_out, exec_ins):
 # zombie was not heard to go through a bush at all. On its own measure a bush
 # crossed is two or three, most of them between two steps.
 #
-# The bush cells carry the grass cells' tag and no other, so the mesh tells
-# them apart (the level needs no regenerating for this). The walk over Bushes
-# is per RUSTLE_STRIDE_CM, not per frame: 2 components on the 200 m map, 200
-# on the 1 km one.
+# A TREE WITH LOW LEAVES RUSTLES TOO. Where a tree's leaves start at the knee
+# (the pine sapling: forest_generator/low_leaves.py has the measure and the
+# rule) a walker passing it brushes them. LeafTreeMeshes holds those trees'
+# meshes, both builds of each, and LeafTrees the level's components of them.
+# A sapling's bounds are its low needles', so the same asking fits it, from
+# further off (LEAF_REACH_CM): a bush is walked through, but a sapling is
+# pushed into. Its needles are in its collision, thinly (the tenth of them
+# its Nanite fallback keeps), and a walker's middle stops 100-200 cm from the
+# stem, a capsule's half-width outside needles whose tips stand up to 40 cm
+# outside the bounds. Measured on the 200 m map with a 34 cm sphere swept at
+# seven saplings from eight sides.
+#
+# A bush cell carries the grass cells' tag and a tree cell none, so the mesh
+# tells what a cell is, and BeginPlay asks every actor of the level (about
+# 1,300 on the 1 km map; the level needs no regenerating for this). The walk
+# over the two is per RUSTLE_STRIDE_CM, not per frame: 8 components on the
+# 200 m map (4 of bushes, 4 of saplings), a few hundred on the 1 km one.
 
 RUSTLE_STRIDE_CM = 80.0
 RUSTLE_REACH_CM = 30.0
+# How near a low-leaved tree's bounds a walker rustles: their own half-width
+# (34 cm, where the needles stop them) and the tips outside the bounds.
+LEAF_REACH_CM = 70.0
 ISM_CLASS = "/Script/Engine.InstancedStaticMeshComponent"
+ACTOR_CLASS = "/Script/Engine.Actor"
+
+
 
 
 def rustle_defaults():
-    """{BushMeshes: the bush meshes, loaded (one never built is left out),
-    RustleStrideCm: the rustle's measure}."""
+    """{BushMeshes: the bush meshes, LeafTreeMeshes: the low-leaved trees',
+    loaded (one never built is left out), RustleStrideCm: the rustle's
+    measure}."""
     eas = _assets()
     return {FV.RustleStrideCm: RUSTLE_STRIDE_CM,
             FV.BushMeshes: [eas.load_asset(s.mesh_path) for s in DEFAULT_BUSH_SPECS
-                            if eas.does_asset_exist(s.mesh_path)]}
+                            if eas.does_asset_exist(s.mesh_path)],
+            FV.LeafTreeMeshes: [eas.load_asset(path) for path in low_leaf_mesh_paths()
+                                if eas.does_asset_exist(path)]}
 
 
 def _author_find_bushes(ed, exec_in):
-    """BeginPlay: Bushes = the level's bush components. Returns the exec pin after."""
+    """BeginPlay: Bushes = the level's bush components, LeafTrees = its
+    low-leaved trees'. Returns the exec pin after."""
     g = _G(ed)
-    cells = g.call(FN_WITH_TAG, [exec_in], Tag=GRASS_TAG)
+    cells = g.call(FN_ALL_ACTORS, [exec_in])
+    _pin(cells, "ActorClass").set_pin_value(ACTOR_CLASS)
     cell, _index, body, done = for_each(g, out(cells, "OutActors"), [then(cells)])
     comp = g.call(FN_GET_COMP, self=cell)
     _pin(comp, "ComponentClass").set_pin_value(ISM_CLASS)
@@ -338,12 +365,36 @@ def _author_find_bushes(ed, exec_in):
     as_ism = _loose_pin(instanced, "AsInstancedStaticMeshComponent", is_input=False)
     mesh = g.iget(as_ism, EP.STATIC_MESH, "/Script/Engine.StaticMeshComponent")
     known = g.call(FN_ARR_CONTAINS, TargetArray=g.get(FV.BushMeshes), ItemToFind=mesh)
-    bush, _other = g.branch(out(known), [then(instanced)])
+    bush, other = g.branch(out(known), [then(instanced)])
     g.call(FN_ARR_ADD, [bush], TargetArray=g.get(FV.Bushes), NewItem=as_ism)
+    leafy = g.call(FN_ARR_CONTAINS, TargetArray=g.get(FV.LeafTreeMeshes), ItemToFind=mesh)
+    tree, _neither = g.branch(out(leafy), [other])
+    g.call(FN_ARR_ADD, [tree], TargetArray=g.get(FV.LeafTrees), NewItem=as_ism)
     ed.add_comment_to_nodes(
-        f"The level's bushes: of the cells tagged {GRASS_TAG}, the instanced "
-        "components whose mesh is one of BushMeshes. A footfall asks them "
-        "whether it is inside one.", g.made)
+        "The level's bushes, and its trees with low leaves: of every actor, the "
+        "instanced components whose mesh is one of BushMeshes, into Bushes, or one of "
+        "LeafTreeMeshes, into LeafTrees (a tree cell has no tag to be found by). A "
+        "walker asks them whether they are at one.", g.made)
+    return done
+
+
+def _author_ask(g, comps_var, reach, at_pin, exec_in):
+    """Raise InBush if a component of ``comps_var`` has an instance whose
+    bounds come within ``reach`` cm of ``at_pin``. Returns the exec pin after."""
+    comp, _index, body, done = for_each(g, g.get(comps_var), [exec_in])
+    near = g.call(FN_INSTANCES_IN_SPHERE, self=comp, Center=at_pin)
+    _set(near, "Radius", reach)
+    _set(near, "bSphereInWorldSpace", True)
+    # Const, so pure here; were it ever given an exec pin, it goes in the chain.
+    runs = BEL.find_input_pin(near, "execute")
+    if runs and runs.is_valid():
+        _connect(body, runs)
+        body = then(near)
+    count = g.call(FN_ARR_LEN, TargetArray=out(near))
+    inside, _clear = g.branch(op(g, FN_GREATER_II, out(count), 0), [body])
+    mark = g.keep(g.ed.add_set_member_variable_node(FV.InBush))
+    _set(mark, FV.InBush, True)
+    _connect(inside, _pin(mark, "execute"))
     return done
 
 
@@ -362,27 +413,17 @@ def _author_rustle(ed, at_pin, volume_pin, moved_pin, exec_in):
     out_of = g.keep(ed.add_set_member_variable_node(FV.InBush))
     _set(out_of, FV.InBush, False)
     _connect(g.put(FV.RustleTravelled, out(left), [due]), _pin(out_of, "execute"))
-    bush, _index, body, done = for_each(g, g.get(FV.Bushes), [then(out_of)])
-    near = g.call(FN_INSTANCES_IN_SPHERE, self=bush, Center=at_pin)
-    _set(near, "Radius", RUSTLE_REACH_CM)
-    _set(near, "bSphereInWorldSpace", True)
-    # Const, so pure here; were it ever given an exec pin, it goes in the chain.
-    runs = BEL.find_input_pin(near, "execute")
-    if runs and runs.is_valid():
-        _connect(body, runs)
-        body = then(near)
-    count = g.call(FN_ARR_LEN, TargetArray=out(near))
-    inside, _clear = g.branch(op(g, FN_GREATER_II, out(count), 0), [body])
-    mark = g.keep(ed.add_set_member_variable_node(FV.InBush))
-    _set(mark, FV.InBush, True)
-    _connect(inside, _pin(mark, "execute"))
+    done = then(out_of)
+    for comps_var, reach in ((FV.Bushes, RUSTLE_REACH_CM), (FV.LeafTrees, LEAF_REACH_CM)):
+        done = _author_ask(g, comps_var, reach, at_pin, done)
     brushed, open_ground = g.branch(g.get(FV.InBush), [done])
     made, heard = _author_random_sound(ed, FV.RustleSounds, at_pin, brushed, volume_pin=volume_pin)
     ed.add_comment_to_nodes(
-        f"Going through a bush rustles: every {RUSTLE_STRIDE_CM:g} cm of ground covered, "
-        f"some component of Bushes has an instance within {RUSTLE_REACH_CM:g} cm of the "
-        "walker (a bush has no collision, so its instances' bounds are asked), and one of "
-        "RustleSounds plays there, at StepVolume.",
+        f"Going through a bush rustles, and brushing a tree's low leaves: every "
+        f"{RUSTLE_STRIDE_CM:g} cm of ground covered, some component of Bushes has an "
+        f"instance within {RUSTLE_REACH_CM:g} cm of the walker (a bush has no collision, "
+        f"so its instances' bounds are asked) or some component of LeafTrees one within "
+        f"{LEAF_REACH_CM:g} cm, and one of RustleSounds plays there, at StepVolume.",
         g.made + made)
     return (heard, open_ground, not_yet)
 

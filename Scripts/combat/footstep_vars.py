@@ -18,13 +18,17 @@ Sounds = Var("Sounds", array(obj("/Script/Engine.SoundBase")))
 # since the bushes were last asked and how much of it between two askings,
 # the takes, the
 # meshes that are bushes, the level's bush components (found at BeginPlay)
-# and whether this footfall is in one.
+# and whether the walker is in one. A tree with low leaves rustles too
+# (forest_generator/low_leaves.py): the meshes of those, and the level's
+# components of them.
 RustleSounds = Var("RustleSounds", array(obj("/Script/Engine.SoundBase")))
 BushMeshes = Var("BushMeshes", array(obj("/Script/Engine.StaticMesh")))
 Bushes = Var("Bushes", array(obj("/Script/Engine.InstancedStaticMeshComponent")))
 InBush = Var("InBush", BOOL, False)
 RustleTravelled = Var("RustleTravelled", FLOAT, 0.0)
 RustleStrideCm = Var("RustleStrideCm", FLOAT)
+LeafTreeMeshes = Var("LeafTreeMeshes", array(obj("/Script/Engine.StaticMesh")))
+LeafTrees = Var("LeafTrees", array(obj("/Script/Engine.InstancedStaticMeshComponent")))
 
 TABLE = (Travelled, StrideCm, StepVolume, StepNoise, Sounds, RustleSounds, BushMeshes, Bushes, InBush,
-         RustleTravelled, RustleStrideCm)
+         RustleTravelled, RustleStrideCm, LeafTreeMeshes, LeafTrees)

@@ -309,7 +309,9 @@ covers about 0.15 m², so the ground reads as tufts with terrain between them, n
 jittered grid with most cells left empty, so the floor alternates between open grass and
 thickets. The mesh is `SM_Bush_02` from the Light Foliage pack, 1.95 m tall and 3.5 m across,
 planted at 0.75–1.10×. They never block (planted with no collision), and the player's or a wanderer's
-passage through one is heard as a rustle (`Scripts/Sound/CLAUDE.md`).
+passage through one is heard as a rustle (`Scripts/Sound/CLAUDE.md`), and so is brushing
+the needles of a pine sapling, the one tree whose leaves start under head height
+(`forest_generator/low_leaves.py`).
 
 ### 3.2c NPC placement — `forest_generator/npc_placement.py`
 

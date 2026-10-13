@@ -333,8 +333,7 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_lyra.py
   falls back to the mannequin's `MM_Attack_01` on the UEFN skeleton
   (`retarget_to_uefn.py` still makes it) and says so in the build's log; the punch
   verifier then fails its "is Lyra's melee" line.
-- **The licence is not recorded** (`fab_library.json`, the entry's `license` is empty): ask
-  the user before a build with it ships.
+- **The licence is Fab's Standard** (`fab_library.json`, recorded 2026-10-13).
 
 ## Mixamo for the player: the knife's and the axe's clips (C2, 2026-10-08)
 

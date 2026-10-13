@@ -5,8 +5,7 @@ Run inside the editor:
 
     Scripts/dev/uepy.py Scripts/asset_pipeline/import_quaternius.py
 
-Before the weapons build, which draws the shotgun and the pistol from the gun
-pack; and again after build_retarget.py, because retargeting the clips needs
+Before the weapons build, which draws the shotgun from the gun pack; and again after build_retarget.py, because retargeting the clips needs
 the adventurer's IK rig. Without the rig, step 2 is skipped with a note and
 the player crouches and lies down procedurally until it runs again.
 
@@ -22,7 +21,7 @@ the names quaternius_paths lists.  Then:
     5. check it all, and log [VERIFY] lines like the suites do
 
 Then rebuild the weapons (build_weapons_and_combat.py): the player's anim BP
-plays the crouch and the crawl, and the shotgun and pistol are the pack's.
+plays the crouch and the crawl, and the shotgun is the pack's.
 """
 
 import os
@@ -41,13 +40,13 @@ from asset_pipeline.quaternius_import import (                    # noqa: E402
     import_prop_packs, import_ual_packs, import_zombie,
 )
 from asset_pipeline.quaternius_paths import (                     # noqa: E402
-    CROUCH_IDLE, CROUCH_WALK, PICKUP, PISTOL_MODEL, PRONE_CRAWL, SEARCH_KNEEL, SHOTGUN_MODEL,
+    CROUCH_IDLE, CROUCH_WALK, PICKUP, PRONE_CRAWL, SEARCH_KNEEL, SHOTGUN_MODEL,
     THROW, UAL_CHARACTERS, prop_mesh, ual_clip,
 )
 from asset_pipeline.rig_util import _bone_world, _load            # noqa: E402
 from asset_pipeline.ual_retarget import retarget_ual              # noqa: E402
 from combat.skin import SKIN_ADVENTURER                           # noqa: E402
-from combat.weapon_models import PISTOL_MESH, SHOTGUN_MESH        # noqa: E402
+from combat.weapon_models import SHOTGUN_MESH                     # noqa: E402
 
 
 def _extent(clip, bones):
@@ -121,8 +120,7 @@ def main():
     for short, (fbxs, meshes) in props.items():
         check(f"{short}: every FBX of the pack is a static mesh",
               fbxs > 0 and len(meshes) == fbxs, f"({len(meshes)}/{fbxs})")
-    for (short, stem), used in ((SHOTGUN_MODEL, SHOTGUN_MESH),
-                                (PISTOL_MODEL, PISTOL_MESH)):
+    for (short, stem), used in ((SHOTGUN_MODEL, SHOTGUN_MESH),):
         check(f"combat.weapon_models draws {stem} from {short}",
               used == prop_mesh(short, stem)
               and unreal.EditorAssetLibrary.does_asset_exist(used), used)

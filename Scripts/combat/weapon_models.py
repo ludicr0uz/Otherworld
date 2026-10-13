@@ -1,9 +1,10 @@
 """Every gun as a real model: the SMG, the rifle and the sniper are the FPS
 Weapon Bundle's SMG11, AK 47 and AS Val (Deadghost Interactive, a Fab pack
-under /Game/FPS_Weapon_Bundle), the shotgun and the pistol are Quaternius's
-Ultimate Gun Pack's Shotgun_3 and Pistol_1 (CC0, imported by
-asset_pipeline/import_quaternius.py). How each is placed in the weapon's
-frame, and the measured outline every grip and sight check reads.
+under /Game/FPS_Weapon_Bundle), the shotgun is Quaternius's Ultimate Gun
+Pack's Shotgun_3 (CC0, imported by asset_pipeline/import_quaternius.py), and
+the pistol is Stein Games' 1911 (a Fab listing taken raw, under
+/Game/Fab/1911_Pistol_High_Poly). How each is placed in the weapon's frame,
+and the measured outline every grip and sight check reads.
 
 WHY AN OUTLINE AS WELL AS A MODEL
 ---------------------------------
@@ -29,13 +30,13 @@ The pack's _X/_Y are not texture variants but axis variants: SK_KA47 (_Y) and
 SK_KA47_X are the same gun lying along +Y and +X. The _X is used so no
 rotation has to be carried.
 
-The Quaternius guns also point down +X with +Z up, but at no one size (the
-pistol is 1.8 m long as imported, the shotgun 5.8 m), so each carries its own
-scale to real size: the shotgun 104 cm, the pistol 20. The outlines below are
-measured on the scaled mesh.
+The Quaternius shotgun also points down +X with +Z up, but is 5.8 m long as
+imported, so it carries its own scale to real size, 104 cm. The 1911 lies
+along +Y a little over real size, so it carries a quarter turn and a scale.
+The outlines below are measured on the mesh as it is placed.
 
-Nothing here acquires either pack. A clone without them fails the build at
-_must_load with the pack's name; fab_library.json is the Fab pack's restore
+Nothing here acquires any of the packs. A clone without them fails the build
+at _must_load with the pack's name; fab_library.json is the Fab packs' restore
 recipe, and the Quaternius zips go in assets/cache/quaternius/.
 """
 
@@ -51,10 +52,12 @@ AK47_MESH = f"{FAB_WEAPONS}/Ka47/SK_KA47_X"
 VAL_MESH = f"{FAB_WEAPONS}/KA_Val/SK_KA_Val_X"
 SCOPE_MESH = f"{FAB_WEAPONS}/Accessories/SM_Scope_25x56_X"
 
-# asset_pipeline/quaternius_paths.SHOTGUN_MODEL and PISTOL_MODEL.
+# asset_pipeline/quaternius_paths.SHOTGUN_MODEL.
 QUATERNIUS_GUNS = "/Game/Sourced/Quaternius/Guns"
 SHOTGUN_MESH = f"{QUATERNIUS_GUNS}/SM_Shotgun_3"
-PISTOL_MESH = f"{QUATERNIUS_GUNS}/SM_Pistol_1"
+
+# "1911 Pistol - High Poly" in fab_library.json (asset_pipeline/fab_raw_import.py).
+PISTOL_MESH = "/Game/Fab/1911_Pistol_High_Poly/SM_1911_02"
 
 
 def _eye_behind(rear, front, eye_x):
@@ -227,7 +230,7 @@ TRIGGER_REACH_CM = 2.5
 # the guard; putting it in the guard would hang the fist 3 cm under the wood.
 SHOTGUN_TRIGGER_REACH_CM = 4.5
 # Lyra's pistol ready pose lays the index straight along the frame, above
-# the guard, not on the trigger: 3.9 cm from the pistol's guard, 3.5 from the
+# the guard, not on the trigger: 3.8 cm from the pistol's guard, 3.5 from the
 # SMG's (verify/grip_fit.py; the pose until C3 had it 1.7 off).
 PISTOL_POSE_TRIGGER_REACH_CM = 4.5
 
@@ -267,34 +270,46 @@ def shotgun_outline():
     )
 
 
-# ─── Quaternius Pistol_1: the pistol ────────────────────────────────────────
+# ─── 1911: the pistol ────────────────────────────────────────────────────────
 
-# A service automatic: the slide over a short frame, the grip raked back with
-# the weapon's origin inside it, a rear notch and a front post on the slide.
-PISTOL_SCALE = 0.11
+# Stein Games' 1911 (a Fab listing taken raw, fab_library.json): a Government
+# model with its hammer down, the slide over a frame with a short dust cover,
+# the grip raked back. The mesh lies along +Y at 108% of the real gun (23.4 cm
+# from the beavertail to the muzzle), so the model is turned a quarter turn
+# onto +X and scaled to 21.1 cm. Its origin is already where the weapon's
+# belongs: inside the top of the grip, behind the trigger guard.
+PISTOL_SCALE = 0.9
 PISTOL_MODEL = (
-    ("Model", PISTOL_MESH, (0.0, 0.0, 0.0), _rot(), (PISTOL_SCALE,) * 3),
+    ("Model", PISTOL_MESH, (0.0, 0.0, 0.0), _rot(yaw=-90.0), (PISTOL_SCALE,) * 3),
 )
 
-# The barrel's end, standing a centimetre proud of the slide.
-PISTOL_MUZZLE = (16.4, 0.0, 6.35)
+# The middle of the bore at the barrel's face, flush with the slide's front.
+PISTOL_MUZZLE = (16.3, 0.0, 6.48)
 
-# The sight line: the top of the rear notch (two blades 8.125 high at x -1.2,
-# 4.4 mm apart) and the tip of the front post (8.29 at x 13.9, 4.4 mm wide),
-# the post's tip level with the blades. The eye is 21 cm behind the slide's
-# back: far enough that both hands stand partly in the view, round the gun
-# (at 10 cm the slide's back alone filled a quarter of it).
-PISTOL_SIGHT_REAR = (-1.2, 0.0, 8.125)
-PISTOL_SIGHT_FRONT = (13.9, 0.0, 8.29)
+# The sight line: the top of the rear blades (8.06 high at their front edge,
+# x -0.58, a notch 4.9 mm wide between them) and the tip of the front post
+# (7.90 at x 15.0, 2.6 mm wide): the post stands 1.6 mm lower than the
+# blades, so the line falls a little to the front. The eye is 21 cm behind
+# the hammer: far enough that both hands stand partly in the view, round the
+# gun (at 10 cm the slide's back alone filled a quarter of it).
+PISTOL_SIGHT_REAR = (-0.58, 0.0, 8.064)
+PISTOL_SIGHT_FRONT = (15.01, 0.0, 7.902)
 PISTOL_SIGHT = _eye_behind(PISTOL_SIGHT_REAR, PISTOL_SIGHT_FRONT, -25.0)
 
 
 def pistol_outline():
     return (
-        _box("Slide",        (-3.7, -1.6, 3.3),  (16.3, 1.6, 7.7)),
-        _box("RearSight",    (-1.7, -1.8, 7.7),  (-0.7, 1.8, 8.125)),
-        _box("FrontSight",   (13.3, -0.8, 7.7),  (15.3, 0.8, 8.29)),
-        _box("Frame",        (2.3, -1.6, 2.3),   (8.3, 1.6, 3.3)),
-        _box("Grip",         (-3.7, -1.8, -4.5), (2.3, 1.8, 3.3)),
-        _box("TriggerGuard", (3.3, -0.8, 0.9),   (8.3, 0.8, 2.3)),
+        _box("Slide",        (-3.1, -1.0, 3.9),   (16.3, 1.0, 7.47)),
+        # The blades up to their highest edge, and the post from its tip on.
+        _box("RearSight",    (-1.55, -0.5, 7.47), (-0.58, 0.5, 8.064)),
+        _box("FrontSight",   (14.9, -0.13, 7.47), (16.0, 0.13, 7.902)),
+        _box("Hammer",       (-4.8, -0.35, 4.15), (-3.1, 0.35, 5.6)),
+        # The frame over the trigger, between the grip and the dust cover.
+        _box("Frame",        (1.7, -0.75, 3.15),  (7.6, 0.75, 3.9)),
+        # The grip between its straps at mid height (it is raked: the back
+        # strap runs from x -3.1 under the slide to -4.5 at the butt), the
+        # panels' 3.1 cm across, down to the magazine's floor.
+        _box("Grip",         (-3.9, -1.55, -6.3), (1.5, 1.55, 0.9)),
+        # The guard's bar under the trigger.
+        _box("TriggerGuard", (1.8, -0.5, 0.9),    (7.4, 0.5, 1.45)),
     )

@@ -452,8 +452,9 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     above the fist's centre, so no fist on the wood reaches the guard: the `Grip` box is the
     wrist and the receiver's back belly (furthest joint 3.4 cm off), and the index lies along
     the receiver 4.1 cm above the guard. Its row carries `trigger_reach` 4.5 for that check
-    (`SHOTGUN_TRIGGER_REACH_CM`); the others keep 2.5. The pistol (`Pistol_1`) fits like the
-    rest: 2.9 cm, index 1.7 cm off.
+    (`SHOTGUN_TRIGGER_REACH_CM`); the others keep 2.5. The pistol (the 1911) fits like the
+    rest: furthest joint 2.9 cm off; its index lies 3.8 cm above the guard's bar, inside
+    the pistol pose's 4.5 (`PISTOL_POSE_TRIGGER_REACH_CM`).
 - **The shotgun is held in the rifle's ready pose** (C3; until then a pose keyed for it,
   `A_AimShotgun`), and its left hand has a point of its own (`shotgun_hold.py`).
   - **Why:** the rifle pose stands the left thumb up the handguard, far under the AK's and

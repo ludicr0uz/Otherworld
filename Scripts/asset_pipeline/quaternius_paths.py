@@ -129,6 +129,5 @@ PICKUP = ("UAL2", "Farm_Harvest")
 # The clip the hands are calibrated on (palm_twist): hands at rest.
 PALM_CALIBRATION = ("UAL1", "Idle_Loop")
 
-# The shotgun and pistol models (combat/weapon_models.py).
+# The shotgun's model (combat/weapon_models.py).
 SHOTGUN_MODEL = ("Guns", "Shotgun_3")
-PISTOL_MODEL = ("Guns", "Pistol_1")

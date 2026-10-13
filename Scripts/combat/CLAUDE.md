@@ -105,11 +105,19 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
 - **A new weapon is a row plus a model and its outline.** Add a row in
   `weapon_specs._weapon_specs()`. Adding the SMG, the rifle and the sniper changed **no** node
   in the fire, reload or gate graphs.
-- **The shotgun and the pistol are Quaternius models** (`weapon_models.py`): the Ultimate Gun
-  Pack's `SM_Shotgun_3` (a pump gun with a straight wooden stock) and `SM_Pistol_1`, CC0,
+- **The pistol is a 1911** (`weapon_models.py`): Stein Games' `SM_1911_02`, a Fab listing
+  taken raw ("1911 Pistol - High Poly" in `fab_library.json`, under
+  `/Game/Fab/1911_Pistol_High_Poly`, not committed), drawn in its own material. The mesh
+  lies along +Y at 108% of the real gun, so its row's model carries a quarter turn
+  (yaw -90) and a scale of 0.9 (21.1 cm); its origin is already inside the top of the grip.
+  A mesh's turn is not checked against its outline by any verifier: after changing it,
+  look at the icon (`build_item_icons.py Pistol`), which is the Blueprint's own picture.
+  Until 13 Oct 2026 it was Quaternius's `SM_Pistol_1`.
+- **The shotgun is a Quaternius model** (`weapon_models.py`): the Ultimate Gun
+  Pack's `SM_Shotgun_3` (a pump gun with a straight wooden stock), CC0,
   imported by `asset_pipeline/import_quaternius.py` into `/Game/Sourced/Quaternius/Guns`
-  (zips in `assets/cache/quaternius/`). The pack is at no one size, so each row's model
-  carries its scale to real size (0.18 and 0.11: 104 cm and 20 cm). Static meshes have no
+  (zips in `assets/cache/quaternius/`). The pack is at no one size, so its row's model
+  carries its scale to real size (0.18: 104 cm). Static meshes have no
   muzzle socket: the muzzles are the barrels' ends, measured. The shotgun's index can't reach
   its guard from the rifle's ready pose (`docs/aiming.md`). The shotgun is held in the
   rifle's ready pose, a shipped clip, and down the sights its left hand is held on a point

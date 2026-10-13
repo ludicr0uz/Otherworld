@@ -15,9 +15,10 @@ from combat.anim_blueprint import AIM_SLOT, _slot_name
 from combat.carry_pose import carry_fields
 from combat.body_pose import POSE_CROUCH
 from combat.carry_pose_consts import (
-    CARRY_BLEND_SPEED, CARRY_CROUCH_WALK_FULL_CM_S, CARRY_FOR_VAR, CARRY_JOG_FULL_CM_S,
-    CARRY_POSE, CARRY_SPRINT, CARRY_SPRINT_BLEND_SPEED,
+    CARRY_ALSO_VAR, CARRY_BLEND_SPEED, CARRY_CROUCH_WALK_FULL_CM_S, CARRY_FOR_VAR,
+    CARRY_JOG_FULL_CM_S, CARRY_POSE, CARRY_SPRINT, CARRY_SPRINT_BLEND_SPEED,
 )
+from combat.finger_pose import clips as finger_clips
 from combat.gas_moves import slide_on, traversal_on
 from combat.gas_moves_tuning import DOING_VAR
 from combat.skin import player_skin
@@ -183,10 +184,12 @@ def check_carry_weights():
               and bool(now) and _title(PIN.get_owning_node(now[0])) == f"Get {name}")
     behind = _behind(BEL.find_input_pin(writes[CARRY_POSE][0], CARRY_POSE), 80)
     reads = {_title(n) for n in behind}
-    wants = {"Get Lowered", "Get HandPose", f"Get {CARRY_FOR_VAR}", "Get Stance",
+    wants = {"Get Lowered", "Get HandPose", f"Get {CARRY_FOR_VAR}",
+             f"Get {CARRY_ALSO_VAR}", "Get Stance",
              "Get Searching"} | ({f"Get {DOING_VAR}"} if traversal_on() else set())
     calls = {"IsSliding"} if slide_on() else set()
-    check(f"...{CARRY_POSE} targets Lowered AND HandPose == {CARRY_FOR_VAR} AND a "
+    check(f"...{CARRY_POSE} targets Lowered AND HandPose == {CARRY_FOR_VAR} (or one "
+          f"of {CARRY_ALSO_VAR}) AND a "
           "stance, not searching" + (", not sliding" if slide_on() else "")
           + (", not in a traversal" if traversal_on() else ""),
           wants <= reads and calls <= reads, str(sorted((wants | calls) - reads)))
@@ -215,7 +218,10 @@ def check_carried_guns():
     check(f"{CARRY_FOR_VAR} is the rifle's ready pose",
           pose is not None and pose.get_path_name().split(".")[0] == skin.aim_rifle,
           str(pose.get_path_name() if pose else None))
-    carried = sorted(sp["display"] for sp in _weapon_specs() if sp["aim"] == skin.aim_rifle)
+    also = sorted(a.get_path_name().split(".")[0] for a in w.get_editor_property(CARRY_ALSO_VAR))
+    check(f"{CARRY_ALSO_VAR} is that pose with a gun's own fingers: every fitted gun's clip",
+          also == sorted(finger_clips()), str(also))
+    carried = sorted(sp["display"] for sp in _weapon_specs() if sp["pose"] == skin.aim_rifle)
     check("...which the rifle, the sniper and the shotgun are held in, and no "
           "one-handed gun", len(carried) == 3, str(carried))
 

@@ -20,7 +20,9 @@ piece, brought to where its fingers' joints fit the part the row names
   - no joint in a part beside the one held (the AK's magazine);
   - the wrist within the arm's reach: the IK does not stretch.
 
-Only the place moves. The hand's turn and its fingers are the clip's.
+Only the place moves. The hand's turn is the clip's, and so are its fingers
+here: finger_pose.py bends them onto the model afterwards, for the rows
+weapon_models.GUN_FINGERS names.
 
 A NEW GUN
 ---------
@@ -124,15 +126,18 @@ def finger_points(bones, comp, tip_cm):
     return at + [tuple(p + tip_cm * d for p, d in zip(at[-1], tip))]
 
 
-def held(skin, spec):
+def held(skin, spec, clip=None):
     """``spec``'s ready pose with the gun in its hand: (the pose in the
     component, the weapon's quat there, a function placing a component point
     in the weapon's frame). Against the solved grip (the row's grip_rot and
-    grip_loc): a Grip somebody placed by eye does not move the left hand."""
+    grip_loc): a Grip somebody placed by eye does not move the left hand.
+    The pose is the row's `pose`, which the hands are seated in; ``clip``
+    names another (the row's own clip with its fingers bent, finger_pose.py)."""
+    path = clip or spec["pose"]
     mesh = _assets().load_asset(skin.mesh)
-    clip = _assets().load_asset(spec["aim"])
+    clip = _assets().load_asset(path)
     if mesh is None or clip is None:
-        raise RuntimeError(f"could not load {skin.mesh} or {spec['aim']}")
+        raise RuntimeError(f"could not load {skin.mesh} or {path}")
     comp = _shown(clip, mesh, mesh_ref_pose(mesh))
     weapon = weapon_rotation(spec, comp)
     origin = weapon_origin(comp, spec["grip_loc"])
@@ -251,4 +256,4 @@ def support_point(skin, spec, quiet=False):
     comp, weapon, _placed = held(skin, spec)
     move = _turn(weapon, support_move(skin, spec, quiet))
     in_hand = _turn(_conj(comp[skin.pose_bones["hand_r"]][1]), move)
-    return tuple(round(a + m, 3) for a, m in zip(support_at(skin, spec["aim"]), in_hand))
+    return tuple(round(a + m, 3) for a, m in zip(support_at(skin, spec["pose"]), in_hand))

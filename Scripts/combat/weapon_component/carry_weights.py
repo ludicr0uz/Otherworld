@@ -2,14 +2,16 @@
 CarrySprint ease towards (carry_pose.py owns the nodes they weight;
 pose_weights.py eases them, on every machine's copy).
 
-    CarryPose   -> Lowered AND HandPose == CarryFor AND NOT Stance == PRONE
+    CarryPose   -> Lowered AND (HandPose == CarryFor OR HandPose in CarryAlso)
+                   AND NOT Stance == PRONE
                    AND NOT Searching AND NOT sliding AND NOT in a traversal
     CarrySprint -> the movement's IsSprinting
 
 Lowered (carry.py) is already "no ready pose": a gun nothing holds up, or a
 sprint. HandPose (look.py) is the pose the hand's item is held in, and CarryFor
-is the rifle's ready pose, which the rifle, the sniper and the shotgun share:
-so the carry is theirs alone, and the pistol, the knife and empty hands keep
+is the rifle's ready pose, which the rifle, the sniper and the shotgun share
+(CarryAlso: that pose with one gun's fingers fitted to it, finger_pose.py,
+which is such a gun's HandPose instead): so the carry is theirs alone, and the pistol, the knife and empty hands keep
 the locomotion's arms. Both travel to the other machines already (LookLowered,
 LookPose), so another player's copy carries with nothing new replicated.
 
@@ -19,7 +21,7 @@ own if it ever were not). Not while searching a body, sliding or in a
 traversal, which pose the whole body themselves.
 """
 
-from combat.carry_pose_consts import CARRY_FOR_VAR, CARRY_POSE, CARRY_SPRINT
+from combat.carry_pose_consts import CARRY_ALSO_VAR, CARRY_FOR_VAR, CARRY_POSE, CARRY_SPRINT
 from combat.carry_tuning import LOWERED_VAR
 from combat.gas_moves import traversal_on
 from combat.gas_moves_tuning import DOING_VAR
@@ -30,7 +32,8 @@ from combat.weapon_component.stance import PRONE, STANCE_VAR
 from uebp.g import _G
 from uebp.graph import _pin, out
 from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNER
-from uebp.nodes.math import FN_AND, FN_EQ_II, FN_EQ_OO, FN_NOT
+from uebp.nodes.array import FN_ARR_CONTAINS
+from uebp.nodes.math import FN_AND, FN_EQ_II, FN_EQ_OO, FN_NOT, FN_OR
 from uebp.nodes.move import FN_IS_SPRINTING
 
 
@@ -47,6 +50,9 @@ def carry_targets(ed, sliding=None):
 
     owner = out(g.call(FN_GET_OWNER))
     long_gun = out(g.call(FN_EQ_OO, A=g.get(HandPose), B=g.get(CARRY_FOR_VAR)))
+    fitted = g.call(FN_ARR_CONTAINS, TargetArray=g.get(CARRY_ALSO_VAR),
+                    ItemToFind=g.get(HandPose))
+    long_gun = out(g.call(FN_OR, A=long_gun, B=out(fitted)))
     upright = never(out(g.call(FN_EQ_II, A=g.get(STANCE_VAR), B=PRONE)))
     on = both(both(g.get(LOWERED_VAR), long_gun), upright)
     on = both(on, never(g.get(WV.Searching)))

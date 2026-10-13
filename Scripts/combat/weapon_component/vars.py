@@ -18,7 +18,7 @@ from combat.breath_tuning import (
     BREATH_FORCED_VAR, BREATH_HELD_VAR, BREATH_HOLD_S, BREATH_SCALE_VAR, BREATH_VAR,
     WINDED_VAR,
 )
-from combat.carry_pose_consts import CARRY_FOR_VAR
+from combat.carry_pose_consts import CARRY_ALSO_VAR, CARRY_FOR_VAR
 from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR, RAISE_FORCED_VAR
 from combat.chop_tuning import (
     CHOP_COUNT_VAR, CHOP_ITEM_VAR, CHOP_TREE_VAR, WOOD_CLASS_VAR, WOOD_SPOT_VAR,
@@ -306,6 +306,8 @@ PunchQueued = Var("PunchQueued", BOOL, False)
 # The ready pose whose guns are carried at the hip (carry_weights.py): the
 # rifle's, which the sniper and the shotgun share. None without the clips.
 CarryFor = Var(CARRY_FOR_VAR, _CLIP)
+# That pose with one gun's fingers fitted (finger_pose.py): carried too.
+CarryAlso = Var(CARRY_ALSO_VAR, array(_CLIP))
 PunchPending = Var("PunchPending", BOOL, False)
 NextPunchTime = Var("NextPunchTime", FLOAT, 0.0)
 PunchDueTime = Var("PunchDueTime", FLOAT, 0.0)
@@ -409,7 +411,7 @@ STATE = (
     FirePressedAt,
     SprintForced, AimForced, AimHeld, DebugMode, HitBone, HitPoint, ShotgunClass, PistolClass,
     KnifeClass, AxeClass, MatchesClass, StickClass, StarterPantsClass,
-    ImpactClass, CampfireClass, PunchAnim, CarryFor,
+    ImpactClass, CampfireClass, PunchAnim, CarryFor, CarryAlso,
     PunchQueued, PunchPending, NextPunchTime, PunchDueTime, BlowDamage, KnifeAnim, AxeAnim,
     AxePose, KnifeQueued, KnifePending, NextKnifeTime, KnifeDueTime, InteractTarget,
     InteractGap, InteractForced, CrouchForced, ThrowAiming, ThrowKeyForced, ThrowClickForced,

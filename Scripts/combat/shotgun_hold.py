@@ -66,7 +66,8 @@ def row(skin):
     """What gun_hold reads of the shotgun's row of weapon_specs, made here so
     a check of the shotgun does not solve all five guns."""
     grip_rot = _grip_rotation(skin.aim_rifle)
-    return dict(display="Shotgun", aim=skin.aim_rifle, parts=shotgun_outline(),
+    return dict(display="Shotgun", aim=skin.aim_rifle, pose=skin.aim_rifle,
+                parts=shotgun_outline(),
                 grip_rot=grip_rot,
                 grip_loc=_grip_location(skin.aim_rifle, grip_rot, shotgun_outline()),
                 sight_rear=SHOTGUN_SIGHT_REAR, sight_front=SHOTGUN_SIGHT_FRONT,

@@ -25,3 +25,6 @@ CARRY_CROUCH_WALK_FULL_CM_S = 120.0
 # rifle's, which the sniper and the shotgun are held in too). HandPose is
 # compared with it, which every machine's copy has (look.py).
 CARRY_FOR_VAR = "CarryFor"
+# And CarryAlso: the clips that are that pose with a gun's own fingers
+# (finger_pose.py), which such a gun's HandPose is instead.
+CARRY_ALSO_VAR = "CarryAlso"

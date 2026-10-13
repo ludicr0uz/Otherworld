@@ -36,7 +36,7 @@ import unreal
 
 from combat.anim_blueprint import AIM_SLOT
 from combat.body_pose import POSE_CROUCH
-from combat.carry_pose_consts import CARRY_FOR_VAR, CARRY_POSE, CARRY_SPRINT
+from combat.carry_pose_consts import CARRY_ALSO_VAR, CARRY_FOR_VAR, CARRY_POSE, CARRY_SPRINT
 from combat.carry_tuning import (
     CARRY_GRIP, CARRY_RAISE_HOLD_S, LOWERED_VAR, RAISE_FORCED_VAR,
 )
@@ -224,7 +224,10 @@ def _gun(p, player, wc, anim, layers, label, index):
     yield lambda: p.get(wc, "Held") == p.get(wc, "Inventory")[index]
     held = p.get(wc, "Held")
     pose = p.get(wc, CARRY_FOR_VAR)
-    carried = pose is not None and held.get_editor_property("AimPose") == pose
+    # The rifle's ready pose, or that pose with the gun's own fingers
+    # (combat/finger_pose.py: the rifle and the sniper).
+    aim = held.get_editor_property("AimPose")
+    carried = pose is not None and (aim == pose or aim in list(p.get(wc, CARRY_ALSO_VAR)))
     _rest(p, held)
     yield _until(lambda: p.get(wc, LOWERED_VAR))
     if carried:

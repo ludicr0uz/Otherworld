@@ -116,6 +116,9 @@ and it never relies on a variable another section left behind.
   gun_hold    both hands fitted to every gun's model in its aimed hold: the
               left on the part its row names, in no part beside it, its thumb
               under the sight line, the arm reaching; the right in no part
+  finger_pose a fitted gun's fingers on its model in the clip it is held in:
+              the clip its pose but for the fingers, each bent finger on the
+              model and where the fit puts it, the left thumb laid on the part
   interact    the interact key: its idle state, the probe's press, the reach,
               the ranking by AimPoint, a walk that only remembers
   record      the inventory's record (M18, A3a): what replicates and to whom,
@@ -209,7 +212,7 @@ and it never relies on a variable another section left behind.
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "ammo_graph", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "seat", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "carry_pose", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "melee_clips", "shotgun_pose", "gun_hold", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "leftovers", "glimmer", "heat", "trigger",
+    "hold_pose", "melee_clips", "shotgun_pose", "gun_hold", "finger_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "world_items", "relevancy", "leftovers", "glimmer", "heat", "trigger",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "wear_draw", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
     "var_tables",
 )

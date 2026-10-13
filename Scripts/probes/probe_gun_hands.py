@@ -24,6 +24,14 @@ live mesh's joints are read in the held gun's own frame (+X down the barrel,
 
 A pistol's part is its grip with the right hand's three wrapping fingers on
 it (gun_hold.fist_box), read off the live right hand.
+
+A gun of weapon_models.GUN_FINGERS is held in a clip of its own, its fingers
+bent onto its model (combat/finger_pose.py; verify/finger_pose.py measures
+the saved clip). Here the live fingers: the gun's AimPose is that clip, and
+each of the seven bent fingers (the left hand's four, the right's middle,
+ring and little) lies on the model, its riding points (its two outer joints,
+its tip, the middles of its outer bones) a skin off it. And lowered again it
+is still carried in both hands (CarryPose): the carry knows its clip.
 """
 
 SYSTEMS = ('weapons', 'animation')
@@ -31,10 +39,14 @@ SYSTEMS = ('weapons', 'animation')
 # them before the fourth gun is up (a dead player's sights never seat).
 LEVEL = "/Game/Maps/Lvl_Forest_200m"
 
+import time
+
 import unreal
 
-from combat import gun_hold, hand_seat
-from combat.carry_tuning import RAISE_FORCED_VAR
+from combat import finger_fit, gun_hold, hand_seat
+from combat.finger_pose import FINGER_NAMES, clip_for
+from combat.carry_pose_consts import CARRY_POSE
+from combat.carry_tuning import LOWERED_VAR, RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import SEAT_VAR, SIGHTS_FORCED_VAR
 from combat.skin import skin_of_mesh
@@ -42,7 +54,7 @@ from combat.support_hand import SUPPORT_POINT_VAR
 from combat.weapon_component import vars as WV
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from probes.probe_sight_align import HUD_BP_PATH, _live_hud
-from combat.weapon_models import GUN_HOLDS
+from combat.weapon_models import GUN_FINGERS, GUN_HOLDS
 
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
             (WEAPON_COMP_BP_PATH, WV.EquippedIndex),
@@ -58,6 +70,16 @@ WRIST_CM = 1.0
 SINK_CM = 1.5
 REACH_CM = 5.25
 GRIP_SINK_CM = 2.0
+# A fitted gun's finger is laid on the model when every riding point of it
+# is this far off it (cm): verify/finger_pose.py's 0.3 to 1.6 of the saved
+# clip, with a little for the live blend (measured 0.46 to 1.51; the ready
+# pose unfitted leaves five of an AK's seven past it, 1.98 to 2.42). The
+# AK's left index is past the front of its handguard and is the pose's.
+FINGER_NEAR_CM = 0.1
+FINGER_FAR_CM = 1.8
+FINGERS_LAID = 6
+CARRIED = 0.95          # the carry's weight, eased up
+CARRY_WAIT_S = 6.0      # wall seconds for it
 
 
 def _points(mesh, held, fingers, thumb):
@@ -130,6 +152,48 @@ def _check_gun(p, mesh, held, skin, name):
             "cm inside any part", d > -GRIP_SINK_CM, f"{joint} {d:.2f} cm from the {part}")
 
 
+def _finger(mesh, held, bones):
+    """A live finger's three joints and its tip in the held gun's frame, the
+    tip down its last bone's own line as the build has it
+    (gun_hold.finger_points): _points carries the middle bone's line on,
+    which a bent last joint leaves."""
+    gun = held.get_actor_transform()
+    comp = {}
+    for bone in bones:
+        xf = unreal.MathLibrary.make_relative_transform(
+            mesh.get_socket_transform(bone), gun)
+        t, q = xf.translation, xf.rotation
+        comp[bone] = ((t.x, t.y, t.z), (q.x, q.y, q.z, q.w))
+    return gun_hold.finger_points(bones, comp, gun_hold.FINGER_TIP_CM)
+
+
+def _check_fingers(p, mesh, held, skin, name):
+    """The live fingers of a gun whose fingers are fitted."""
+    outline, support = GUN_HOLDS[name]
+    parts = outline()
+    boxes = [gun_hold.part_box(parts, part[0]) for part in parts]
+    box = support["box"] if "box" in support else gun_hold.part_box(parts, support["part"])
+    beside = [box] + [b for b in boxes if not hand_seat.overlaps(b, box)]
+    pose = held.get_editor_property("AimPose")
+    want = clip_for(name).rsplit("/", 1)[-1]
+    p.check(f"{name}: it is held in its own clip, {want}",
+            pose is not None and pose.get_name() == want, str(pose))
+    fingers = [(f"left {n}", bones, beside)
+               for n, bones in zip(FINGER_NAMES, skin.support_fingers)]
+    fingers += [(f"right {n}", bones, boxes)
+                for n, bones in list(zip(FINGER_NAMES, skin.grip_fingers))[1:]]
+    laid, said = [], []
+    for label, bones, on in fingers:
+        d = [finger_fit.nearest(on, [pt])
+             for pt in finger_fit.riding(_finger(mesh, held, bones))]
+        said.append(f"{label} {min(d):.2f} to {max(d):.2f}")
+        if min(d) > FINGER_NEAR_CM and max(d) < FINGER_FAR_CM:
+            laid.append(label)
+    p.check(f"...and its fingers lie on the model: at least {FINGERS_LAID} of the "
+            f"seven with every riding point {FINGER_NEAR_CM:g} to {FINGER_FAR_CM:g} cm "
+            "off it", len(laid) >= FINGERS_LAID, "; ".join(said))
+
+
 def probe(p):
     yield lambda: p.pawn() is not None
     wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
@@ -140,6 +204,7 @@ def probe(p):
     skin = skin_of_mesh(worn)
     p.check("the player wears a known skin", skin is not None, worn)
     # Two guns are issued; the dev menu's request puts the rest in the bag.
+    layers = p.pose_instance(mesh)
     hud = _live_hud(p)
     p.set(hud, DEV_GUNS_REQUEST_VAR, True)
     yield lambda: not p.get(hud, DEV_GUNS_REQUEST_VAR)
@@ -160,6 +225,18 @@ def probe(p):
         yield lambda: p.get(wc, SEAT_VAR) > SEATED
         yield 0.3
         _check_gun(p, mesh, held, skin, name)
+        if name in GUN_FINGERS:
+            _check_fingers(p, mesh, held, skin, name)
         p.set(wc, SIGHTS_FORCED_VAR, False)
         p.set(wc, RAISE_FORCED_VAR, False)
         yield lambda: p.get(wc, SEAT_VAR) < 0.01
+        if name in GUN_FINGERS:
+            # Its HandPose is no longer the rifle's ready pose, which the
+            # carry asks for: its own clip is one of CarryAlso.
+            end = time.time() + CARRY_WAIT_S
+            yield lambda: p.get(layers, CARRY_POSE) > CARRIED or time.time() > end
+            p.check(f"...and lowered it is carried in both hands as the rifle's pose "
+                    f"is: {CARRY_POSE} is up",
+                    p.get(wc, LOWERED_VAR) and p.get(layers, CARRY_POSE) > CARRIED,
+                    f"{CARRY_POSE} {p.get(layers, CARRY_POSE):.2f}, lowered "
+                    f"{p.get(wc, LOWERED_VAR)}")

@@ -72,7 +72,7 @@ def check_shotgun_clip():
               == source.data_model_interface.get_number_of_keys(),
               f"{skin.aim_rifle}, {rifle.get_play_length():.3f} s")
     held_in = sorted(s["display"] for s in _weapon_specs()
-                     if s["aim"] in two_handed_poses(skin))
+                     if s["pose"] in two_handed_poses(skin))
     check("the three long guns are held in it, in both hands",
           held_in == ["Rifle", "Shotgun", "Sniper"], str(held_in))
 

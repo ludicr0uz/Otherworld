@@ -37,6 +37,7 @@ from combat.gas_locomotion import build_gas_locomotion, resave_gas_locomotion
 from combat.heat import build_hot_material
 from combat.health_component import build_health_component
 from combat.hit_bodies import fit_hit_bodies
+from combat.finger_pose import build_finger_poses, clips as finger_clips
 from combat.hold_pose import build_hold_poses
 from combat.install import install_on_character, install_on_npc, retire_old_assets
 from combat.knife import build_knife
@@ -208,6 +209,11 @@ def _weapons(c):
     retire_keyed_pose()
 
 
+def _finger_poses(c):
+    # Before the guns, whose AimPose a fitted one's clip is.
+    build_finger_poses(c.skin, _weapon_specs())
+
+
 def _hold_poses(c):
     # Before the knife and the consumables, whose grips are solved in them.
     build_hold_poses(c.skin)
@@ -331,7 +337,8 @@ STEPS = (
     Step("glimmer_material", _glimmer_material),
     Step("input_assets", _input_assets, made=(INPUT.IMC_DEFAULT, INPUT.IA_FIRE)),
     Step("weapon_item", _weapon_item, made=(P.ITEM_BP_PATH,)),
-    Step("weapons", _weapons, needs=("weapon_item",), made=_WEAPONS),
+    Step("finger_poses", _finger_poses, made=finger_clips()),
+    Step("weapons", _weapons, needs=("weapon_item", "finger_poses"), made=_WEAPONS),
     Step("hold_poses", _hold_poses),
     Step("melee_clips", _melee_clips, made=(P.KNIFE_ANIM_PATH,)),
     Step("throw_ready", _throw_ready),

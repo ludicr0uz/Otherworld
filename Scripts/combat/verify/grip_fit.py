@@ -143,7 +143,10 @@ def check_seat_graph():
 
 def run():
     check_seat_graph()
-    check_handles_in_fist([(s["display"], s["path"], s["aim"], s["parts"],
+    # In the row's pose, which the grip is solved in: a fitted gun's fingers
+    # are closed on the Grip afterwards (verify/finger_pose.py), and a fist
+    # that closes moves its middle.
+    check_handles_in_fist([(s["display"], s["path"], s["pose"], s["parts"],
                             "Grip", "TriggerGuard",
                             s.get("trigger_reach", TRIGGER_REACH_CM))
                            for s in _weapon_specs()])

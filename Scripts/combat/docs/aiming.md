@@ -499,7 +499,7 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     "Grip" in the fist (`grip.py`, above).
   - **The left hand** is carried by the IK to the gun's `SupportPoint`, and that point is
     where the ready pose has the wrist, moved by `gun_hold.support_move()`: the rigid hand
-    (its shape is the clip's; the fingers are not posed here) is brought to where its own
+    (its shape is the clip's; the fingers are bent afterwards, below) is brought to where its own
     finger joints and tips ride `SEAT_OFF_CM` (0.75) off the part the row names, the worst
     of them as near as it can be (`hand_seat.seat`, a descent from where the clip has the
     hand), with no joint deeper than 0.5 cm in it, none in a part of the outline beside
@@ -534,6 +534,48 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     and `probes/probe_gun_hands.py` reads the live hands down each gun's sights, the wrist
     against the point first. A hand that cannot be fitted says so there: move the row's
     box, or the grip (a fist further back takes the handguard out of the arm's reach).
+- **A rifle's fingers are bent onto its model** (`finger_pose.py`, `finger_fit.py`), for
+  the guns `weapon_models.GUN_FINGERS` names (the AK and the Val; the shotgun and the
+  pistols are not yet). The hands above are rigid pieces of a clip made for Lyra's rifle:
+  on the AK the left fingers hang up to 2.9 cm off the handguard and the right's up to
+  2.4 off the grip; the Val's left joints start up to 0.8 cm inside its receiver.
+  - **Each such gun is held in a clip of its own**, `/Game/Weapons/Anims/A_Aim<Blueprint>`
+    (`A_AimAssaultRifle`, `A_AimSniperRifle`; the `finger_poses` build step, before
+    `weapons`): the row's ready pose frame for frame, but the bent fingers' bones hold one
+    key on every frame. It is the item's `AimPose`, which the equip already plays and the
+    look already replicates, so no graph changed. A row keeps both: `pose` (the shipped
+    clip, which the grip, the left hand's seat and `two_handed` are solved in) and `aim`
+    (what is played; the same clip for a gun that is not fitted).
+  - **What bends:** the left hand's four fingers (the hand where the seat has it), the
+    right hand's middle, ring and little, and the left thumb. The right index is the
+    clip's (it is at the trigger) and so is the right thumb.
+  - **How** (`finger_fit.close`, pure, `dev/tests/test_finger_fit.py`): a finger bends
+    about one axis, the normal of the plane its own joints lie in. Its three joints take
+    the bend that lays its riding points (the two outer joints, the tip, the middles of
+    the two outer bones) nearest `SKIN_CM` (0.75, the seat's number) off the model's
+    boxes, a point pressed in counted four times one as far off; a joint opens at most
+    20° from the clip and closes 45/60/50°, never back past straight. A finger that still
+    has fewer than two points on the model keeps the clip's pose (the AK's left index,
+    past the front of its handguard). The left fingers lie on what the hand holds and
+    the parts beside it; the right's on every part. The thumb is not curled: one swing at
+    its base towards the part, stopped a skin off it or under the seat's ceiling.
+  - **Measured:** every bent finger's riding points 0.43 to 1.44 cm off the model (1.98
+    to 2.86 before on the AK), the left thumbs 0.8 cm (4.6 and 2.8 before).
+  - **Tried first:** closing the knuckle until something touched, then the next joint.
+    The tip of an opened finger touches before the finger is round the part, and the
+    outer joints ended at their opening limit.
+  - **What it does not do:** the fingers are fitted with the left hand at its seat, which
+    it has only down the sights; at the hip the hand is the clip's and the fingers are
+    those of the seat. The carry's clips are untouched. A fist that closes moves its
+    middle, so `verify/grip_fit.py` measures the grip in the row's `pose`.
+  - **The carry** asked `HandPose == CarryFor` (the rifle's ready pose); a fitted gun's
+    HandPose is its own clip, so the component has `CarryAlso`, every fitted clip, and
+    the test is `== CarryFor OR CarryAlso contains` (`weapon_component/carry_weights.py`).
+  - **A new gun:** its Blueprint's name in `GUN_FINGERS`, build, and read the
+    `[GUN] <name>: built ... its fingers bent onto the model` line (each finger's bend,
+    and its nearest and furthest point before and after). `verify/finger_pose.py` holds
+    the saved clip to the model and to the fit's own arithmetic;
+    `probes/probe_gun_hands.py` reads the live fingers and that the gun is still carried.
 - **The shotgun is held in the rifle's ready pose** (C3; until then a pose keyed for it,
   `A_AimShotgun`), and its left hand has a point of its own (`shotgun_hold.py`).
   - **Why:** the rifle pose stands the left thumb up the handguard, far under the AK's and

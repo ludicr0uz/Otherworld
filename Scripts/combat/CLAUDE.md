@@ -112,7 +112,8 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   (`gun_hold.py`): the row's `support` names the part the left hand holds down the sights,
   and `weapon_models.GUN_HOLDS` has the gun's line; `verify/gun_hold.py` and
   `probes/probe_gun_hands.py` hold every gun to it (`docs/aiming.md`, "Both hands are
-  fitted to each gun's model"). Adding the SMG, the rifle and the sniper changed **no** node
+  fitted to each gun's model"). A long gun's name in `weapon_models.GUN_FINGERS` bends its
+  fingers onto the model too (`finger_pose.py`; the rifles today). Adding the SMG, the rifle and the sniper changed **no** node
   in the fire, reload or gate graphs.
 - **The pistol is a 1911** (`weapon_models.py`): Stein Games' `SM_1911_02`, a Fab listing
   taken raw ("1911 Pistol - High Poly" in `fab_library.json`, under
@@ -413,6 +414,14 @@ the asset from a checkout that has it).
   holds only down the sights: at the hip the hand is where the clip has it. Lyra's own
   `MM_Shotgun_Idle_ADS` is the rifle's with the left hand 2 cm further back, further from
   this pump, so it is not taken.
+- **A rifle's fingers are bent onto its model** (`finger_pose.py`, `finger_fit.py`): a
+  gun named in `weapon_models.GUN_FINGERS` (the AK, the Val) is held in a clip of its
+  own, `A_Aim<Blueprint>`, its row's pose with the fingers closed on that gun, built
+  before the guns (`finger_poses`). So a row has `pose` (the shipped clip: solve the
+  grip and the seat in it, ask `two_handed` of it) and `aim` (what the item plays):
+  never compare a gun's `AimPose` with `skin.aim_rifle`, which is why the carry has
+  `CarryAlso`. `verify/finger_pose.py`, `probes/probe_gun_hands.py`;
+  `docs/aiming.md` ("A rifle's fingers are bent onto its model").
 - **Every gun's left hand is seated on its own model** (`gun_hold.py`), the shotgun's
   being one case: the AK's on its handguard clear of the magazine, the Val's on the front
   of its receiver, the pistol's and the SMG's over the right hand's fingers on the grip.

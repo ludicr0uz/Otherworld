@@ -110,7 +110,7 @@ def check_component_writes_support_hand():
           len(copies) == 1 and f"Get {SUPPORT_POINT_VAR}" in src,
           f"{len(copies)} write(s), fed by {sorted(src)}")
     odd = [s["display"] for s in _weapon_specs()
-           if s["two_handed"] != (s["aim"] in two_handed_poses(skin))]
+           if s["two_handed"] != (s["pose"] in two_handed_poses(skin))]
     check(f"every gun held in the rifle pose (or the shotgun's, which is the "
           f"rifle's but for the thumbs) is two-handed, and no other: "
           f"{HELD_TWO_HANDED} names the pose", not odd, str(odd))

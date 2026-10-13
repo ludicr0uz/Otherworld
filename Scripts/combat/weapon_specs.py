@@ -18,7 +18,7 @@ from combat.paths import (
 )
 from combat.skin import player_skin
 from Sound.sound_weapons import fire_sound, reload_sound
-from combat import gun_hold
+from combat import finger_pose, gun_hold
 from item_icons.items import icon_name
 from combat.weapon_models import (
     PISTOL_MODEL, PISTOL_MUZZLE, PISTOL_SIGHT, PISTOL_SIGHT_FRONT,
@@ -168,11 +168,17 @@ def _weapon_specs():
         # Held in both hands is what the rifle ready pose does (the shotgun
         # is held in it too); the guard pose (body_pose.py) picks fists or
         # the gun across the body on it.
-        spec["two_handed"] = spec["aim"] in two_handed_poses(skin)
-        spec["grip_loc"] = _grip_location(spec["aim"], spec["grip_rot"], spec["parts"])
+        # `pose` is the shipped clip the grip and the hands are solved in;
+        # `aim` is the clip the gun is held in, which is its own where its
+        # fingers are bent onto its model (finger_pose.py).
+        spec["pose"] = spec["aim"]
+        spec["two_handed"] = spec["pose"] in two_handed_poses(skin)
+        spec["grip_loc"] = _grip_location(spec["pose"], spec["grip_rot"], spec["parts"])
         # Where the left hand is held down the sights (support_hand.py):
         # its ready pose's place, moved onto the part the row names.
         spec["support_point"] = support_point_of(skin, spec)
+        if finger_pose.fitted(spec):
+            spec["aim"] = finger_pose.clip_path(spec)
     return specs
 
 

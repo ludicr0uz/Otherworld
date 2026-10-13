@@ -8,13 +8,14 @@ the sights key). Seated, the live mesh's thumb joints are read in the held
 gun's own frame (+X down the barrel, +Y right, +Z up; the gun is rigid in the
 hand, so this is what the eye on its sight line sees):
 
-  - the shotgun and the rifle both play the skin's rifle pose;
+  - the shotgun plays the skin's rifle pose;
   - the shotgun's grip thumb, as the clip lays it along the stock's wrist, is
     at least 2.5 cm under the sight line, joints and tip;
   - the support hand's thumb is all of it under the sight line, its joints
     under the barrel's top (the clip stands its tip 3.7 cm above the line);
-  - the rifle's support thumb still stands up the handguard, where the clip
-    has it: its sight line is 14 cm above the grip.
+  - the rifle is held in that pose with its own fingers on it
+    (combat/finger_pose.py): its support thumb, which the clip stands up
+    beside the handguard, is laid against it, under its sight line.
 
 Run with --windowed and OW_SIGHT_SHOTS=1 to save the shotgun's sight picture
 to Saved/Screenshots/MacEditor.
@@ -31,12 +32,14 @@ import shutil
 
 import unreal
 
+from combat.finger_pose import clip_for as finger_clip
 from combat.grip import part_placement
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import SEAT_VAR, SIGHTS_FORCED_VAR
-from combat.gun_hold import THUMB_TIP_CM
+from combat.gun_hold import THUMB_TIP_CM, part_box
+from combat.hand_seat import box_distance
 from combat.skin import skin_of_mesh
-from combat.weapon_models import shotgun_outline
+from combat.weapon_models import GUN_HOLDS, shotgun_outline
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
 from combat.weapon_component import vars as WV
@@ -52,6 +55,8 @@ HOME = 0.01             # ...and back on the boom
 # The grip thumb lies along the top of the stock's wrist: this far under the
 # sight line at least (cm; verify/shotgun_pose.py asks 3 of the clip).
 GRIP_THUMB_UNDER_CM = 2.5
+# The rifle's support thumb against its handguard (cm; measured 0.8).
+RIFLE_THUMB_CM = 1.25
 
 
 def _file():
@@ -170,17 +175,26 @@ def _run(p):
     yield from _sights(p, wc, bag.index("BP_AssaultRifle_C"))
     held = p.get(wc, "Held")
     pose = held.get_editor_property("AimPose")
-    want = skin.aim_rifle.rsplit("/", 1)[-1]
-    p.check(f"the rifle's ready pose is {want} too",
+    # That clip with the rifle's own fingers on it (combat/finger_pose.py),
+    # which leaves the right thumb the clip's.
+    want = finger_clip("BP_AssaultRifle").rsplit("/", 1)[-1]
+    p.check(f"the rifle's ready pose is that clip with its own fingers, {want}",
             pose is not None and pose.get_name() == want, str(pose))
     _at, lines = _thumb(mesh, held, skin.grip_thumb)
     p.check("...and its thumb lies forward along the grip: every line of it "
             "runs up the barrel",
             all(line.x > 0.6 for line in lines),
             ", ".join(_fmt(line) for line in lines))
-    _at, lines = _thumb(mesh, held, skin.support_thumb)
-    p.check("...and its support thumb stands up the handguard, as the clip has it",
-            all(line.z > 0.4 for line in lines),
-            ", ".join(_fmt(line) for line in lines))
+    # The clip stands it up beside the handguard, 4.6 cm off it; the rifle's
+    # own clip lays it against the handguard, under its sight line.
+    at, _lines = _thumb(mesh, held, skin.support_thumb)
+    guard = part_box(GUN_HOLDS["BP_AssaultRifle"][0](), "Handguard")
+    near = min(box_distance(guard, (v.x, v.y, v.z)) for v in at[1:])
+    line = held.get_editor_property("SightAim").z
+    p.check("...and its support thumb is laid against the handguard, within "
+            f"{RIFLE_THUMB_CM:g} cm of it and not in it, under the sight line",
+            0.0 < near < RIFLE_THUMB_CM and max(v.z for v in at[1:]) < line,
+            f"{near:.2f} cm off, its top at z {max(v.z for v in at[1:]):.2f} "
+            f"under {line:.1f}")
     p.set(wc, SIGHTS_FORCED_VAR, False)
     yield lambda: p.get(wc, SEAT_VAR) < HOME

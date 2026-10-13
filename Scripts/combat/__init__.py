@@ -312,4 +312,11 @@ wrong module.
 
   carry_pose         The long gun's carry: with the rifle, the sniper or the shotgun in hand and nothing holding it up, the upper ...
   carry_pose_consts  The long gun's carry pose: its names and numbers
+
+  finger_fit        how far a finger bends to lie on a gun (pure): the bend of its
+                    three joints that lays it best a skin off the model's boxes,
+                    within the joints' limits; the swing that lays a thumb on a part
+  finger_pose       a fitted gun's own ready clip (weapon_models.GUN_FINGERS: the
+                    rifles): its row's pose frame for frame with the fingers bent
+                    onto that gun's model, which its item is held in (AimPose)
 """

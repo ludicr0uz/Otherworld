@@ -38,11 +38,11 @@ from forest_generator.tree_placement import (
 )
 from forest_generator.grass_placement import (
     scatter_grass,
-    DEFAULT_GRASS_SPECS,
     DEFAULT_DENSITY_PER_SQM,
     DEFAULT_PATCHINESS,
     KNEE_HEIGHT_CM,
 )
+from forest_generator.grass_look import grass_specs_for
 from forest_generator.bush_placement import (
     scatter_bushes,
     DEFAULT_BUSH_SPECS,
@@ -215,6 +215,7 @@ def main():
             density_per_sqm=args.grass_density,
             knee_height_cm=args.grass_height,
             patchiness=args.grass_patchiness,
+            grass_specs=grass_specs_for(level_name),
             placed_trees=placed_trees,
         )
         grass_counts = Counter(g.spec_name for g in placed_grass)
@@ -450,7 +451,7 @@ def _write_unreal_import_script(
     # Grass mesh/material table, keyed by HISM actor label
     grass_configs = {
         s.name: {"mesh": s.mesh_path, "mats": list(s.material_paths)}
-        for s in DEFAULT_GRASS_SPECS
+        for s in grass_specs_for(level_name)
     }
     grass_configs_json = json.dumps(grass_configs)
     tree_configs_json = json.dumps({
@@ -850,6 +851,8 @@ def _write_unreal_import_script(
             from forest_import import undergrowth_assets, wind as wind_import
             wind_import.ensure_wind()
             undergrowth_assets.ensure_undergrowth_assets()
+            from forest_import import grass_look as grass_look_import
+            grass_look_import.ensure_grass_look()
 
         # ── 5b. Plant knee-high grass ────────────────────────────────────────
         # Per-cell, per-tier HISMs, saved unlit and (above Low) hidden in game
@@ -1332,7 +1335,9 @@ def _write_unreal_verify_script(
         if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
             from forest_import import undergrowth_assets, wind as wind_import
             wind_import.verify_wind(check)
-            undergrowth_assets.verify_undergrowth_assets(check, actors)
+            undergrowth_assets.verify_undergrowth_assets(check, actors, LEVEL_NAME)
+            from forest_import import grass_look as grass_look_import
+            grass_look_import.verify_grass_look(check)
 
         # ── 6. Navigation + NPCs ─────────────────────────────────────────────
         if EXPECTED_NPCS:

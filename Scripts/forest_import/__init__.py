@@ -10,4 +10,6 @@ call, rather than carrying inline. Unlike forest_generator/, these import
   wind            Wind in the materials: MPC_Wind, and the world-position offset (WPO) that makes the grass and the trees move
 
   undergrowth_assets  Check the grass and bush meshes are there before a level plants them, and verify them
+
+  grass_look  Build the dark grass's material instance, tint the ground under it, and verify both
 """

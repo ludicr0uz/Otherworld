@@ -102,7 +102,9 @@ change. The forest has day and night beds faded by the clock.
 
 **The world** (`Scripts/world/CLAUDE.md`, `Scripts/forest_generator/CLAUDE.md`). Two
 generated maps, `Lvl_Forest_200m` (the editor's startup map) and `Lvl_Forest_1000m` (what a
-packaged game plays). A clock turns the sun and moon; day and night are 4 minutes each for
+packaged game plays). On the 200 m map the grass is a dark, dull olive in wide clumps that
+cover some 40% of a ground tinted to match; the 1 km map's is still the pack's light green
+tufts, on the same dark ground (`forest_generator/grass_look.py`). A clock turns the sun and moon; day and night are 4 minutes each for
 now, the night moonlit under the real stars, and a level starts at a random hour. The clock
 has one owner: the server's (single player's own), which every client's sky and wind follow
 through the GameState (`Scripts/net/CLAUDE.md`, "One world clock"). At night
@@ -302,8 +304,20 @@ mesh's own material at 0.7–1.0× to reach knee height; the offline `Grass Upsc
 still fails the build past **2.4×**. Per-instance jitter is height ×0.85–1.15, width
 ×0.85–1.20, and a ±4° lean so the field does not look stamped.
 
+**The dark, wide grass (`forest_generator/grass_look.py`).** On the levels it names, today
+`Lvl_Forest_200m` alone, `grass_specs_for(level)` hands the scatter the same spec with two
+fields changed: width ×1.55–2.10 at the same height (the same clumps in the same places,
+about 3.2× the area each, some 40% of the ground covered where a sixth was) and a material,
+`/Game/Forest/Materials/MI_Grass_02_09_Dark`, an instance of the pack's `grass_02_09_Mat`
+set to a dark, dull olive. The same module holds the ground's colour: the import
+(`forest_import/grass_look.py`) builds the instance and puts a desaturation and a tint
+(`GroundSaturation`, `GroundTint`) in front of `M_Forest_Ground_PBR`'s base colour, so a gap
+between clumps does not read as bare ground. That material is shared, so every level's
+ground is the dark one; the 1 km and probe levels' grass is still the pack's light green.
+
 200 m at the defaults ⇒ **40,521 clumps**, about 1.0/m² with every density tier drawn. A clump
-covers about 0.15 m², so the ground reads as tufts with terrain between them, not a field.
+covers about 0.15 m², so the ground reads as tufts with terrain between them, not a field
+(about 0.5 m² with the wide specs, which is what the 200 m map plants).
 
 **Bushes** (`bush_placement.py`) are a third layer: loose clusters of one to four on a coarse
 jittered grid with most cells left empty, so the floor alternates between open grass and

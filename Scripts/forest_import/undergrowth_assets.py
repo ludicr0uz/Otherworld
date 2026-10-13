@@ -3,7 +3,9 @@ verify them.
 
 Called by the generated import_<Level>.py (step 5a) and verify_<Level>.py. The
 meshes come out of two Fab packs and are planted as the pack made them
-(forest_generator/undergrowth_meshes.py): nothing here writes to one.
+(forest_generator/undergrowth_meshes.py): nothing here writes to one. A cell
+draws the mesh's own materials unless its spec names others: the dark grass
+of forest_generator/grass_look.py, on the levels that have it.
 
 What the verifier guards is the two ways this can go wrong without anyone
 touching the code: the pack is updated and the mesh is no longer the one
@@ -13,6 +15,8 @@ a clone draws it with the default grey material.
 
 import unreal
 
+from forest_generator.bush_placement import DEFAULT_BUSH_SPECS
+from forest_generator.grass_look import grass_specs_for
 from forest_generator.undergrowth_meshes import UNDERGROWTH_MESHES
 
 _CELL_PREFIXES = ("HISM_Grass", "HISM_Bush")
@@ -34,7 +38,7 @@ def ensure_undergrowth_assets():
         _log(f"   {mesh.name}: {mesh.mesh}")
 
 
-def _dependencies(package):
+def dependencies(package):
     """Every /Game package ``package`` needs, itself included."""
     registry = unreal.AssetRegistryHelpers.get_asset_registry()
     options = unreal.AssetRegistryDependencyOptions(
@@ -50,8 +54,14 @@ def _dependencies(package):
     return seen
 
 
-def verify_undergrowth_assets(check, actors):
-    """``check`` is the verify script's harness; ``actors`` the level's."""
+def _package(obj):
+    return obj.get_path_name().split(".")[0]
+
+
+def verify_undergrowth_assets(check, actors, level=None):
+    """``check`` is the verify script's harness; ``actors`` the level's, and
+    ``level`` its name: which grass specs it plants (a verify script written
+    before the dark grass passes none, and plants the default ones)."""
     eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
     meshes = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
     for record in UNDERGROWTH_MESHES:
@@ -80,23 +90,28 @@ def verify_undergrowth_assets(check, actors):
             if not base or not base.get_editor_property("used_with_instanced_static_meshes"):
                 unusable.append(str(slot.get_editor_property("material_slot_name")))
         check(f"{record.name} Materials Draw On Instances", not unusable, str(unusable))
-        stray = sorted(_dependencies(record.mesh) - set(record.packages))
+        stray = sorted(dependencies(record.mesh) - set(record.packages))
         check(f"{record.name} Needs Nothing The Repository Does Not Carry",
               not stray, str(stray[:3]))
 
-    # Every undergrowth cell draws one of these, with the mesh's own materials.
+    # Every undergrowth cell draws one of these, with the materials its spec
+    # names: none, so the mesh's own, but for the dark grass.
     wanted = {m.mesh for m in UNDERGROWTH_MESHES}
-    other, overridden = [], []
+    named = {spec.mesh_path.split(".")[0]: [p.split(".")[0] for p in spec.material_paths]
+             for spec in grass_specs_for(level) + list(DEFAULT_BUSH_SPECS)}
+    other, wrong = [], []
     for actor in actors:
         label = actor.get_actor_label()
         if not (label.startswith(_CELL_PREFIXES) and "__" in label):
             continue
         root = actor.get_editor_property("root_component")
         mesh = root.get_editor_property("static_mesh") if root else None
-        if not mesh or mesh.get_path_name().split(".")[0] not in wanted:
+        if not mesh or _package(mesh) not in wanted:
             other.append(label)
-        elif any(root.get_editor_property("override_materials")):
-            overridden.append(label)
+            continue
+        drawn = [_package(m) for m in root.get_editor_property("override_materials") if m]
+        if drawn != named[_package(mesh)]:
+            wrong.append(f"{label}: {drawn}")
     check("Undergrowth Cells Draw The Library Meshes", not other, str(other[:3]))
-    check("Undergrowth Cells Keep The Meshes' Own Materials", not overridden,
-          str(overridden[:3]))
+    check("Undergrowth Cells Draw The Materials Their Specs Name", not wrong,
+          str(wrong[:3]))

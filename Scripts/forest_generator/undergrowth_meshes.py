@@ -1,7 +1,8 @@
 """The meshes the grass and the bushes are planted from. Pure Python (no ``unreal``).
 
 Both come out of Fab packs the user added, and are planted where the pack put
-them, with the pack's own materials:
+them, with the pack's own materials (the grass on a level grass_look.py names
+draws an instance of its own, a child of the pack's):
 
     grass    grass_02_09_mesh   "temperate Vegetation: optimized Grass Library"
     bushes   SM_Bush_02         "Light Foliage"

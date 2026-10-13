@@ -27,4 +27,6 @@
   undergrowth_meshes  The meshes the grass and the bushes are planted from
 
   low_leaves  Which trees have leaves low enough to walk into, so that passing one is heard as passing a bush is ...
+
+  grass_look  The dark, ground-filling grass: its colours, the ground's under it, how wide a clump is planted, and which ...
 """

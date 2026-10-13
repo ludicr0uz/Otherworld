@@ -15,7 +15,8 @@ cell is one species, one tier, one 100 m square.
 
 The mesh is a clump out of the grass library, planted with its own material
 (forest_generator/undergrowth_meshes.py; forest_import/undergrowth_assets.py
-checks it is there before this runs).
+checks it is there before this runs), or with the material its spec names: the
+dark instance on a level forest_generator/grass_look.py lists.
 """
 
 import json

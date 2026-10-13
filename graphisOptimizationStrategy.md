@@ -246,3 +246,25 @@ What changed is the look, not the frame time:
 - **The grass pack's atlas is three 8k textures (109 MB on disk)** for the one clump the levels use.
 
 Pictures at each preset: `assets/generated/undergrowth/` (git-ignored). Not measured: night, Retina-equivalent pixels, texture memory.
+
+### Dark, wide grass on the 200 m map (G1, 2026-10-13)
+
+The widening named above is done, on `Lvl_Forest_200m` only (`forest_generator/grass_look.py`). The same 40,521 clumps stand in the same places at the same height, each 1.55–2.10× wide in place of 0.85–1.20×: the clumps' summed footprint goes from 17% of the ground to 55%, about 16% to 42% once overlap is allowed for. They draw with `MI_Grass_02_09_Dark`, our instance of the pack's material, and the shared ground material is tinted to the same olive. Instances, triangles, tiers, cull distances and the bushes are unchanged.
+
+`probes/probe_grass_look.py`, windowed at 1280×720, the perf audit's spot (the densest tree cluster) at noon, the grass cells alone hidden and shown, each state twice:
+
+| Preset | | Grass shown | Grass hidden | Grass costs |
+|---|---|---|---|---|
+| Medium | before | 15.88, 15.79 ms | 13.38, 13.26 ms | 2.5 ms |
+| Medium | after | 14.02, 13.97 ms | 11.20, 11.17 ms | 2.8 ms |
+| High | before | 43.34, 43.13 ms | 42.21, 42.30 ms | 1.0 ms |
+| High | after | 41.91, 41.99 ms | 40.87, 41.60 ms | 0.7 ms |
+
+- **3.2× the masked area per clump cost nothing that can be measured:** +0.3 ms at Medium and −0.3 ms at High, where two runs of one state differ by up to 0.7 ms. Well under the 7 ms that would have stopped the change.
+- **The whole frame is about 2 ms shorter after, with the grass hidden too.** That is not the grass. The two runs are a re-import and an hour apart, and the ground is darker; which of them it is was not found.
+- **This profile draws all four grass tiers at Medium (16 cells in range) and three at High (12),** before and after. Not looked into here.
+- **Auto exposure undoes a dark albedo at noon.** With grass and ground both dark it opens up until the ground reads tan again; with the grass at brightness 0.20 and the ground tint at 0.085 the sky and the leaves burnt out, so the values stop at 0.24 and 0.11. At night the same values read dark. A darker noon is the exposure's or the sun's to give, not the albedo's.
+- **The pack's `Tint` alpha does nothing** (linked to no input of `MA_Grass`), its subsurface colour is not tinted and needs its own two parameters lowered, and its `ColorVariation` at the shipped 0.02 shows as teal and maroon clumps on a dull olive (0.005 now).
+- **Blades do not read as oversized at 1.8×:** a clump reads as a wider tussock, so the width was not brought down.
+
+Pictures (git-ignored, `assets/generated/undergrowth/`): `g1_<Low|Medium|High>_<noon|night>_<across|down>.png`, and the same twelve from before as `g1_before_…`. Not done: the 1 km map (its grass is the pack's until the pictures are seen; its ground is already the dark one), Retina-equivalent pixels, Low's frame time.

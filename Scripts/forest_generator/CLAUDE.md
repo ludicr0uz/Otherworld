@@ -27,6 +27,7 @@ The generator's code lives in this package. The level-side import code is in
 | `tree_lods.py` | which levels plant the trees' other build, a LOD chain ending in an impostor (`TREE_LOD_LEVELS`: the 1 km map, and the title level, which plants that map's middle trees: `Scripts/title/forest.py`), and where that mesh is |
 | `grass_placement.py` | `DEFAULT_GRASS_SPECS` and a stratified scatter |
 | `bush_placement.py` | `DEFAULT_BUSH_SPECS` and the clustered scatter |
+| `grass_look.py` | the dark, ground-filling grass: the colours of its material instance and of the ground under it (each with its reason), the wide `width_jitter`, and the levels that have it (`DARK_GRASS_LEVELS`, the 200 m map alone; `grass_specs_for(level)`). `forest_import/grass_look.py` builds the instance and patches the ground material from it ("Rendering gotchas", below) |
 | `undergrowth_meshes.py` | the two library meshes the grass and the bushes are planted from, and the packages of each that the repository carries ("Rendering gotchas", below) |
 | `npc_placement.py` | NPC numbers (see `Scripts/npc/CLAUDE.md`) |
 | `npc_agro.py` | sense and patrol numbers |
@@ -59,7 +60,8 @@ script.
 
 **After an import, re-run `place_forage.py`, `build_clothing.py` and `build_day_night.py`.** The
 import rebuilds the level from scratch, which drops the forage, the garments lying in it and
-the day/night cycle actor.
+the day/night cycle actor. The import also rebuilds the dark grass's material instance and
+re-applies the ground's tint (`forest_import/grass_look.py`), on whichever level it runs.
 
 ## Navmesh
 
@@ -116,7 +118,37 @@ the day/night cycle actor.
   (`undergrowth_meshes.py`): `grass_02_09_mesh` (60 cm tall, 54 cm across, 2,152 triangles)
   and `SM_Bush_02` (1.95 m tall, 3.5 m across, 1,304 triangles).
   - Neither is Nanite. Each has four mesh LODs and a masked two-sided material, and a cell
-    draws the mesh's own materials (the specs name none).
+    draws the mesh's own materials unless its spec names one (the default specs name none).
+  - **The 200 m map's grass is dark and wide (G1); the 1 km and probe levels' is not.**
+    `grass_look.py` holds it: a level in `DARK_GRASS_LEVELS` plants the same clumps, in the
+    same places, 1.55–2.10× wide in place of 0.85–1.20× (same height; about 3.2× the area,
+    so some 40% of the ground is under grass where a sixth was) and drawn with
+    `/Game/Forest/Materials/MI_Grass_02_09_Dark`, our instance of the pack's
+    `grass_02_09_Mat`. To give another level the look, add its name there, regenerate and
+    re-import it.
+    - **What the pack's `MA_Grass` does with the instance's numbers:** base colour is
+      `desaturate(variation(albedo × Brightness) × Tint.rgb, 1 − Saturation)`. **`Tint`'s
+      alpha is wired to nothing** (the pack ships it 0; only the RGB output is linked).
+      The subsurface colour is the albedo × `Subsurface Strengh` (the pack's spelling),
+      **not tinted**: lower it and `Subsurface Saturation` too, or a backlit clump stays
+      spring green. `ColorVariation` turns the hue per clump: on a dull olive the pack's
+      0.02 shows as teal and maroon clumps, so it is 0.005.
+    - **The ground is brought to the grass's hue, on every level.** `M_Forest_Ground_PBR`
+      has no authoring script (the generator only assigns it), so
+      `forest_import/grass_look.py` patches it in place: a `Desaturation` and a `Multiply`
+      between the old base colour and the output, driven by the parameters
+      `GroundSaturation` and `GroundTint`. It finds its own nodes on a second run. The
+      material is shared: the 1 km, probe and title levels' ground is dark too.
+    - **Auto exposure answers a darker ground by opening up.** At noon the frame is lifted
+      until the ground reads tan again and, taken too far (grass brightness 0.20, ground
+      tint 0.085), the sky and the leaves burn out. Judge the colours at night and against
+      the trees, not by the noon ground alone.
+    - The level verifier holds the instance to its parent, its numbers and its
+      dependencies, the cells to the material their spec names, and the ground to its tint
+      (`verify_grass_look`, eight checks). `probes/probe_grass_look.py` (windowed; its
+      docstring has the command) measures the frame with the grass shown and hidden at
+      Medium and High and takes the pictures: 2.8 ms at Medium and 0.7 ms at High, against
+      2.5 and 1.0 for the narrow clumps, which is inside what two runs differ by.
   - **They sway by their pack's wind, not `MPC_Wind`.** The graphics menu's wind strength and
     speed do not reach them; its world-position-offset switch still does.
   - **The packs are git-ignored but these two meshes are committed.** `.gitignore`
@@ -125,12 +157,13 @@ the day/night cycle actor.
     `undergrowth_meshes.py` and its `gitignore_lines()` to `.gitignore`;
     `dev/tests/test_undergrowth_meshes.py` holds the two together, and the level verifier
     fails if a mesh references a package outside its list.
-  - Nothing writes to a pack asset. `forest_import/undergrowth_assets.py` only checks them:
+  - Nothing writes to a pack asset (the dark instance is a new asset in our folder).
+    `forest_import/undergrowth_assets.py` only checks them:
     the import stops if one is missing, and the verifier re-measures height, LOD count and
     triangles, so a pack update that changes the mesh fails there.
   - **A grass clump is a third of the width of the generated patch it replaced,** so at the
     same count (about 1/m² with every tier drawn) the ground is tufts with terrain between
-    them. Grass is scaled to the target height from the mesh's real bounds at plant time;
+    them, wherever the default specs are planted. Grass is scaled to the target height from the mesh's real bounds at plant time;
     the offline check caps the upscale at 2.4×.
   - **The generated patches and bushes are still in the tree but no level plants them:**
     `foliage_meshes.py`, `forest_import/foliage_assets.py` and `/Game/Forest/Procedural`.

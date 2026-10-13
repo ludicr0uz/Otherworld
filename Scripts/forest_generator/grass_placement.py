@@ -75,7 +75,8 @@ class GrassSpec:
 # One clump out of the grass library (forest_generator/undergrowth_meshes.py):
 # 60 cm tall and about 54 cm across as authored, so planting scales it by
 # 0.7-1.0 to reach knee height. No material is named: a cell draws the mesh's
-# own.
+# own. A level named in grass_look.py plants these wider and with a dark
+# instance of that material (grass_look.grass_specs_for).
 #
 # The clump is a third of the width of the generated patch it replaced
 # (1.1 m), so at the same count the ground is far more open: tufts with

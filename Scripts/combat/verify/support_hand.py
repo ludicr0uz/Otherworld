@@ -15,6 +15,7 @@ from combat.support_hand import (
 from combat.verify.aim_pitch import _feeds, _title
 from combat.verify.common import BEL, PIN, cdo, check, graph, load
 from combat.verify.fixtures import wg
+from combat.weapon_component import vars as WV
 from combat.weapon_component.pose_weights import (
     HELD_SUPPORT_POINT, HELD_TWO_HANDED,
 )
@@ -86,9 +87,10 @@ def check_anim_bp_support_hand():
 def check_component_writes_support_hand():
     skin = player_skin()
     for var, source, why in (
-            (SUPPORT_HAND_VAR, "SightBlend",
-             "the hold eases in with the sights and is off at the hip"),
-            (SUPPORT_POINT_VAR, HELD_SUPPORT_POINT,
+            (SUPPORT_HAND_VAR, ("SightBlend", str(WV.ReloadHand)),
+             "the hold eases in with the sights, is off at the hip, and lets go for "
+             "a reload's clip (verify/reload_clip.py)"),
+            (SUPPORT_POINT_VAR, (HELD_SUPPORT_POINT,),
              "the component's own copy, so nothing reads off an empty hand")):
         writes = [n for n in wg if _title(n) == f"Set {var}"]
         check(f"BP_WeaponComponent writes the anim BP's {var} once a frame",
@@ -96,8 +98,9 @@ def check_component_writes_support_hand():
         if len(writes) != 1:
             continue
         src = {_title(n) for n in _feeds(BEL.find_input_pin(writes[0], var))}
-        check(f"...from {source} alone: {why}", src == {f"Get {source}"},
-              str(sorted(src)))
+        gets = {t for t in src if t.startswith("Get ")}
+        check(f"...from {' and '.join(source)} alone: {why}",
+              gets == {f"Get {s}" for s in source}, str(sorted(src)))
         target = _feeds(BEL.find_input_pin(writes[0], "self"), limit=3)
         check("...onto the player's anim instance, cast to the player's anim BP",
               any(n.get_class().get_name() == "K2Node_DynamicCast" for n in target),

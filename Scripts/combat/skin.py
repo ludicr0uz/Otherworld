@@ -159,6 +159,11 @@ class PlayerSkin:
     # from the same library, played into the upper-body slot. None where the
     # rig has none: the item is then taken with no clip.
     pickup: str = None
+    # The magazine change of the AKM and the sniper (weapon_component/
+    # reload_clip.py), played into the upper-body slot: Lyra's rifle reload
+    # (asset_pipeline/lyra_paths.RELOAD_RIFLE). None where the rig has none:
+    # the reload is then its sound and its pause, as every other gun's.
+    reload_rifle: str = None
     # A long gun's carry (carry_pose.py): the upper body's pose while the
     # rifle, the sniper or the shotgun is in hand and nothing holds it up,
     # standing, at a jog and at a sprint, and crouched at rest and walking
@@ -342,6 +347,7 @@ SKIN_GAS = dataclasses.replace(
     fist_index=LYRA.uefn_clip(LYRA.AIM_RIFLE),
     idle=GAS.IDLE,
     punch=LYRA.uefn_clip(LYRA.PUNCH),
+    reload_rifle=LYRA.uefn_clip(LYRA.RELOAD_RIFLE),
     crouch_idle=f"{GAS_UAL_ANIMS}UAL1_Crouch_Idle_Loop",
     crouch_walk=f"{GAS_UAL_ANIMS}UAL1_Crouch_Fwd_Loop",
     prone_idle=FAL.uefn_clip(FAL.PRONE_IDLE),
@@ -420,6 +426,10 @@ def _gas_skin(eas):
              "in the mannequin's ready poses. Add Lyra and run asset_pipeline/"
              "import_lyra.py.")
         skin = dataclasses.replace(skin, fist_index=None, **GAS_AIM_WITHOUT_LYRA)
+    if not eas.does_asset_exist(skin.reload_rifle):
+        _log(f"note: {skin.reload_rifle} is not here — the rifles reload without a "
+             "clip. Add Lyra and run asset_pipeline/import_lyra.py.")
+        skin = dataclasses.replace(skin, reload_rifle=None)
     if not all(eas.does_asset_exist(p) for p in (skin.prone_idle, skin.prone_crawl)):
         # As Lyra: a Fab pack the user adds by hand.
         _log(f"note: {skin.prone_idle} or the crawl is not here — lying down is the "

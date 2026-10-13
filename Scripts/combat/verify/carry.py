@@ -118,7 +118,10 @@ def check_pose_follows_carry():
     # Every place that starts the ready pose (the equip and the keepalive) asks
     # Lowered first, and plays HandPose, the held item's AimPose as this copy
     # has it (verify/look.py); the punch and the slash are their own montages.
-    plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if not is_melee_play(n)
+    # A play has a rate: the reload's take-over asks the slot for HandPose
+    # through the same two pins (verify/reload_clip.py) and starts nothing.
+    plays = [n for n in by_pins(wg, "Asset", "SlotNodeName", "InPlayRate")
+             if not is_melee_play(n)
              and HandPose in _reads(_feeds(BEL.find_input_pin(n, "Asset"), 3))]
     check("the ready pose is started in two places: the equip and the keepalive",
           len(plays) == 2, f"{len(plays)} plays")

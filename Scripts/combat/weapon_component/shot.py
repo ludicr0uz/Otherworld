@@ -61,6 +61,7 @@ from combat.weapon_component.carry import _author_shot_origin
 from combat.weapon_component.firing import _author_fire
 from combat.weapon_component.impact import author_pellet_flew
 from combat.weapon_component.record import authority, rep_dirty
+from combat.weapon_component.reload_clip import author_reload_clip
 from combat.weapon_component.shot_noise import _author_shot_noise
 from combat.weapon_component.slot_nodes import op, valid
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_GET_OWNER
@@ -141,13 +142,14 @@ def _author_reloaded(ed):
         "raises no event, so it has no sound and no pause.", g.made)
 
 
-def _author_heard_on_gun(ed, sound_var):
+def _author_heard_on_gun(ed, sound_var, first=None):
     """The body of Fx_Shot and Fx_Reload: Held's ``sound_var`` played where
     the gun is, behind IsValid(Held). A few centimetres from the muzzle, and
-    no second copy of the muzzle sub-graph."""
+    no second copy of the muzzle sub-graph. ``first(g, exec_in)`` authors what
+    comes before it and returns the exec pins after (the reload's clip)."""
     def body(g, exec_in, _event):
         held = g.get(WV.Held)
-        armed, _empty = g.branch(valid(g, held), [exec_in])
+        armed, _empty = g.branch(valid(g, held), first(g, exec_in) if first else [exec_in])
         g.call(FN_PLAY_SOUND, [armed], Sound=g.iget(held, sound_var),
                Location=out(g.call(FN_ACTOR_LOC, self=held)))
     return body
@@ -156,8 +158,9 @@ def _author_heard_on_gun(ed, sound_var):
 def author_shot_events(ed):
     """What the graph hangs on the base's events, and the shot's and the
     reload's cosmetics."""
-    for name, sound in ((SHOT, IV.FireSound), (RELOAD, IV.ReloadSound)):
-        fx.pair(ed, name, (), _author_heard_on_gun(ed, sound), fx.UNPREDICTED,
+    for name, sound, first in ((SHOT, IV.FireSound, None),
+                               (RELOAD, IV.ReloadSound, author_reload_clip)):
+        fx.pair(ed, name, (), _author_heard_on_gun(ed, sound, first), fx.UNPREDICTED,
                 item_class=ITEM_CLASS_PATH)
     author_pellet_flew(ed)
     _author_shot_fired(ed)

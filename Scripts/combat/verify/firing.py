@@ -87,9 +87,10 @@ def check_recoil():
     # The four body-pose weights and the kneel's ease with FInterpTo too
     # (verify/body_pose.py checks those); each one's Current is its own weight.
     # So do the held breath's BreathScale (verify/breath.py) and the carry's two
-    # (verify/carry_pose.py).
+    # (verify/carry_pose.py), and the reload's ReloadHand (verify/reload_clip.py).
     pose_reads = {f"Get {name}" for name in (*POSE_WEIGHTS, POSE_KNEEL, POSE_SLIDE,
-                                             CARRY_POSE, CARRY_SPRINT, "BreathScale")}
+                                             CARRY_POSE, CARRY_SPRINT, "BreathScale",
+                                             "ReloadHand")}
     interps = [n for n in by_pins(wg, "Current", "Target", "DeltaTime", "InterpSpeed")
                if not any(str(BEL.get_node_title(PIN.get_owning_node(q))) in pose_reads
                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Current")))]

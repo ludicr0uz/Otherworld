@@ -24,6 +24,7 @@ from uebp.nodes.actor import (
     FN_IS_PLAYING_SLOT, FN_SET_HIDDEN, FN_SET_REL_XFORM, FN_STOP_SLOT)
 from uebp.nodes.grip import FN_GRIP_SEAT
 from combat.weapon_component.pickup_clip import picking_up
+from combat.weapon_component import reload_clip
 from combat.weapon_component.throw_windup import THROW_ANIM_VAR
 from uebp.nodes.array import FN_ARR_ADD
 from uebp.nodes.math import (
@@ -250,9 +251,19 @@ def _author_equip(ed, exec_in):
     _set(throwing, "SlotNodeName", AIM_SLOT)
     # ...nor the pick-up's (pickup_clip.py): the take's own NeedsRefresh
     # runs this equip the frame the reach down starts.
+    taken_up = keep(_node(ed, FN_OR))
+    _connect(out(throwing), _pin(taken_up, "A"))
+    _connect(picking_up(ed, anim_out, keep), _pin(taken_up, "B"))
+    # ...nor the reload's (reload_clip.py): the reload raises a lowered gun,
+    # and that raise runs this equip the frame after the clip starts. Only
+    # while the pose in hand is still a gun's that reloads with the clip:
+    # another gun taken out cuts it.
+    reloading = keep(_node(ed, FN_AND))
+    _connect(reload_clip.holding(ed, anim_out, keep), _pin(reloading, "A"))
+    _connect(reload_clip.reloads_with_clip(ed, keep), _pin(reloading, "B"))
     busy = keep(_node(ed, FN_OR))
-    _connect(out(throwing), _pin(busy, "A"))
-    _connect(picking_up(ed, anim_out, keep), _pin(busy, "B"))
+    _connect(out(taken_up), _pin(busy, "A"))
+    _connect(out(reloading), _pin(busy, "B"))
     mid_throw = keep(ed.add_branch_node())
     _connect(out(busy), _pin(mid_throw, "Condition"))
     for e in taken:

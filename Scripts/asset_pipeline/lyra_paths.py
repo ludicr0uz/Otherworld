@@ -68,8 +68,13 @@ PUNCH = f"{ACTIONS}/MM_Pistol_Melee"
 AIM_RIFLE = f"{LOCOMOTION}/Rifle/MM_Rifle_Idle_ADS"
 AIM_PISTOL = f"{LOCOMOTION}/Pistol/MM_Pistol_Idle_ADS"
 
+# The magazine change of the AKM and the sniper (combat/weapon_component/
+# reload_clip.py): one clip for both, 2.2 s.  It starts and ends in Lyra's
+# hip pose, which the ready pose is blended over at both ends.
+RELOAD_RIFLE = f"{ACTIONS}/MM_Rifle_Reload"
+
 # Every Lyra clip the game plays.  A later one is a row here and a re-run.
-CLIPS = (PUNCH, AIM_RIFLE, AIM_PISTOL)
+CLIPS = (PUNCH, AIM_RIFLE, AIM_PISTOL, RELOAD_RIFLE)
 
 
 def uefn_clip(source):

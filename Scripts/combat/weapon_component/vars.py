@@ -374,6 +374,15 @@ ThrowDueTime = Var("ThrowDueTime", FLOAT, 0.0)
 # The pick-up's clip (pickup_clip.py): the reach down for an item taken off
 # the ground. The builder fills it where the skin has one.
 PickUpAnim = Var("PickUpAnim", _CLIP)
+# The reload's clip (reload_clip.py): the magazine change, the ready clips of
+# the guns that reload with it (the AKM's and the sniper's), the world time
+# the ready pose takes the slot back, and how far the left hand has let go
+# of the gun down the sights. The builder fills the first two where the skin
+# has the clip.
+ReloadAnim = Var("ReloadAnim", _CLIP)
+ReloadFor = Var("ReloadFor", array(_CLIP))
+ReloadClipEnds = Var("ReloadClipEnds", FLOAT, 0.0)
+ReloadHand = Var("ReloadHand", FLOAT, 0.0)
 # Chopping a tree (chop.py): the tree being cut, the blows on it, where the
 # wood lands, and the wood.
 ChopTree = Var(CHOP_TREE_VAR, obj("/Script/Engine.PrimitiveComponent"))
@@ -418,7 +427,8 @@ STATE = (
     Thrown, ThrowStart, ThrowVelocity, ThrowLast, ThrowTime, ThrowFlyer, ThrowStamp,
     ThrowStopped, ThrowEnded, ThrowEndFrom, ThrowEndAt, ThrowEndOff, ThrowEndParent,
     ThrowEndBone, ThrowEndTime, ThrowTwin, ThrowLetGo, ThrowPast, ThrowBone, ThrowSkin,
-    ThrowAnim, ThrowReadyAnim, ThrowWinding, ThrowDueTime, PickUpAnim, ChopTree, ChopItem,
+    ThrowAnim, ThrowReadyAnim, ThrowWinding, ThrowDueTime, PickUpAnim, ReloadAnim, ReloadFor,
+    ReloadClipEnds, ReloadHand, ChopTree, ChopItem,
     ChopCount,
     WoodSpot, WoodClass, LightWood, ThrowArc, ThrowArcClass,
 )

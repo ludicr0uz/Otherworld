@@ -30,7 +30,8 @@ the forearm bone itself, as the pose left it. The hand's turn is not touched;
 it is the pose's, in mesh space, as the right hand's is.
 
 SupportHand is its weight. The weapon component writes both
-(weapon_component/support_hand.py): SupportHand is SightBlend, so the hold
+(weapon_component/support_hand.py): SupportHand is SightBlend (less a
+reload's clip in the slot: weapon_component/reload_clip.py), so the hold
 eases in with the sights and is nothing at the hip, on the shoulder, or with
 no gun in hand. Only down the sights, because that is where the view rides the
 gun; elsewhere the upper-body slot also plays things the left hand must be

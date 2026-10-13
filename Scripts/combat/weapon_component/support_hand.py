@@ -2,7 +2,7 @@
 SupportHand and SupportPoint every frame (support_hand.py owns the IK they
 drive, and says why the hand needs holding).
 
-    SupportHand  = SightBlend          the IK's weight
+    SupportHand  = SightBlend x (1 - ReloadHand)    the IK's weight
     SupportPoint = HeldSupportPoint    where the held gun's ready pose has the
                                        left hand, in the right hand's space
 
@@ -11,7 +11,9 @@ sights key and out once the camera has left the gun, so the hand never snaps,
 and at the hip, on the shoulder or with no gun in hand it writes 0 and the
 pose is left alone. HeldSupportPoint is the component's own copy of
 Held.SupportPoint (pose_weights.py writes it behind an IsValid Branch, beside
-HeldTwoHanded), so nothing here reads off Held.
+HeldTwoHanded), so nothing here reads off Held. ReloadHand rises while a
+reload's clip is in the slot (reload_clip.py): the hand leaves the gun for
+the magazine, and takes hold again after.
 
 The anim instance is cast to the player's anim BP class, so a wearer with
 another anim BP simply fails the cast.
@@ -28,6 +30,7 @@ from uebp.graph import BEL, _connect, _node, _palette, _pin, else_, out, then
 from combat.skin import player_skin
 from combat.support_hand import SUPPORT_HAND_VAR, SUPPORT_POINT_VAR
 from combat.weapon_component.pose_weights import HELD_SUPPORT_POINT
+from combat.weapon_component.reload_clip import author_hand_weight
 from combat.weapon_component.sight_pitch import _anim_class_path, _anim_instance
 from uebp.nodes.system import FN_IS_DEDICATED_SERVER
 from combat.weapon_component import vars as WV
@@ -61,18 +64,22 @@ def _author_support_hand(ed, exec_ins):
                    if str(unreal.BlueprintGraphPinLibrary.get_pin_name(p))
                    .startswith("As"))
 
-    tail = then(cast)
-    for var, source in ((SUPPORT_HAND_VAR, "SightBlend"), (SUPPORT_POINT_VAR, HELD_SUPPORT_POINT)):
-        value = keep(ed.add_get_member_variable_node(source))
+    # The hold lets go for a reload's clip (reload_clip.py): the left hand
+    # goes to the magazine.
+    blend = keep(ed.add_get_member_variable_node("SightBlend"))
+    tail, weight = author_hand_weight(ed, out(blend, "SightBlend"), then(cast), keep)
+    point = keep(ed.add_get_member_variable_node(HELD_SUPPORT_POINT))
+    for var, value in ((SUPPORT_HAND_VAR, weight),
+                       (SUPPORT_POINT_VAR, out(point, HELD_SUPPORT_POINT))):
         put = keep(ed.add_set_member_variable_node(var, anim_class))
         _connect(as_anim, _pin(put, "self"))
-        _connect(out(value, source), _pin(put, var))
+        _connect(value, _pin(put, var))
         _connect(tail, _pin(put, "execute"))
         tail = then(put)
 
     ed.add_comment_to_nodes(
         f"Down the sights the left hand holds the gun: {SUPPORT_HAND_VAR} = "
-        f"SightBlend and {SUPPORT_POINT_VAR} = {HELD_SUPPORT_POINT}, onto the "
+        f"SightBlend (less while a reload's clip plays) and {SUPPORT_POINT_VAR} = {HELD_SUPPORT_POINT}, onto the "
         "player's anim BP, whose Two Bone IK they drive (Scripts/combat/"
         "support_hand.py). 0 at the hip and on the shoulder, and never written "
         "on a dedicated server, which draws no hand.", made)

@@ -10,9 +10,10 @@ from combat.hit_reaction import HIT_REACT_PROBE, POSE_BACK_PROBE_PREFIX
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS
 from combat.weapon_component.look_vars import HandPose, HandRaise
 from combat.weapon_component.pickup_clip import picking_up
+from combat.weapon_component import reload_clip
 from combat.weapon_component.throw_windup import THROW_ANIM_VAR
 from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_IS_PLAYING_SLOT, FN_IS_SLOT_ACTIVE, FN_PLAY_SLOT
-from uebp.nodes.math import FN_AND, FN_NEQ_BB, FN_NOT
+from uebp.nodes.math import FN_AND, FN_NEQ_BB, FN_NOT, FN_OR
 from uebp.nodes.system import FN_IS_VALID, FN_WARN
 from combat.weapon_component import vars as WV
 
@@ -44,6 +45,8 @@ def _author_ready_pose_keepalive(ed, exec_ins):
           AND DefaultSlot is quiet      (nothing is holding the pose)
           AND HitSlot is quiet          (we are not mid-flinch)
           AND the throw's clip is not playing   (its first frame reads quiet)
+          AND neither the pick-up's nor the reload's is (a reload's clip
+              whose time is up counts as a quiet slot: reload_clip.py)
             -> play HandPose into DefaultSlot again
 
     HandPose (look.py) is the held item's AimPose as the equip last took it:
@@ -100,17 +103,29 @@ def _author_ready_pose_keepalive(ed, exec_ins):
     # The pick-up's clip the same (pickup_clip.py).
     not_picking = keep(_node(ed, FN_NOT))
     _connect(picking_up(ed, anim_out, keep), _pin(not_picking, "A"))
+    # ...and the reload's (reload_clip.py), until its time is up.
+    not_reloading = keep(_node(ed, FN_NOT))
+    _connect(reload_clip.holding(ed, anim_out, keep), _pin(not_reloading, "A"))
+    free = keep(_node(ed, FN_AND))
+    _connect(out(not_throwing), _pin(free, "A"))
+    _connect(out(not_picking), _pin(free, "B"))
     calm = keep(_node(ed, FN_AND))
-    _connect(out(not_throwing), _pin(calm, "A"))
-    _connect(out(not_picking), _pin(calm, "B"))
+    _connect(out(free), _pin(calm, "A"))
+    _connect(out(not_reloading), _pin(calm, "B"))
     settled = keep(_node(ed, FN_NOT))
     _connect(out(flinching), _pin(settled, "A"))
 
     ready = keep(_node(ed, FN_AND))
     _connect(out(armed), _pin(ready, "A"))
     _connect(out(still), _pin(ready, "B"))
+    # A reload's clip whose time is up is a quiet slot: played then, the
+    # pose blends the clip out against itself, where a clip left to end
+    # blends out to the locomotion's pose and the gun dips to the hip.
+    open_slot = keep(_node(ed, FN_OR))
+    _connect(out(no_pose), _pin(open_slot, "A"))
+    _connect(reload_clip.ending(ed, anim_out, pose_pin, keep), _pin(open_slot, "B"))
     quiet = keep(_node(ed, FN_AND))
-    _connect(out(no_pose), _pin(quiet, "A"))
+    _connect(out(open_slot), _pin(quiet, "A"))
     _connect(out(settled), _pin(quiet, "B"))
     undisturbed = keep(_node(ed, FN_AND))
     _connect(out(quiet), _pin(undisturbed, "A"))

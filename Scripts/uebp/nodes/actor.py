@@ -46,6 +46,8 @@ FN_IS_PLAYING_SLOT = "/Script/Engine.AnimInstance.IsPlayingSlotAnimation"
 # out. It is what lets the ready pose notice that a hit reaction took the
 # montage group off it, and put itself back the frame the flinch ends.
 FN_IS_SLOT_ACTIVE = "/Script/Engine.AnimInstance.IsSlotActive"
+# How long a clip is, in seconds: pure.
+FN_PLAY_LENGTH = "/Script/Engine.AnimationAsset.GetPlayLength"
 FN_PLAY_SLOT = "/Script/Engine.AnimInstance.PlaySlotAnimationAsDynamicMontage"
 FN_STOP_SLOT = "/Script/Engine.AnimInstance.StopSlotAnimation"
 

@@ -329,6 +329,10 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_lyra.py
   along the frame, and the poses lean in to the sights (`Scripts/combat/CLAUDE.md`, "The
   gun poses"). Without Lyra the guns are held in the mannequin's poses
   (`skin.GAS_AIM_WITHOUT_LYRA`).
+- **The rifles' reload** is `Actions/MM_Rifle_Reload` (`lyra_paths.RELOAD_RIFLE`, 2.2 s,
+  the left hand to the pouch and back): the AKM's and the sniper's magazine change
+  (`Scripts/combat/CLAUDE.md`, "The weapon layers"). Without Lyra there is no clip and
+  they reload with the sound alone (`skin._gas_skin` drops `reload_rifle`).
 - **A checkout without Lyra** still wears the motion-matching skin: `combat/skin._gas_skin`
   falls back to the mannequin's `MM_Attack_01` on the UEFN skeleton
   (`retarget_to_uefn.py` still makes it) and says so in the build's log; the punch

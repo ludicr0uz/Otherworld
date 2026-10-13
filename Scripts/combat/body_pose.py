@@ -24,7 +24,12 @@ with its Alpha driven by one weight:
 A weight of 0 skips its nodes entirely, so standing costs nothing.
 
 WITH THE CLIPS the crouch is all clip, and the prone is the crawl with its
-hips lifted, since the clip's lie under the feet's root:
+hips lifted. A real prone (PlayerSkin.prone_idle: the motion-matching
+player's, P1) lies on the ground as it is: PoseProne lifts its hips the
+3.4 cm from the 12.6 the retargeted clip carries them at to PRONE_HIPS_CM,
+which takes the hand joints (1.7 cm under, lying still) out of the ground,
+and there is no ProneMoving. The older crawls' hips lie under the feet's
+root:
 
     PoseProne     to PRONE_HIPS_CM, lying still
     ProneMoving   PoseProne x Move, a product rather than a variable: 15 cm
@@ -273,7 +278,7 @@ def pose_plan(skin, ref):
     steps.append((GUARD_GUN, b["neck"], ADDITIVE, _conj(chest), None))
 
     if skin.stance_clips:
-        return steps + _prone_on_clip(b, crawl_hips_z(skin))
+        return steps + _prone_on_clip(b, crawl_hips_z(skin), kicks=not skin.prone_idle)
 
     thigh = _swing(DOWN, FORWARD, CROUCH_THIGH_DEG)
     # The shin, carried forward by the thigh, swings back to S behind vertical.
@@ -315,12 +320,15 @@ def crawl_hips_z(skin):
     return round((min(zs) + max(zs)) / 2.0, 2)
 
 
-def _prone_on_clip(b, hips_z):
+def _prone_on_clip(b, hips_z, kicks=True):
     """The prone's corrections on the crawl clip (stance_clips.py): lift the
-    hips onto the ground, and higher while crawling."""
-    return [(POSE_PRONE, b["hips"], IGNORE, None,
-              (0.0, 0.0, PRONE_HIPS_CM - hips_z)),
-             (PRONE_MOVING, b["hips"], IGNORE, None, (0.0, 0.0, PRONE_CRAWL_LIFT_CM))]
+    hips onto the ground, and higher while crawling where the crawl
+    ``kicks`` its knees under them (not a real prone's)."""
+    steps = [(POSE_PRONE, b["hips"], IGNORE, None, (0.0, 0.0, PRONE_HIPS_CM - hips_z))]
+    if kicks:
+        steps.append((PRONE_MOVING, b["hips"], IGNORE, None,
+                      (0.0, 0.0, PRONE_CRAWL_LIFT_CM)))
+    return steps
 
 
 # ─── authoring ───────────────────────────────────────────────────────────────
@@ -445,7 +453,7 @@ def patch_body_pose(skin):
         get = ed.add_get_member_variable_node(name)
         weight_pins[name] = out(get, name)
         made.append(get)
-    if skin.stance_clips:
+    if PRONE_MOVING in used:
         weight_pins[PRONE_MOVING] = _prone_moving(ed, weight_pins[POSE_PRONE])
     pose = start_out
     for step in plan:

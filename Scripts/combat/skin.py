@@ -13,6 +13,7 @@ import dataclasses
 
 import unreal
 
+from asset_pipeline import fal_paths as FAL
 from asset_pipeline.gas_bridge_paths import PLAYER_FAMILY
 from asset_pipeline import lyra_paths as LYRA
 from asset_pipeline import mixamo_paths as MIXAMO
@@ -139,6 +140,11 @@ class PlayerSkin:
     crouch_walk: str = None
     prone_crawl: str = None
     search_kneel: str = None
+    # Lying still, where the rig has a prone of its own (P1: the Free
+    # Animation Library's, asset_pipeline/import_fal.py): a loop, and
+    # prone_crawl is then a crawl that lies on the ground as it is. None:
+    # lying still is prone_crawl held on one frame, lifted off the ground.
+    prone_idle: str = None
     # The overhand throw (weapon_component/throw_windup.py), from the same
     # library, played into the upper-body slot. None where the rig has none:
     # the item then leaves the hand on the click, with no clip.
@@ -297,6 +303,9 @@ SKIN_METAHUMAN = dataclasses.replace(
 # and its idle the sample's own.
 GAS_ANIMS = f"/Game/Sourced/Characters/Anims/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
 GAS_UAL_ANIMS = f"/Game/Sourced/Quaternius/UAL/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
+# The crawl of a checkout that has no Free Animation Library (_gas_skin):
+# Mixamo's zombie crawl, the prone_crawl role of player_clips.csv.
+GAS_CRAWL_WITHOUT_FAL = MIXAMO.player_clip("prone_crawl")
 # The punch and the two ready poses of a checkout that has no Lyra
 # (_gas_skin): the mannequin's.
 GAS_PUNCH_WITHOUT_LYRA = f"{GAS_ANIMS}MM_Attack_01"
@@ -315,7 +324,8 @@ SKIN_GAS = dataclasses.replace(
     punch=LYRA.uefn_clip(LYRA.PUNCH),
     crouch_idle=f"{GAS_UAL_ANIMS}UAL1_Crouch_Idle_Loop",
     crouch_walk=f"{GAS_UAL_ANIMS}UAL1_Crouch_Fwd_Loop",
-    prone_crawl=MIXAMO.player_clip("prone_crawl"),
+    prone_idle=FAL.uefn_clip(FAL.PRONE_IDLE),
+    prone_crawl=FAL.uefn_clip(FAL.PRONE_FWD),
     search_kneel=f"{GAS_UAL_ANIMS}UAL1_Fixing_Kneeling",
     throw=f"{GAS_UAL_ANIMS}UAL2_OverhandThrow",
     pickup=f"{GAS_UAL_ANIMS}UAL2_Farm_Harvest")
@@ -349,7 +359,7 @@ def _without_missing_clips(skin, eas, who, builder):
         return skin
     _log(f"note: no Quaternius stance clips yet — {who} crouches and lies down "
          f"procedurally. Run asset_pipeline/{builder}.")
-    return dataclasses.replace(skin, crouch_idle=None, crouch_walk=None,
+    return dataclasses.replace(skin, crouch_idle=None, crouch_walk=None, prone_idle=None,
                                prone_crawl=None, search_kneel=None)
 
 
@@ -381,6 +391,13 @@ def _gas_skin(eas):
              "in the mannequin's ready poses. Add Lyra and run asset_pipeline/"
              "import_lyra.py.")
         skin = dataclasses.replace(skin, fist_index=None, **GAS_AIM_WITHOUT_LYRA)
+    if not all(eas.does_asset_exist(p) for p in (skin.prone_idle, skin.prone_crawl)):
+        # As Lyra: a Fab pack the user adds by hand.
+        _log(f"note: {skin.prone_idle} or the crawl is not here — lying down is the "
+             f"zombie crawl. Add the Free Animation Library ({FAL.CONTENT_DIR}) and "
+             "run asset_pipeline/import_fal.py.")
+        skin = dataclasses.replace(skin, prone_idle=None,
+                                   prone_crawl=GAS_CRAWL_WITHOUT_FAL)
     return _without_missing_clips(skin, eas, "the MetaHuman", "retarget_to_uefn.py")
 
 

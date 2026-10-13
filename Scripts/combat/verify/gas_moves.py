@@ -70,6 +70,9 @@ def check_crouch():
     values = enum_values(bp)["Stance"]
     picks = [n for c in casts for n in _up(BEL.find_input_pin(c, "Byte"))]
     picks = [n for p in picks for n in _up(BEL.find_input_pin(p, "InInt"))]
+    # The crouch's own read: gas_feet.py asks GetStance too, for the prone.
+    reads = [n for p in picks for e in _up(BEL.find_input_pin(p, "bPickA"))
+             for n in _up(BEL.find_input_pin(e, "A")) if _flat(n) == "GetStance"]
     check("the motion matching's Stance is Crouch while the movement component says the "
           "character is crouched and not prone (GetStance == 1), else Stand: the sample's "
           "crouch set plays, on every machine",

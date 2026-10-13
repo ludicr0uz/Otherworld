@@ -146,6 +146,30 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   Zombie Pack (`mixamo_paths.PLAYER_CLIPS["prone_crawl"]`, the `prone_crawl` row of `player_clips.csv`: `Scripts/dev/swap_clip.py` tries another; retargeted by `import_mixamo_player.py`;
   its hips bob about 7 cm, so the verifier allows `CRAWL_BOB_CM`), and lying still is that clip held
   at 0.96 s (`PRONE_REST_S`, hips mid-bob). The older skins still use `Swim_Fwd_Loop`.
+- **The motion-matching player's prone is a real one** (P1, `PlayerSkin.prone_idle`): lying
+  still plays the Free Animation Library's `anim_Prone_Idle` (propped on the elbows, a 1 s
+  loop, at 1x) and crawling its `anim_Prone_Fwd_Loop_R`, both retargeted onto the UEFN
+  skeleton by `asset_pipeline/import_fal.py` (`Scripts/asset_pipeline/CLAUDE.md`, "The Free
+  Animation Library"). `stance_clips.prone_nodes(skin)` is what the blend's two arms are: two
+  players with an idle, the old evaluator and player without (the older skins, and a checkout
+  without the pack, which falls back to the zombie crawl: `skin.GAS_CRAWL_WITHOUT_FAL`).
+  - **The rate** is picked as the crouch walk's was: the crawl moves at the jog × 0.2 = 80 cm/s
+    and the loop covers 63 cm in its second, so `PRONE_LOOP_RATE` = 80 / 63 = 1.27, under the
+    cap, and no slide is left. Sideways and backwards play the same loop (P2).
+  - **The copies are in place** (root and pelvis travel 0.00 cm: the plain retargeter drops the
+    root's travel), with no root motion; the verifier holds both.
+  - **`body_pose` lifts the hips 3.3 cm** (from the copy's 12.7 to `PRONE_HIPS_CM`) and has no
+    `ProneMoving` step: nothing kicks under the hips.
+  - **The base graph's feet are off while prone** (`gas_feet.py`): Foot Placement and Leg IK
+    come after the layers. Leg IK pulled each foot to its IK bone, which a retargeted clip
+    leaves under a standing body's hips, so the legs folded under the body (the zombie crawl's
+    too); with the IK bones on the feet (`ik_follow.py`) Foot Placement carried the hips 8 cm
+    up and let them drift. Both nodes take their Alpha from `OwFeetAlpha`: 0 while
+    `GetStance == 2`.
+  - **Measured in game** (`probe_stance_clips.py`): still, hips 15.6 cm, head joint 38.4 and
+    steady, lowest limb 1.6; crawling 80 cm/s, hips 15.6–16.4, hands from 3.3, knees from 8.8,
+    hips fixed over the capsule. With a gun the hands are 37 cm up (pistol 43), as far apart as
+    standing, head joint 57–59 under the capsule's top (80): left as they were.
 - **Where:** between the locomotion state machine and both its readers (the aim slot and the
   upper-body layered blend's base): `TwoWayBlend(PoseCrouch)` then `TwoWayBlend(PoseProne)`,
   each B a still/walking `TwoWayBlend` by `Move = clamp(GroundSpeed / 60, 0, 1)`. The aim

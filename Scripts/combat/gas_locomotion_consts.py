@@ -77,7 +77,10 @@ LANDED_AT = Var("OwLandedAt", FLOAT, 0.0)
 # what puts the sample's own montage slot in the pose line
 # (gas_traversal_slot.py). Declared always, written only with traversal on.
 TRAVERSING = Var("OwTraversing", BOOL, False)
-ADDED_VARS = (WAS_FALLING, FALL_VELOCITY, LAND_VELOCITY, LANDED_AT, TRAVERSING)
+# ...and how much of Foot Placement and Leg IK is in: 0 while the player lies
+# down (gas_feet.py).
+FEET_ALPHA = Var("OwFeetAlpha", FLOAT, 1.0)
+ADDED_VARS = (WAS_FALLING, FALL_VELOCITY, LAND_VELOCITY, LANDED_AT, TRAVERSING, FEET_ALPHA)
 
 # The struct's fields (S_CharacterPropertiesForAnimation), as the Make node
 # names its pins: each is followed by an id, so a pin is matched by its head.
@@ -110,5 +113,6 @@ OFFSET_ROOT_CLASS = "AnimGraphNode_OffsetRootBone"
 # pose history after it is what the next frame's search reads, so both are on
 # both arms.
 HISTORY_CLASS = "AnimGraphNode_PoseSearchHistoryCollector"
+FEET_CLASSES = ("AnimGraphNode_FootPlacement", "AnimGraphNode_LegIK")
 EYE_CLASSES = ("AnimGraphNode_ComponentToLocalSpace", "AnimGraphNode_LegIK",
                "AnimGraphNode_FootPlacement", "AnimGraphNode_LocalToComponentSpace")

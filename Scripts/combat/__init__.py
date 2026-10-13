@@ -301,4 +301,6 @@ wrong module.
   input_assets      authors IA_Fire and IMC_Default, and names them on the
                     player character's class defaults (the fire key is an
                     input action; weapon_component/trigger.py)
+
+  gas_feet  The motion-matching graph's feet are off while the player lies down
 """

@@ -53,6 +53,7 @@ from combat.gas_locomotion_consts import (
     HISTORY_CLASS, JUST_LANDED_SECONDS, LAND_VELOCITY, LANDED_AT, PROPERTIES_GRAPH,
     PROPERTIES_VAR, SLOT_CLASS, SLOT_NAME, WALK_BELOW_CMS, WAS_FALLING,
 )
+from combat.gas_feet import author_feet_alpha, link_feet_alpha, remove_feet_alpha
 from combat.gas_moves import crouch_on, traversal_on
 from combat.gas_traversal_slot import (
     author_traversal_slot, author_traversing_flag, remove_traversal_slot,
@@ -224,6 +225,7 @@ def _author_properties(bp, ed):
     # One write, reached from every way through the landing's branches.
     wrote = g.put(PROPERTIES_VAR, next(iter(BEL.list_output_pins(make))),
                   [kept, done, else_pin(ed, landed)])
+    wrote = author_feet_alpha(g, char, [wrote])
     if traversal_on():
         author_traversing_flag(g, char, [wrote])
     ed.add_comment_to_nodes(
@@ -459,6 +461,7 @@ def build_gas_locomotion():
     unshare(anim)
     _remove_server_branch(anim, events)
     _remove_link(anim)
+    remove_feet_alpha(anim)
     remove_traversal_slot(anim, _slot(anim))
     declare(properties, ADDED_VARS)
     if not BEL.compile_blueprint(bp):
@@ -469,6 +472,7 @@ def build_gas_locomotion():
         author_traversal_slot(anim, _slot(anim))
     _author_link(anim)
     _author_server_branch(anim, events)
+    link_feet_alpha(anim)
     # The traversal's slot and the server branch each take one pose on both
     # arms: a cached pose each, or the motion matching under them is updated
     # twice a frame while a blend has both arms in (uebp/pose_share.py).

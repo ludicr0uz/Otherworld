@@ -115,4 +115,8 @@ Editor-side, in pipeline order:
 
   import_metahuman  copy the sample MetaHuman the player wears into Content/MetaHumans
   metahuman_paths   where the player's MetaHuman is, and what it is made of
+
+  fal_paths   Where the Free Animation Library lies and which of its clips the game plays
+  ik_follow   Key a retargeted clip's IK foot bones onto its feet
+  import_fal  the Free Animation Library's clips the game plays, onto the player's skeleton
 """

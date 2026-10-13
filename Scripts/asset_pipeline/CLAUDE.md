@@ -335,6 +335,27 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_lyra.py
   verifier then fails its "is Lyra's melee" line.
 - **The licence is Fab's Standard** (`fab_library.json`, recorded 2026-10-13).
 
+## The Free Animation Library: the prone (P1, 2026-10-13)
+
+A Fab pack the user added at `/Game/FreeAnimationLibrary` (git-ignored, as its copies are;
+`fab_library.json`). The game plays two of its clips, the rows of `fal_paths.CLIPS`:
+`anim_Prone_Idle` and `anim_Prone_Fwd_Loop_R` (`Animations/UnarmedProne`).
+
+- **One import path:** `uepy.py Scripts/asset_pipeline/import_fal.py` retargets every row
+  onto `SK_UEFN_Mannequin` into `/Game/FreeAnimationLibrary/UEFN_Player` as
+  `A_UEFN_Player_<clip>`, read off the pack's own `SKM_Manny_Simple` through a rig of the
+  mannequin's chain table and the plain retargeter, as `import_lyra.py` does. Another clip
+  (P2's four directions) is a row and a re-run. Then `build_weapons_and_combat.py`.
+- **In place.** The forward loop carries 63 cm on its root bone; the plain retargeter has
+  Root Motion off and the pelvis's horizontal travel zeroed, so the copy's root and pelvis
+  travel 0.00 cm. The importer fails a copy that travels 0.5 cm, and sets root motion off.
+- **IK feet onto the feet** (`ik_follow.follow_feet`): a retarget leaves `ik_foot_l`/`_r` in
+  the reference pose, and the motion-matching graph's Leg IK pulls the feet to them
+  (`Scripts/combat/CLAUDE.md`, "The feet are off while the player lies down"). Every other
+  retargeted copy (Lyra's, Mixamo's) still has them there: harmless on the arms and spine.
+- **A checkout without the pack** wears the zombie crawl (`combat/skin._gas_skin`) and says
+  so in the build's log. `dev/tests/test_fal_import.py` holds the table.
+
 ## Mixamo for the player: the knife's and the axe's clips (C2, 2026-10-08)
 
 `import_mixamo.py`'s last step (`mixamo_player.py`; `import_mixamo_player.py` runs it

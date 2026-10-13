@@ -19,6 +19,12 @@ the procedural poses all apply on top of a crouched or lying body:
     kneel  = Evaluate search_kneel at KneelTime
     Move   = clamp(GroundSpeed / MOVE_FULL_CM_S, 0, 1)   (body_pose.move_alpha)
 
+A skin with a prone of its own (PlayerSkin.prone_idle: the motion-matching
+player's, the Free Animation Library's, P1) lies in two loops instead:
+
+    crawl  = TwoWayBlend(Move, A = Play prone_idle, B = Play prone_crawl at
+                               PRONE_LOOP_RATE)
+
 On the motion-matching body (G5, gas_moves.py) the line is, with both
 switches on:
 
@@ -37,9 +43,10 @@ weapon component runs KneelTime up and back down the working stretch
 ease is what kneels and stands. Under the aim layer like the other two, so
 empty hands rummage and a held gun stays held over the kneeling legs.
 
-Lying still is the crawl held on one frame (arms reaching ahead, legs
-straight): the pack has no prone idle. The clip's hips lie below the feet's
-root, and body_pose.py lifts them (more while crawling, when the kick drops
+Without a prone idle (the older skins, on the Quaternius swim; a checkout
+without the Free Animation Library, on Mixamo's zombie crawl) lying still is
+the crawl held on one frame (arms reaching ahead, legs straight). Those
+clips' hips lie below the feet's root, and body_pose.py lifts them (more while crawling, when the kick drops
 the knees) and tips an aimed upper body forward: the aim layer blends in mesh space, so with a
 gun in hand the chest is upright over the crawling hips until it does.
 
@@ -50,6 +57,8 @@ nothing here and keeps the procedural crouch and prone.
 """
 
 from uebp.vars import declare
+from asset_pipeline.fal_paths import PRONE_FWD_TRAVEL_CM
+from asset_pipeline.mixamo_paths import RATE_SCALE_RANGE
 from combat import anim_vars as AN
 from combat.aim_pitch import OWN_POSE_CLASSES, _feeding_all, _nodes_of
 from combat.aim_pitch import _remove_previous as _remove_pitch_chain
@@ -58,6 +67,7 @@ from combat.body_pose import KNEEL_TIME, POSE_CROUCH, POSE_KNEEL, POSE_PRONE, mo
 from combat.gas_moves import crouch_on, slide_on
 from combat.gas_moves_tuning import POSE_SLIDE, SLIDE_CLIP
 from combat.log import _log
+from combat.tuning import COMBAT
 from uebp.graph import BEL, BGE, PIN, _assets, _connect, _palette, _pin, _set, out
 from uebp.layout import arrange
 
@@ -76,6 +86,23 @@ PRONE_CRAWL_RATE = 1.5
 # The crawl's still frame (Mixamo's zombie crawl): a frame of the stroke with
 # the hips at the middle of their bob, so lying still they are PRONE_HIPS_CM up.
 PRONE_REST_S = 0.96
+# The Free Animation Library's forward crawl covers 63 cm in its second, and
+# the player crawls at the jog x prone_speed_scale (400 x 0.2 = 80 cm/s; the
+# movement's, not changed here), so it plays at 80 / 63 = 1.27: well under
+# the 2.0 the crouch walk stops at, so nothing is left to slide (80 - 1.27 x
+# 63 = 0.0 cm/s; the elbows hold the ground they are planted on).
+PRONE_LOOP_RATE = min(RATE_SCALE_RANGE[1], round(
+    COMBAT.jog_speed_cms * COMBAT.prone_speed_scale / PRONE_FWD_TRAVEL_CM, 2))
+
+
+def prone_nodes(skin):
+    """((class, clip, rate or None), ...) for lying still and for crawling:
+    what patch_stance_clips authors and verify.stance_clips looks for."""
+    if skin.prone_idle:
+        return ((PLAYER_CLASS, skin.prone_idle, 1.0),
+                (PLAYER_CLASS, skin.prone_crawl, PRONE_LOOP_RATE))
+    return ((EVALUATOR_CLASS, skin.prone_crawl, None),
+            (PLAYER_CLASS, skin.prone_crawl, PRONE_CRAWL_RATE))
 
 
 def _mine(ed):
@@ -195,20 +222,25 @@ def patch_stance_clips(skin):
     ed.remove_member_variable(POSE_SLIDE)
     if skin.stance_clips:
         clips = {f: _assets().load_asset(getattr(skin, f))
-                 for f in ("crouch_idle", "crouch_walk", "prone_crawl", "search_kneel")}
+                 for f in ("crouch_idle", "crouch_walk", "prone_crawl", "search_kneel")
+                 + (("prone_idle",) if skin.prone_idle else ())}
         if slide_on():
             clips["slide"] = _assets().load_asset(SLIDE_CLIP)
             declare(ed, AN.SLIDE)
         missing = [f for f, c in clips.items() if not c]
         if missing:
-            raise RuntimeError(f"no clip for {missing}: run import_quaternius.py"
+            raise RuntimeError(f"no clip for {missing}: run import_quaternius.py "
+                               "(the prone's: import_fal.py)"
                                + (" (the slide's: import_gas.py)" if "slide" in missing else ""))
         consumers = PIN.list_connected_pins(base)
         PIN.break_pin_links(base)
 
         move = move_alpha(ed)
-        crawl = _blend(ed, _pose(_evaluator(ed, clips["prone_crawl"], PRONE_REST_S)),
-                       _pose(_player(ed, clips["prone_crawl"], PRONE_CRAWL_RATE)), move)
+        still, crawling = prone_nodes(skin)
+        crawl = _blend(ed, _pose(_player(ed, clips["prone_idle"], still[2])
+                                 if skin.prone_idle else
+                                 _evaluator(ed, clips["prone_crawl"], PRONE_REST_S)),
+                       _pose(_player(ed, clips["prone_crawl"], crawling[2])), move)
         weights = {w: out(ed.add_get_member_variable_node(w), w)
                    for w in (POSE_PRONE, POSE_KNEEL, KNEEL_TIME)
                    + (() if crouch_on() else (POSE_CROUCH,))}
@@ -248,6 +280,7 @@ def patch_stance_clips(skin):
     _assets().save_loaded_asset(bp)
     _log(f"{bp.get_name()}: stance clips "
          + (f"{skin.crouch_idle.rsplit('/', 1)[1]}, {skin.crouch_walk.rsplit('/', 1)[1]}, "
+            + (f"{skin.prone_idle.rsplit('/', 1)[1]}, " if skin.prone_idle else "") +
             f"{skin.prone_crawl.rsplit('/', 1)[1]}, "
             f"{skin.search_kneel.rsplit('/', 1)[1]}" if skin.stance_clips
             else "none (procedural crouch and prone)"))

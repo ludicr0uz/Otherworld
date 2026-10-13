@@ -257,6 +257,11 @@ another player's copy and the server's).
   `ABP_Unarmed`'s branch (the keyed rig's, and each wanderer's); the worn graph's is
   `verify/gas_locomotion.py`'s. The sample's graph has a blend by bool of its own (the
   aim offset's), so the server's is found by its flag, not by its class.
+- **The feet are off while the player lies down** (`gas_feet.py`, P1): Foot Placement and
+  Leg IK each take their Alpha from `OwFeetAlpha`, which the properties function writes (0
+  while `GetStance == 2`, else 1). They plant two standing feet: on a prone body they folded
+  the legs under it and lifted its hips. A clip that poses the legs in the layers needs its
+  IK foot bones on its feet (`asset_pipeline/ik_follow.py`), or Leg IK moves them.
 - **The sample's foley component rides on the player, silent** (`install.install_foley`,
   `GasFoley`). The sample's clips carry foot, jump and land notifies that look for
   `AC_FoleyEvents` on the owner and play the sample's own sound in 2D when there is
@@ -461,7 +466,9 @@ into the game's own asset (`A_HoldKnife`, `A_KnifeSlash`, `A_HoldAxe`, `A_AxeSwi
     candidates imports each once. `swap_clip.py --prune` deletes the ones no row names
     (the creatures' pack keeps all of its sources); do it before committing.
   - **A new crawl has its own rest frame**: `stance_clips.PRONE_REST_S` (0.96 s, hips
-    mid-bob) was read off the zombie crawl.
+    mid-bob) was read off the zombie crawl. The motion-matching player no longer plays that
+    role (P1: its prone is the Free Animation Library's idle and forward loop, `docs/stance.md`);
+    the row is what a checkout without that pack falls back to, and the older skins' crawl.
 - **The stick is not a melee item** (it is not `Melee`; the fire key does nothing with it),
   so it has no swing, and its torch poses are still `hold_pose.py`'s.
 - **The clips are on the sample's skeleton alone.** With `GAS_LOCOMOTION` off, or the

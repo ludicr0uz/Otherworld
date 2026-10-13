@@ -13,8 +13,9 @@ from combat.gas_locomotion import (
     enum_values, fields_set, graphs, layer_links, link_class, link_tag, server_branches,
     slot_in_line,
 )
+from combat.gas_feet import PRONE, alpha_sources, feet_nodes
 from combat.gas_locomotion_consts import (
-    ADDED_VARS, CHOOSER, EYE_CLASSES, FOLEY_BANK_TABLE, FOLEY_BANK_VAR,
+    ADDED_VARS, CHOOSER, EYE_CLASSES, FEET_ALPHA, FOLEY_BANK_TABLE, FOLEY_BANK_VAR,
     FOLEY_COMPONENT, FOLEY_SILENT_BANK,
     HISTORY_CLASS, WALK_BELOW_CMS,
 )
@@ -203,6 +204,29 @@ def check_body():
           CHOOSER)
 
 
+def check_feet(bp, anim, properties):
+    """gas_feet.py: the feet's two nodes are out while the player lies down."""
+    sources = {_class(n): alpha_sources(n) for n in feet_nodes(anim)}
+    check(f"Foot Placement and Leg IK each take their Alpha from {FEET_ALPHA} (a body "
+          "lying down has no feet under it to plant: they lifted its hips and folded "
+          "its legs)", set(sources) == set(FEET)
+          and all(v == [f"Get {FEET_ALPHA}"] for v in sources.values()), str(sources))
+    nodes = list(properties.list_all_nodes())
+    puts = [n for n in nodes if _title(n).startswith("Set") and _title(n).endswith(f" {FEET_ALPHA}")]
+    picks = [PIN.get_owning_node(q) for p in puts for q in linked(BEL.find_input_pin(p, str(FEET_ALPHA)))]
+    asks = [PIN.get_owning_node(q) for k in picks for q in linked(BEL.find_input_pin(k, "bPickA"))]
+    values = [(PIN.get_pin_value(BEL.find_input_pin(k, "A")), PIN.get_pin_value(BEL.find_input_pin(k, "B")))
+              for k in picks]
+    stances = [str(PIN.get_pin_value(BEL.find_input_pin(a, "B"))) for a in asks]
+    default = unreal.get_default_object(BEL.generated_class(bp)).get_editor_property(str(FEET_ALPHA))
+    # A literal equal to its pin's default reads "" once loaded from disk.
+    check(f"...written once a frame: 0 while GetStance is {PRONE} (prone, the movement's "
+          "answer on every machine), else 1, and 1 by default",
+          len(puts) == 1 and len(picks) == 1 and stances == [PRONE] and default == 1.0
+          and all(float(a or 0.0) == 0.0 and float(b or 0.0) == 1.0 for a, b in values),
+          f"{len(puts)} write(s), stance {stances}, values {values}, default {default!r}")
+
+
 def run():
     skin = player_skin()
     if not skin.gas:
@@ -216,4 +240,5 @@ def run():
     anim, _events, properties = graphs(bp)
     check_properties(bp, properties)
     check_anim_graph(bp, anim)
+    check_feet(bp, anim, properties)
     check_body()

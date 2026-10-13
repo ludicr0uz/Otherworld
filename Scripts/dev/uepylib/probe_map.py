@@ -60,7 +60,9 @@ VERIFIER_RULES = (
     ("Scripts/generated_levels/Lvl_Probe_50m/", LEVELS[:1]),
     ("Scripts/generated_levels/Lvl_Forest_200m/", LEVELS[1:2]),
     ("Scripts/generated_levels/Lvl_Forest_1000m/", LEVELS[2:]),
-    ("Scripts/forest_generator/", LEVELS),
+    # The title level plants the 1 km scatter's middle trees (Scripts/title).
+    ("Scripts/forest_generator/", ("verify_title_level.py",) + LEVELS),
+    ("Scripts/forest_import/trees.py", ("verify_title_level.py",) + LEVELS),
     ("Scripts/combat/", (WEAPONS,)),
     ("Scripts/loot/", (WEAPONS,)),
     ("Scripts/net/", (WEAPONS,)),

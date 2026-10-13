@@ -1,6 +1,6 @@
 """verify_title_level.py's checks: the level exists and is the game's
 default map, and the stage holds exactly its actors, each as title/paths.py
-numbers it."""
+numbers it: the forest floor, the play level's middle trees, the night."""
 
 import os
 import re
@@ -8,6 +8,9 @@ import re
 import unreal
 
 from combat.verify.common import check
+from forest_generator.lighting import get_preset
+from forest_import import trees as trees_import
+from title import forest
 from title import paths as P
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -48,12 +51,28 @@ def check_level():
     check(f"{P.TITLE_LEVEL} exists and loads", les.load_level(P.TITLE_LEVEL))
     actors = _actors()
     found = _by_label(actors)
-    check("the stage holds each of its actors once, and nothing else: no forest, "
-          "no wanderers, no day/night",
+    others = {label for label in found if not label.startswith(P.TREE_LABEL_PREFIX)}
+    check("the stage holds each of its actors once, and beside them only its trees: "
+          "no terrain, no wanderers, no day/night clock",
           all(len(found.get(label, [])) == 1 for label in P.LABELS)
-          and set(found) == set(P.LABELS),
-          str(sorted(found)))
+          and others == set(P.LABELS),
+          str(sorted(others)))
     return found
+
+
+def check_trees():
+    """The trees are the play level's middle ones, planted as that level
+    plants them (forest_import/trees.py's own checks: counts, collision,
+    the LOD build, draw distances)."""
+    placements = forest.trees()
+    nearest = min((t["x"] ** 2 + t["y"] ** 2) ** 0.5 for t in placements)
+    check(f"the stage stands in a thick wood: over 150 trees within "
+          f"{P.TREE_RADIUS_CM / 100:g} m, none within 7 m of the figure",
+          len(placements) > 150 and nearest >= 700.0,
+          f"{len(placements)} trees, the nearest at {nearest / 100:.1f} m")
+    trees_import.verify_trees(lambda name, ok, detail="": check(f"title trees: {name}", ok, detail),
+                              _actors(), forest.counts(placements), len(placements),
+                              P.TITLE_LEVEL_NAME)
 
 
 def check_floor(found):
@@ -61,17 +80,15 @@ def check_floor(found):
     smc = floor.get_component_by_class(unreal.StaticMeshComponent) if floor else None
     mesh = smc.get_editor_property("static_mesh") if smc else None
     mat = smc.get_material(0) if smc else None
-    flat = (isinstance(mat, unreal.Material)
-            and unreal.MaterialEditingLibrary.get_num_material_expressions(mat) == 3)
-    check("the floor: the engine's cube in the title's own near-black matte (a flat "
-          "material: base colour, metallic, roughness), its top at z = 0, blocking",
+    check("the floor: the engine's cube in the forest's ground, wide enough to hold the "
+          "trees, its top at z = 0, blocking",
           mesh is not None and mesh.get_path_name().split(".")[0] == P.FLOOR_MESH
           and mat is not None and mat.get_path_name().split(".")[0] == P.FLOOR_MATERIAL
           and _near(floor.get_actor_scale3d(), P.FLOOR_SCALE, 1e-3)
           and _near(floor.get_actor_location(), (0.0, 0.0, P.FLOOR_Z))
-          and str(smc.get_collision_profile_name()) == "BlockAll"
-          and flat,
-          f"{mesh and mesh.get_name()}, {mat and mat.get_name()}, flat {flat}")
+          and P.FLOOR_SCALE[0] * 50.0 > P.TREE_RADIUS_CM
+          and str(smc.get_collision_profile_name()) == "BlockAll",
+          f"{mesh and mesh.get_name()}, {mat and mat.get_name()}")
 
 
 def check_figure_place(found):
@@ -97,41 +114,53 @@ def check_camera(found):
           f"{cam and cam.get_actor_location()} {cam and _rot(cam)} auto {auto}")
 
 
-def _light(found, label, spec, shadows):
-    light = found.get(label, [None])[0]
-    comp = light.get_component_by_class(unreal.DirectionalLightComponent) if light else None
+def check_moon(found, cfg):
+    moon = found.get(P.MOON_LABEL, [None])[0]
+    comp = moon.get_component_by_class(unreal.DirectionalLightComponent) if moon else None
     colour = comp.get_editor_property("light_color") if comp else None
-    want = unreal.LinearColor(*spec["color"], 1.0).to_color(True) if comp else None
-    check(f"{label}: a directional light at {spec['intensity']} lux, "
-          f"{'with' if shadows else 'no'} shadows, where the builder aimed it",
-          comp is not None and abs(comp.get_editor_property("intensity") - spec["intensity"]) < 1e-3
-          and _rot(light) == tuple(round(x, 2) for x in spec["rotation"])
-          and bool(comp.get_editor_property("cast_shadows")) is shadows
-          and (colour.r, colour.g, colour.b) == (want.r, want.g, want.b),
-          f"{light and _rot(light)} {comp and comp.get_editor_property('intensity')} {colour}")
+    check(f"the moon: the forest night's directional light, {cfg['intensity']} lux, "
+          "with shadows, low in the sky on the camera's side of the figure",
+          comp is not None and abs(comp.get_editor_property("intensity") - cfg["intensity"]) < 1e-3
+          and _rot(moon) == (cfg["pitch"], cfg["yaw"], 0.0)
+          and bool(comp.get_editor_property("cast_shadows"))
+          and [colour.r, colour.g, colour.b] == cfg["color"],
+          f"{moon and _rot(moon)} {comp and comp.get_editor_property('intensity')} {colour}")
 
 
-def check_lights(found):
-    _light(found, P.KEY_LIGHT_LABEL, P.KEY_LIGHT, True)
-    _light(found, P.FILL_LIGHT_LABEL, P.FILL_LIGHT, False)
+def check_sky(found, cfg):
+    dome = found.get(P.SKY_SPHERE_LABEL, [None])[0]
+    smc = dome.get_component_by_class(unreal.StaticMeshComponent) if dome else None
+    mat = smc.get_material(0) if smc else None
+    sky = found.get(P.SKY_LIGHT_LABEL, [None])[0]
+    comp = sky.get_component_by_class(unreal.SkyLightComponent) if sky else None
+    check("the sky: the forest's starfield on a dome, captured by the sky light as the "
+          "stage's ambient light",
+          mat is not None and mat.get_path_name().split(".")[0] == P.SKY_SPHERE_MATERIAL
+          and comp is not None and bool(comp.get_editor_property("real_time_capture"))
+          and abs(comp.get_editor_property("intensity") - cfg["intensity"]) < 1e-3
+          and isinstance(found.get(P.SKY_ATMOSPHERE_LABEL, [None])[0], unreal.SkyAtmosphere),
+          f"{mat and mat.get_name()}, sky light {comp and comp.get_editor_property('intensity')}")
+
+
+def check_fog_and_exposure(found, night):
     fog = found.get(P.FOG_LABEL, [None])[0]
     fc = fog.get_component_by_class(unreal.ExponentialHeightFogComponent) if fog else None
-    check("the fog fades the floor into black with distance",
-          fc is not None and abs(fc.get_editor_property("fog_density") - P.FOG["density"]) < 1e-6
-          and abs(fc.get_editor_property("fog_height_falloff") - P.FOG["height_falloff"]) < 1e-6,
+    check("the fog is the forest night's: its density, volumetric",
+          fc is not None
+          and abs(fc.get_editor_property("fog_density") - night["fog"]["density"]) < 1e-6
+          and bool(fc.get_editor_property("enable_volumetric_fog")),
           f"{fc and fc.get_editor_property('fog_density')}")
     ppv = found.get(P.POST_PROCESS_LABEL, [None])[0]
     settings = ppv.get_editor_property("settings") if ppv else None
-    lo = settings.get_editor_property("auto_exposure_min_brightness") if settings else None
-    hi = settings.get_editor_property("auto_exposure_max_brightness") if settings else None
+    got = {k: settings.get_editor_property(k) for k in P.EXPOSURE_KEYS} if settings else {}
     overridden = {f: bool(settings.get_editor_property(f)) for f in P.EXPOSURE_OVERRIDES} \
         if settings else {"none": False}
-    check("the exposure is fixed (min = max, each with its override flag) over the whole stage: no hunting over the dark",
+    check("the exposure is the forest night's range (each value with its override flag) "
+          "over the whole stage",
           ppv is not None and ppv.get_editor_property("unbound")
-          and abs(lo - P.EXPOSURE["min_brightness"]) < 1e-6 and abs(hi - lo) < 1e-6
-          and abs(settings.get_editor_property("auto_exposure_bias") - P.EXPOSURE["bias"]) < 1e-6
+          and all(abs(got[k] - night["post_process"][k]) < 1e-6 for k in P.EXPOSURE_KEYS)
           and all(overridden.values()),
-          f"{lo}..{hi}, overrides {overridden}")
+          f"{got}, overrides {overridden}")
 
 
 def run():
@@ -140,4 +169,8 @@ def run():
     check_floor(found)
     check_figure_place(found)
     check_camera(found)
-    check_lights(found)
+    check_trees()
+    night = get_preset(P.NIGHT_PRESET)
+    check_moon(found, night["sun"])
+    check_sky(found, night["sky_light"])
+    check_fog_and_exposure(found, night)

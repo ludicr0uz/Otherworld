@@ -341,13 +341,6 @@ GENERATED = (
              "(build_title_level.py, Scripts/title).",
     ),
     AssetSource(
-        dest="Content/Title",
-        kind="generated",
-        builders=("Scripts/build_title_level.py",),
-        note="M_TitleFloor, the near-black matte the title level's floor is in "
-             "(title/paths.py has its colour).",
-    ),
-    AssetSource(
         dest="Content/World",
         kind="generated",
         builders=("Scripts/build_day_night.py",),

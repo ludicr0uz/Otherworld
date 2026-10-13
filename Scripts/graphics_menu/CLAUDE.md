@@ -65,8 +65,11 @@ link under it, names its part there.
 ## One menu: the title's and M's (`menu_main.py`, `menu_screens.author_title`)
 
 - **The title is the menu held open, on the title level.** `Lvl_Title` (`Scripts/title`,
-  `build_title_level.py`; `DefaultEngine.ini`'s `GameDefaultMap`) is a stage of its own
-  with no forest: a floor, two lights, fog, a fixed exposure, a PlayerStart and a
+  `build_title_level.py`; `DefaultEngine.ini`'s `GameDefaultMap`) is a stage of its own,
+  a piece of the forest at night with the play level not loaded: a flat floor in the
+  forest's ground, the 215 trees the 1 km level has within 60 m of its middle
+  (`title/forest.py`), the forest's static night (moon, starfield, sky light, fog, the
+  night's exposure range; no day/night clock), a PlayerStart and a
   CameraActor player 0 takes as the level comes up. The GameMode spawns the player's
   character there as anywhere, and that is the figure on the title. While `GameStarted`
   is false DrawHUD hides the HUD's `Body` and the death menu, sets `MenuOpen` and goes

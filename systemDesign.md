@@ -67,7 +67,8 @@ loot tables, Tab kneels and opens the loot window).
 **The HUD and the one menu** (`Scripts/graphics_menu/CLAUDE.md`). UMG screens on an `AHUD`:
 the five bars (HP, stamina, hunger, thirst, temperature), kill counters, an FPS readout,
 the inventory grid, the menu, the death menu and the settings page, all keyboard and mouse.
-The game opens on a title level of its own (`Lvl_Title`, `Scripts/title`: a lit stage with
+The game opens on a title level of its own (`Lvl_Title`, `Scripts/title`: a clearing in a
+night forest, the 1 km level's own middle trees under the forest's static night, with
 the player's character in the saved profile's garments, empty-handed); M opens the same menu in play. Its
 rows: Single Player (New Game / Continue Game opens `Lvl_Forest_1000m`), Multiplayer (a
 server address and Join Server), Controls (rebinding, difficulty EASY/MEDIUM/SURVIVOR),

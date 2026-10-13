@@ -23,7 +23,8 @@ a third. The cull distances (tree_cells.py) are the same for both builds.
 
 from mesh_lod.jobs import TREE_DEST
 
-TREE_LOD_LEVELS = frozenset({"Lvl_Forest_1000m"})
+# The title level stands in the 1 km map's own middle trees (Scripts/title).
+TREE_LOD_LEVELS = frozenset({"Lvl_Forest_1000m", "Lvl_Title"})
 
 # The fewest LODs a planted LOD tree may have: a mesh and its impostor.
 MIN_TREE_LODS = 2

@@ -11,7 +11,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-for _name in [m for m in sys.modules if m.split(".")[0] in ("title",)]:
+for _name in [m for m in sys.modules if m.split(".")[0] in ("title", "forest_generator", "forest_import")]:
     del sys.modules[_name]
 
 from title import stage                                           # noqa: E402
@@ -20,6 +20,7 @@ from title import stage                                           # noqa: E402
 def main():
     stage.open_level()
     stage.place_floor()
+    stage.plant_trees()
     stage.place_lights()
     stage.place_camera()
     stage.place_player_start()

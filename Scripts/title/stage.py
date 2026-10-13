@@ -1,10 +1,14 @@
-"""build_title_level.py's steps, each one actor of the stage (title/paths.py
-has the numbers). The level is made if missing, and the stage's own actors
-(by label) are replaced, so the build is a rebuild."""
+"""build_title_level.py's steps: the floor, the trees (title/forest.py picks
+them), the night (forest_generator/lighting.py has its numbers), the camera
+and the PlayerStart; title/paths.py has the stage's own numbers. The level
+is made if missing, and the stage's own actors (by label) are replaced, so
+the build is a rebuild."""
 
 import unreal
 
-from combat.materials import build_flat_material
+from forest_generator.lighting import get_preset
+from forest_import import trees as trees_import
+from title import forest
 from title import paths as P
 
 _LOG = "[GEN]"
@@ -34,8 +38,11 @@ def _spawn(cls, location, rotation, label):
     return actor
 
 
-def _colour(rgb):
-    return unreal.LinearColor(*rgb, 1.0)
+def _must_load(path):
+    asset = _assets().load_asset(path)
+    if asset is None:
+        raise RuntimeError(f"{path} is missing")
+    return asset
 
 
 def open_level():
@@ -45,7 +52,8 @@ def open_level():
         if not les.load_level(P.TITLE_LEVEL):
             raise RuntimeError(f"could not load {P.TITLE_LEVEL}")
         stale = [a for a in _actors().get_all_level_actors()
-                 if a.get_actor_label() in P.LABELS]
+                 if a.get_actor_label() in P.LABELS + P.RETIRED_LABELS
+                 or a.get_actor_label().startswith(P.TREE_LABEL_PREFIX)]
         if stale:
             _actors().destroy_actors(stale)
         unreal.log_warning(f"{_LOG} {P.TITLE_LEVEL}: loaded, {len(stale)} stage actor(s) replaced")
@@ -56,11 +64,7 @@ def open_level():
 
 
 def place_floor():
-    mesh = _assets().load_asset(P.FLOOR_MESH)
-    material = build_flat_material(P.FLOOR_MATERIAL, P.FLOOR_COLOUR, P.FLOOR_METALLIC,
-                                   P.FLOOR_ROUGHNESS)
-    if not mesh or not material:
-        raise RuntimeError(f"{P.FLOOR_MESH} or {P.FLOOR_MATERIAL} is missing")
+    mesh, material = _must_load(P.FLOOR_MESH), _must_load(P.FLOOR_MATERIAL)
     floor = _spawn(unreal.StaticMeshActor, (0.0, 0.0, P.FLOOR_Z), (0.0, 0.0, 0.0), P.FLOOR_LABEL)
     smc = floor.get_component_by_class(unreal.StaticMeshComponent)
     smc.set_mobility(unreal.ComponentMobility.STATIC)
@@ -72,26 +76,64 @@ def place_floor():
     return floor
 
 
-def _directional(label, spec, shadows):
-    light = _spawn(unreal.DirectionalLight, (0.0, 0.0, 300.0), spec["rotation"], label)
-    comp = light.get_component_by_class(unreal.DirectionalLightComponent)
-    comp.set_mobility(unreal.ComponentMobility.MOVABLE)
-    comp.set_intensity(spec["intensity"])
-    comp.set_light_color(_colour(spec["color"]))
-    comp.set_cast_shadows(shadows)
-    return light
+def plant_trees():
+    """The play level's middle trees, in cells as any level's are, from the
+    LOD build (forest_generator/tree_lods.py names this level)."""
+    placements = forest.trees()
+    planted, _cells = trees_import.plant_trees(
+        placements, forest.configs(), _actors(), _assets(), P.TITLE_LEVEL_NAME)
+    if planted != len(placements):
+        raise RuntimeError(f"planted {planted} of {len(placements)} trees")
+    return planted
+
+
+def _place_moon(cfg):
+    moon = _spawn(unreal.DirectionalLight, (0.0, 0.0, 5000.0),
+                  (cfg["pitch"], cfg["yaw"], 0.0), P.MOON_LABEL)
+    comp = moon.get_component_by_class(unreal.DirectionalLightComponent)
+    comp.set_editor_property("intensity", cfg["intensity"])
+    red, green, blue = cfg["color"]
+    comp.set_editor_property("light_color", unreal.Color(r=red, g=green, b=blue, a=255))
+    comp.set_editor_property("cast_shadows", cfg["cast_shadows"])
+    comp.set_editor_property("dynamic_shadow_distance_movable_light", cfg["shadow_distance_cm"])
+    comp.set_editor_property("atmosphere_sun_light", True)
+    comp.set_editor_property("atmosphere_sun_light_index", 0)
+    return moon
+
+
+def _place_sky(sky_cfg):
+    """The starfield dome and the sky light that captures it: the stars are
+    the stage's ambient light, as they are the forest's."""
+    _spawn(unreal.SkyAtmosphere, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), P.SKY_ATMOSPHERE_LABEL)
+    dome = _spawn(unreal.StaticMeshActor, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), P.SKY_SPHERE_LABEL)
+    smc = dome.get_component_by_class(unreal.StaticMeshComponent)
+    smc.set_static_mesh(_must_load(P.SKY_SPHERE_MESH))
+    smc.set_material(0, _must_load(P.SKY_SPHERE_MATERIAL))
+    smc.set_editor_property("relative_scale3d", unreal.Vector(*[P.SKY_SPHERE_SCALE] * 3))
+    smc.set_collision_profile_name("NoCollision")
+    smc.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+    smc.set_editor_property("cast_shadow", False)
+    sky = _spawn(unreal.SkyLight, (0.0, 0.0, 5000.0), (0.0, 0.0, 0.0), P.SKY_LIGHT_LABEL)
+    comp = sky.get_component_by_class(unreal.SkyLightComponent)
+    comp.set_editor_property("intensity", sky_cfg["intensity"])
+    comp.set_editor_property("real_time_capture", sky_cfg["real_time_capture"])
 
 
 def place_lights():
-    """The key light with shadows, the fill without, the fog, and a fixed
-    exposure."""
-    key = _directional(P.KEY_LIGHT_LABEL, P.KEY_LIGHT, True)
-    fill = _directional(P.FILL_LIGHT_LABEL, P.FILL_LIGHT, False)
-    fog = _spawn(unreal.ExponentialHeightFog, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), P.FOG_LABEL)
+    """The forest's night: the moon, the starfield and its sky light, the
+    fog, and the night's exposure range."""
+    night = get_preset(P.NIGHT_PRESET)
+    _place_moon(night["sun"])
+    _place_sky(night["sky_light"])
+    fog_cfg = night["fog"]
+    fog = _spawn(unreal.ExponentialHeightFog, (0.0, 0.0, 500.0), (0.0, 0.0, 0.0), P.FOG_LABEL)
     fc = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
-    fc.set_fog_density(P.FOG["density"])
-    fc.set_fog_height_falloff(P.FOG["height_falloff"])
-    fc.set_fog_inscattering_color(_colour(P.FOG["luminance"]))
+    fc.set_editor_property("enable_volumetric_fog", fog_cfg["enable_volumetric"])
+    fc.set_fog_density(fog_cfg["density"])
+    fc.set_fog_inscattering_color(unreal.LinearColor(*fog_cfg["inscattering_color"], 1.0))
+    fc.set_editor_property("volumetric_fog_extinction_scale",
+                           fog_cfg["volumetric_extinction_scale"])
+    pp_cfg = night["post_process"]
     ppv = _spawn(unreal.PostProcessVolume, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0),
                  P.POST_PROCESS_LABEL)
     ppv.set_editor_property("unbound", True)
@@ -100,11 +142,9 @@ def place_lights():
     for flag in P.EXPOSURE_OVERRIDES:
         settings.set_editor_property(flag, True)
     settings.set_editor_property("auto_exposure_method", unreal.AutoExposureMethod.AEM_HISTOGRAM)
-    settings.set_editor_property("auto_exposure_min_brightness", P.EXPOSURE["min_brightness"])
-    settings.set_editor_property("auto_exposure_max_brightness", P.EXPOSURE["max_brightness"])
-    settings.set_editor_property("auto_exposure_bias", P.EXPOSURE["bias"])
+    for key in P.EXPOSURE_KEYS:
+        settings.set_editor_property(key, pp_cfg[key])
     ppv.set_editor_property("settings", settings)
-    return key, fill, fog, ppv
 
 
 def place_camera():

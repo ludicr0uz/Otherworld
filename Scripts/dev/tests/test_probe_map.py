@@ -108,16 +108,20 @@ class VerifiersFor(unittest.TestCase):
                          ["Scripts/verify_npc_blueprints.py"])
         self.assertEqual(f(["Scripts/generated_levels/Lvl_Probe_50m/forest.py"]),
                          ["Scripts/generated_levels/Lvl_Probe_50m/verify_Lvl_Probe_50m.py"])
-        levels = f(["Scripts/forest_generator/trees.py"])
+        # The title level stands in the forest's trees, so it is read too.
+        forest = f(["Scripts/forest_generator/trees.py"])
+        levels = [p for p in forest if "generated_levels" in p]
         self.assertEqual(len(levels), 3)
-        self.assertTrue(all("generated_levels" in p for p in levels))
+        self.assertEqual([p for p in forest if p not in levels],
+                         ["Scripts/verify_title_level.py"])
 
     def test_suite_order_tops_then_levels_each_once(self):
         got = probe_map.verifiers_for(["Scripts/forest_generator/a.py", "Scripts/npc/b.py",
                                        "Scripts/combat/c.py", "Scripts/combat/d.py"])
-        self.assertEqual(got[:2], ["Scripts/verify_npc_blueprints.py",
+        self.assertEqual(got[:3], ["Scripts/verify_npc_blueprints.py",
+                                   "Scripts/verify_title_level.py",
                                    "Scripts/verify_weapons_and_combat.py"])
-        self.assertEqual(len(got), 5)
+        self.assertEqual(len(got), 6)
 
     def test_every_rule_names_a_verifier_on_disk(self):
         for _rule, scripts in probe_map.VERIFIER_RULES:

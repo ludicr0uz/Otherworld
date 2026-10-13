@@ -72,7 +72,7 @@ night forest, the 1 km level's own middle trees under the forest's static night,
 the player's character in the saved profile's garments, empty-handed); M opens the same menu in play. Its
 rows: Single Player (New Game / Continue Game opens `Lvl_Forest_1000m`), Multiplayer (a
 server address and Join Server), Controls (rebinding, difficulty EASY/MEDIUM/SURVIVOR),
-Debug, Dev All Guns, the GUN / MONSTER / PLAYER / SOUND / WORLD / GRAPHICS SETTINGS tabs
+Debug, Dev All Guns (in play only: the title has no such row), the GUN / MONSTER / PLAYER / SOUND / WORLD / GRAPHICS SETTINGS tabs
 (live tuning, each saved to a tracked CSV the matching build reads; as a client of a server
 the gun, monster, world and player tables are the server's: a change is sent to it and
 applied there, by `BP_GameTuner` on the GameState, only where the server was started with

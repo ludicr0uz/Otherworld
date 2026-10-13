@@ -15,6 +15,7 @@ from graphics_menu import umg_consts as UC
 from graphics_menu.pause_checks import (
     _feeds, _gates, _is_row_test, _pins, _sets, _sources, _title, _value, row_gates)
 from graphics_menu.ask_checks import asks
+from graphics_menu.dev_consts import DEV_GUNS_ACTION
 from combat.ask_consts import ASK_SAVE_EXIT, EXIT_DUE_VAR
 from graphics_menu.profile_consts import (
     EXIT_ACTION, EXIT_LEAVING_VAR, EXIT_ROW_LABEL, PROFILE_SLOT)
@@ -381,6 +382,27 @@ def _check_no_single_row(check, nodes):
           f"{len(carets)} caret write(s)")
 
 
+def _check_no_cheat_row(check, nodes):
+    """The title is offered no dev-all-guns row."""
+    row = UC.PAUSE_ROW_ACTIONS.index(DEV_GUNS_ACTION)
+    its = [n for n in nodes if {"self", "InVisibility"} <= _pins(n)
+           and any(_int(c, "Index") == row for cast in _sources(n, "self")
+                   for c in _sources(cast, "Object"))]
+    arms = sorted(("Collapsed" in _value(n, "InVisibility"), _feeds(g, "Condition"))
+                  for n in its for g in _gates(n))
+    hides = [n for n in its if "Collapsed" in _value(n, "InVisibility")]
+    carets = sorted(_int(n, UC.PAUSE_ROW_VAR) for n in nodes
+                    if _title(n) == f"Set {UC.PAUSE_ROW_VAR}"
+                    and any(h in _upstream(n) for h in hides))
+    started = [f"Get {UC.GAME_STARTED_VAR}"]
+    check("the dev-all-guns row is a game's: collapsed on the title and shown in "
+          "play (the two arms of one GameStarted Branch), and on the title the "
+          "caret is moved off it, up to the row above or down to the one below",
+          arms == [(False, started), (True, started)]
+          and len({id(g) for n in its for g in _gates(n)}) == 1
+          and {row - 1, row + 1} <= set(carets), f"{arms}, caret writes {carets}")
+
+
 def check_modes(check, bp, nodes):
     check_session(check)
     check_no_client_game_mode(check)
@@ -396,3 +418,4 @@ def check_modes(check, bp, nodes):
     _check_begin(check, nodes)
     _check_in_play(check, nodes)
     _check_no_single_row(check, nodes)
+    _check_no_cheat_row(check, nodes)

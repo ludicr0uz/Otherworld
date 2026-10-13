@@ -35,7 +35,7 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   caret goes round it, `mode_draw.author_mode_words`), `Multiplayer` (on the title it opens the Multiplayer page: the server's
   address and `Join Server`; in play it does nothing and says `from the title`), `Controls` (the settings page, titled
   **CONTROLS**; the code still calls it the settings page), `Debug` (wanderer numbers, pellet tracers and impact damage,
-  the wanderers' sight cones; not the FPS readout, which is always on), `Dev All Guns`, `Gun Settings`,
+  the wanderers' sight cones; not the FPS readout, which is always on), `Dev All Guns` (in play only: on the title the row is collapsed and the caret goes past it, `mode_draw.author_mode_words`), `Gun Settings`,
   `Monster Settings`, `World Settings`, `Player Settings`, `Sound Settings`, `Graphics Settings`, and last
   the one way out (`EXIT_ACTION`): on the title it reads `Exit Game` and quits to the desktop,
   saving nothing; in play it reads `Save and Exit`, in single player and as a client of a
@@ -404,6 +404,11 @@ stays held, as with a pick-up; asking twice adds nothing.
 
 - **`profile_checks` tells its `Set Dropped`/`Set NeedsRefresh` apart from the cheat's** (the
   cheat's item comes through a cast; its refresh follows no `Set EquippedIndex`).
+- **Not on the title.** The row is collapsed until `GameStarted` and shown from then on
+  (`mode_draw.author_mode_words`, with the first row's own collapse); a caret that Up or Down
+  brought to it is moved on to the row above or below in the same frame
+  (`mode_checks._check_no_cheat_row`). Probe, rendered (DrawHUD does it, and `-nullrhi` draws
+  none): `uepy.py --game --title --windowed --probe Scripts/probes/probe_title_no_cheat_row.py`.
 - **Probe:** `uepy.py --game --probe Scripts/probes/probe_dev_all_guns.py` writes the request
   flag (no keyboard in a probe). Taking the row by hand needs a play session.
 - **Single player only (M32).** The request is lowered on any machine, but the guns are given

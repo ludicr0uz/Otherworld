@@ -11,7 +11,8 @@
                        a join is under way, or why the last one ended
   author_mode_hidden   on the menu's own rows: both panels collapsed
   author_mode_words    the menu's rows: single player (resume in play; no
-                       such row for a client in play),
+                       such row for a client in play), the dev-all-guns
+                       cheat (no such row on the title),
                        multiplayer (from the title only), the last row (exit
                        game on the title, save and exit in play), and the
                        mode under the title
@@ -23,6 +24,7 @@ taken row does is Tick's (mode_tick.py).
 from uebp.graph import _connect, _loose_pin, _node, _pin, _set, out, then
 from graphics_menu.cursor import ROW, author_back_row, author_row_cursor
 from graphics_menu.cursor_consts import PAGE_CLICK_VAR
+from graphics_menu.dev_consts import DEV_GUNS_ACTION
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.loot_find import put
 from graphics_menu.menu_nav import NAV_UP, _emit_row_nav
@@ -193,22 +195,37 @@ def author_mode_words(ed, rows, in_execs, made):
         _set(n, PAUSE_ROW_VAR, row)
         return _wire(in_execs, n)
 
+    def stepped_off(row, above, below, in_execs):
+        """The caret never rests on a collapsed ``row``: Up took it there, so
+        on to ``above``; anything else, ``below``. Returns the exec tails."""
+        on_it = _call(ed, FN_EQ_II, made, A=_get(ed, PAUSE_ROW_VAR, made), B=row)
+        there, clear = _branch(ed, out(on_it), in_execs, made)
+        going_up = _call(ed, FN_WAS_PRESSED, made,
+                         self=out(_call(ed, FN_GET_OWNING_PC, made)), Key=NAV_UP)
+        up, down = _branch(ed, out(going_up), [there], made)
+        return [caret_to(above, [up]), caret_to(below, [down]), clear]
+
+    # The cheat's row is a game's: the title has no player to hand a gun to,
+    # so there it is collapsed and the caret goes past it. Before the first
+    # row's fragment: mode_checks tells that one's caret writes by what is
+    # upstream of them.
+    guns = PAUSE_ROW_ACTIONS.index(DEV_GUNS_ACTION)
+    cheat, found, missing = row_at(ed, rows, guns, in_execs)
+    playing, title = started([found])
+    flow = [set_shown(ed, cheat, True, [playing]), missing,
+            *stepped_off(guns, guns - 1, guns + 1, [set_shown(ed, cheat, False, [title])])]
     # The first row: the Single Player page from the title, resume in play.
     # A client in play has no such row: it is collapsed, and the caret never
     # rests on it (Up from the row under it goes round to the last).
-    first, found, missing = row_at(ed, rows, PAUSE_START_ROW, in_execs)
+    first, found, missing = row_at(ed, rows, PAUSE_START_ROW, flow)
     text = member(ed, first, WBP_MENU_ROW, ROW_LABEL)
     playing, title = started([found])
     single, client = alone([playing])
-    on_it = _call(ed, FN_EQ_II, made, A=_get(ed, PAUSE_ROW_VAR, made), B=PAUSE_START_ROW)
-    there, clear = _branch(ed, out(on_it), [set_shown(ed, first, False, [client])], made)
-    going_up = _call(ed, FN_WAS_PRESSED, made, self=out(_call(ed, FN_GET_OWNING_PC, made)),
-                     Key=NAV_UP)
-    up, down = _branch(ed, out(going_up), [there], made)
     flow = [set_text(ed, text, RESUME_ROW_LABEL, [set_shown(ed, first, True, [single])]),
             set_text(ed, text, SINGLE_ROW_LABEL, [set_shown(ed, first, True, [title])]),
-            caret_to(len(PAUSE_ROW_ACTIONS) - 1, [up]),
-            caret_to(PAUSE_START_ROW + 1, [down]), clear, missing]
+            *stepped_off(PAUSE_START_ROW, len(PAUSE_ROW_ACTIONS) - 1, PAUSE_START_ROW + 1,
+                         [set_shown(ed, first, False, [client])]),
+            missing]
     # The rows that only the title serves say so in play.
     for action in TITLE_ACTIONS:
         text, found, missing = words(action, ROW_VALUE, flow)

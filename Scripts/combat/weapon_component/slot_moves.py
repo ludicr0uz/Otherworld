@@ -29,6 +29,9 @@ them and the equip follows.
     the move (the HUD's drag, MoveFrom -> MoveTo):
         the item fits MoveTo and whatever is there fits MoveFrom -> swapped;
         an empty MoveTo just takes it. Only a weapon fits a weapon slot.
+        Onto the hand, whose item does not fit MoveFrom (the pistol dragged
+        up with the shotgun in hand) -> SlotRequest = MoveFrom: as its key,
+        the hand's item going home.
 
 Each of the three that moves an item names it in HandledItem, and the serve
 ends by playing that item's HandleSounds (Sound/sound_items.author_handled):
@@ -140,7 +143,12 @@ def _author_slot_move(g, in_execs):
     t1 = g.put(HAND_FROM_VAR, src_i, [up])
     down, other = g.branch(op(g, FN_EQ_II, src_i, HAND), [not_up])
     t2 = g.put(HAND_FROM_VAR, dst_i, [down])
-    return [t1, t2, other, stuck, refused, nothing, bad, idle]
+    # Onto the hand, whose item does not fit the slot this one leaves (the
+    # shotgun in hand, the pistol dragged up): asked as its key asks, so the
+    # hand's item goes home. Served next Tick: the slot request is above.
+    to_hand, stuck = g.branch(op(g, FN_EQ_II, dst_i, HAND), [stuck])
+    keyed = g.put(SLOT_REQUEST_VAR, src_i, [to_hand])
+    return [t1, t2, other, keyed, stuck, refused, nothing, bad, idle]
 
 
 def _ask(g, name, execs, **params):

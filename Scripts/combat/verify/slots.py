@@ -10,7 +10,7 @@ about in a game.
 from combat.paths import AXE_BP_PATH, ITEM_BP_PATH, KNIFE_BP_PATH
 from combat.slot_tuning import (
     BAG_FIRST, BAG_LAST, BAG_SIZE, HAND, HAND_FROM_VAR, HAS_ROOM_VAR, LONG_GUN, MELEE_KIND, MELEE_SLOT,
-    MOVE_FROM_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, NO_REQUEST, NOT_A_WEAPON, PISTOL_KIND, PISTOL_SLOT,
+    MOVE_DST_VAR, MOVE_FROM_VAR, MOVE_SRC_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, NO_REQUEST, NOT_A_WEAPON, PISTOL_KIND, PISTOL_SLOT,
     PRIMARY, SECONDARY, SLOT_COUNT, SLOT_ITEMS_VAR, SLOT_KEYS, SLOT_REQUEST_VAR, SLOT_VAR,
     STARTER_HAND_FROM, STARTER_SLOTS, UNPLACED, USE_FIT_VAR, USE_FREE_VAR, USE_REQUEST_VAR,
     USE_WANT_VAR, WEAPON_KIND_VAR, fits,
@@ -260,7 +260,20 @@ def check_use_request():
           len(gates) == 1, str(len(gates)))
 
 
+def check_drag_to_hand():
+    """slot_moves._author_slot_move: a drag onto the hand the swap refuses."""
+    raised = [n for n in wg if _title(n) == f"Set {SLOT_REQUEST_VAR}"
+              and [_title(f) for f in _feeders(n, SLOT_REQUEST_VAR)] == [f"Get {MOVE_SRC_VAR}"]]
+    gates = [[_title(a) for c in _feeders(b, "Condition") for a in _feeders(c, "A")]
+             for n in raised for b in _exec_feeders(n)]
+    check("a drag onto the hand, whose item does not fit the slot it came from, asks "
+          f"for that slot as its key does ({SLOT_REQUEST_VAR} off {MOVE_SRC_VAR}, behind "
+          f"a Branch on {MOVE_DST_VAR}): the hand's item goes home",
+          gates == [[f"Get {MOVE_DST_VAR}"]], str(gates))
+
+
 def run():
+    check_drag_to_hand()
     check_slot_rule()
     check_item_slots()
     check_component_slots()

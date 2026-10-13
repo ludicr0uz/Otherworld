@@ -99,6 +99,16 @@ def _run(p):
             p.get(wc, "Held") == pistol
             and matches.get_editor_property(SLOT_VAR) == BAG_FIRST + 1, str(_slots(wc)))
 
+    yield from _ask(p, wc, SLOT_REQUEST_VAR, PRIMARY)
+    staged = p.get(wc, "Held") == shotgun and pistol.get_editor_property(SLOT_VAR) == PISTOL_SLOT
+    yield from _move(p, wc, PISTOL_SLOT, HAND)
+    yield lambda: p.get(wc, SLOT_REQUEST_VAR) == NO_REQUEST
+    yield SETTLE
+    p.check("the pistol dragged from its slot onto the hand, the shotgun in it: the "
+            "pistol comes to hand and the shotgun goes home to the primary",
+            staged and p.get(wc, "Held") == pistol and p.get(wc, HAND_FROM_VAR) == PISTOL_SLOT
+            and shotgun.get_editor_property(SLOT_VAR) == PRIMARY, str(_slots(wc)))
+
     yield from _move(p, wc, BAG_FIRST, PRIMARY)
     p.check("the axe dragged onto the primary slot is refused (only a long gun fits)",
             axe.get_editor_property(SLOT_VAR) == BAG_FIRST

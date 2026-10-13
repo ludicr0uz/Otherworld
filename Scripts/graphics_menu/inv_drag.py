@@ -21,7 +21,9 @@
         over another slot:
             slot to slot -> AskMove(InvDragFrom, InvOver)
                 (the component swaps them where both fit; only a weapon
-                fits a weapon slot)
+                fits a weapon slot; onto the hand, whose item does not
+                fit the slot left, that item goes home as a slot key
+                sends it)
             worn to slot -> AskTakeOff(the worn slot, InvOver) (taken off
                 into it: the hand or a bag slot)
             slot to worn -> AskWear(InvDragFrom) (worn if a garment,

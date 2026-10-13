@@ -113,11 +113,17 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   A mesh's turn is not checked against its outline by any verifier: after changing it,
   look at the icon (`build_item_icons.py Pistol`), which is the Blueprint's own picture.
   Until 13 Oct 2026 it was Quaternius's `SM_Pistol_1`.
-- **The shotgun is a Quaternius model** (`weapon_models.py`): the Ultimate Gun
-  Pack's `SM_Shotgun_3` (a pump gun with a straight wooden stock), CC0,
-  imported by `asset_pipeline/import_quaternius.py` into `/Game/Sourced/Quaternius/Guns`
-  (zips in `assets/cache/quaternius/`). The pack is at no one size, so its row's model
-  carries its scale to real size (0.18: 104 cm). Static meshes have no
+- **The shotgun is a pump-action with a wooden stock** (`weapon_models.py`): Stein Games'
+  `SM_Shotgun_02`, a Fab listing taken raw ("Shotgun - Pump Action - Wooden Stock - Hish
+  Poly" in `fab_library.json`, under `/Game/Fab/Shotgun_Pump_Action_Wooden_Stock_Hish_Poly`,
+  not committed), drawn in its own material. As the 1911, the mesh lies along +Y a little
+  over real size (its length of pull 38.5 cm against a real pump gun's 35.6), so its row's
+  model carries the quarter turn (yaw -90) and a scale of 0.93 (95.6 cm); its origin is
+  where the stock meets the receiver. The fist is behind the trigger guard, on the front
+  of the stock's wrist, not down on the swell of its semi-pistol grip: the left arm's IK
+  does not stretch, and a fist 4 cm further back leaves the pump out of its reach. After
+  changing the turn, look at the icon (`build_item_icons.py Shotgun`). Until 13 Oct 2026
+  it was Quaternius's `SM_Shotgun_3`; no gun is drawn from that pack now. Static meshes have no
   muzzle socket: the muzzles are the barrels' ends, measured. The shotgun's index can't reach
   its guard from the rifle's ready pose (`docs/aiming.md`). The shotgun is held in the
   rifle's ready pose, a shipped clip, and down the sights its left hand is held on a point
@@ -390,10 +396,10 @@ the asset from a checkout that has it).
   (`aim_pitch.py`); no aim offset asset is used.
 - **The shotgun is the rifle's clip with one offset** (`shotgun_hold.py`): its
   `SupportPoint`, the point the support hand's IK holds the left wrist on down the sights,
-  is the pose's point moved onto the pump (4 cm forward, 5 down on the worn hand), found
+  is the pose's point moved onto the pump (6 cm forward, 5.4 down on the worn hand), found
   by `pump_seat.seat` with the thumb kept under the barrel's top. Unmoved, the thumb's tip
-  is 3.7 cm above the shotgun's sight line. The hand's shape is the clip's, so its joints
-  ride up to 3.8 cm off the wood (`verify/shotgun_pose.PUMP_REACH_CM`), and the point
+  is 4.2 cm above the shotgun's sight line. The hand's shape is the clip's, so its joints
+  ride up to 4.7 cm off the wood (`verify/shotgun_pose.PUMP_REACH_CM`), and the point
   holds only down the sights: at the hip the hand is where the clip has it. Lyra's own
   `MM_Shotgun_Idle_ADS` is the rifle's with the left hand 2 cm further back, further from
   this pump, so it is not taken.

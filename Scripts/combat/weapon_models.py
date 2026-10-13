@@ -1,8 +1,8 @@
 """Every gun as a real model: the SMG, the rifle and the sniper are the FPS
 Weapon Bundle's SMG11, AK 47 and AS Val (Deadghost Interactive, a Fab pack
-under /Game/FPS_Weapon_Bundle), the shotgun is Quaternius's Ultimate Gun
-Pack's Shotgun_3 (CC0, imported by asset_pipeline/import_quaternius.py), and
-the pistol is Stein Games' 1911 (a Fab listing taken raw, under
+under /Game/FPS_Weapon_Bundle), the shotgun and the pistol are Stein Games'
+pump-action shotgun with a wooden stock and 1911 (Fab listings taken raw,
+under /Game/Fab/Shotgun_Pump_Action_Wooden_Stock_Hish_Poly and
 /Game/Fab/1911_Pistol_High_Poly). How each is placed in the weapon's frame,
 and the measured outline every grip and sight check reads.
 
@@ -30,14 +30,13 @@ The pack's _X/_Y are not texture variants but axis variants: SK_KA47 (_Y) and
 SK_KA47_X are the same gun lying along +Y and +X. The _X is used so no
 rotation has to be carried.
 
-The Quaternius shotgun also points down +X with +Z up, but is 5.8 m long as
-imported, so it carries its own scale to real size, 104 cm. The 1911 lies
-along +Y a little over real size, so it carries a quarter turn and a scale.
-The outlines below are measured on the mesh as it is placed.
+The Stein Games guns lie along +Y with +Z up, a little over real size, so
+each carries a quarter turn onto +X and a scale. The outlines below are
+measured on the mesh as it is placed.
 
 Nothing here acquires any of the packs. A clone without them fails the build
 at _must_load with the pack's name; fab_library.json is the Fab packs' restore
-recipe, and the Quaternius zips go in assets/cache/quaternius/.
+recipe.
 """
 
 from uebp.graph import _rot
@@ -52,11 +51,9 @@ AK47_MESH = f"{FAB_WEAPONS}/Ka47/SK_KA47_X"
 VAL_MESH = f"{FAB_WEAPONS}/KA_Val/SK_KA_Val_X"
 SCOPE_MESH = f"{FAB_WEAPONS}/Accessories/SM_Scope_25x56_X"
 
-# asset_pipeline/quaternius_paths.SHOTGUN_MODEL.
-QUATERNIUS_GUNS = "/Game/Sourced/Quaternius/Guns"
-SHOTGUN_MESH = f"{QUATERNIUS_GUNS}/SM_Shotgun_3"
-
-# "1911 Pistol - High Poly" in fab_library.json (asset_pipeline/fab_raw_import.py).
+# "Shotgun - Pump Action - Wooden Stock - Hish Poly" and "1911 Pistol - High
+# Poly" in fab_library.json (asset_pipeline/fab_raw_import.py).
+SHOTGUN_MESH = "/Game/Fab/Shotgun_Pump_Action_Wooden_Stock_Hish_Poly/SM_Shotgun_02"
 PISTOL_MESH = "/Game/Fab/1911_Pistol_High_Poly/SM_1911_02"
 
 
@@ -209,64 +206,90 @@ def sniper_outline():
     )
 
 
-# ─── Quaternius Shotgun_3: the shotgun ──────────────────────────────────────
+# ─── Pump shotgun with a wooden stock: the shotgun ──────────────────────────
 
-# A pump gun with a straight wooden stock (no pistol grip: the hand holds the
-# stock's wrist behind the trigger guard), a tube magazine under the barrel,
-# the wooden pump round both, and a band with the bead near the muzzle.
-SHOTGUN_SCALE = 0.18
+# Stein Games' pump-action shotgun (a Fab listing taken raw, fab_library.json):
+# a wooden stock with a semi pistol grip (the wrist swells down behind the
+# trigger guard, its front face raked back from under the receiver), a
+# receiver with a notched rear sight block, a ribbed barrel over a tube
+# magazine, the wooden pump round the tube, and a clamp with the bead behind
+# the muzzle. The mesh lies along +Y at about 107% of a real pump gun, as the
+# same maker's 1911 does (its trigger is 38.5 cm from the butt and its
+# receiver 23.1 long, against a Remington 870's 35.6 and 21.6), so the model
+# is turned a quarter turn onto +X and scaled to 95.6 cm, butt to muzzle. Its
+# origin is where the stock meets the receiver, on the gun's middle plane.
+SHOTGUN_SCALE = 0.93
 SHOTGUN_MODEL = (
-    ("Model", SHOTGUN_MESH, (0.0, 0.0, 0.0), _rot(), (SHOTGUN_SCALE,) * 3),
+    ("Model", SHOTGUN_MESH, (0.0, 0.0, 0.0), _rot(yaw=-90.0), (SHOTGUN_SCALE,) * 3),
 )
 
 # The end of the barrel, on its axis.
-SHOTGUN_MUZZLE = (77.5, 0.0, 3.9)
+SHOTGUN_MUZZLE = (67.76, 0.0, 3.44)
 
 # How far the index's outer joints may rest off the trigger guard (cm).
 TRIGGER_REACH_CM = 2.5
-# How far the shotgun's may (verify/grip_fit). The ready pose is a pistol grip's: its index lies
-# 4.5 cm above the fist's centre. This gun has a straight stock and its guard
-# hangs under the wrist, so the index lies along the receiver, 4.1 cm above
-# the guard; putting it in the guard would hang the fist 3 cm under the wood.
+# How far the shotgun's may (verify/grip_fit). The ready pose is a pistol
+# grip's: its index lies 4 cm above the fist's centre, the other fingers
+# stacked upright under it. This gun's guard hangs level with the fist, behind
+# a raked swell of the stock: the fist is seated with its middle finger behind
+# the guard, under the receiver's tail, and the index lies along the receiver
+# 3.3 cm above the guard. Putting it in the guard would hang the fist 4 cm
+# under the wood.
 SHOTGUN_TRIGGER_REACH_CM = 4.5
 # Lyra's pistol ready pose lays the index straight along the frame, above
 # the guard, not on the trigger: 3.8 cm from the pistol's guard, 3.5 from the
 # SMG's (verify/grip_fit.py; the pose until C3 had it 1.7 off).
 PISTOL_POSE_TRIGGER_REACH_CM = 4.5
 
-# The sight line: a shotgun has no rear sight, so the line skims the
-# receiver's hump (a fin 6.83 high at x 3.7) a millimetre over it and ends on
-# the bead's tip (6.42, x 69): the bead stands half a centimetre clear of the
-# hump, and its tip is the point of aim. The eye is a near plane behind the
-# receiver's back, 12 cm behind the grip.
-SHOTGUN_SIGHT_REAR = (3.7, 0.0, 6.93)
-SHOTGUN_SIGHT_FRONT = (69.0, 0.0, 6.42)
-SHOTGUN_SIGHT = _eye_behind(SHOTGUN_SIGHT_REAR, SHOTGUN_SIGHT_FRONT, -12.0)
+# The sight line: the top of the rear block's two blades (6.40 high at their
+# back edge, x 7.85, a notch 2 mm deep between them) and the top of the bead
+# (5.88, a bar from x 64.9 to 66.8, 3 mm wide): the bead stands half a
+# centimetre lower than the blades, so the line falls a little to the muzzle,
+# over the rib (4.98). The eye is 12.4 cm behind the fist's middle, as it was
+# on the gun before this one: 15 cm behind the receiver's back.
+SHOTGUN_SIGHT_REAR = (7.85, 0.0, 6.397)
+SHOTGUN_SIGHT_FRONT = (65.88, 0.0, 5.878)
+SHOTGUN_SIGHT = _eye_behind(SHOTGUN_SIGHT_REAR, SHOTGUN_SIGHT_FRONT, -12.8)
 
 
-# The stock's wrist, where the right hand closes: its min and max corners,
-# measured.
-SHOTGUN_WRIST = ((-4.6, -1.5, -5.4), (1.4, 1.5, 2.4))
+# The stock's wrist: its min and max corners, measured. Its underside falls
+# from the receiver's tail to (-0.9, -2.4), then the swell's face runs back
+# and down to (-4.2, -6.9); the wood is 3 cm thick.
+SHOTGUN_WRIST = ((-7.4, -1.5, -7.1), (2.2, 1.5, 0.9))
 
 # The pump, where the left hand closes: the wood round the magazine tube,
-# under the barrel (which runs y -1.4..1.4, z 2.5..5.3 above it), measured.
-SHOTGUN_PUMP = ((28.4, -2.1, -2.5), (44.4, 2.1, 2.3))
+# reaching half a centimetre up the sides of the barrel (which runs
+# y -1.1..1.1, z 2.3..4.6, a rib on it to 5.0), measured.
+SHOTGUN_PUMP = ((29.1, -2.1, -2.0), (47.7, 2.1, 2.8))
 
 
 def shotgun_outline():
     return (
-        _box("Stock",        (-26.6, -1.5, -10.1), (-4.6, 1.5, 3.9)),
-        # Where the right hand closes: the stock's wrist (x -4.6..1.4, z -5.4..2.4)
-        # and the back of the receiver's belly, the fist as far forward and
-        # down as the index needs to reach into the guard.
-        _box("Grip",         (-2.6, -1.4, -6.0),   (3.4, 1.4, 0.8)),
-        _box("Receiver",     (1.4, -2.2, -2.5),    (22.4, 2.2, 6.8)),
-        _box("TriggerGuard", (3.4, -0.8, -5.6),    (11.4, 0.8, -2.3)),
-        _box("Barrel",       (22.4, -1.4, 2.5),    (77.5, 1.4, 5.3)),
-        _box("MagTube",      (22.4, -1.4, -1.2),   (62.4, 1.4, 1.6)),
-        _box("Pump",         (28.4, -2.1, -2.5),   (44.4, 2.1, 5.3)),
-        # The band round barrel and tube, with the bead on top.
-        _box("MuzzleBand",   (62.4, -1.8, -1.7),   (70.4, 1.8, 6.4)),
+        # The butt and the comb, back from the wrist.
+        _box("Stock",        (-27.9, -2.05, -13.2), (-3.6, 2.05, 0.9)),
+        # Where the right hand closes: the wrist under the receiver's tail,
+        # from the top of the swell to the back of the guard. The fist's
+        # middle is just under the wood there, the middle finger a finger's
+        # width behind the guard and the thumb along the wrist's top. The
+        # fingers of a pistol grip's pose stand upright, so the ring and the
+        # little finger close on air 5 cm ahead of the swell's raked face:
+        # seated on that face, the hand is 4 cm further from the trigger and
+        # from the pump, which the left arm then cannot reach at all.
+        _box("Grip",         (-3.6, -1.5, -5.4),    (2.8, 1.5, 0.2)),
+        _box("Receiver",     (2.2, -1.9, -1.86),    (23.7, 1.9, 5.65)),
+        # The rear block up to its blades' tops.
+        _box("RearSight",    (7.5, -0.7, 5.65),     (9.7, 0.7, 6.397)),
+        # The guard's loop under the receiver.
+        _box("TriggerGuard", (5.0, -0.47, -3.8),    (11.07, 0.47, -1.86)),
+        # The barrel (a tube 2.2 cm across, its top at 4.56) with the rib
+        # along its top: what the left thumb stays under
+        # (shotgun_hold.barrel_top).
+        _box("Barrel",       (23.7, -1.1, 2.3),     (67.76, 1.1, 4.98)),
+        _box("MagTube",      (23.7, -1.4, -1.0),    (66.1, 1.4, 1.8)),
+        _box("Pump",         (29.1, -2.1, -2.0),    (47.7, 2.1, 2.8)),
+        # The clamp round barrel and tube, and the bead on the barrel.
+        _box("BarrelClamp",  (62.4, -1.4, -2.25),   (64.9, 1.4, 4.98)),
+        _box("Bead",         (64.9, -0.25, 4.98),   (67.0, 0.25, 5.878)),
     )
 
 

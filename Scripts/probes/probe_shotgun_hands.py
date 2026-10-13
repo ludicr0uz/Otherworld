@@ -1,7 +1,7 @@
 """Down the shotgun's sights the left hand is on the pump, its thumb out of
 the sight picture (combat/shotgun_hold.py). The shotgun is held in the
 rifle's ready pose, a shipped clip that cups a deep handguard: as the clip
-has it the thumb stands 3.7 cm above the shotgun's sight line and the hand is
+has it the thumb stands 4.2 cm above the shotgun's sight line and the hand is
 at the pump's back end. So the shotgun's SupportPoint, the point the support
 hand's IK holds the wrist on down the sights, is moved onto the pump.
 
@@ -41,8 +41,9 @@ WRITABLE = [(WEAPON_COMP_BP_PATH, WV.EquippedIndex),
             (WEAPON_COMP_BP_PATH, SIGHTS_FORCED_VAR)]
 SHOTS = bool(os.environ.get("OW_GRIP_SHOTS"))
 SEATED = 0.99           # the camera is on the sights
-# As verify/shotgun_pose.py, with half a centimetre for the live blend: the
-# pose is layered over the idle, and the arms drift a little apart.
+# As verify/shotgun_pose.py, the sink with half a centimetre for the live
+# blend: the pose is layered over the idle, and the arms drift a little apart
+# (measured live on the pump-action of Oct 2026: 0.40 inside at most, 4.54 off).
 SINK_CM = 1.5
 REACH_CM = 4.75
 # The hand comes at least this far down onto the pump from the hip's (cm).

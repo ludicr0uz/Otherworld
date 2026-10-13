@@ -447,11 +447,13 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     3.5 cm limit. A thinner grip than these needs the limit or the ready pose revisited, not
     a fatter box. The SMG11's grip is 3.2 cm thick but 6.8 cm front to back (its magazine runs
     up it); its furthest joint is 3.2 cm off.
-  - **The Quaternius shotgun has a straight stock** (`Shotgun_3`): no pistol grip, and its
-    guard hangs under the wrist. The ready pose is a pistol grip's, with the index 4.5 cm
-    above the fist's centre, so no fist on the wood reaches the guard: the `Grip` box is the
-    wrist and the receiver's back belly (furthest joint 3.4 cm off), and the index lies along
-    the receiver 4.1 cm above the guard. Its row carries `trigger_reach` 4.5 for that check
+  - **The shotgun has a wooden stock with a semi-pistol swell** (`SM_Shotgun_02`): no
+    pistol grip, and its guard hangs under the receiver ahead of the wrist. The ready pose
+    is a pistol grip's, with the index 3.5 to 4 cm above the fist's centre, so no fist on
+    the wood reaches the guard: the `Grip` box is the front of the wrist, just behind the
+    guard (furthest joint 2.8 cm off), and the index lies along the receiver 3.3 cm above
+    the guard. The fist is not down on the swell, 4 cm further back, where a hand would
+    also sit: the left arm (49 cm, its IK does not stretch) then has the pump out of reach. Its row carries `trigger_reach` 4.5 for that check
     (`SHOTGUN_TRIGGER_REACH_CM`); the others keep 2.5. The pistol (the 1911) fits like the
     rest: furthest joint 2.9 cm off; its index lies 3.8 cm above the guard's bar, inside
     the pistol pose's 4.5 (`PISTOL_POSE_TRIGGER_REACH_CM`).
@@ -459,13 +461,15 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
   `A_AimShotgun`), and its left hand has a point of its own (`shotgun_hold.py`).
   - **Why:** the rifle pose stands the left thumb up the handguard, far under the AK's and
     the Val's sight lines (14 cm above the grip). The shotgun's line skims the receiver
-    6.4 cm above it: as the clip has it the thumb's tip is 3.7 cm ABOVE the line, a finger
-    beside the bead, and the hand is at the pump's back end (a 5 cm bar,
-    `weapon_models.SHOTGUN_PUMP`), one joint 1.3 cm inside the wood.
+    8.5 cm above the fist: as the clip has it the thumb's tip is 4.2 cm ABOVE the line, a
+    finger beside the bead, and the hand is at the pump's back end (a bar 4.8 cm deep,
+    `weapon_models.SHOTGUN_PUMP`), one joint 1.4 cm inside the wood.
   - **What moves:** the shotgun's `SupportPoint` (the IK's point, in the right hand's
     space) is the pose's moved by `support_move()`: straight down until the thumb is under
     the barrel's top, then `pump_seat.seat`'s descent to where the fingers' joints fit the
-    pump best. The hand is moved as one piece; its shape is the clip's.
+    pump best (6 cm forward and 5.4 down). The hand is moved as one piece; its shape is
+    the clip's. The barrel lies only 2.2 cm over the pump's wood, so the thumb holds the
+    hand low: its joints ride 0.9 to 4.7 cm off the wood.
   - **Only down the sights** (`SupportHand` is `SightBlend`): at the hip and on the
     shoulder the hand is the clip's own. `probes/probe_shotgun_hands.py` reads the live
     joints against the pump both ways; with `--windowed` and `OW_GRIP_SHOTS=1` it saves
@@ -474,7 +478,7 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     camera changes nothing).
   - **The right hand is the rifle pose's**, so the grip's solve and the fist are the
     rifle's (`verify/shotgun_pose.py`); its thumb lies forward along the top of the
-    stock's wrist, 4 cm under the sight line.
+    stock's wrist, 3.6 cm under the sight line.
   - `probes/probe_shotgun_thumb.py` reads the live thumbs down the sights (and the rifle's,
     left where the clip has them); with `--windowed` and `OW_SIGHT_SHOTS=1` it saves the
     sight picture.

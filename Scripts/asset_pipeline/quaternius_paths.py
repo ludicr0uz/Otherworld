@@ -81,7 +81,7 @@ def ual_ik_rig(short):
 
 
 def prop_mesh(short, stem):
-    """One FBX of a prop pack: SM_Shotgun_3 in Quaternius/Guns."""
+    """One FBX of a prop pack: SM_Axe in Quaternius/Survival."""
     return f"{pack_dir(short)}/SM_{stem}"
 
 
@@ -128,6 +128,3 @@ THROW = ("UAL2", "OverhandThrow")
 PICKUP = ("UAL2", "Farm_Harvest")
 # The clip the hands are calibrated on (palm_twist): hands at rest.
 PALM_CALIBRATION = ("UAL1", "Idle_Loop")
-
-# The shotgun's model (combat/weapon_models.py).
-SHOTGUN_MODEL = ("Guns", "Shotgun_3")

@@ -25,14 +25,17 @@ SAME_RAD = 2e-3
 # A joint axis may sit this far inside the wood: a finger pressed on it (cm).
 SINK_CM = 1.0
 # How far a left finger's joint may stand off the pump. The hand is the rifle
-# pose's, shaped for a deeper handguard, moved as one piece: measured at most
-# 3.8 (the pose keyed until C3 closed every joint within 1.6; unmoved, the
-# rifle pose's are up to 4.1 off with one 1.3 inside).
-PUMP_REACH_CM = 4.25
+# pose's, shaped for a deeper handguard, moved as one piece, and its thumb is
+# held under the barrel's top: on this gun the barrel lies only 2.2 cm over
+# the wood, so the hand hangs lower than the fit alone would have it.
+# Measured at most 4.66, the little finger's knuckle (3.8 on the gun before
+# this one, whose barrel was 0.8 cm higher over its pump; the pose keyed until
+# C3 closed every joint within 1.6).
+PUMP_REACH_CM = 4.75
 # The grip thumb lies forward along the top of the stock's wrist: at least
-# this far under the sight line (cm; measured 4.1).
+# this far under the sight line (cm; measured 3.6).
 GRIP_THUMB_UNDER_CM = 3.0
-# The hand is moved at least this far to be seated (cm; measured 6.5).
+# The hand is moved at least this far to be seated (cm; measured 8.1).
 MOVED_CM = 2.0
 
 

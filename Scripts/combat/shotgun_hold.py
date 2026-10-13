@@ -8,14 +8,14 @@ The rifle ready pose (PlayerSkin.aim_rifle, Lyra's MM_Rifle_Idle_ADS) holds a
 pistol grip under a tall receiver: the left palm stands on edge beside a deep
 handguard, its thumb up the side. The AK's and the Val's sight lines run 14 cm
 above the grip, so the thumb is nowhere near the picture. The shotgun
-(Quaternius Shotgun_3) has a straight stock, a sight line that skims the
-receiver 6.4 cm above the grip, and a 5 cm bar of a pump where the middle of
-that handguard would be. In the rifle's pose, measured in the weapon's frame:
+(Stein Games' SM_Shotgun_02) has a wooden stock with no pistol grip, a sight
+line that skims the receiver 8.5 cm above the fist, and a bar of a pump 4.8 cm
+deep where the middle of that handguard would be. In the rifle's pose, measured in the weapon's frame:
 
-  - the left thumb's tip is 3.7 cm ABOVE the sight line, 5 cm left of the
+  - the left thumb's tip is 4.2 cm ABOVE the sight line, 5 cm left of the
     barrel: a finger standing beside the bead;
-  - the hand is at the pump's back end: the index's middle joint 1.3 cm
-    inside the wood, the pinky's 3 cm behind it.
+  - the hand is at the pump's back end: one joint 1.4 cm inside the wood,
+    the pinky's knuckle 4.5 cm behind it.
 
 Until C3 a pose of its own was keyed for it (A_AimShotgun: both thumbs, the
 left hand's turn and every finger joint swung onto directions in a table).
@@ -29,18 +29,19 @@ space, each gun's own (support_hand.py, BP_WeaponItem.SupportPoint). The
 shotgun's is the rifle pose's point plus support_move(): first straight down
 until the thumb is under the barrel's top, then pump_seat.seat's descent to
 where the fingers' joints fit the pump best with the thumb kept there. On the
-worn hand that is 4 cm forward and 5 down: the hand cupped under the pump, its
+worn hand that is 6 cm forward and 5.4 down: the hand cupped under the pump, its
 fingers up the right side, its thumb beside the barrel under the sight line.
 
 WHAT A SHIPPED CLIP COSTS
 -------------------------
   - The hand's shape is the rifle pose's, made for a deeper handguard: seated,
-    its joints ride 0.5 to 3.8 cm off the wood (the keyed pose had them
-    within 1.6).
+    its joints ride 0.9 to 4.7 cm off the wood (the keyed pose had them
+    within 1.6). The barrel is only 2.2 cm over the pump, and the thumb under
+    its top holds the hand that low.
   - The point holds only down the sights (SupportHand is SightBlend). At the
     hip and on the shoulder the hand is where the clip has it; the camera is
     not on the sights there.
-  - The right thumb lies forward along the top of the stock's wrist, 4 cm
+  - The right thumb lies forward along the top of the stock's wrist, 3.6 cm
     under the sight line, as the clip has it on a pistol grip; the keyed pose
     wrapped it over the wrist.
 """

@@ -20,7 +20,7 @@ motion matching; zombies and wendigos hunt them. Each paragraph names the packag
 **The player** (`Scripts/combat/CLAUDE.md`; the body: `Scripts/asset_pipeline/CLAUDE.md`).
 A Meshy-generated adventurer (`SKM_Adventurer03`, one setting in `asset_pipeline/player_body.py`)
 issued a shotgun, pistol, knife, axe, matches and a stick; the SMG, assault rifle and sniper
-are found as drops (Fab models; the pistol is a Fab 1911, the shotgun Quaternius's, CC0). Movement is the
+are found as drops (Fab models; the pistol is a 1911, the shotgun a pump-action with a wooden stock). Movement is the
 Game Animation Sample's motion matching on a hidden UEFN mannequin, nothing hand-animated;
 the sprint, prone, aim-walk, slide and stamina are the C++ movement component's, predicted
 on the owning client and decided by the server (`Source/CLAUDE.md`). The player jogs at

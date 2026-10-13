@@ -80,8 +80,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     cells over its defaults; no unreal, so the dev tests hold it
   weapon_specs      the five weapons: muzzles, icons, _weapon_specs()
   weapon_models     every gun's model: the SMG's, the rifle's and the sniper's Fab
-                    ones (SMG11, AK 47, AS Val + scope), the shotgun's Quaternius one
-                    (Shotgun_3), the pistol's 1911 (Fab), their muzzles and sights,
+                    ones (SMG11, AK 47, AS Val + scope), the shotgun's pump-action
+                    and the pistol's 1911 (Fab too), their muzzles and sights,
                     and the measured outline the grip and sight checks read
   camera            boom and aim-trace numbers, face/aim-the-camera patches
   knife             BP_Knife: the Fab M9 knife as a Melee item, its model

@@ -8,7 +8,8 @@ the sights key). Seated, the live mesh's thumb joints are read in the held
 gun's own frame (+X down the barrel, +Y right, +Z up; the gun is rigid in the
 hand, so this is what the eye on its sight line sees):
 
-  - the shotgun plays the skin's rifle pose;
+  - the shotgun plays the skin's rifle pose with its own fingers on it
+    (combat/finger_pose.py, A_AimShotgun);
   - the shotgun's grip thumb, as the clip lays it along the stock's wrist, is
     at least 2.5 cm under the sight line, joints and tip;
   - the support hand's thumb is all of it under the sight line, its joints
@@ -145,8 +146,8 @@ def _run(p):
     yield from _sights(p, wc, bag.index("BP_Shotgun_C"))
     held = p.get(wc, "Held")
     pose = held.get_editor_property("AimPose")
-    want = skin.aim_rifle.rsplit("/", 1)[-1]
-    p.check(f"the shotgun is held in the rifle's ready pose, {want}",
+    want = finger_clip("BP_Shotgun").rsplit("/", 1)[-1]
+    p.check(f"the shotgun is held in the rifle's ready pose with its own fingers, {want}",
             pose is not None and pose.get_name() == want, str(pose))
     line_z = min(held.get_editor_property("SightAim").z,
                  held.get_editor_property("SightOffset").z)

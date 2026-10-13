@@ -141,5 +141,17 @@ class Swing(unittest.TestCase):
         self.assertEqual(finger_fit.swing(self.THUMB, [], 10.0)[1], 0.0)
 
 
+class Through(unittest.TestCase):
+    def test_a_named_part_has_the_parts_that_run_through_it(self):
+        # The shotgun's pump (its tube and barrel inside it), the AK's handguard.
+        self.assertTrue(finger_fit.through(dict(part="Pump", under="Barrel")))
+        self.assertTrue(finger_fit.through(dict(part="Handguard")))
+
+    def test_a_measured_box_or_the_fist_has_not(self):
+        # The Val's box is cut out of its receiver; a pistol's left hand is on the right.
+        self.assertFalse(finger_fit.through(dict(box=((0, 0, 0), (1, 1, 1)))))
+        self.assertFalse(finger_fit.through(dict(part="Grip", fist=True)))
+
+
 if __name__ == "__main__":
     unittest.main()

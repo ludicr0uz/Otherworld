@@ -1,23 +1,23 @@
 """verify.shotgun_pose -- how the shotgun is held (combat/shotgun_hold.py):
-in the rifle's ready pose, a shipped clip (no pose keyed for it is left), its
-grip solved in that pose, and the left hand's point moved onto the pump: down
-the sights the thumb is under the barrel's top, so under the sight line, and
-the fingers are round the wood, not in it.
+in the rifle's ready pose, a shipped clip (its item's clip is that pose but
+for the fingers bent onto it, verify/finger_pose.py), its grip solved in that
+pose, and the left hand's point moved onto the pump: down the sights the
+thumb is under the barrel's top, so under the sight line, and the hand as the
+seat leaves it, before a finger is bent, is round the wood, not in it.
 """
 
 from asset_pipeline import lyra_paths as LYRA
 from combat import item_vars as IV
 from combat import hand_seat
 from combat.grip import _grip_rotation
-from combat.paths import RETIRED_SHOTGUN_AIM_ANIM_PATH, SHOTGUN_BP_PATH
+from combat.paths import SHOTGUN_BP_PATH
 from combat.gun_hold import THUMB_TIP_CM, finger_points, hand_points
-from combat.shotgun_hold import barrel_top, held, support_move, support_point
+from combat.shotgun_hold import barrel_top, held, row, support_move, support_point
 from combat.skin import player_skin
 from combat.support_hand import SUPPORT_POINT_VAR, support_at
 from combat.verify.common import cdo, check, load
 from combat.weapon_models import SHOTGUN_PUMP
 from combat.weapon_specs import _weapon_specs, two_handed_poses
-from uebp.graph import _assets
 
 SAME_RAD = 2e-3
 # A joint axis may sit this far inside the wood: a finger pressed on it (cm).
@@ -55,13 +55,15 @@ def check_shotgun_clip():
     if None in (worn, rifle, bp):
         check("the shotgun, the rifle pose and the worn body exist", False)
         return
-    pose = cdo(bp).get_editor_property(IV.AimPose)
-    check("the shotgun is held in the rifle's ready pose, on the worn skeleton",
-          pose == rifle
-          and rifle.get_editor_property("skeleton") == worn.get_editor_property("skeleton"),
+    pose, own = cdo(bp).get_editor_property(IV.AimPose), row(skin)
+    check("the shotgun is held in a clip of its own, on the worn skeleton",
+          pose is not None and pose == load(own["aim"]) and pose != rifle
+          and pose.get_editor_property("skeleton") == worn.get_editor_property("skeleton"),
           str(pose))
-    check("no pose keyed for it is left: A_AimShotgun is gone",
-          not _assets().does_asset_exist(RETIRED_SHOTGUN_AIM_ANIM_PATH))
+    check("...which is the rifle's ready pose with this gun's fingers: its row "
+          "is seated in the rifle's",
+          [s["pose"] for s in _weapon_specs() if s["path"] == SHOTGUN_BP_PATH]
+          == [skin.aim_rifle] and own["pose"] == skin.aim_rifle, own["pose"])
     if skin.gas:
         source = load(LYRA.AIM_RIFLE)
         check("...and that pose is a shipped clip: Lyra's MM_Rifle_Idle_ADS, as "

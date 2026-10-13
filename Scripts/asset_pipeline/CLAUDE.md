@@ -134,7 +134,7 @@ Back to the per-body skeleton: `PLAYER_RIG = "own"` and `swap_player_body.py adv
     is solved for the body and lands 1-2 cm off on this one;
   - the throw's ready pose 5 cm from the clip's own frame;
   - `calf_l`/`calf_r` of `A_AimShotgun` not the rifle pose's. Not understood yet (the
-    pose is gone since C3).
+    keyed pose is gone since C3; the name is the shotgun's fitted clip now).
 
 Things the first runs found, all fixed: the importer names a mesh after its FILE; a pelvis
 left on Meshy's high Hips joint floats the body in every clip (`mannequin_bind/fit.py`);

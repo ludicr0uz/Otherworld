@@ -534,8 +534,8 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     and `probes/probe_gun_hands.py` reads the live hands down each gun's sights, the wrist
     against the point first. A hand that cannot be fitted says so there: move the row's
     box, or the grip (a fist further back takes the handguard out of the arm's reach).
-- **A rifle's fingers are bent onto its model** (`finger_pose.py`, `finger_fit.py`), for
-  the guns `weapon_models.GUN_FINGERS` names (the AK and the Val; the shotgun and the
+- **A long gun's fingers are bent onto its model** (`finger_pose.py`, `finger_fit.py`), for
+  the guns `weapon_models.GUN_FINGERS` names (the AK, the Val and the shotgun; the
   pistols are not yet). The hands above are rigid pieces of a clip made for Lyra's rifle:
   on the AK the left fingers hang up to 2.9 cm off the handguard and the right's up to
   2.4 off the grip; the Val's left joints start up to 0.8 cm inside its receiver.
@@ -576,8 +576,26 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     and its nearest and furthest point before and after). `verify/finger_pose.py` holds
     the saved clip to the model and to the fit's own arithmetic;
     `probes/probe_gun_hands.py` reads the live fingers and that the gun is still carried.
-- **The shotgun is held in the rifle's ready pose** (C3; until then a pose keyed for it,
-  `A_AimShotgun`), and its left hand has a point of its own (`shotgun_hold.py`).
+  - **The shotgun** (`A_AimShotgun`, the name its keyed pose had until C3; nothing
+    retires that name any more). Two things it needed that the rifles did not:
+    - Its magazine tube and barrel run through its pump, so `gun_hold.beside` (the parts
+      that share no volume with what is held) dropped them, and the little finger, 1.4 cm
+      behind the wood, had nothing to lie on. Where a row holds a named part of the
+      outline (not a measured box cut out of one, as the Val's, nor the fist), the left
+      fingers lie on every part (`finger_fit.through`). The AK's handguard shares no
+      volume with a part, so its clip did not change.
+    - Bounds of its own (`verify/finger_pose.BOUNDS`, `probe_gun_hands.FINGER_BOUNDS`).
+      The pump is 4.8 cm deep under a hand shaped for 7.5, and the thumb under the
+      barrel's top holds the knuckles 1.6 to 4.6 cm below the wood. Measured: the seven
+      fingers' riding points 0.17 to 2.66 cm off the model (-0.75 to 3.84 before; live
+      0.13 to 2.60), the left index, middle and little at their 20 degree opening limit,
+      the left thumb swung 30 degrees to 0.78 cm off the wood (5.7 before). Opening
+      the outer joints 40 degrees was tried by hand: the middle then lies 0.47 to 1.49,
+      but the index's best fit has one point on the wood and is refused; the limits are
+      the rifles' still.
+- **The shotgun is held in the rifle's ready pose** (C3; until then a whole pose keyed
+  for it; its fingers alone are bent since, above), and its left hand has a point of
+  its own (`shotgun_hold.py`).
   - **Why:** the rifle pose stands the left thumb up the handguard, far under the AK's and
     the Val's sight lines (14 cm above the grip). The shotgun's line skims the receiver
     8.5 cm above the fist: as the clip has it the thumb's tip is 4.2 cm ABOVE the line, a

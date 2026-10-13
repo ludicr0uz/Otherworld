@@ -28,6 +28,10 @@ Against every part of the gun's outline (and the row's measured support box):
 The grip and the left hand's point are solved against the row's `pose`, not
 this clip: the fingers are bent last, onto a gun that is already in the hand.
 
+The left fingers lie on what the hand holds and the parts beside it; where
+that is a part of the outline itself, on the parts running through it too
+(finger_fit.through: the shotgun's tube and barrel, bare behind its pump).
+
 A NEW GUN: its Blueprint's name in weapon_models.GUN_FINGERS; the build logs
 each finger's bend, verify/finger_pose.py holds the saved clip to the model
 and probes/probe_gun_hands.py reads the live fingers.
@@ -76,11 +80,15 @@ def solid(skin, spec, comp, placed):
     """(the boxes the left hand's fingers lie on, the right hand's). The
     left: what it holds (the row's part or measured box) and every part
     beside that; a part the measured box is cut out of (the Val's receiver,
-    whose outline box reaches under its handguard) is not one. The right:
-    every part of the outline."""
+    whose outline box reaches under its handguard) is not one, but a part
+    that runs through a part of the outline the row names is (the shotgun's
+    magazine tube and barrel, bare behind and in front of its pump: the
+    little finger lies behind the wood, on the tube). The right: every part
+    of the outline."""
     box = gun_hold.support_box(skin, spec, comp, placed)
-    return ([box] + list(gun_hold.beside(spec, box).values()),
-            [gun_hold.part_box(spec["parts"], part[0]) for part in spec["parts"]])
+    parts = [gun_hold.part_box(spec["parts"], part[0]) for part in spec["parts"]]
+    return (parts if finger_fit.through(gun_hold.support_of(spec)) else [box] + list(gun_hold.beside(spec, box).values()),
+            parts)
 
 
 def hands(skin, spec, comp, placed):

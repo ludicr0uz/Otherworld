@@ -113,7 +113,7 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   and `weapon_models.GUN_HOLDS` has the gun's line; `verify/gun_hold.py` and
   `probes/probe_gun_hands.py` hold every gun to it (`docs/aiming.md`, "Both hands are
   fitted to each gun's model"). A long gun's name in `weapon_models.GUN_FINGERS` bends its
-  fingers onto the model too (`finger_pose.py`; the rifles today). Adding the SMG, the rifle and the sniper changed **no** node
+  fingers onto the model too (`finger_pose.py`; the rifles and the shotgun today). Adding the SMG, the rifle and the sniper changed **no** node
   in the fire, reload or gate graphs.
 - **The pistol is a 1911** (`weapon_models.py`): Stein Games' `SM_1911_02`, a Fab listing
   taken raw ("1911 Pistol - High Poly" in `fab_library.json`, under
@@ -397,8 +397,9 @@ Every gun's ready pose (what it is held in for an aim, down the sights, a shot, 
 and the guard) is a shipped clip: Lyra's ADS idles, retargeted onto the UEFN skeleton by
 `asset_pipeline/import_lyra.py` (`lyra_paths.AIM_RIFLE`, `AIM_PISTOL`; `SKIN_GAS.aim_rifle`,
 `aim_pistol`). The rifle's is the sniper's and the shotgun's, the pistol's the SMG's.
-Nothing is keyed: `shotgun_pose.py` and `A_AimShotgun` are gone (the weapons build deletes
-the asset from a checkout that has it).
+No whole pose is keyed: `shotgun_pose.py` is gone, and `A_AimShotgun` is today the rifle's
+pose with the shotgun's fingers bent onto it (`finger_pose.py`, below), not the pose keyed
+until C3.
 
 - **Still one ready pose per gun.** Lyra's hipfire idles are not played: the game has no
   hip pose (a gun not held up is carried in the locomotion's hand, `docs/aiming.md`, "The
@@ -414,14 +415,18 @@ the asset from a checkout that has it).
   holds only down the sights: at the hip the hand is where the clip has it. Lyra's own
   `MM_Shotgun_Idle_ADS` is the rifle's with the left hand 2 cm further back, further from
   this pump, so it is not taken.
-- **A rifle's fingers are bent onto its model** (`finger_pose.py`, `finger_fit.py`): a
-  gun named in `weapon_models.GUN_FINGERS` (the AK, the Val) is held in a clip of its
+- **A long gun's fingers are bent onto its model** (`finger_pose.py`, `finger_fit.py`): a
+  gun named in `weapon_models.GUN_FINGERS` (the AK, the Val, the shotgun) is held in a clip of its
   own, `A_Aim<Blueprint>`, its row's pose with the fingers closed on that gun, built
   before the guns (`finger_poses`). So a row has `pose` (the shipped clip: solve the
   grip and the seat in it, ask `two_handed` of it) and `aim` (what the item plays):
   never compare a gun's `AimPose` with `skin.aim_rifle`, which is why the carry has
   `CarryAlso`. `verify/finger_pose.py`, `probes/probe_gun_hands.py`;
-  `docs/aiming.md` ("A rifle's fingers are bent onto its model").
+  `docs/aiming.md` ("A long gun's fingers are bent onto its model"). The left fingers lie
+  on what the hand holds and the parts beside it; where the row names a part of the
+  outline, on the parts that run through it too (`finger_fit.through`: the shotgun's
+  tube and barrel, bare behind its pump). A gun the pose's hand does not suit has its
+  own measured bounds in `verify/finger_pose.BOUNDS` (the shotgun: 0.17 to 2.66 cm).
 - **Every gun's left hand is seated on its own model** (`gun_hold.py`), the shotgun's
   being one case: the AK's on its handguard clear of the magazine, the Val's on the front
   of its receiver, the pistol's and the SMG's over the right hand's fingers on the grip.

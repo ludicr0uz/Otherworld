@@ -376,6 +376,7 @@ GUN_HOLDS = {
 
 # The guns whose fingers are bent onto their model, by Blueprint name
 # (finger_pose.py): each is held in a ready clip of its own, A_Aim<its name>,
-# its row's pose with the fingers closed on this gun. The rifles; a new gun
-# is a name here.
-GUN_FINGERS = ("BP_AssaultRifle", "BP_SniperRifle")
+# its row's pose with the fingers closed on this gun. The long guns (the
+# pistols' left hand closes on the right, not on the model); a new gun is a
+# name here.
+GUN_FINGERS = ("BP_AssaultRifle", "BP_SniperRifle", "BP_Shotgun")

@@ -160,8 +160,7 @@ DATA (constants and pure tables -- no Blueprint authoring)
   shotgun_hold      the shotgun's hold (C3): the rifle's ready pose, a
                     shipped clip, with the left hand's SupportPoint moved
                     onto the pump, the thumb under the barrel's top
-                    (support_point); nothing keyed. Deletes the pose keyed
-                    for it until C3 (retire_keyed_pose)
+                    (support_point); its fingers are finger_pose's
 
 SHARED AUTHORING HELPERS
   (uebp)            node/pin/connect/set, out/then, variables, components,
@@ -317,6 +316,6 @@ wrong module.
                     three joints that lays it best a skin off the model's boxes,
                     within the joints' limits; the swing that lays a thumb on a part
   finger_pose       a fitted gun's own ready clip (weapon_models.GUN_FINGERS: the
-                    rifles): its row's pose frame for frame with the fingers bent
+                    rifles and the shotgun): its row's pose frame for frame with the fingers bent
                     onto that gun's model, which its item is held in (AimPose)
 """

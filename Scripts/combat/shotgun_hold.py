@@ -1,6 +1,8 @@
 """The shotgun's hold: the rifle's ready pose, a shipped clip, with the left
 hand's point moved onto the pump. No pose is keyed here (C3): this module
-works out one offset, the shotgun's SupportPoint.
+works out one offset, the shotgun's SupportPoint. (The fingers are bent onto
+the gun afterwards, like any fitted gun's, in a clip that is that pose but
+for them: finger_pose.py, A_AimShotgun, the name the keyed pose had.)
 
 WHY THE SHOTGUN NEEDS ONE
 -------------------------
@@ -43,7 +45,8 @@ WHAT A SHIPPED CLIP COSTS
   - The hand's shape is the rifle pose's, made for a deeper handguard: seated,
     its joints ride up to 5.0 cm off the wood (the keyed pose had them
     within 1.6). The barrel is only 2.2 cm over the pump, and the thumb under
-    its top holds the hand that low.
+    its top holds the hand that low. The knuckles stay there; the fingers
+    past them are bent up onto the wood by finger_pose.py.
   - The point holds only down the sights (SupportHand is SightBlend). At the
     hip and on the shoulder the hand is where the clip has it; the camera is
     not on the sights there.
@@ -52,21 +55,22 @@ WHAT A SHIPPED CLIP COSTS
     wrapped it over the wrist.
 """
 
-from combat import gun_hold
+from combat import finger_pose, gun_hold
 from combat.grip import _grip_location, _grip_rotation
-from combat.log import _log
-from combat.paths import RETIRED_SHOTGUN_AIM_ANIM_PATH
+from combat.paths import WEAPON_DIR
 from combat.weapon_models import (
     SHOTGUN_SIGHT_FRONT, SHOTGUN_SIGHT_REAR, SHOTGUN_SUPPORT, shotgun_outline,
 )
-from uebp.graph import _assets
+
+NAME = "BP_Shotgun"
 
 
 def row(skin):
     """What gun_hold reads of the shotgun's row of weapon_specs, made here so
     a check of the shotgun does not solve all five guns."""
     grip_rot = _grip_rotation(skin.aim_rifle)
-    return dict(display="Shotgun", aim=skin.aim_rifle, pose=skin.aim_rifle,
+    return dict(display="Shotgun", path=f"{WEAPON_DIR}/{NAME}",
+                aim=finger_pose.clip_for(NAME), pose=skin.aim_rifle,
                 parts=shotgun_outline(),
                 grip_rot=grip_rot,
                 grip_loc=_grip_location(skin.aim_rifle, grip_rot, shotgun_outline()),
@@ -98,13 +102,3 @@ def support_point(skin, quiet=False):
     moved by support_move(), in the right hand's bone space."""
     return gun_hold.support_point(skin, row(skin), quiet)
 
-
-def retire_keyed_pose():
-    """Delete A_AimShotgun, the pose keyed for the shotgun until C3, from a
-    checkout that still has it. After the weapons are built: until then the
-    shotgun's Blueprint names it."""
-    if _assets().does_asset_exist(RETIRED_SHOTGUN_AIM_ANIM_PATH):
-        if not _assets().delete_asset(RETIRED_SHOTGUN_AIM_ANIM_PATH):
-            raise RuntimeError(f"could not delete {RETIRED_SHOTGUN_AIM_ANIM_PATH}")
-        _log(f"deleted {RETIRED_SHOTGUN_AIM_ANIM_PATH}: the shotgun is held in "
-             "the rifle's ready pose")

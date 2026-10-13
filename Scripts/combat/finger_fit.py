@@ -72,6 +72,15 @@ THUMB_CLEAR_CM = 0.3
 _STRAIGHT = 0.05
 
 
+def through(support):
+    """True when what the left hand holds (a row's ``support``) is a part of
+    the outline itself, not a box measured out of one nor the right fist:
+    every part that shares its volume is then model too, running through it
+    (a shotgun's tube and barrel through its pump), and a finger past the
+    part's end may lie on them."""
+    return "part" in support and "box" not in support and not support.get("fist")
+
+
 def _sub(a, b):
     return tuple(x - y for x, y in zip(a, b))
 

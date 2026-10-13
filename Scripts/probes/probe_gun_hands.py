@@ -77,6 +77,9 @@ GRIP_SINK_CM = 2.0
 # AK's left index is past the front of its handguard and is the pose's.
 FINGER_NEAR_CM = 0.1
 FINGER_FAR_CM = 1.8
+# The shotgun's own (verify/finger_pose.BOUNDS has why: its pump is shallow
+# for the pose's hand, 0.17 to 2.66 in the saved clip), {Blueprint: (near, far)}.
+FINGER_BOUNDS = {"BP_Shotgun": (-0.1, 3.0)}
 FINGERS_LAID = 6
 CARRIED = 0.95          # the carry's weight, eased up
 CARRY_WAIT_S = 6.0      # wall seconds for it
@@ -173,7 +176,10 @@ def _check_fingers(p, mesh, held, skin, name):
     parts = outline()
     boxes = [gun_hold.part_box(parts, part[0]) for part in parts]
     box = support["box"] if "box" in support else gun_hold.part_box(parts, support["part"])
-    beside = [box] + [b for b in boxes if not hand_seat.overlaps(b, box)]
+    # What the left fingers lie on, as finger_pose.solid has it.
+    beside = boxes if finger_fit.through(support) else (
+        [box] + [b for b in boxes if not hand_seat.overlaps(b, box)])
+    near_cm, far_cm = FINGER_BOUNDS.get(name, (FINGER_NEAR_CM, FINGER_FAR_CM))
     pose = held.get_editor_property("AimPose")
     want = clip_for(name).rsplit("/", 1)[-1]
     p.check(f"{name}: it is held in its own clip, {want}",
@@ -187,10 +193,10 @@ def _check_fingers(p, mesh, held, skin, name):
         d = [finger_fit.nearest(on, [pt])
              for pt in finger_fit.riding(_finger(mesh, held, bones))]
         said.append(f"{label} {min(d):.2f} to {max(d):.2f}")
-        if min(d) > FINGER_NEAR_CM and max(d) < FINGER_FAR_CM:
+        if min(d) > near_cm and max(d) < far_cm:
             laid.append(label)
     p.check(f"...and its fingers lie on the model: at least {FINGERS_LAID} of the "
-            f"seven with every riding point {FINGER_NEAR_CM:g} to {FINGER_FAR_CM:g} cm "
+            f"seven with every riding point {near_cm:g} to {far_cm:g} cm "
             "off it", len(laid) >= FINGERS_LAID, "; ".join(said))
 
 

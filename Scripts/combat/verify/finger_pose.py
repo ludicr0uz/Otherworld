@@ -23,6 +23,15 @@ from combat.weapon_specs import _weapon_specs
 # and none is further than FAR_CM (measured at most 1.44, its right ring).
 NEAR_CM = 0.3
 FAR_CM = 1.6
+# A gun the ready pose's hand does not suit has bounds of its own, measured:
+# {Blueprint: (nearest, furthest)}. The shotgun's pump is 4.8 cm deep where
+# the pose's hand is shaped for a handguard of 7.5, and the thumb under the
+# barrel's top holds the knuckles 1.6 to 4.6 cm below the wood: a finger
+# comes up to the pump's lower edge and turns that corner, its middle joint
+# pressed nearer the edge and its first bone still coming up to it.
+# Measured 0.17 (the left middle's joint at the edge) to 2.66 (the left
+# little's first bone, coming up to the magazine tube behind the pump).
+BOUNDS = {"BP_Shotgun": (0.1, 2.9)}
 # The saved clip against the fit's arithmetic (cm).
 KEYED_CM = 0.05
 # The left thumb's nearest point to the part (cm; measured 0.81 and 0.82).
@@ -89,6 +98,7 @@ def _check_clip(skin, spec):
 
 def _check_fingers(skin, spec):
     name = spec["display"]
+    near_cm, far_cm = BOUNDS.get(spec["path"].rsplit("/", 1)[-1], (NEAR_CM, FAR_CM))
     _turns, bends = finger_pose.fit(skin, spec)
     was, now = finger_pose.measure(skin, spec), finger_pose.measure(skin, spec, spec["aim"])
     want = finger_pose.expected(skin, spec)
@@ -107,8 +117,8 @@ def _check_fingers(skin, spec):
                   _same(now[label], was[label], KEYED_CM), f"{now[label]} was {was[label]}")
             continue
         check(f"...on the model: at least {finger_fit.ON_POINTS} of its points a "
-              f"skin off it, none nearer than {NEAR_CM:g} cm, none further than {FAR_CM:g}",
-              on >= finger_fit.ON_POINTS and near >= NEAR_CM and far <= FAR_CM,
+              f"skin off it, none nearer than {near_cm:g} cm, none further than {far_cm:g}",
+              on >= finger_fit.ON_POINTS and near >= near_cm and far <= far_cm,
               f"{on} on, {near:.2f} to {far:.2f} cm")
         check("...and better laid than the pose had it: its worst point nearer a "
               "skin off the model than the pose's worst was (in it or in the air)",
@@ -120,7 +130,7 @@ def _check_fingers(skin, spec):
     top, ceiling = max(p[2] for p in thumb[1:]), gun_hold.ceiling(spec)
     check(f"{name}: the left thumb is laid against the part, within {THUMB_CM:g} cm "
           "of it and not in it, under its ceiling",
-          NEAR_CM <= near <= THUMB_CM and top < ceiling,
+          near_cm <= near <= THUMB_CM and top < ceiling,
           f"{near:.2f} cm off (the pose's {was['left thumb'][1]:.2f}), its top at "
           f"z {top:.2f} under {ceiling:.2f}")
 

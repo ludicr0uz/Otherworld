@@ -23,9 +23,13 @@ The defaults are all rebindable on the settings screen:
   (`weapon_component/knife.py`), with the **matches** it **lights a campfire**
   (`weapon_component/light.py`), and with **empty hands it punches**
   (`weapon_component/punch.py`; all in `docs/firing_gate.md`).
-- A gun is **carried lowered** (the jog's own arms, the gun in the hand) and comes up into its
-  ready pose while an aim key or the guard is held, and for a shot or a reload
-  (`weapon_component/carry.py`, `docs/aiming.md`).
+- A gun is **carried lowered** and comes up into its ready pose while an aim key or the
+  guard is held, and for a shot or a reload (`weapon_component/carry.py`, `docs/aiming.md`).
+  A pistol or an SMG rides in the jog's own arm; a **long gun** (rifle, sniper, shotgun) is
+  carried in both hands at the hip, standing, walking, jogging and sprinting: three clips of
+  the Animation Starter Pack blended onto the aim slot's source by `CarryPose`
+  (`carry_pose.py`, `weapon_component/carry_weights.py`; `docs/aiming.md`, "The carry").
+  Crouched and prone are not part of it yet.
 - Right click aims **over the shoulder**, middle click aims **down the sights** (both held).
   Only a gun has sights (`HasSights`): with anything else in hand the middle click is the
   **use key** (`weapon_component/use.py`) and does not aim at all

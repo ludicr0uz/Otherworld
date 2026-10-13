@@ -4,7 +4,8 @@ shot keeps it up. Constants only; the graph is weapon_component/carry.py.
 
 # A gun is carried lowered: the ready pose is not played, and the locomotion
 # (idle, walk, jog) comes through the upper-body blend with the gun in the
-# right hand, as it always has while sprinting. It is raised into its ready
+# right hand, as it always has while sprinting (a long gun in both hands, in a
+# carry of its own: carry_pose.py). It is raised into its ready
 # pose while an aim key or the guard is held, and by a shot or a reload.
 #
 # A shot or a reload keeps it up until this long after the gun could fire

@@ -119,4 +119,7 @@ Editor-side, in pipeline order:
   fal_paths   Where the Free Animation Library lies and which of its clips the game plays
   ik_follow   Key a retargeted clip's IK foot bones onto its feet
   import_fal  the Free Animation Library's clips the game plays, onto the player's skeleton
+
+  asp_paths   Where the Animation Starter Pack lies and which of its clips the game plays
+  import_asp  the Animation Starter Pack's clips the game plays, onto the player's skeleton
 """

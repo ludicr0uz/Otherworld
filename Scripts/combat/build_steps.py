@@ -27,6 +27,7 @@ from combat.axe import build_axe
 from combat.blood import build_blood_splash
 from combat.body_pose import patch_body_pose
 from combat.bullet_impact import build_bullet_impact
+from combat.carry_pose import patch_carry_pose
 from combat.combat_trace import build_combat_trace_switch
 from combat.footsteps import build_footstep_component
 from combat.game_state import ensure_game_mode_vars
@@ -175,6 +176,8 @@ def _anim_patches(c):
     patch_support_hand(skin)
     # The crouch and the crawl clips under everything else.
     patch_stance_clips(skin)
+    # The long gun's carry on the aim slot's source, after the stances.
+    patch_carry_pose(skin)
     # The jog's speed onto the blend space's jog row, or the player walks.
     patch_gait(skin)
     # Last of the anim graph's patches: the one branch a dedicated server takes.

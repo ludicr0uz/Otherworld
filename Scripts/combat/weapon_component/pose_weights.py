@@ -8,6 +8,7 @@ stance_clips.py the clips).
     GuardGun   -> Blocking AND HeldTwoHanded
     GuardArms  -> Blocking AND NOT HeldTwoHanded     (fists, pistol, food)
     PoseKneel  -> Searching AND NOT Stance == PRONE  (slower: KNEEL_BLEND_SPEED)
+    CarryPose, CarrySprint -> carry_weights.py (a skin with the carry's clips)
     KneelTime  =  KNEEL_FROM_S + |time mod 2 span - span|, span = KNEEL_TO_S - KNEEL_FROM_S
 
 Searching is written by the HUD while its loot window is open
@@ -31,12 +32,15 @@ from combat.body_pose import (
     GUARD_ARMS, GUARD_GUN, KNEEL_BLEND_SPEED, KNEEL_FROM_S, KNEEL_TIME, KNEEL_TO_S,
     POSE_BLEND_SPEED, POSE_CROUCH, POSE_KNEEL, POSE_PRONE,
 )
+from combat.carry_pose_consts import (
+    CARRY_BLEND_SPEED, CARRY_POSE, CARRY_SPRINT, CARRY_SPRINT_BLEND_SPEED)
 from combat.gas_moves import slide_on
 from combat.gas_moves_tuning import POSE_SLIDE, SLIDE_BLEND_SPEED
 from uebp.graph import BEL, _connect, _node, _palette, _pin, _set, else_, out, then
 from combat.paths import ITEM_CLASS_PATH
 from combat.skin import player_skin
 from combat.support_hand import SUPPORT_POINT_VAR
+from combat.weapon_component.carry_weights import carry_targets
 from combat.weapon_component.sight_pitch import _anim_class_path, _anim_instance
 from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR
 from uebp.nodes.math import (
@@ -159,11 +163,16 @@ def _author_pose_weights(ed, tick, held, armed_out, exec_ins):
                    .startswith("As"))
 
     targets = _targets(ed)
+    carried = bool(player_skin().carry_idle)
+    if carried:
+        targets.update(carry_targets(ed, targets.get(POSE_SLIDE)))
     tail = then(cast)
     for weight, speed in ((POSE_CROUCH, POSE_BLEND_SPEED), (POSE_PRONE, POSE_BLEND_SPEED),
                           (GUARD_ARMS, POSE_BLEND_SPEED), (GUARD_GUN, POSE_BLEND_SPEED),
                           (POSE_KNEEL, KNEEL_BLEND_SPEED),
-                          *(((POSE_SLIDE, SLIDE_BLEND_SPEED),) if slide_on() else ())):
+                          *(((POSE_SLIDE, SLIDE_BLEND_SPEED),) if slide_on() else ()),
+                          *(((CARRY_POSE, CARRY_BLEND_SPEED),
+                             (CARRY_SPRINT, CARRY_SPRINT_BLEND_SPEED)) if carried else ())):
         target = _node(ed, FN_BOOL_TO_FLOAT)
         _connect(targets[weight], _pin(target, "InBool"))
         now = ed.add_get_member_variable_node(weight, anim_class)
@@ -190,6 +199,7 @@ def _author_pose_weights(ed, tick, held, armed_out, exec_ins):
         f"each eased (speed {POSE_BLEND_SPEED:g}) on the player's anim instance, "
         f"whose ModifyBones they weight (Scripts/combat/body_pose.py); and "
         f"{POSE_KNEEL} from {SEARCHING_VAR} (speed {KNEEL_BLEND_SPEED:g}), with "
-        f"{KNEEL_TIME} running up and down the kneel clip's working stretch.",
+        f"{KNEEL_TIME} running up and down the kneel clip's working stretch. "
+        f"{CARRY_POSE} / {CARRY_SPRINT} are a long gun's carry (carry_weights.py).",
         [n for n in ed.list_all_nodes() if n.get_name() not in before])
     return (tail, out(cast, "CastFailed"))

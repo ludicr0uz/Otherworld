@@ -2,7 +2,13 @@
 the guard raises it.
 
 For the shotgun and the pistol in turn: at rest and jogging the ready pose is
-not playing, the barrel hangs well off the horizon and the hand is low. The
+not playing, the barrel is off the horizon and the hand is low. The pistol
+hangs in the locomotion's hand, the barrel at the ground. The shotgun, a long
+gun, is in the carry (combat/carry_pose.py): CarryPose is up on the weapon
+layers, the barrel a little under the horizon, the left hand as far from the
+right as in the ready pose (on the gun), standing, jogging and at a sprint,
+where CarrySprint brings the sprint's own carry; raised, crouched or sliding
+out of it CarryPose is down again. The
 probes' stand-in for an aim key (RaiseForced) brings the ready pose up and the
 barrel level, with the muzzle near where a lowered gun's shot starts; letting
 go lowers it. A forced shot raises it too, and it comes
@@ -28,18 +34,21 @@ import time
 import unreal
 
 from combat.anim_blueprint import AIM_SLOT
+from combat.carry_pose_consts import CARRY_FOR_VAR, CARRY_POSE, CARRY_SPRINT
 from combat.carry_tuning import (
     CARRY_GRIP, CARRY_RAISE_HOLD_S, LOWERED_VAR, RAISE_FORCED_VAR,
 )
 from combat.paths import ITEM_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.skin import SKINS
+from combat.sprint_tuning import SPRINT_FORCED_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from graphics_menu.profile_consts import PROFILE_SLOT
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, v) for v in
-            (WV.EquippedIndex, WV.NeedsRefresh, RAISE_FORCED_VAR, FIRE_FORCED_VAR)] + [
+            (WV.EquippedIndex, WV.NeedsRefresh, RAISE_FORCED_VAR, FIRE_FORCED_VAR,
+             SPRINT_FORCED_VAR, WV.Stance)] + [
     (ITEM_BP_PATH, IV.NextFireTime)]
 
 SETTLE_S = 0.4          # the ready pose's blend, and a little
@@ -49,6 +58,12 @@ LOWERED_DEG = 35.0      # the barrel hangs at least this far below the horizon
 RAISED_DEG = 20.0       # ...and raised, sits within this of it
 ORIGIN_NEAR_CM = 32.0    # the stand-in muzzle against the raised gun's own
 HAND_RISE_CM = 15.0     # how far the hand comes up with the gun
+# A long gun's carry: the barrel sits in this band under the horizon standing
+# and jogging (the clips have it some 15 deg down), and the hands are as far
+# apart as the ready pose has them, within this.
+CARRY_DEG = (3.0, 35.0)
+CARRY_HANDS_CM = 8.0
+SPRINT_S = 1.2
 SHOTS = bool(os.environ.get("OW_CARRY_SHOTS"))
 WALL_WAIT_S = 20.0      # a headless game's clock is slow: bound waits by the wall
 
@@ -86,6 +101,18 @@ def _hand_z(player):
     return mesh.get_socket_location(bone).z - player.get_actor_location().z
 
 
+def _hands_apart(player):
+    mesh = player.get_editor_property("mesh")
+    at = [mesh.get_socket_location(next(
+        s.pose_bones[b] for s in SKINS if mesh.get_bone_index(s.pose_bones[b]) >= 0))
+        for b in ("hand_r", "hand_l")]
+    return (at[0] - at[1]).length()
+
+
+def _in_carry_band(pitch):
+    return -CARRY_DEG[1] < pitch < -CARRY_DEG[0]
+
+
 def _posing(anim, held):
     return anim.is_playing_slot_animation(held.get_editor_property("AimPose"), AIM_SLOT)
 
@@ -103,21 +130,74 @@ def _rest(p, held):
     p.set(held, "NextFireTime", now - CARRY_RAISE_HOLD_S - 1.0)
 
 
-def _gun(p, player, wc, anim, label, index):
+def _sprint(p, player, wc, layers, held, label):
+    """A long gun at a sprint: the sprint's own carry comes in, and goes."""
+    p.set(wc, SPRINT_FORCED_VAR, True)
+    t0 = unreal.GameplayStatics.get_time_seconds(p.world())
+    top, seen = [0.0, 0.0], []
+
+    def run():
+        player.add_movement_input(player.get_actor_forward_vector(), 1.0)
+        top[0] = max(top[0], p.get(layers, CARRY_SPRINT))
+        top[1] = max(top[1], player.get_velocity().length())
+        seen.append((p.get(layers, CARRY_POSE), _hands_apart(player)))
+        return unreal.GameplayStatics.get_time_seconds(p.world()) - t0 >= SPRINT_S
+    yield _until(run)
+    p.set(wc, SPRINT_FORCED_VAR, False)
+    late = seen[len(seen) // 2:]
+    p.check(f"{label}, sprinting: {CARRY_SPRINT} brings the sprint's carry in, "
+            f"{CARRY_POSE} stays up",
+            top[0] > 0.9 and min(c for c, _ in late) > 0.9 and p.get(wc, LOWERED_VAR),
+            f"{CARRY_SPRINT} {top[0]:.2f} at {top[1]:.0f} cm/s, "
+            f"{CARRY_POSE} >= {min(c for c, _ in late):.2f}")
+    yield _until(lambda: player.get_velocity().length() < 5.0
+                 and p.get(layers, CARRY_SPRINT) < 0.05)
+    p.check(f"...and out of the sprint {CARRY_SPRINT} goes again",
+            p.get(layers, CARRY_SPRINT) < 0.05, f"{p.get(layers, CARRY_SPRINT):.2f}")
+    return [h for _, h in late]
+
+
+def _crouched(p, wc, layers, label):
+    """Crouched, a long gun rides as it did: the carry is the standing body's."""
+    p.set(wc, "Stance", 1)
+    yield _until(lambda: p.get(layers, CARRY_POSE) < 0.05)
+    p.check(f"{label}, crouched: {CARRY_POSE} is down (the carry is the standing "
+            "body's)", p.get(layers, CARRY_POSE) < 0.05,
+            f"{p.get(layers, CARRY_POSE):.2f}")
+    p.set(wc, "Stance", 0)
+    yield _until(lambda: p.get(layers, CARRY_POSE) > 0.95)
+    p.check("...and standing up brings it back", p.get(layers, CARRY_POSE) > 0.95,
+            f"{p.get(layers, CARRY_POSE):.2f}")
+
+
+def _gun(p, player, wc, anim, layers, label, index):
     p.set(wc, "EquippedIndex", index)
     p.set(wc, "NeedsRefresh", True)
     yield lambda: p.get(wc, "Held") == p.get(wc, "Inventory")[index]
     held = p.get(wc, "Held")
+    pose = p.get(wc, CARRY_FOR_VAR)
+    carried = pose is not None and held.get_editor_property("AimPose") == pose
     _rest(p, held)
     yield _until(lambda: p.get(wc, LOWERED_VAR))
+    if carried:
+        yield _until(lambda: p.get(layers, CARRY_POSE) > 0.98)
     yield SETTLE_S
     yield from _shot(p)
     low_hand, low_pitch = _hand_z(player), _barrel_pitch(p, held)
     p.check(f"{label}, at rest: lowered, the ready pose is not playing",
             p.get(wc, LOWERED_VAR) and not _posing(anim, held)
             and held.get_attach_parent_actor() == player)
-    p.check(f"...and the barrel hangs more than {LOWERED_DEG:g} deg below the horizon",
-            low_pitch < -LOWERED_DEG, f"{low_pitch:+.1f} deg")
+    low_apart = _hands_apart(player)
+    if carried:
+        p.check(f"...in the carry: {CARRY_POSE} is up and the barrel is {CARRY_DEG[0]:g} "
+                f"to {CARRY_DEG[1]:g} deg under the horizon",
+                p.get(layers, CARRY_POSE) > 0.98 and _in_carry_band(low_pitch),
+                f"{CARRY_POSE} {p.get(layers, CARRY_POSE):.2f}, {low_pitch:+.1f} deg")
+    else:
+        p.check(f"...and the barrel hangs more than {LOWERED_DEG:g} deg below the "
+                f"horizon, {CARRY_POSE} never up",
+                low_pitch < -LOWERED_DEG and p.get(layers, CARRY_POSE) < 0.02,
+                f"{low_pitch:+.1f} deg, {CARRY_POSE} {p.get(layers, CARRY_POSE):.2f}")
 
     # Jogging: the locomotion's own arms, the gun still down.
     t0 = unreal.GameplayStatics.get_time_seconds(p.world())
@@ -135,12 +215,21 @@ def _gun(p, player, wc, anim, label, index):
     median = seen[len(seen) // 2]
     p.note(f"{label}, jogging: the barrel swings {seen[0]:+.1f} to {seen[-1]:+.1f} deg "
            f"(median {median:+.1f}) over {len(seen)} frames")
-    p.check(f"{label}, jogging: still lowered, no ready pose, and the barrel "
-            f"swings with the arm, mostly more than {LOWERED_DEG:g} deg below the "
-            "horizon",
-            p.get(wc, LOWERED_VAR) and not _posing(anim, held)
-            and fastest[0] > 100.0 and median < -LOWERED_DEG,
-            f"{fastest[0]:.0f} cm/s, median {median:+.1f} deg")
+    if carried:
+        p.check(f"{label}, jogging: still lowered, no ready pose, and the barrel "
+                "stays in the carry's band",
+                p.get(wc, LOWERED_VAR) and not _posing(anim, held)
+                and fastest[0] > 100.0 and _in_carry_band(median)
+                and p.get(layers, CARRY_POSE) > 0.98,
+                f"{fastest[0]:.0f} cm/s, median {median:+.1f} deg")
+        fast_apart = yield from _sprint(p, player, wc, layers, held, label)
+    else:
+        p.check(f"{label}, jogging: still lowered, no ready pose, and the barrel "
+                f"swings with the arm, mostly more than {LOWERED_DEG:g} deg below the "
+                "horizon",
+                p.get(wc, LOWERED_VAR) and not _posing(anim, held)
+                and fastest[0] > 100.0 and median < -LOWERED_DEG,
+                f"{fastest[0]:.0f} cm/s, median {median:+.1f} deg")
     yield _until(lambda: player.get_velocity().length() < 5.0)
     # The stop is a clip of its own (the body leans back out of the run), and
     # the muzzle is measured standing.
@@ -170,10 +259,23 @@ def _gun(p, player, wc, anim, label, index):
             f"{HAND_RISE_CM:g} cm higher",
             abs(up_pitch) < RAISED_DEG and up_hand > low_hand + HAND_RISE_CM,
             f"{up_pitch:+.1f} deg, hand {low_hand:.1f} -> {up_hand:.1f} cm")
+    if carried:
+        up_apart = _hands_apart(player)
+        p.check(f"...{CARRY_POSE} is down under the ready pose, and the carry had the "
+                f"left hand where that has it, within {CARRY_HANDS_CM:g} cm (on the gun), "
+                "standing and at the sprint",
+                p.get(layers, CARRY_POSE) < 0.05
+                and abs(low_apart - up_apart) < CARRY_HANDS_CM
+                and all(abs(h - up_apart) < CARRY_HANDS_CM for h in fast_apart),
+                f"{CARRY_POSE} {p.get(layers, CARRY_POSE):.2f}; hands {up_apart:.1f} cm "
+                f"apart raised, {low_apart:.1f} carried, "
+                f"{min(fast_apart):.1f}..{max(fast_apart):.1f} sprinting")
     p.set(wc, RAISE_FORCED_VAR, False)
     yield _until(lambda: not _posing(anim, held))
     p.check(f"{label}, the aim let go: lowered again",
             p.get(wc, LOWERED_VAR) and not _posing(anim, held))
+    if carried:
+        yield from _crouched(p, wc, layers, label)
 
     # A shot raises it, and it stays up until the hold has passed.
     loaded = p.get(held, "Loaded")
@@ -210,9 +312,12 @@ def _run(p):
         unreal.VisibilityBasedAnimTickOption.ALWAYS_TICK_POSE_AND_REFRESH_BONES,
         unreal.PropertyAccessChangeNotifyMode.NEVER)
     anim = mesh.get_anim_instance()
+    layers = p.pose_instance(mesh)
+    p.check(f"the build has the long gun's carry ({CARRY_FOR_VAR} is set)",
+            p.get(wc, CARRY_FOR_VAR) is not None)
     names = [i.get_class().get_name() for i in p.get(wc, "Inventory")]
     for label, cls in (("shotgun", "BP_Shotgun_C"), ("pistol", "BP_Pistol_C")):
-        yield from _gun(p, player, wc, anim, label, names.index(cls))
+        yield from _gun(p, player, wc, anim, layers, label, names.index(cls))
 
     index = names.index("BP_Knife_C")
     p.set(wc, "EquippedIndex", index)

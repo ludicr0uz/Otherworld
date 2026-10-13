@@ -6,6 +6,7 @@ group, where it always has; all start at zero or false.
 
 from uebp.vars import BOOL, FLOAT, VECTOR, Var
 from combat import item_vars as IV
+from combat.carry_pose_consts import CARRY_POSE, CARRY_SPRINT
 from combat.gas_moves_tuning import POSE_SLIDE
 from combat.server_anim_consts import SERVER_POSE_VAR
 
@@ -32,6 +33,10 @@ SUPPORT = (SupportHand, SupportPoint)
 
 # stance_clips.py: the slide's weight, declared only with the slide on.
 SLIDE = (Var(POSE_SLIDE, FLOAT),)
+
+# carry_pose.py: the long gun's carry over the upper body, and how far it is
+# the sprint's (carry_weights.py's targets, eased by pose_weights.py).
+CARRY = (Var(CARRY_POSE, FLOAT), Var(CARRY_SPRINT, FLOAT))
 
 # server_anim.py, gas_locomotion.py: this machine is a dedicated server.
 SERVER = (Var(SERVER_POSE_VAR, BOOL),)

@@ -23,6 +23,7 @@ from combat.body_pose import (
     POSE_PRONE, PRONE_CRAWL_LIFT_CM, PRONE_HIPS_CM, PRONE_MOVING, _ref, crawl_hips_z,
     pose_plan,
 )
+from combat.carry_pose_consts import CARRY_POSE
 from combat.gas_moves import crouch_on, slide_on
 from combat.gas_moves_tuning import POSE_SLIDE, SLIDE_CLIP
 from combat.skin import player_skin
@@ -106,14 +107,18 @@ def check_stance_graph():
     # A crawl by direction (P2) is eight players where the forward one was,
     # under seven blends more.
     dirs = 7 if crawl_by_direction(skin) else 0
-    blends = 5 - (2 if crouch_on() else 0) + (1 if slide_on() else 0) + dirs
+    # A long gun's carry (carry_pose.py, checked by verify.carry_pose) is three
+    # blends and three players of the same classes, after the stances.
+    carry = 3 if skin.carry_idle else 0
+    blends = 5 - (2 if crouch_on() else 0) + (1 if slide_on() else 0) + dirs + carry
     # A prone idle is a player where the held crawl was an evaluator.
     idle = 1 if skin.prone_idle else 0
-    players = 3 - (2 if crouch_on() else 0) + (1 if slide_on() else 0) + idle + dirs
+    players = 3 - (2 if crouch_on() else 0) + (1 if slide_on() else 0) + idle + dirs + carry
     check(f"{abp.get_name()}: {blends} stance blends, {players} players, "
           f"{2 - idle} evaluator(s)"
           + (" (no crouch clip: the crouch is the motion matching's)" if crouch_on() else "")
-          + (" (and the slide's)" if slide_on() else ""),
+          + (" (and the slide's)" if slide_on() else "")
+          + (" (and the carry's three of each)" if carry else ""),
           sorted(_cls(n) for n in ours) == sorted([BLEND_CLASS] * blends
                                                   + [PLAYER_CLASS] * players
                                                   + [EVALUATOR_CLASS] * (2 - idle)),
@@ -122,6 +127,10 @@ def check_stance_graph():
     slot = next((n for n in nodes if _cls(n) == "AnimGraphNode_Slot"
                  and _slot_name(n) == AIM_SLOT), None)
     down = _up(slot, "Source") if slot else None
+    carried = _cls(down) == BLEND_CLASS and _title(_up(down, "Alpha")) == f"Get {CARRY_POSE}"
+    if carried:
+        # The carry's blend is on the slot's source alone, over the stances'.
+        down = _up(down, "A")
     kneel = _up(down, "B") if _cls(down) == BLEND_CLASS else None
     check(f"the aim slot reads the kneel: {POSE_KNEEL} blends in the kneel clip, "
           f"held at {KNEEL_TIME}",
@@ -156,7 +165,8 @@ def check_stance_graph():
     check("...and so does the upper-body layered blend's base (the aim layer "
           "rides on the crouched, lying or kneeling body)",
           sorted(_cls(PIN.get_owning_node(p)) for p in feeds)
-          == ["AnimGraphNode_LayeredBoneBlend", "AnimGraphNode_Slot"],
+          == ["AnimGraphNode_LayeredBoneBlend",
+              BLEND_CLASS if carried else "AnimGraphNode_Slot"],
           str([_cls(PIN.get_owning_node(p)) for p in feeds]))
     if not ((low or crouch_on()) and lying):
         return

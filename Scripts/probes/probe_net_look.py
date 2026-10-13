@@ -11,7 +11,8 @@ pistol, a knife, the matches, the stick and a rifle. After each step it posts wh
 own character is doing; client 2 and the server then look at THEIR copy of
 that character (weapon_component/look.py): the stance and the capsule, the
 aim mode, the gun raised or lowered, the hand's pose and that it is playing,
-and the upper body's pitch.
+the upper body's pitch, and the long gun's carry (CarryPose, combat/carry_pose.py:
+up with the shotgun at rest, standing, and down for everything else).
 
 The rifle is not an issued item, and nothing hands a client of a server one
 yet (the cheat is single player's, a drop is a one-in-ten roll), so the
@@ -38,6 +39,7 @@ from combat import item_vars as IV
 from combat.aim_pitch import AIM_PITCH_VAR
 from combat.anim_blueprint import AIM_SLOT
 from combat.body_pose import POSE_CROUCH, POSE_PRONE
+from combat.carry_pose_consts import CARRY_FOR_VAR, CARRY_POSE
 from combat.carry_tuning import LOWERED_VAR, RAISE_FORCED_VAR
 from combat.paths import (
     HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, ITEM_BP_PATH, RIFLE_BP_PATH,
@@ -103,6 +105,7 @@ def _look(p, pawn):
         "crouch": float(p.get(layers, POSE_CROUCH)) if layers else 0.0,
         "prone": float(p.get(layers, POSE_PRONE)) if layers else 0.0,
         "pitch": float(p.get(layers, AIM_PITCH_VAR)) if layers else 0.0,
+        "carry": float(p.get(layers, CARRY_POSE)) if layers else 0.0,
     }
 
 
@@ -130,6 +133,8 @@ def _poses(here, there):
     out["the stance's weights"] = (
         abs(here["crouch"] - low[0]) < 0.15 and abs(here["prone"] - low[1]) < 0.15,
         f"crouch {here['crouch']:.2f}, prone {here['prone']:.2f}")
+    out["the long gun's carry"] = (abs(here["carry"] - there["carry"]) < 0.15,
+                                   f"{here['carry']:.2f}; the player's {there['carry']:.2f}")
     out["the body's pitch"] = (abs(here["pitch"] - there["pitch"]) <= PITCH_NEAR_DEG,
                                f"{here['pitch']:.1f}; the player's {there['pitch']:.1f}")
     out["the feet on the ground"] = (abs(here["feet"] - there["feet"]) <= 3.0,
@@ -192,6 +197,7 @@ def _steps(p, pawn, wc):
         ("an item carried up (the stick)", hold("stick")),
         ("a long gun again (the shotgun), raised", hold("shotgun", True)),
         ("a rifle's ready pose, raised", rifle_pose),
+        ("the shotgun, carried", hold("shotgun")),
     ]
 
 
@@ -223,6 +229,14 @@ def _act(p, pawn, wc, other):
         p.post(f"did {name}", mine)
         done.append(name)
         yield from _await(lambda: all(p.posted(w, f"saw {name}") for w in watchers))
+    carry = {n: p.posted("client 1", f"did {n}")["carry"] for n in done}
+    if p.get(wc, CARRY_FOR_VAR) is not None:
+        p.check("client 1's own long gun is in the carry at rest, standing, and never "
+                "raised, crouched or with a pistol in hand",
+                carry["standing"] > 0.9 and carry["the shotgun, carried"] > 0.9
+                and max(carry[n] for n in ("crouched", "a pistol, lowered",
+                                           "a long gun again (the shotgun), raised")) < 0.1,
+                str({k: round(v, 2) for k, v in carry.items()}))
     held = {n: p.posted("client 1", f"did {n}")["pose"] for n in done}
     p.check("client 1's own poses are the items' own: the knife's, the item's",
             held.get("a knife") == POSES["knife"].rsplit("/", 1)[1]

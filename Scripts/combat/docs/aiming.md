@@ -307,8 +307,8 @@ in game `probes/probe_carry.py`.
 
 - **A gun's ready pose plays only while something holds the gun up.** Otherwise the slot is
   stopped and the locomotion (idle, walk, jog) comes through the upper-body blend with the gun
-  in the right hand, as it always has while sprinting. No new clip: the packs have no
-  armed-carry jog.
+  in the right hand, as it always has while sprinting. A one-handed gun still rides so; a
+  long gun has a carry of its own (below).
   `Lowered = Sprinting OR (gun AND NOT prone AND NOT (Aiming OR Blocking OR RaiseForced OR
   SightSeat > SEAT_HOLD OR now < Held.NextFireTime + CARRY_RAISE_HOLD_S))`, written once a
   frame behind `IsValid(Held)`.
@@ -324,6 +324,33 @@ in game `probes/probe_carry.py`.
 - **The pose follows `Lowered` on its edge** (`ready_pose.py`): `Lowered != PoseLowered` sets
   `NeedsRefresh`, and the equip plays or stops the slot. The keepalive after a flinch asks
   `Lowered` too.
+- **A long gun is carried in both hands** (`carry_pose.py`, `carry_pose_consts.py`,
+  `weapon_component/carry_weights.py`, `verify/carry_pose.py`): with the rifle, the sniper or
+  the shotgun lowered, standing, the upper body is the Animation Starter Pack's rifle carry
+  (`Scripts/asset_pipeline/CLAUDE.md`), the gun at the hip some 15 degrees under the horizon
+  standing, walking and jogging, across the body at a sprint.
+  - It is not a montage. In `ABP_WeaponLayers` a blend by `CarryPose` sits on the aim slot's
+    **source alone** (the layered blend's base stays the stance blends' pose): a slot with no
+    montage hands its source on, so the carry reaches the body from `spine_01` up through
+    the blend that was already there, and the ready pose, a throw or a pick-up plays over it
+    and blends back to it. No second layered blend, and the legs are the motion matching's.
+  - `CarryPose -> Lowered AND HandPose == CarryFor AND Stance == 0 AND NOT Searching AND NOT
+    sliding AND NOT in a traversal`; `CarrySprint -> the movement's IsSprinting`, both eased
+    by `pose_weights.py` on every machine. `CarryFor` is the rifle's ready pose, which the
+    three long guns share (`weapon_specs`): the pistol, the SMG, the knife and empty hands
+    never carry. `Lowered` and `HandPose` already reach the other machines, so nothing new
+    replicates.
+  - The clip under it is the standing one or the jog's by `GroundSpeed`
+    (`CARRY_JOG_FULL_CM_S`), then the sprint's by `CarrySprint`. Measured retargeted: the
+    grip hand 29 cm under the ready pose's (40 at the sprint), the left hand within 3 cm of
+    where the ready pose has it against the right, so no IK holds it.
+  - Crouched it is off (the gun rides in the hand as before; a later task), and prone the
+    gun is up. The stand-in shot origin (below) is unchanged.
+  - A checkout without the pack has no carry: the skin's three fields are None
+    (`skin._gas_skin` says so in the build's log), the variables exist and nothing weights
+    them.
+  - In game: `probes/probe_carry.py` (the weights, the barrel, the hands, the sprint, the
+    crouch) and, for another player's copy, `probes/probe_net_look.py`.
 - **The carry runs where the keys are.** On another machine's copy of the player `Lowered`
   is the mirror's, off the replicated `LookLowered`, and the pose the equip and the
   keep-alive play is `HandPose`: `Held.AimPose` locally, the replicated `LookPose` on a

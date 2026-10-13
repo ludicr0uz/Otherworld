@@ -11,6 +11,7 @@ anim Blueprint (PlayerSkin.base_anim_bp) with the weapon layers' graph
 
 import dataclasses
 
+from asset_pipeline import asp_paths as ASP
 from asset_pipeline import fal_paths as FAL
 from asset_pipeline.gas_bridge_paths import PLAYER_FAMILY
 from asset_pipeline import lyra_paths as LYRA
@@ -158,6 +159,14 @@ class PlayerSkin:
     # from the same library, played into the upper-body slot. None where the
     # rig has none: the item is then taken with no clip.
     pickup: str = None
+    # A long gun's carry (carry_pose.py): the upper body's pose while the
+    # rifle, the sniper or the shotgun is in hand and nothing holds it up,
+    # standing, at a jog and at a sprint (the Animation Starter Pack's,
+    # asset_pipeline/import_asp.py). All three or none: without them the gun
+    # rides in the locomotion's own hand.
+    carry_idle: str = None
+    carry_jog: str = None
+    carry_sprint: str = None
     # A carried item's hand is closed as the pistol pose closes it
     # (hold_pose.closed_fist). Where that pose does not close the index, the
     # ready pose its index is taken from instead; None where it does.
@@ -338,7 +347,10 @@ SKIN_GAS = dataclasses.replace(
     prone_fwd_right=FAL.uefn_clip(FAL.PRONE_FWD_RIGHT),
     search_kneel=f"{GAS_UAL_ANIMS}UAL1_Fixing_Kneeling",
     throw=f"{GAS_UAL_ANIMS}UAL2_OverhandThrow",
-    pickup=f"{GAS_UAL_ANIMS}UAL2_Farm_Harvest")
+    pickup=f"{GAS_UAL_ANIMS}UAL2_Farm_Harvest",
+    carry_idle=ASP.uefn_clip(ASP.CARRY_IDLE),
+    carry_jog=ASP.uefn_clip(ASP.CARRY_JOG),
+    carry_sprint=ASP.uefn_clip(ASP.CARRY_SPRINT))
 
 
 # Every skin there is, most specific first: what a running game, which has no
@@ -413,6 +425,12 @@ def _gas_skin(eas):
              "— the forward crawl plays whichever way the player goes. Run "
              "asset_pipeline/import_fal.py.")
         skin = dataclasses.replace(skin, **_NO_DIRECTIONS)
+    if not all(eas.does_asset_exist(p) for p in (skin.carry_idle, skin.carry_jog, skin.carry_sprint)):
+        # As Lyra: a Fab pack the user adds by hand.
+        _log(f"note: {skin.carry_idle} or the jog's or the sprint's is not here — a "
+             "long gun rides in the locomotion's hand. Add the Animation Starter Pack "
+             f"({ASP.CONTENT_DIR}) and run asset_pipeline/import_asp.py.")
+        skin = dataclasses.replace(skin, carry_idle=None, carry_jog=None, carry_sprint=None)
     return _without_missing_clips(skin, eas, "the MetaHuman", "retarget_to_uefn.py")
 
 

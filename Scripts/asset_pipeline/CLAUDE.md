@@ -365,6 +365,32 @@ reverse instead (`Scripts/combat/docs/stance.md`).
 - **A checkout without the pack** wears the zombie crawl (`combat/skin._gas_skin`) and says
   so in the build's log. `dev/tests/test_fal_import.py` holds the table.
 
+## The Animation Starter Pack: the long gun's carry (2026-10-13)
+
+Epic's pack, which the user added at `/Game/AnimStarterPack` (git-ignored, as its copies
+are; `fab_library.json`, licence Standard). It is on the UE4 mannequin
+(`UE4_Mannequin/Mesh/SK_Mannequin`). The game plays three of its clips, the rows of
+`asp_paths.CLIPS`: `Idle_Rifle_Hip`, `Jog_Fwd_Rifle` and `Sprint_Fwd_Rifle`, the upper body
+of a player carrying a rifle or a shotgun (`Scripts/combat/docs/aiming.md`, "The carry").
+
+- **One import path:** `uepy.py Scripts/asset_pipeline/import_asp.py` retargets every row
+  onto `SK_UEFN_Mannequin` into `/Game/AnimStarterPack/UEFN_Player` as
+  `A_UEFN_Player_<clip>`, through a rig of the mannequin's chain table and the plain
+  retargeter, as `import_fal.py` does. The UE4 mannequin has three spine bones and one
+  neck, so `asp_paths.CHAINS` ends the spine at `spine_03` and the neck at `neck_01`.
+  Root motion is set off and a copy that travels fails the import. Then
+  `build_weapons_and_combat.py`.
+- **Measured retargeted** (mesh space, forward +Y, right -X; the rifle's ready pose has
+  `hand_r` at (-21, 25, 125)): the idle 6.3 s, `hand_r` (-23, 0, 96), the gun 14 degrees
+  down; the jog 1.47 s, (-24, 16, 97), 15 degrees down; the sprint 0.97 s, (-18, 27, 85),
+  the gun across the body to the left and 23 to 39 degrees down. The left hand stays
+  within 3 cm of its place in the ready pose, against the right hand, in all three.
+- **Why not Lyra's:** its `MM_Rifle_Idle_Hipfire` is its ADS idle with the hands 0 to 8 cm
+  lower and the gun level, its rifle jog takes the left hand 17 to 20 cm off the gun, and
+  it has no sprint.
+- **A checkout without the pack** has no carry (`combat/skin._gas_skin`), and says so in
+  the build's log.
+
 ## Mixamo for the player: the knife's and the axe's clips (C2, 2026-10-08)
 
 `import_mixamo.py`'s last step (`mixamo_player.py`; `import_mixamo_player.py` runs it

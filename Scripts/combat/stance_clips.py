@@ -64,9 +64,11 @@ clips' hips lie below the feet's root, and body_pose.py lifts them (more while c
 the knees) and tips an aimed upper body forward: the aim layer blends in mesh space, so with a
 gun in hand the chest is upright over the crawling hips until it does.
 
-This module owns every TwoWayBlend and sequence node in the player's AnimGraph;
-nothing else authors one, so a rerun takes all of them out and rejoins the
-locomotion to what it fed. A skin without clips (PlayerSkin.stance_clips) gets
+This module owns every TwoWayBlend and sequence node in the player's AnimGraph,
+so a rerun takes all of them out and rejoins the locomotion to what it fed.
+One other module authors any: carry_pose.py, after this one, puts the long
+gun's carry between the last blend here and the aim slot's source, and its
+nodes go with these. A skin without clips (PlayerSkin.stance_clips) gets
 nothing here and keeps the procedural crouch and prone.
 """
 
@@ -142,7 +144,11 @@ def _remove_previous(ed):
     out = src[0]
     if PIN.get_owning_node(out).get_name() not in names:
         return out
-    consumers = PIN.list_connected_pins(out)
+    # What the blends feed that is not theirs: the layered blend's base and
+    # the slot's source, which the carry's blend (carry_pose.py) is between.
+    consumers = [c for n in mine if n.get_class().get_name() == BLEND_CLASS
+                 for c in PIN.list_connected_pins(_pose(n))
+                 if PIN.get_owning_node(c).get_name() not in names]
     base = out
     # Down the A inputs of the stance blends to the pose that is not ours.
     while PIN.get_owning_node(base).get_name() in names:

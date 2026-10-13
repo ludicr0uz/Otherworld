@@ -207,6 +207,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
            if player_skin().throw else {}),
         **({WV.PickUpAnim: _must_load(player_skin().pickup)}
            if player_skin().pickup else {}),
+        **({WV.CarryFor: _must_load(player_skin().aim_rifle)}
+           if player_skin().carry_idle else {}),
         WV.ThrowArcClass: arc_class,
     })
     # The component replicates (its look, to the other players): a class

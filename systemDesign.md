@@ -28,7 +28,7 @@ on the owning client and decided by the server (`Source/CLAUDE.md`). The player 
 breath down the sights, reloads, eats, blocks, punches, stabs with the knife, chops with the
 axe (every third blow on a tree leaves wood), lights a campfire with matches and wood,
 lights the stick at a fire and holds it out as a torch, heats a blade at a fire (cauterises a
-bleed, double damage to a wendigo for 20 s), crouches, goes prone (a real prone: the Free Animation Library's idle and forward crawl,
+bleed, double damage to a wendigo for 20 s), crouches, goes prone (a real prone: the Free Animation Library's idle and a crawl loop for each of the eight directions the body can go, chosen by the pawn's own velocity on every machine,
 with the sample's foot planting off while lying down), slides, mantles the
 sample's traversal blocks, throws whatever is in hand (a thrown knife or axe wounds, stays
 in the body or a tree, and is taken back with E; on a server every machine flies the

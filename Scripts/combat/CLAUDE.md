@@ -262,6 +262,15 @@ another player's copy and the server's).
   while `GetStance == 2`, else 1). They plant two standing feet: on a prone body they folded
   the legs under it and lifted its hips. A clip that poses the legs in the layers needs its
   IK foot bones on its feet (`asset_pipeline/ik_follow.py`), or Leg IK moves them.
+- **The crawl goes the way the player moves** (P2; `crawl_consts.py`, `crawl_direction.py`,
+  `stance_clips._moving`, `verify/crawl_direction.py`): the layers' event graph keeps the
+  pawn's velocity along its own forward and right, eased, and five weights read off it; the
+  stance line blends a loop per direction by them. The velocity is what every machine has,
+  so nothing replicates. A turn passes through the idle (no pop). The side loops leave
+  46 cm/s of slide and the diagonals 28 at the crawl's 80 cm/s; slowing the crawl by
+  direction is not decided. All of it: `docs/stance.md`, "The crawl goes the way the
+  player moves". A probe that crawls a player lying down for long clears the pack first
+  (`probe_net_crawl._clear_pack`): the zombies kill it in about 8 s.
 - **The sample's foley component rides on the player, silent** (`install.install_foley`,
   `GasFoley`). The sample's clips carry foot, jump and land notifies that look for
   `AC_FoleyEvents` on the owner and play the sample's own sound in 2D when there is

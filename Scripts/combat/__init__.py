@@ -189,7 +189,7 @@ ASSETS AND PATCHES
   server_anim       the one IsDedicatedServer branch of an anim graph, the player's
                     and each wanderer's: a server skips what is for the eye (A4)
   server_anim_consts  what that branch's server arm may hold, and why; ServerPose
-  skin              the player's body (PlayerSkin, player_skin, wear_skin): the
+  skin              the player's body (PlayerSkin, player_skin; wear_skin.py wears it): the
                     mesh, the anim Blueprint the layers are in (anim_bp), the
                     one the Mesh component runs where that is another
                     (base_anim_bp), the clips and the bones
@@ -303,4 +303,8 @@ wrong module.
                     input action; weapon_component/trigger.py)
 
   gas_feet  The motion-matching graph's feet are off while the player lies down
+
+  crawl_consts     The crawl by direction (P2): the eight directions, the clip and the play rate of each, the slide each leaves, ...
+  crawl_direction  Which way the player crawls, for the stance clips to pose (P2): the weapon layers' event graph, after ...
+  wear_skin        puts the player in its skin: the Character's mesh, its anim Blueprint, the MetaHuman under it (moved out of skin.py)
 """

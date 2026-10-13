@@ -28,8 +28,10 @@ from combat.gas_moves_tuning import POSE_SLIDE, SLIDE_CLIP
 from combat.skin import player_skin
 from combat.stance_clips import (
     BLEND_CLASS, CROUCH_WALK_RATE, EVALUATOR_CLASS, OWN_CLASSES, PLAYER_CLASS,
-    PRONE_CRAWL_RATE, PRONE_LOOP_RATE, PRONE_REST_S, prone_nodes,
+    PRONE_CRAWL_RATE, PRONE_REST_S, crawl_by_direction, prone_nodes,
 )
+from combat.crawl_consts import PRONE_LOOP_RATE
+from combat.verify.crawl_direction import check_direction_clips, check_direction_tree
 from combat.verify.common import BEL, PIN, check, graph, load, num_pin
 from uebp.pose_share import fed as linked
 
@@ -101,10 +103,13 @@ def check_stance_graph():
         return
     # The crouch's two blends and two players are not there while the crouch
     # is the motion matching's (G5); the slide adds a blend and a player.
-    blends = 5 - (2 if crouch_on() else 0) + (1 if slide_on() else 0)
+    # A crawl by direction (P2) is eight players where the forward one was,
+    # under seven blends more.
+    dirs = 7 if crawl_by_direction(skin) else 0
+    blends = 5 - (2 if crouch_on() else 0) + (1 if slide_on() else 0) + dirs
     # A prone idle is a player where the held crawl was an evaluator.
     idle = 1 if skin.prone_idle else 0
-    players = 3 - (2 if crouch_on() else 0) + (1 if slide_on() else 0) + idle
+    players = 3 - (2 if crouch_on() else 0) + (1 if slide_on() else 0) + idle + dirs
     check(f"{abp.get_name()}: {blends} stance blends, {players} players, "
           f"{2 - idle} evaluator(s)"
           + (" (no crouch clip: the crouch is the motion matching's)" if crouch_on() else "")
@@ -174,7 +179,9 @@ def check_stance_graph():
         return (_cls(node) == cls and _clip_of(node) == clip
                 and (rate is None or abs(_rate(node) - rate) < 1e-6))
 
-    if skin.prone_idle:
+    if crawl_by_direction(skin):
+        check_direction_tree(skin, crawl, is_node(rest, want_still))
+    elif skin.prone_idle:
         check(f"prone: the idle loop still, and the crawl loop played at "
               f"{PRONE_LOOP_RATE:g}x as GroundSpeed rises",
               _cls(crawl) == BLEND_CLASS and _moved_by_speed(crawl)
@@ -188,6 +195,8 @@ def check_stance_graph():
               and is_node(rest, want_still) and num_pin(rest, "ExplicitTime") == PRONE_REST_S
               and is_node(moving, want_moving),
               f"{_clip_of(rest)} @ {num_pin(rest, 'ExplicitTime') if rest else None}")
+    if crouch_on() and crawl_by_direction(skin):
+        return   # no blend of this graph reads Move: the crawl's is CrawlMove
     clamp = _up(crouch or crawl, "Alpha") if (crouch or crawl) else None
     scale = _up(clamp, "Value") if clamp else None
     check(f"...Move is clamp(GroundSpeed x 1/{MOVE_FULL_CM_S:g}, 0, 1)",
@@ -299,6 +308,8 @@ def _check_real_prone(skin, crawl, lying, lift):
               "feet are on its feet (the base graph's Leg IK folds the legs to them)",
               travel < 0.5 and not clip.get_editor_property("enable_root_motion")
               and off_cm(clip) < 0.5, f"{travel:.2f} cm, IK feet {off_cm(clip):.2f} cm off")
+    if crawl_by_direction(skin):
+        check_direction_clips(skin, lying, lift)
     still = _samples(idle, lying, lift=lift)[0]
     check("prone, still: the head is ahead of the hips and the feet behind them",
           still["Head"].y > still[hips].y + 30

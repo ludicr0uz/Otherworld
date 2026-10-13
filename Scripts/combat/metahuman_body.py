@@ -19,7 +19,7 @@ grafted under the game's mannequin instead of under a root of its own. The
 mannequin keeps everything that was ever built against it -- the anim
 blueprint, the slots, the ready poses, the grip socket, the hit bodies and
 the ragdoll -- and the MetaHuman is what is drawn. Nothing in the weapons
-build changes for it; skin.wear_skin() calls install() or remove() with the
+build changes for it; wear_skin.wear_skin() calls install() or remove() with the
 rest of the skin.
 
 Names matter: MetaHumanComponentUE finds the body and the face by component
@@ -67,7 +67,7 @@ def _skeletal(bp, parent, name, mesh, anim_bp=None):
     if anim_bp:
         comp.set_editor_property("animation_mode", unreal.AnimationMode.ANIMATION_BLUEPRINT)
         comp.set_editor_property("anim_class", _anim_class(anim_bp))
-    # Posed whether or not it is drawn, like the mannequin (skin.wear_skin):
+    # Posed whether or not it is drawn, like the mannequin (wear_skin.py):
     # behind the sniper's scope the body is hidden from its own camera.
     comp.set_editor_property(
         "visibility_based_anim_tick_option",

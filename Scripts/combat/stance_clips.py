@@ -25,6 +25,20 @@ player's, the Free Animation Library's, P1) lies in two loops instead:
     crawl  = TwoWayBlend(Move, A = Play prone_idle, B = Play prone_crawl at
                                PRONE_LOOP_RATE)
 
+and where it has the side and diagonal loops too (P2, crawl_by_direction),
+the crawl goes the way the body does: eight loops, the backward ones the
+forward ones in reverse, blended by what the event graph reads off the
+pawn's velocity (crawl_direction.py; crawl_consts.py has the weights, the
+rates and the slide each direction leaves):
+
+    crawl    = TwoWayBlend(CrawlMove, A = Play prone_idle, B = moving)
+    moving   = TwoWayBlend(CrawlSide, A = TwoWayBlend(CrawlDiag, A = axis,
+                                                      B = diagonal), B = side)
+    axis     = TwoWayBlend(CrawlBack, forward, back)
+    side     = TwoWayBlend(CrawlRight, left, right)
+    diagonal = TwoWayBlend(CrawlBack, TwoWayBlend(CrawlRight, fwd left, fwd right),
+                                      TwoWayBlend(CrawlRight, back left, back right))
+
 On the motion-matching body (G5, gas_moves.py) the line is, with both
 switches on:
 
@@ -57,17 +71,15 @@ nothing here and keeps the procedural crouch and prone.
 """
 
 from uebp.vars import declare
-from asset_pipeline.fal_paths import PRONE_FWD_TRAVEL_CM
-from asset_pipeline.mixamo_paths import RATE_SCALE_RANGE
 from combat import anim_vars as AN
 from combat.aim_pitch import OWN_POSE_CLASSES, _feeding_all, _nodes_of
 from combat.aim_pitch import _remove_previous as _remove_pitch_chain
 from combat.anim_blueprint import AIM_SLOT, _slot_node
+from combat.crawl_consts import BY_NAME, DIRECTION_FIELDS, DIRECTIONS, PRONE_LOOP_RATE
 from combat.body_pose import KNEEL_TIME, POSE_CROUCH, POSE_KNEEL, POSE_PRONE, move_alpha
 from combat.gas_moves import crouch_on, slide_on
 from combat.gas_moves_tuning import POSE_SLIDE, SLIDE_CLIP
 from combat.log import _log
-from combat.tuning import COMBAT
 from uebp.graph import BEL, BGE, PIN, _assets, _connect, _palette, _pin, _set, out
 from uebp.layout import arrange
 
@@ -86,13 +98,6 @@ PRONE_CRAWL_RATE = 1.5
 # The crawl's still frame (Mixamo's zombie crawl): a frame of the stroke with
 # the hips at the middle of their bob, so lying still they are PRONE_HIPS_CM up.
 PRONE_REST_S = 0.96
-# The Free Animation Library's forward crawl covers 63 cm in its second, and
-# the player crawls at the jog x prone_speed_scale (400 x 0.2 = 80 cm/s; the
-# movement's, not changed here), so it plays at 80 / 63 = 1.27: well under
-# the 2.0 the crouch walk stops at, so nothing is left to slide (80 - 1.27 x
-# 63 = 0.0 cm/s; the elbows hold the ground they are planted on).
-PRONE_LOOP_RATE = min(RATE_SCALE_RANGE[1], round(
-    COMBAT.jog_speed_cms * COMBAT.prone_speed_scale / PRONE_FWD_TRAVEL_CM, 2))
 
 
 def prone_nodes(skin):
@@ -103,6 +108,16 @@ def prone_nodes(skin):
                 (PLAYER_CLASS, skin.prone_crawl, PRONE_LOOP_RATE))
     return ((EVALUATOR_CLASS, skin.prone_crawl, None),
             (PLAYER_CLASS, skin.prone_crawl, PRONE_CRAWL_RATE))
+
+
+def crawl_by_direction(skin):
+    """Does ``skin`` have a loop for every way of crawling?"""
+    return bool(skin.prone_idle and all(getattr(skin, f) for f in DIRECTION_FIELDS))
+
+
+def direction_nodes(skin):
+    """{direction: (clip, rate)}: the eight players of a crawl by direction."""
+    return {d.name: (getattr(skin, d.clip), d.rate) for d in DIRECTIONS}
 
 
 def _mine(ed):
@@ -179,6 +194,25 @@ def _pose(node):
     return out(node, "Pose")
 
 
+def _moving(ed, clips):
+    """The crawl by direction's moving pose (the module's docstring): a
+    player per direction, blended by the event graph's weights."""
+    def play(name):
+        d = BY_NAME[name]
+        return _pose(_player(ed, clips[d.clip], d.rate))
+
+    def get(var):
+        return out(ed.add_get_member_variable_node(var), var)
+
+    axis = _blend(ed, play("forward"), play("back"), get(AN.CrawlBack))
+    side = _blend(ed, play("left"), play("right"), get(AN.CrawlRight))
+    fore = _blend(ed, play("forward left"), play("forward right"), get(AN.CrawlRight))
+    aft = _blend(ed, play("back left"), play("back right"), get(AN.CrawlRight))
+    diagonal = _blend(ed, _pose(fore), _pose(aft), get(AN.CrawlBack))
+    inner = _blend(ed, _pose(axis), _pose(diagonal), get(AN.CrawlDiag))
+    return _blend(ed, _pose(inner), _pose(side), get(AN.CrawlSide)), get(AN.CrawlMove)
+
+
 def unpatch_stance_clips(skin):
     """Take the stance blends out of ``skin``'s anim BP, without compiling.
 
@@ -223,7 +257,8 @@ def patch_stance_clips(skin):
     if skin.stance_clips:
         clips = {f: _assets().load_asset(getattr(skin, f))
                  for f in ("crouch_idle", "crouch_walk", "prone_crawl", "search_kneel")
-                 + (("prone_idle",) if skin.prone_idle else ())}
+                 + (("prone_idle",) if skin.prone_idle else ())
+                 + (DIRECTION_FIELDS if crawl_by_direction(skin) else ())}
         if slide_on():
             clips["slide"] = _assets().load_asset(SLIDE_CLIP)
             declare(ed, AN.SLIDE)
@@ -237,10 +272,15 @@ def patch_stance_clips(skin):
 
         move = move_alpha(ed)
         still, crawling = prone_nodes(skin)
-        crawl = _blend(ed, _pose(_player(ed, clips["prone_idle"], still[2])
-                                 if skin.prone_idle else
-                                 _evaluator(ed, clips["prone_crawl"], PRONE_REST_S)),
-                       _pose(_player(ed, clips["prone_crawl"], crawling[2])), move)
+        if crawl_by_direction(skin):
+            moving, crawl_move = _moving(ed, clips)
+            crawl = _blend(ed, _pose(_player(ed, clips["prone_idle"], still[2])),
+                           _pose(moving), crawl_move)
+        else:
+            crawl = _blend(ed, _pose(_player(ed, clips["prone_idle"], still[2])
+                                     if skin.prone_idle else
+                                     _evaluator(ed, clips["prone_crawl"], PRONE_REST_S)),
+                           _pose(_player(ed, clips["prone_crawl"], crawling[2])), move)
         weights = {w: out(ed.add_get_member_variable_node(w), w)
                    for w in (POSE_PRONE, POSE_KNEEL, KNEEL_TIME)
                    + (() if crouch_on() else (POSE_CROUCH,))}
@@ -270,8 +310,10 @@ def patch_stance_clips(skin):
             + ("the crouch is the motion matching's own, " if crouch_on() else
                f"{POSE_CROUCH} blends in the crouch, ")
             + (f"{POSE_SLIDE} the sample's slide over it, " if slide_on() else "")
-            + f"{POSE_PRONE} the crawl, still or walking by GroundSpeed, "
-            f"and {POSE_KNEEL} the kneel over a body being searched, held at "
+            + f"{POSE_PRONE} the crawl, still or walking by GroundSpeed"
+            + (" (the loop of the way the body goes, by Crawl*), "
+               if crawl_by_direction(skin) else ", ")
+            + f"and {POSE_KNEEL} the kneel over a body being searched, held at "
             f"{KNEEL_TIME}. See Scripts/combat/stance_clips.py.", _mine(ed))
 
     arrange(ed)

@@ -155,7 +155,45 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   without the pack, which falls back to the zombie crawl: `skin.GAS_CRAWL_WITHOUT_FAL`).
   - **The rate** is picked as the crouch walk's was: the crawl moves at the jog × 0.2 = 80 cm/s
     and the loop covers 63 cm in its second, so `PRONE_LOOP_RATE` = 80 / 63 = 1.27, under the
-    cap, and no slide is left. Sideways and backwards play the same loop (P2).
+    cap, and no slide is left.
+  - **The crawl goes the way the player moves** (P2, `PlayerSkin.prone_left`, `prone_right`,
+    `prone_fwd_left`, `prone_fwd_right`; `crawl_consts.py` is the table, `DIRECTIONS`):
+    - **Where the direction comes from:** the pawn's velocity along its own forward and right
+      vectors, read in the weapon layers' event graph beside `GroundSpeed`
+      (`crawl_direction.py`). The movement component has it on the owner, on the server and,
+      from the replicated movement, on a simulated copy, so nothing is replicated for it and
+      there is no RPC (`probe_net_crawl.py` holds client 2's copy and the server's to what
+      client 1 does, with `--lag 120` too).
+    - **Seven floats** (`anim_vars.CRAWL`, on `ABP_WeaponLayers`): `CrawlAhead` and
+      `CrawlAcross` are that velocity eased (`FInterpTo`, `TURN_SPEED` 8/s); `CrawlMove` is its
+      length over 60 cm/s; `CrawlDiag` and `CrawlSide` are its angle off the fore-and-aft line
+      (0-45 and 45-90 degrees); `CrawlBack` and `CrawlRight` are steps (which end, which side).
+      Each is stored, then read: a pure chain read twice eases twice.
+    - **The tree** (`stance_clips._moving`): crawl = Blend(idle, moving, CrawlMove); moving =
+      Blend(Blend(axis, diagonal, CrawlDiag), side, CrawlSide); axis = Blend(forward, back,
+      CrawlBack); side = Blend(left, right, CrawlRight); diagonal = Blend(Blend(FL, FR,
+      CrawlRight), Blend(BL, BR, CrawlRight), CrawlBack). Nine players, eight blends.
+    - **Back is forward in reverse** (a negative play rate; the pack's own `Bwd` clips are its
+      forward ones at rate scale -1 and are not imported): back plays the forward loop, back
+      left `Fwd_Right` and back right `Fwd_Left`, since a loop reversed goes the opposite way.
+    - **No pop.** A turn eases the velocity, so a strafe reversed or a crawl turned backward
+      passes through zero, where `CrawlMove` is 0 and the body is the idle; `CrawlBack` and
+      `CrawlRight` step only where the loops they choose between weigh nothing (measured: each
+      stepped with `CrawlMove` at 0.05, and no joint moved faster than in the steady loops).
+    - **The slide left, at the crawl's 80 cm/s** (`crawl_consts.SLIDE_CMS`; every loop is
+      capped at 2x): forward and back 0; the four diagonals cover 52.3 cm in 2.0 s, 52.3 cm/s
+      at 2x, so **27.7 cm/s slides**; left and right cover 38.4 cm in 2.27 s, 33.8 cm/s at 2x,
+      so **46.2 cm/s slides**: the side crawl's body covers ground more than twice as fast as
+      its hands and knees do, and it does not read right. Making it read right means a crawl of
+      about 34 cm/s to the side (and 52 on a diagonal), which is the crawl's speed by
+      direction: the user's decision, not made here.
+    - **The pack's `anim_Prone_Left_loop` carries its root bone to the right** while its body
+      goes left of the root (net 38 cm left; its poses mirror the right loop's). The retarget
+      drops the root's travel either way, so the copy is in place and leans left.
+    - **The side loops lift the hips** to 21.7 cm in game (15.1 at rest) as the body shuffles
+      over an arm; nothing goes under the ground in any direction (lowest limb 2.8 cm).
+    - **A checkout with the pack's idle and forward loop but not all four** crawls forward in
+      every direction, as P1 did (`skin._gas_skin` says so in the build's log).
   - **The copies are in place** (root and pelvis travel 0.00 cm: the plain retargeter drops the
     root's travel), with no root motion; the verifier holds both.
   - **`body_pose` lifts the hips 3.3 cm** (from the copy's 12.7 to `PRONE_HIPS_CM`) and has no

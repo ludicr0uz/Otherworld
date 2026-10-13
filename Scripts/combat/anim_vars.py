@@ -39,3 +39,15 @@ SERVER = (Var(SERVER_POSE_VAR, BOOL),)
 # weapon_layers.py, player_gait.py: the pawn's speed over the ground.
 GroundSpeed = Var("GroundSpeed", FLOAT)
 GROUND = (GroundSpeed,)
+
+# crawl_direction.py: the pawn's eased velocity in its own frame (cm/s ahead
+# and to the right), and the weights stance_clips.py blends the crawl's eight
+# directions by (crawl_consts.alphas).
+CrawlAhead = Var("CrawlAhead", FLOAT)
+CrawlAcross = Var("CrawlAcross", FLOAT)
+CrawlMove = Var("CrawlMove", FLOAT)
+CrawlDiag = Var("CrawlDiag", FLOAT)
+CrawlSide = Var("CrawlSide", FLOAT)
+CrawlBack = Var("CrawlBack", FLOAT)
+CrawlRight = Var("CrawlRight", FLOAT)
+CRAWL = (CrawlAhead, CrawlAcross, CrawlMove, CrawlDiag, CrawlSide, CrawlBack, CrawlRight)

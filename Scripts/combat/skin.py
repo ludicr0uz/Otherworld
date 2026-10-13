@@ -1,5 +1,5 @@
 """What the player wears: the PlayerSkin table (Quinn fallback, generated
-adventurer) and wear_skin(), which puts it on BP_ThirdPersonCharacter.
+adventurer); wear_skin.py puts one on BP_ThirdPersonCharacter.
 
 player_skin() is the one answer to "which body": the rig the weapon layers,
 the poses, the grips and the clips are keyed on, and what the Character's
@@ -11,8 +11,6 @@ anim Blueprint (PlayerSkin.base_anim_bp) with the weapon layers' graph
 
 import dataclasses
 
-import unreal
-
 from asset_pipeline import fal_paths as FAL
 from asset_pipeline.gas_bridge_paths import PLAYER_FAMILY
 from asset_pipeline import lyra_paths as LYRA
@@ -21,10 +19,9 @@ from asset_pipeline.mannequin_bind.paths import bound_asset_dir, bound_asset_nam
 from asset_pipeline.metahuman_paths import ABP_RETARGET, BODY_MESH, FACE_MESH
 from asset_pipeline.player_body import PLAYER_NAME, PLAYER_RIG
 from combat import gas_locomotion_consts as GAS
-from combat import metahuman_body
+from combat.crawl_consts import DIRECTION_FIELDS
 from combat.log import _log
-from uebp.graph import BEL, _assets, _component_object, _handles, _rot
-from combat.paths import CHARACTER_BP_PATH
+from uebp.graph import _assets
 from combat.weapon_layers_consts import LAYERS_ABP, LAYERS_TAG
 
 
@@ -145,6 +142,14 @@ class PlayerSkin:
     # prone_crawl is then a crawl that lies on the ground as it is. None:
     # lying still is prone_crawl held on one frame, lifted off the ground.
     prone_idle: str = None
+    # The crawl to each side and on the two forward diagonals (P2: the same
+    # library's; crawl_consts.DIRECTION_FIELDS). All four or none: with them
+    # the crawl plays the loop of the way the body goes, backwards being the
+    # forward ones in reverse; without, prone_crawl whichever way.
+    prone_left: str = None
+    prone_right: str = None
+    prone_fwd_left: str = None
+    prone_fwd_right: str = None
     # The overhand throw (weapon_component/throw_windup.py), from the same
     # library, played into the upper-body slot. None where the rig has none:
     # the item then leaves the hand on the click, with no clip.
@@ -303,6 +308,7 @@ SKIN_METAHUMAN = dataclasses.replace(
 # and its idle the sample's own.
 GAS_ANIMS = f"/Game/Sourced/Characters/Anims/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
 GAS_UAL_ANIMS = f"/Game/Sourced/Quaternius/UAL/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
+_NO_DIRECTIONS = dict.fromkeys(DIRECTION_FIELDS)
 # The crawl of a checkout that has no Free Animation Library (_gas_skin):
 # Mixamo's zombie crawl, the prone_crawl role of player_clips.csv.
 GAS_CRAWL_WITHOUT_FAL = MIXAMO.player_clip("prone_crawl")
@@ -326,6 +332,10 @@ SKIN_GAS = dataclasses.replace(
     crouch_walk=f"{GAS_UAL_ANIMS}UAL1_Crouch_Fwd_Loop",
     prone_idle=FAL.uefn_clip(FAL.PRONE_IDLE),
     prone_crawl=FAL.uefn_clip(FAL.PRONE_FWD),
+    prone_left=FAL.uefn_clip(FAL.PRONE_LEFT),
+    prone_right=FAL.uefn_clip(FAL.PRONE_RIGHT),
+    prone_fwd_left=FAL.uefn_clip(FAL.PRONE_FWD_LEFT),
+    prone_fwd_right=FAL.uefn_clip(FAL.PRONE_FWD_RIGHT),
     search_kneel=f"{GAS_UAL_ANIMS}UAL1_Fixing_Kneeling",
     throw=f"{GAS_UAL_ANIMS}UAL2_OverhandThrow",
     pickup=f"{GAS_UAL_ANIMS}UAL2_Farm_Harvest")
@@ -360,7 +370,7 @@ def _without_missing_clips(skin, eas, who, builder):
     _log(f"note: no Quaternius stance clips yet — {who} crouches and lies down "
          f"procedurally. Run asset_pipeline/{builder}.")
     return dataclasses.replace(skin, crouch_idle=None, crouch_walk=None, prone_idle=None,
-                               prone_crawl=None, search_kneel=None)
+                               prone_crawl=None, search_kneel=None, **_NO_DIRECTIONS)
 
 
 def _gas_skin(eas):
@@ -397,7 +407,12 @@ def _gas_skin(eas):
              f"zombie crawl. Add the Free Animation Library ({FAL.CONTENT_DIR}) and "
              "run asset_pipeline/import_fal.py.")
         skin = dataclasses.replace(skin, prone_idle=None,
-                                   prone_crawl=GAS_CRAWL_WITHOUT_FAL)
+                                   prone_crawl=GAS_CRAWL_WITHOUT_FAL, **_NO_DIRECTIONS)
+    elif not all(eas.does_asset_exist(getattr(skin, f)) for f in DIRECTION_FIELDS):
+        _log("note: the Free Animation Library's side and diagonal crawls are not here "
+             "— the forward crawl plays whichever way the player goes. Run "
+             "asset_pipeline/import_fal.py.")
+        skin = dataclasses.replace(skin, **_NO_DIRECTIONS)
     return _without_missing_clips(skin, eas, "the MetaHuman", "retarget_to_uefn.py")
 
 
@@ -438,85 +453,3 @@ def player_skin():
              f"{len(want)} assets missing, first {missing[0]}) — wearing the "
              "mannequin. Run Scripts/asset_pipeline to build it.")
     return SKIN_QUINN
-
-
-MANNEQUIN_COMPONENT = "Mesh"
-
-
-def mannequin_component(bp):
-    """(template, handle) of the Character's own mesh: the mannequin that is
-    animated, whatever is drawn."""
-    for handle, name in _handles(bp):
-        if name == MANNEQUIN_COMPONENT:
-            obj = _component_object(handle)
-            if not isinstance(obj, unreal.SkeletalMeshComponent):
-                raise RuntimeError(f"{bp.get_name()}.{name} is a {obj.get_class().get_name()}")
-            return obj, handle
-    raise RuntimeError(f"{bp.get_name()} has no {MANNEQUIN_COMPONENT} component")
-
-
-def wear_skin(skin=None):
-    """Put the player in a body, and run that body's animation.
-
-    Separate from install_on_character, and called before it, because the
-    weapon specs are built in between: _grip_rotation() samples the ready pose
-    through whatever mesh the player is wearing at the time, so a skin applied
-    afterwards would leave five weapons oriented for the previous rig.
-
-    Idempotent, and quiet when there is nothing to do -- the template already
-    ships wearing SKM_Quinn_Simple, so a checkout without the asset pipeline
-    passes through here writing the values that are already there.
-    """
-    skin = skin or player_skin()
-    eas = _assets()
-    bp = eas.load_asset(CHARACTER_BP_PATH)
-    if not bp:
-        raise RuntimeError(f"could not load {CHARACTER_BP_PATH}")
-    mesh_asset = eas.load_asset(skin.mesh)
-    if not mesh_asset:
-        raise RuntimeError(f"{skin.mesh} is missing — the player would have no body")
-    # An anim BP is bound to one skeleton, so a mismatch here is not a cosmetic
-    # error: the component silently falls back to the reference pose and the
-    # player slides around the map in a T-pose with nothing in the log.
-    worn = skin.worn_anim_bp
-    anim_class = unreal.load_class(None, f"{worn}.{worn.rsplit('/', 1)[1]}_C")
-    if not anim_class:
-        raise RuntimeError(f"{worn} has no generated class — it did not compile")
-
-    # By name, not "the first SkeletalMeshComponent": with a MetaHuman worn
-    # there are five, and the subobject list is not in tree order.
-    comp, mesh_handle = mannequin_component(bp)
-
-    comp.set_editor_property("skeletal_mesh_asset", mesh_asset)
-    comp.set_editor_property("anim_class", anim_class)
-    comp.set_editor_property("relative_location", unreal.Vector(0.0, 0.0, skin.mesh_z))
-    comp.set_editor_property("relative_rotation", _rot(yaw=skin.mesh_yaw))
-    # The pose is refreshed whether or not the body is drawn. By default an
-    # unrendered mesh keeps its last bones, and behind the sniper's scope the
-    # body is hidden from its own camera (weapon_component/sights.py): the
-    # gun would freeze in the hand, and the view, which looks down the gun's
-    # sight line, could not follow the mouse up or down.
-    always = unreal.VisibilityBasedAnimTickOption.ALWAYS_TICK_POSE_AND_REFRESH_BONES
-    comp.set_editor_property("visibility_based_anim_tick_option", always)
-    if comp.get_editor_property("visibility_based_anim_tick_option") != always:
-        raise RuntimeError("the body would still freeze its pose when not drawn")
-    got = comp.get_editor_property("skeletal_mesh_asset")
-    if got != mesh_asset or comp.get_editor_property("anim_class") != anim_class:
-        raise RuntimeError(f"the skin did not stick: mesh={got}, "
-                           f"anim={comp.get_editor_property('anim_class')}")
-    # A MetaHuman skin draws the MetaHuman and not the mannequin it hangs
-    # under. Hidden, not invisible: the mannequin's children draw on their
-    # own, and its pose still updates (the tick option above) for them to
-    # follow and for the weapon in its hand.
-    comp.set_editor_property("visible", not skin.metahuman)
-    if skin.metahuman:
-        metahuman_body.install(bp, mesh_handle, skin.retarget)
-    else:
-        metahuman_body.remove(bp)
-    if not BEL.compile_blueprint(bp):
-        raise RuntimeError("BP_ThirdPersonCharacter failed to compile after the skin")
-    eas.save_loaded_asset(bp)
-    _log(f"player: wearing {mesh_asset.get_name()} animated by "
-         f"{anim_class.get_name()}, weapon on {skin.grip}"
-         + (" -- drawn as the MetaHuman" if skin.metahuman else ""))
-    return skin

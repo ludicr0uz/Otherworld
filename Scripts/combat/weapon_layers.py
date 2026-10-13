@@ -20,6 +20,8 @@ server_anim.py's branch last.
     GroundSpeed   the event graph's one job: the pawn's speed over the
                   ground, cm/s, which the stance clips' Move reads. Not
                   scaled (player_gait.py): there is no blend space here.
+    Crawl*        after it, each update: which way the pawn crawls
+                  (crawl_direction.py), for the stance clips' eight loops.
     the montages  MAIN_MONTAGES on the class: the weapon component plays
                   into the body's main anim instance, and a linked instance
                   plays its own montages unless told to read the main one's.
@@ -35,6 +37,7 @@ import unreal
 from combat.anim_blueprint import (
     AIM_SLOT, FULL_BODY_SLOT, HIT_SLOT, _configure_blend, _name_slot,
 )
+from combat.crawl_direction import author_crawl_direction
 from combat.gas_locomotion_consts import SKELETON
 from combat.log import _log
 from combat.player_gait import GROUND_SPEED
@@ -148,6 +151,7 @@ def build_weapon_layers():
         raise RuntimeError(f"{LAYERS_ABP} lacks its AnimGraph or its EventGraph")
     _author_slots(ed)
     _author_ground_speed(events)
+    author_crawl_direction(events)
     arrange(ed)
     arrange(events)
     if not BEL.compile_blueprint(bp):

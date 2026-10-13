@@ -465,7 +465,7 @@ def install_hit_reactions(bp, health_handle):
     mesh = None
     for handle, _name in _handles(bp):
         obj = _component_object(handle)
-        # The Character's own mesh, by name (see combat/skin.mannequin_component).
+        # The Character's own mesh, by name (see combat/wear_skin.mannequin_component).
         if _name == "Mesh" and isinstance(obj, unreal.SkeletalMeshComponent):
             mesh = obj
             break

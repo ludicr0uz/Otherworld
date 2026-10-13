@@ -36,9 +36,26 @@ PRONE_FWD = f"{PRONE}/anim_Prone_Fwd_Loop_R"
 # (17.56 -> 80.59 cm): what combat/stance_clips.py picks the play rate from.
 PRONE_FWD_TRAVEL_CM = 63.0
 
+# The crawl by direction (P2): a loop each to the side and on the forward
+# diagonals.  Backwards is the forward ones played in reverse (the pack's own
+# three backward clips are those with the asset's rate scale at -1, so they
+# are not imported): back is PRONE_FWD, back and left PRONE_FWD_RIGHT, back
+# and right PRONE_FWD_LEFT.
+PRONE_LEFT = f"{PRONE}/anim_Prone_Left_loop"
+PRONE_RIGHT = f"{PRONE}/anim_Prone_Right_Loop"
+PRONE_FWD_LEFT = f"{PRONE}/anim_Prone_Fwd_Left_Loop"
+PRONE_FWD_RIGHT = f"{PRONE}/anim_Prone_Fwd_Right_Loop"
+# What each covers and in how long, read off the pack's rig: the side loops
+# 38.4 cm in 2.27 s (two shuffles; anim_Prone_Left_loop's root bone goes
+# right as the right one's does and its body 73 cm left off it, so the 38.4
+# is its pelvis's), the diagonals 52.3 cm in 2.0 s, 37 degrees off forward
+# (31.4 cm across, 41.9 on).
+PRONE_SIDE_TRAVEL_CM, PRONE_SIDE_S = 38.4, 2.27
+PRONE_DIAG_TRAVEL_CM, PRONE_DIAG_S = 52.3, 2.0
+
 # Every clip of the pack the game plays.  A later one is a row here and a
 # re-run of import_fal.py.
-CLIPS = (PRONE_IDLE, PRONE_FWD)
+CLIPS = (PRONE_IDLE, PRONE_FWD, PRONE_LEFT, PRONE_RIGHT, PRONE_FWD_LEFT, PRONE_FWD_RIGHT)
 
 
 def uefn_clip(source):

@@ -1,5 +1,7 @@
 """Pictures of the player lying down: still and crawling forward, with empty
-hands and with the rifle, from the side and from in front.
+hands and with the rifle, from the side and from in front; and, empty-handed,
+crawling left, right, back and back left (P2, the crawl by direction), from
+in front and from above.
 
 A way to SEE the prone (P1: the Free Animation Library's idle and forward
 crawl, combat/stance_clips.py) on the drawn MetaHuman, which the game's own
@@ -15,11 +17,13 @@ Each picture lands in Saved/Screenshots/MacEditor as prone_<what>.png.
 
 LEVEL = "/Game/Maps/Lvl_Forest_200m"  # trees and light to see the body against
 SYSTEMS = ('animation',)
+TIMEOUT = 150.0  # wall seconds: 28 pictures
 
 import os
 
 import unreal
 
+from combat.crawl_consts import BY_NAME
 from combat.game_state import DEBUG_MODE_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import HAND, PRIMARY
@@ -34,6 +38,9 @@ RIFLE = "BP_AssaultRifle_C"
 EYE_FOV = 50.0
 # (name, cm ahead of the player, cm to its right, cm up).
 VIEWS = (("from the right", 40.0, 300.0, 50.0), ("from in front", 300.0, 90.0, 70.0))
+# The directions' own: from in front, and from over the feet looking down.
+WAYS = ("left", "right", "back", "back left")
+WAY_VIEWS = (VIEWS[1], ("from above", -60.0, 0.0, 330.0))
 LOOK_AT_UP_CM = -30.0
 SHOTS_DIR = os.path.join(unreal.Paths.project_saved_dir(), "Screenshots", "MacEditor")
 
@@ -65,7 +72,9 @@ def probe(p):
 
         def step():
             if fwd:
-                player.add_movement_input(player.get_actor_forward_vector(), fwd)
+                ahead, right = (fwd.ahead, fwd.right) if fwd in BY_NAME.values() else (fwd, 0.0)
+                player.add_movement_input(player.get_actor_forward_vector() * ahead
+                                          + player.get_actor_right_vector() * right, 1.0)
             here = player.get_actor_location()
             at = (here + player.get_actor_forward_vector() * ahead_cm
                   + player.get_actor_right_vector() * side_cm
@@ -105,8 +114,16 @@ def probe(p):
             yield moving(1.0, 0.4, view)
             shot(f"{label}, crawling forward, {view[0]}, 0.4 s on")
             yield moving(1.0, 0.2, view)
+        for way in () if cls else WAYS:
+            for view in WAY_VIEWS:
+                yield moving(0.0, 0.5, view)
+                yield moving(BY_NAME[way], 2.0, view)
+                shot(f"{label}, crawling {way}, {view[0]}")
+                yield moving(BY_NAME[way], 0.5, view)
+                shot(f"{label}, crawling {way}, {view[0]}, 0.5 s on")
     yield moving(0.0, 0.5, VIEWS[0])
     p.set(wc, "Stance", 0)
     eye.destroy_actor()
     there = [n for n in taken if os.path.isfile(os.path.join(SHOTS_DIR, n))]
-    p.check("twelve pictures of the prone were taken", len(there) == 12, f"{len(there)}")
+    want = 12 + 2 * len(WAYS) * len(WAY_VIEWS)
+    p.check(f"{want} pictures of the prone were taken", len(there) == want, f"{len(there)}")

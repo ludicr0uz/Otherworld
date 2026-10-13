@@ -18,21 +18,35 @@ ground. Prone (P1, the Free Animation Library's idle and forward crawl):
                           crawling: both hands off the ground and as far
                           apart as standing (the gun is still in both)
 
+    each of the eight     (P2) pushed that way of the body: the body goes that
+    directions            way, the hands do what that direction's loop does
+                          and no other's (crawl_watch.OWN), nothing under the
+                          ground
+    a turn                left to right, and forward to back: no joint moves
+                          faster than it does in the steady loops, and the
+                          weight that picks the side steps only while the
+                          crawl's own weight is next to nothing
+
 (A 60 deg tip of the aimed chest, carried over from the procedural prone, put
 the hands 2 cm off the ground; this probe is what caught it.)
 """
 
 LEVEL = "/Game/Maps/Lvl_Forest_200m"  # passes here, fails on the 50 m probe level (T11)
 SYSTEMS = ('animation', 'movement')
+TIMEOUT = 150.0  # wall seconds: the eight directions and the turns are 45 of them
 
 import unreal
 
+from combat import anim_vars as AN
 from combat.carry_tuning import RAISE_FORCED_VAR
+from combat.crawl_consts import BY_NAME, DIRECTIONS
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.skin import skin_of_mesh
 from combat.slot_tuning import HAND, PRIMARY
+from combat.stance_clips import crawl_by_direction
 from combat.weapon_component import vars as WV
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
+from probes import crawl_watch as CW
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(WEAPON_COMP_BP_PATH, WV.Stance), (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR),
@@ -56,6 +70,12 @@ CROWN_CM = 15.0
 HIPS_HELD_CM = 3.0
 STILL_S, CRAWL_S, CRAWL_START_S = 1.5, 2.5, 0.7
 LIMBS = ("hand_l", "hand_r", "calf_l", "calf_r", "foot_l", "foot_r")
+# A direction is watched for DIRECTION_S once the eased weights have arrived.
+DIRECTION_S, DIRECTION_START_S, TURN_S = 3.2, 1.0, 2.5
+# A turn's fastest joint against the steady loops' fastest, and the crawl's
+# weight when the one that picks the side steps.
+TURN_FASTER, STEP_AT_MOVE = 1.25, 0.1
+TURNS = (("left", "right", AN.CrawlRight), ("forward", "back", AN.CrawlBack))
 
 
 def _skin(player):
@@ -160,6 +180,66 @@ def _prone_empty(p, player, real):
     yield SETTLE_S
 
 
+def _crawl(p, player, anim, name, seconds, skip=0.0):
+    """Push the body ``name``'s way for ``seconds``: (the track, the local
+    velocity and the crawl's weights tick by tick, the step to yield)."""
+    d, track, vel, weights = BY_NAME[name], [], [], []
+    world = p.world()
+    t0 = unreal.GameplayStatics.get_time_seconds(world)
+
+    def step():
+        t = unreal.GameplayStatics.get_time_seconds(world) - t0
+        CW.push(player, d.ahead, d.right)
+        if t >= skip:
+            track.append((t, CW.joints(player)))
+            vel.append(CW.local_velocity(player))
+            weights.append({str(v): p.get(anim, str(v)) for v in AN.CRAWL})
+        return t >= seconds
+    return track, vel, weights, step
+
+
+def _prone_directions(p, player, anim):
+    """Each of the eight directions plays its own loop, then the turns."""
+    steady = {}
+    for d in DIRECTIONS:
+        track, vel, _w, step = _crawl(p, player, anim, d.name, DIRECTION_S, DIRECTION_START_S)
+        yield step
+        sig = CW.signature(track)
+        ahead = sum(v[0] for v in vel) / len(vel)
+        right = sum(v[1] for v in vel) / len(vel)
+        speed = (ahead * ahead + right * right) ** 0.5
+        steady[d.name] = CW.fastest_joint(track)[0]
+        others = [n for n in CW.OWN if n != d.name and CW.own_motion(n, sig)]
+        p.check(f"crawling {d.name}: the body goes that way of itself (over 60 cm/s), "
+                "its hands do what that direction's loop does and no other's, and no "
+                f"hand, knee or foot goes under the ground (by {SINK_CM:g} cm)",
+                speed > 60.0 and ahead * d.ahead + right * d.right > 0.95 * speed
+                and CW.own_motion(d.name, sig) and not others and sig["low"] > -SINK_CM,
+                f"{ahead:+.0f} ahead {right:+.0f} right; {CW.brief(sig)}"
+                + (f"; reads as {others}" if others else ""))
+        yield SETTLE_S
+    for start, end, picks in TURNS:
+        _t, _v, _w, step = _crawl(p, player, anim, start, 1.5)
+        yield step
+        track, vel, weights, step = _crawl(p, player, anim, end, TURN_S)
+        yield step
+        speed, joint, at = CW.fastest_joint(track)
+        limit = TURN_FASTER * max(steady[start], steady[end])
+        steps = [b[str(AN.CrawlMove)] for a, b in zip(weights, weights[1:])
+                 if abs(b[str(picks)] - a[str(picks)]) > 0.01]
+        d = BY_NAME[end]
+        arrived = vel[-1][0] * d.ahead + vel[-1][1] * d.right
+        p.check(f"turned from {start} to {end}: the body ends going {end} and no joint "
+                f"snaps (none moves over {TURN_FASTER:g} times the steady loops' "
+                f"fastest); {picks} steps only with {AN.CrawlMove} under {STEP_AT_MOVE:g}",
+                arrived > 60.0 and speed < limit and steps
+                and max(steps) < STEP_AT_MOVE,
+                f"fastest {joint} {speed:.0f} cm/s at {at:.2f} s against {limit:.0f}; "
+                f"{picks} stepped {len(steps)} time(s) with {AN.CrawlMove} at "
+                f"{[round(x, 3) for x in steps]}; ends {arrived:.0f} cm/s")
+        yield SETTLE_S
+
+
 def _prone_with(p, player, wc, anim, label, cls):
     """Stand with ``cls`` raised, then lie down and crawl with it."""
     bag = [i.get_class().get_name() for i in p.get(wc, "Inventory")]
@@ -245,6 +325,10 @@ def probe(p):
             lying["hips"] < 30.0 and lying["head"] < 80.0,
             f"hips {lying['hips']:.0f}, head {lying['head']:.0f}")
     yield from _prone_empty(p, player, bool(skin.prone_idle))
+    if crawl_by_direction(skin):
+        yield from _prone_directions(p, player, anim)
+    else:
+        p.note("no side or diagonal crawl on this rig: the directions are skipped")
 
     p.set(p.hud(), DEV_GUNS_REQUEST_VAR, True)
     yield lambda: not p.get(p.hud(), DEV_GUNS_REQUEST_VAR)

@@ -338,14 +338,23 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_lyra.py
 ## The Free Animation Library: the prone (P1, 2026-10-13)
 
 A Fab pack the user added at `/Game/FreeAnimationLibrary` (git-ignored, as its copies are;
-`fab_library.json`). The game plays two of its clips, the rows of `fal_paths.CLIPS`:
-`anim_Prone_Idle` and `anim_Prone_Fwd_Loop_R` (`Animations/UnarmedProne`).
+`fab_library.json`). The game plays six of its clips, the rows of `fal_paths.CLIPS`
+(`Animations/UnarmedProne`): `anim_Prone_Idle` and `anim_Prone_Fwd_Loop_R` (P1), and the
+crawl's other directions (P2): `anim_Prone_Left_loop`, `anim_Prone_Right_Loop`,
+`anim_Prone_Fwd_Left_Loop` and `anim_Prone_Fwd_Right_Loop`. Its three `Bwd` clips are the
+forward ones with the asset's rate scale at -1: the game plays the forward copies in
+reverse instead (`Scripts/combat/docs/stance.md`).
 
 - **One import path:** `uepy.py Scripts/asset_pipeline/import_fal.py` retargets every row
   onto `SK_UEFN_Mannequin` into `/Game/FreeAnimationLibrary/UEFN_Player` as
   `A_UEFN_Player_<clip>`, read off the pack's own `SKM_Manny_Simple` through a rig of the
   mannequin's chain table and the plain retargeter, as `import_lyra.py` does. Another clip
-  (P2's four directions) is a row and a re-run. Then `build_weapons_and_combat.py`.
+  is a row and a re-run. Then `build_weapons_and_combat.py`.
+- **Measured on the pack's rig** (mesh space, forward +Y, left +X): the forward loop 63.0 cm
+  in 1.00 s; `Fwd_Left` 52.3 cm in 2.0 s, 37 degrees off forward, `Fwd_Right` its mirror;
+  `Right_Loop` 38.4 cm in 2.27 s (two shuffles). `Left_loop`'s root bone goes right as
+  well, with the body 73 cm left of it by the end (38 cm left in all): the copy, in place,
+  is the right loop's mirror. The side loops' hips rise from 12.1 to 18.7 cm.
 - **In place.** The forward loop carries 63 cm on its root bone; the plain retargeter has
   Root Motion off and the pelvis's horizontal travel zeroed, so the copy's root and pelvis
   travel 0.00 cm. The importer fails a copy that travels 0.5 cm, and sets root motion off.

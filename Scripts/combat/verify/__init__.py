@@ -197,6 +197,8 @@ and it never relies on a variable another section left behind.
               IMC_Default, their names on the player character, the
               OnFirePressed stamp and the Tick that reads it
   var_tables  verify.var_tables -- every combat Blueprint's variables against the tables its builders declare from ...
+
+  crawl_direction  verify.crawl_direction -- the crawl goes the way the player moves (P2): the weapon layers' event graph keeps ...
 """
 
 SECTIONS = (

@@ -49,7 +49,8 @@ from combat.server_anim import patch_server_anim, unpatch_server_anim
 from combat.server_anim_consts import PLAYER
 from combat.settings_savegame import build_settings_savegame
 from combat.shotgun_hold import retire_keyed_pose
-from combat.skin import player_skin, wear_skin
+from combat.skin import player_skin
+from combat.wear_skin import wear_skin
 from combat.stance_clips import patch_stance_clips, retire_player_patches, unpatch_stance_clips
 from combat.stick import build_stick
 from combat.support_hand import patch_support_hand

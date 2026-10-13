@@ -30,6 +30,7 @@ from combat.paths import (
     ABP_PATH, AMMO_BP_PATH, BLOOD_BP_PATH, BULLET_IMPACT_BP_PATH, FOOTSTEP_BP_PATH,
     GAME_MODE_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, SETTINGS_BP_PATH, WEAPON_COMP_BP_PATH)
 from combat.verify.common import check, load
+from combat.weapon_layers_consts import LAYERS_ABP
 from combat.weapon_component import look_vars as LV
 from combat.weapon_component import vars as WV
 from loot import consts as LOOT
@@ -51,9 +52,11 @@ TABLES = (
     (NS.PLAYER_STATE_BP_PATH, NS.PLAYER_TABLE, ()),
     (NS.GAME_STATE_BP_PATH, NS.GAME_TABLE, ()),
 )
-# Added to, not made: the stock anim blueprint and the sample's.
+# Added to, not made: the stock anim blueprint, the weapon layers copied from
+# it, and the sample's.
 PATCHED = (
     (ABP_PATH, AN.AIM + AN.GROUND + AN.POSE + AN.SERVER + AN.SUPPORT),
+    (LAYERS_ABP, AN.CRAWL + AN.GROUND),
     (GAS_ABP_PATH, AN.SERVER + ADDED_VARS),
 )
 

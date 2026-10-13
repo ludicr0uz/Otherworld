@@ -111,16 +111,31 @@ def _check_engine(check, nodes):
           len(gate) == 1 and len(lowered) == 1 and _ran(gate[0]),
           f"{len(gate)} gates, {len(lowered)} lowered")
 
-    (level, _st), = GS.stats_by(GS.LEVEL)
+    groups = GS.stats_by(GS.GROUP)
     calls = [n for n in nodes if {"Value", "self", "execute"} <= _pins(n)]
-    check("one SetOverallScalabilityLevel, from the preset's engine quality",
-          len(calls) == 1 and _stats(calls[0], "Value") == {level},
-          str([sorted(_stats(n, "Value")) for n in calls]))
-    # ApplyNonResolutionSettings takes no arguments: the only node here whose
+    got = sorted((_title(n).replace(" ", ""), tuple(_stats(n, "Value"))) for n in calls)
+    check(f"one GameUserSettings setter per engine quality group ({len(groups)}), each "
+          "from its own row, and no SetOverallScalabilityLevel",
+          got == sorted((st.target, (i,)) for i, st in groups), str(got))
+
+    def moved(n):
+        """The group rows whose "row != what was applied" test gates ``n``."""
+        applied = {i: f"Get {GC.TUNER_GROUP_APPLIED[st.column]}" for i, st in groups}
+        return {i for g in _sources(n, "execute") if "Condition" in _pins(g)
+                for c in _sources(g, "Condition") if _pins(c) == {"A", "B"}
+                for i in _stats(c, "A") if _feeds(c, "B") == [applied.get(i)]}
+    # GetGameUserSettings is what the Branch runs; the setter comes off it.
+    loose = [_title(n) for n in calls
+             if not any(moved(g) == _stats(n, "Value") for g in _sources(n, "execute"))]
+    check("...each only when its row differs from what was last applied (a group "
+          "that did not move is not applied again)", not loose and bool(calls), str(loose))
+    # ApplyNonResolutionSettings takes no arguments: the only nodes here whose
     # inputs are exactly exec + self.
     applies = [n for n in nodes if _pins(n) == {"execute", "self"}]
-    check("...then ApplyNonResolutionSettings, once", len(applies) == 1 and _ran(applies[0]),
-          str(len(applies)))
+    after = sorted(_title(c).replace(" ", "") for n in applies for c in _sources(n, "execute"))
+    check("...then ApplyNonResolutionSettings, once per group and straight after its "
+          "setter", after == sorted(st.target for _i, st in groups),
+          f"{len(applies)} applies after {after}")
     # Regression guard: ApplySettings also applies *resolution*, which on
     # macOS drives SWindow::SetWindowMode and hangs the editor in PIE.
     check("no ApplySettings anywhere (it hangs macOS PIE on a window-mode change)",
@@ -218,7 +233,8 @@ def _check_distances(check, nodes):
             (GC.TUNER_TREE_DISTANCE_APPLIED_VAR, "tree_distance", _metres, False),
             (GC.TUNER_GRASS_SHADOWS_APPLIED_VAR, "grass_shadows", _stats, True),
             (GC.TUNER_GRASS_LAYERS_APPLIED_VAR, "grass_layers", _stats, True),
-            (GC.TUNER_LEVEL_APPLIED_VAR, "engine_quality", _stats, True),
+            *((var, column, _stats, True)
+              for column, var in GC.TUNER_GROUP_APPLIED.items()),
             (GC.TUNER_WIND_APPLIED_VAR, "wind", _stats, True),
             (GC.TUNER_WIND_DISTANCE_APPLIED_VAR, "wind_distance", _stats, True)):
         sets = [n for n in nodes if _title(n) == f"Set {var}"]
@@ -293,7 +309,42 @@ def _check_wind(check, nodes):
           str(wrong) + str(sorted(params)))
 
 
+def _check_rows(check):
+    """The rows the one engine quality row became (pure table, no graph)."""
+    groups = [st for _i, st in GS.stats_by(GS.GROUP)]
+    wrong = [st.column for st in groups
+             if (st.lo, st.hi, st.step, st.kind, st.defaults) != (0, 3, 1, int, (0, 1, 3, 3))]
+    check(f"the tab has a row per engine quality group ({len(groups)}: "
+          f"{', '.join(st.column for st in groups)}), each 0-3 and each starting at "
+          "the engine quality its preset ran (0, 1, 3, 3); no engine quality row",
+          len(groups) == 10 and not wrong and len({st.target for st in groups}) == len(groups)
+          and GS.LEGACY_LEVEL_COLUMN not in GS.GFX_COLUMNS, str(wrong))
+    want = {"shadow_resolution": ("r.Shadow.MaxCSMResolution", 512, 4096),
+            "light_shadow_resolution": ("r.Shadow.MaxResolution", 256, 4096),
+            "shadow_cascades": ("r.Shadow.CSM.MaxCascades", 1, 10)}
+    got = {st.column: (st.target, st.lo, st.hi) for _i, st in GS.stats_by(GS.CVAR)
+           if st.column in want}
+    levels = groups[0].defaults if groups else ()
+    off = [c for c in want if c not in GS.GFX_COLUMNS
+           or GS.GFX_STATS[GS.index_of(c)].defaults
+           != tuple(GS.SHADOW_BY_LEVEL[c][lv] for lv in levels)]
+    check("the shadow maps' sizes and the cascades are rows of their own, cvars with "
+          "their limits, starting where each preset's engine quality had them",
+          got == want and not off, f"{got}, defaults off {off}")
+    old = [float(i) for i in range(GS.LEGACY_STAT_COUNT)]
+    old[GS.LEGACY_LEVEL_INDEX] = 2.0
+    row = GS.migrate_row(old)
+    kept = all(row[GS.index_of(c)] == old[GS.LEGACY_COLUMNS.index(c)]
+               for c in GS.LEGACY_COLUMNS if c in GS.GFX_COLUMNS)
+    check("a row from before the split spreads over today's: its engine quality on "
+          "every group row, the shadow numbers as that level had them, the rest kept",
+          kept and all(row[i] == 2.0 for i, _st in GS.stats_by(GS.GROUP))
+          and [row[GS.index_of(c)] for c in GS.BY_LEVEL_COLUMNS] == [2048.0, 1024.0, 4.0],
+          str(row[:16]))
+
+
 def check_gfx_tuner(check):
+    _check_rows(check)
     bp = unreal.load_asset(GC.TUNER_BP_PATH)
     check("BP_GraphicsTuner exists", bp is not None, GC.TUNER_BP_PATH)
     if bp is None:
@@ -310,7 +361,7 @@ def check_gfx_tuner(check):
     wrong = [k for k, v in tuner_defaults().items()
              if not _same(cdo.get_editor_property(k), v)]
     check("the tuner starts clean, with the built table, distances applied at 1 and "
-          "the level, grass shadows and grass layers never applied",
+          "the quality groups, grass shadows and grass layers never applied",
           not wrong, str(wrong))
     nodes = ed.list_all_nodes()
     _check_engine(check, nodes)

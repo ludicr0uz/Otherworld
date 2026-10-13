@@ -74,19 +74,24 @@ def _check_load(check, nodes):
     writes = [n for n in nodes if {"TargetArray", "Index", "Item", "bSizeToFit"} <= _pins(n)
               and f"Get {TAB.values_var}" in _feeds(n, "TargetArray")
               and any(table in _feeds(s, "TargetArray") for s in _sources(n, "Item"))]
-    offsets = [_int(a, "B") for n in writes for a in _sources(n, "Index")
-               if _pins(a) == {"A", "B"}]
-    loops = [g for n in writes for g in _sources(n, "execute") if "LastIndex" in _pins(g)]
+
+    def sized(n, size):
+        """``n``'s loop runs only on a saved table of ``size`` cells."""
+        return [c for g in _sources(n, "execute") if "LastIndex" in _pins(g)
+                and (_int(g, "FirstIndex"), _int(g, "LastIndex")) == (0, GS.STAT_COUNT - 1)
+                for b in _gates(g) for c in _sources(b, "Condition")
+                if _pins(c) == {"A", "B"} and _int(c, "B") == size
+                and any(table in _feeds(s, "TargetArray") for s in _sources(c, "A"))]
+
+    def cell(n):
+        return [_int(a, "B") for a in _sources(n, "Index") if _pins(a) == {"A", "B"}]
+    own = [n for n in writes if sized(n, GC.GFX_SAVE_TABLE_LEN)]
     check("...and lays only the save's Custom row over the table: one write, cell "
-          f"{GS.CUSTOM_PRESET} x {GS.STAT_COUNT} + i for each of the {GS.STAT_COUNT} stats",
-          len(writes) == 1 and offsets == [GS.CUSTOM_PRESET * GS.STAT_COUNT]
-          and [(_int(g, "FirstIndex"), _int(g, "LastIndex")) for g in loops]
-          == [(0, GS.STAT_COUNT - 1)], f"{len(writes)} writes, offsets {offsets}")
-    sized = [c for g in loops for b in _gates(g) for c in _sources(b, "Condition")
-             if _pins(c) == {"A", "B"} and _int(c, "B") == GC.GFX_SAVE_TABLE_LEN
-             and any(table in _feeds(s, "TargetArray") for s in _sources(c, "A"))]
-    check(f"...only when the saved table is this build's size ({GC.GFX_SAVE_TABLE_LEN}): "
-          "another build's rows are not these stats", len(sized) == 1, str(len(sized)))
+          f"{GS.CUSTOM_PRESET} x {GS.STAT_COUNT} + i for each of the {GS.STAT_COUNT} stats, "
+          f"when the saved table is this build's size ({GC.GFX_SAVE_TABLE_LEN})",
+          len(own) == 1 and cell(own[0]) == [GS.CUSTOM_PRESET * GS.STAT_COUNT],
+          f"{len(own)} of {len(writes)} writes")
+    _check_legacy(check, nodes, [n for n in writes if n not in own], sized, cell)
     picks = [n for n in _sets(nodes, "Quality")
              if any(f"Get {GC.GFX_SAVE_QUALITY_FIELD}" in _feeds(m, "A")
                     and _int(m, "B") == len(GS.PRESET_LABELS) - 1
@@ -95,6 +100,34 @@ def _check_load(check, nodes):
           "not a Clamp)", len(picks) == 1
           and not any("Clamp" in t for t in _feeds(picks[0], "Quality")),
           str([_feeds(n, "Quality") for n in picks]))
+
+
+def _check_legacy(check, nodes, writes, sized, cell):
+    """A save from before the engine quality row was split."""
+    legacy = [n for n in writes if sized(n, GC.GFX_SAVE_LEGACY_LEN)]
+    old_row = GS.CUSTOM_PRESET * GS.LEGACY_STAT_COUNT
+    # Item <- SavedTable[GfxLegacySource[i] + the old Custom row].
+    mapped = [n for n in legacy for kept in _sources(n, "Item")
+              for add in _sources(kept, "Index") if _pins(add) == {"A", "B"}
+              and _int(add, "B") == old_row
+              and any(f"Get {GC.GFX_LEGACY_SOURCE_VAR}" in _feeds(src, "TargetArray")
+                      for src in _sources(add, "A"))]
+    check(f"a saved table of the size before the split ({GC.GFX_SAVE_LEGACY_LEN}) is "
+          "not dropped: its Custom row is laid over today's, each stat from the old "
+          f"cell {GC.GFX_LEGACY_SOURCE_VAR} names",
+          len(legacy) == 1 == len(mapped) and len(writes) == 1
+          and cell(legacy[0]) == [GS.CUSTOM_PRESET * GS.STAT_COUNT],
+          f"{len(legacy)} legacy of {len(writes)} other writes, {len(mapped)} mapped")
+    by_level = sorted(
+        _int(n, "Index") for n in nodes
+        if {"TargetArray", "Index", "Item", "bSizeToFit"} <= _pins(n)
+        and f"Get {TAB.values_var}" in _feeds(n, "TargetArray")
+        and any(f"Get {GC.GFX_LEGACY_BY_LEVEL_VAR}" in _feeds(s, "TargetArray")
+                for s in _sources(n, "Item")))
+    check("...then the shadow maps' sizes and the cascades are the old engine "
+          "quality's, read from the by-level table into their own cells",
+          by_level == sorted(GS.CUSTOM_PRESET * GS.STAT_COUNT + GS.index_of(c)
+                             for c in GS.BY_LEVEL_COLUMNS), str(by_level))
 
 
 def _check_keep(check, nodes):

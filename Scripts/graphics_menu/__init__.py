@@ -214,7 +214,7 @@ Graphics: what a preset is, the tab that tunes it, the component that applies it
   gfx_save             BP_GraphicsSave, the SaveGame the player's pick and
                   Custom row are kept in; BeginPlay's load of it, Tick's save
   gfx_tuner            BP_GraphicsTuner, the HUD's component: Tick applies a
-                  dirty row -- the scalability level, a console command per cvar
+                  dirty row -- each engine quality group, a console command per cvar
   gfx_tuner_read       one stat of the applied preset, in the tuner's graph,
                   as the table has it or as the engine takes it
   gfx_tuner_foliage    the tuner's grass and tree cells: draw distances

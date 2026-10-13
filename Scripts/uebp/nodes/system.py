@@ -4,7 +4,17 @@ input, material, GameplayStatics, user settings.
 
 FN_APPLY = "/Script/Engine.GameUserSettings.ApplyNonResolutionSettings"
 FN_GET_GUS = "/Script/Engine.GameUserSettings.GetGameUserSettings"
-FN_SET_OVERALL = "/Script/Engine.GameUserSettings.SetOverallScalabilityLevel"
+# One engine quality group each (graphics_menu/gfx_tuner.py).
+FN_SET_VIEW_QUALITY = "/Script/Engine.GameUserSettings.SetViewDistanceQuality"
+FN_SET_AA_QUALITY = "/Script/Engine.GameUserSettings.SetAntiAliasingQuality"
+FN_SET_SHADOW_QUALITY = "/Script/Engine.GameUserSettings.SetShadowQuality"
+FN_SET_GI_QUALITY = "/Script/Engine.GameUserSettings.SetGlobalIlluminationQuality"
+FN_SET_REFLECTION_QUALITY = "/Script/Engine.GameUserSettings.SetReflectionQuality"
+FN_SET_POST_QUALITY = "/Script/Engine.GameUserSettings.SetPostProcessingQuality"
+FN_SET_TEXTURE_QUALITY = "/Script/Engine.GameUserSettings.SetTextureQuality"
+FN_SET_EFFECTS_QUALITY = "/Script/Engine.GameUserSettings.SetVisualEffectQuality"
+FN_SET_FOLIAGE_QUALITY = "/Script/Engine.GameUserSettings.SetFoliageQuality"
+FN_SET_SHADING_QUALITY = "/Script/Engine.GameUserSettings.SetShadingQuality"
 
 FN_ACTOR_OF_CLASS = "/Script/Engine.GameplayStatics.GetActorOfClass"
 # Drawn to a fire (npc/drawn.py). FindNearestActor is pure: its actor is read

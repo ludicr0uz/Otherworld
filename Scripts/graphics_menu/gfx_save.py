@@ -7,6 +7,11 @@ fragments that read and write it.
         the size of this build's table
             -> GfxTuneValues' Custom row := the save's Custom row
                Quality := SavedQuality, held inside the presets
+        a SavedTable of the size it had before the engine quality row was
+        split (author_legacy_row)
+            -> the same, each stat read from its old cell: a group's row
+               from the old engine quality, the shadow maps' sizes and
+               cascades as that level had them (gfx_stats.migrate_row)
         anything else -> nothing: the CSV's default preset and Custom row
 
     Tick (author_keep_graphics, from gfx_tune_tick's hand-over), on a change:
@@ -37,14 +42,17 @@ from uebp.graph import (
 )
 from uebp.layout import arrange
 from graphics_menu.dev_guns import _branch, _call, _get
-from graphics_menu.gfx_stats import CUSTOM_PRESET, PRESET_LABELS, STAT_COUNT
+from graphics_menu.gfx_stats import (
+    BY_LEVEL_COLUMNS, CUSTOM_PRESET, LEGACY_LEVEL_INDEX, LEGACY_STAT_COUNT, LEVEL_COUNT,
+    PRESET_LABELS, STAT_COUNT, index_of)
 from graphics_menu.gfx_tune_consts import (
-    GFX_SAVE_BP_PATH, GFX_SAVE_CLASS_PATH, GFX_SAVE_QUALITY_FIELD, GFX_SAVE_SLOT,
-    GFX_SAVE_TABLE_FIELD, GFX_SAVE_TABLE_LEN, GFX_SAVE_USER_INDEX, GFX_TUNE_VALUES_VAR)
+    GFX_LEGACY_BY_LEVEL_VAR, GFX_LEGACY_SOURCE_VAR, GFX_SAVE_BP_PATH, GFX_SAVE_CLASS_PATH,
+    GFX_SAVE_LEGACY_LEN, GFX_SAVE_QUALITY_FIELD, GFX_SAVE_SLOT, GFX_SAVE_TABLE_FIELD,
+    GFX_SAVE_TABLE_LEN, GFX_SAVE_USER_INDEX, GFX_TUNE_VALUES_VAR)
 from graphics_menu.loot_find import put
 from graphics_menu.save_exit import _chain
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN, FN_ARR_SET
-from uebp.nodes.math import FN_ADD_II, FN_EQ_II, FN_MAX_II, FN_MIN_II
+from uebp.nodes.math import FN_ADD_II, FN_EQ_II, FN_MAX_II, FN_MIN_II, FN_ROUND
 from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_GFX_SAVE
 from uebp.nodes.system import FN_CREATE_SAVE, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_WRITE_SAVE
 from graphics_menu import hud_vars as MV
@@ -79,6 +87,61 @@ def _field(ed, save, name, made):
     return _get(ed, name, made, GFX_SAVE_CLASS_PATH, save)
 
 
+def _stat_loop(ed, in_exec, made):
+    loop = ed.add_macro_node(MACRO_FOR_LOOP)
+    if not loop:
+        raise RuntimeError("could not create the ForLoop macro node")
+    made.append(loop)
+    _loose_pin(loop, "FirstIndex").set_pin_value("0")
+    _loose_pin(loop, "LastIndex").set_pin_value(str(STAT_COUNT - 1))
+    _connect(in_exec, _pin(loop, "execute"))
+    return loop
+
+
+def _saved_cell(ed, save, index, made):
+    """SavedTable[index] (a pin, or a literal): a float pin."""
+    kept = _call(ed, FN_ARR_GET, made, TargetArray=_field(ed, save, GFX_SAVE_TABLE_FIELD, made))
+    if isinstance(index, int):
+        _pin(kept, "Index").set_pin_value(str(index))
+    else:
+        _connect(index, _pin(kept, "Index"))
+    return out(kept, "Item")
+
+
+def author_legacy_row(ed, save, in_exec, made):
+    """A save from before the engine quality row was split: its Custom row
+    over today's, stat by stat (gfx_stats.migrate_row is this in Python).
+    Returns the exec tail."""
+    old_row = CUSTOM_PRESET * LEGACY_STAT_COUNT
+    loop = _stat_loop(ed, in_exec, made)
+    source = _call(ed, FN_ARR_GET, made, TargetArray=_get(ed, GFX_LEGACY_SOURCE_VAR, made))
+    _connect(out(loop, "Index"), _pin(source, "Index"))
+    old = out(_call(ed, FN_ADD_II, made, A=out(source, "Item"), B=old_row))
+    cell = out(_call(ed, FN_ADD_II, made, A=out(loop, "Index"), B=CUSTOM_PRESET * STAT_COUNT))
+    write = _call(ed, FN_ARR_SET, made, TargetArray=_get(ed, GFX_TUNE_VALUES_VAR, made))
+    _connect(cell, _pin(write, "Index"))
+    _connect(_saved_cell(ed, save, old, made), _pin(write, "Item"))
+    _connect(out(loop, "LoopBody"), _pin(write, "execute"))
+
+    # The shadow numbers the old level stood for. Min then Max, not a Clamp.
+    flow = out(loop, "Completed")
+    for k, column in enumerate(BY_LEVEL_COLUMNS):
+        level = _call(ed, FN_ROUND, made,
+                      A=_saved_cell(ed, save, old_row + LEGACY_LEVEL_INDEX, made))
+        top = _call(ed, FN_MIN_II, made, A=out(level), B=LEVEL_COUNT - 1)
+        held = _call(ed, FN_MAX_II, made, A=out(top), B=0)
+        pick = out(_call(ed, FN_ADD_II, made, A=out(held), B=k * LEVEL_COUNT))
+        number = _call(ed, FN_ARR_GET, made,
+                       TargetArray=_get(ed, GFX_LEGACY_BY_LEVEL_VAR, made))
+        _connect(pick, _pin(number, "Index"))
+        put_cell = _call(ed, FN_ARR_SET, made, TargetArray=_get(ed, GFX_TUNE_VALUES_VAR, made))
+        _pin(put_cell, "Index").set_pin_value(str(CUSTOM_PRESET * STAT_COUNT + index_of(column)))
+        _connect(out(number, "Item"), _pin(put_cell, "Item"))
+        _connect(flow, _pin(put_cell, "execute"))
+        flow = then(put_cell)
+    return flow
+
+
 def author_load_graphics(ed, in_execs):
     """BeginPlay: the saved pick and Custom row over the built defaults (see
     the module docstring). Returns the exec tails."""
@@ -91,21 +154,17 @@ def author_load_graphics(ed, in_execs):
     # This build's table, or the Custom row would be read off the wrong cells.
     size = _call(ed, FN_ARR_LEN, made, TargetArray=_field(ed, save, GFX_SAVE_TABLE_FIELD, made))
     whole = _call(ed, FN_EQ_II, made, A=out(size), B=GFX_SAVE_TABLE_LEN)
-    fits, stale = _branch(ed, out(whole), [flow], made)
+    fits, other_size = _branch(ed, out(whole), [flow], made)
+    size = _call(ed, FN_ARR_LEN, made, TargetArray=_field(ed, save, GFX_SAVE_TABLE_FIELD, made))
+    older = _call(ed, FN_EQ_II, made, A=out(size), B=GFX_SAVE_LEGACY_LEN)
+    legacy, stale = _branch(ed, out(older), [other_size], made)
+    spread = author_legacy_row(ed, save, legacy, made)
 
-    loop = ed.add_macro_node(MACRO_FOR_LOOP)
-    if not loop:
-        raise RuntimeError("could not create the ForLoop macro node")
-    made.append(loop)
-    _loose_pin(loop, "FirstIndex").set_pin_value("0")
-    _loose_pin(loop, "LastIndex").set_pin_value(str(STAT_COUNT - 1))
-    _connect(fits, _pin(loop, "execute"))
+    loop = _stat_loop(ed, fits, made)
     cell = out(_call(ed, FN_ADD_II, made, A=out(loop, "Index"), B=CUSTOM_PRESET * STAT_COUNT))
-    kept = _call(ed, FN_ARR_GET, made, TargetArray=_field(ed, save, GFX_SAVE_TABLE_FIELD, made))
-    _connect(cell, _pin(kept, "Index"))
     write = _call(ed, FN_ARR_SET, made, TargetArray=_get(ed, GFX_TUNE_VALUES_VAR, made))
     _connect(cell, _pin(write, "Index"))
-    _connect(out(kept, "Item"), _pin(write, "Item"))
+    _connect(_saved_cell(ed, save, cell, made), _pin(write, "Item"))
     _connect(out(loop, "LoopBody"), _pin(write, "execute"))
 
     # Min then Max, not a Clamp: the verifier reads every Clamp in this graph
@@ -114,11 +173,12 @@ def author_load_graphics(ed, in_execs):
                 A=_field(ed, save, GFX_SAVE_QUALITY_FIELD, made),
                 B=len(PRESET_LABELS) - 1)
     held = _call(ed, FN_MAX_II, made, A=out(top), B=0)
-    picked = put(ed, MV.Quality, out(held), [out(loop, "Completed")], made)
+    picked = put(ed, MV.Quality, out(held), [out(loop, "Completed"), spread], made)
     ed.add_comment_to_nodes(
         f"The player's graphics, from slot {GFX_SAVE_SLOT!r}: the preset they picked "
         f"and their Custom row, over the built defaults. Low, Medium and High stay "
-        f"the CSV's. No save, or one from a build with another table: the defaults.",
+        f"the CSV's. A save from before the engine quality row was split is spread "
+        f"over today's rows. No save, or another build's table: the defaults.",
         made)
     return [picked, none, other, stale]
 

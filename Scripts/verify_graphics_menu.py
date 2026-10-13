@@ -41,6 +41,7 @@ from graphics_menu.player_tune_checks import check_player_tune
 from graphics_menu.sound_tune_checks import check_sound_tune
 from graphics_menu.world_tune_checks import check_world_tune
 from graphics_menu.gfx_checks import check_gfx_tune
+from graphics_menu.gfx_tune_consts import GFX_SAVE_TABLE_FIELD, GFX_TUNE_VALUES_VAR
 from graphics_menu.tune_keep_checks import check_kept
 from graphics_menu.tune_keep_consts import KEPT_SLOTS, KEPT_TABS
 from graphics_menu.gfx_tuner_checks import check_gfx_tuner
@@ -741,11 +742,13 @@ def main():
     # take theirs from the loop and from MenuRow, and those are not the push.
     # Nor are the kept tuning tabs' cells (literal, off each one's table and
     # the built copy of it: MonTuneValues, WorldTuneValuesBuilt and the rest),
-    # nor the portrait's reads of the drawn garments' worn slots (wear_portrait.py).
+    # nor the portrait's reads of the drawn garments' worn slots (wear_portrait.py),
+    # nor the cells an old graphics save is spread from and into (gfx_save.py).
     reads = [n for n in by_pins("TargetArray", "Index")
              if not BEL.find_input_pin(n, "Index").list_connected_pins()
              and not ({f"Get {v}" for t in KEPT_TABS for v in (t.values_var, t.built_var)}
-                      | {f"Get {WORN_VAR}"}) & {
+                      | {f"Get {WORN_VAR}", f"Get {GFX_SAVE_TABLE_FIELD}",
+                         f"Get {GFX_TUNE_VALUES_VAR}"}) & {
                  str(BEL.get_node_title(PIN.get_owning_node(q)))
                  for q in BEL.find_input_pin(n, "TargetArray").list_connected_pins()}]
     check("...read out of Binds by index, one per action",

@@ -211,10 +211,10 @@ caret whenever the mouse was nudged), and the verifier checks nothing polls its 
 <a id="presets-and-the-graphics-settings-tab"></a>
 ## Presets and the GRAPHICS SETTINGS tab (`gfx_*.py`, `presets.py`)
 
-A preset is **one row of the graphics table** (`gfx_stats.GFX_STATS`, 28 numbers), and
+A preset is **one row of the graphics table** (`gfx_stats.GFX_STATS`, 40 numbers), and
 `graphics_tuning.csv` is the tracked copy. The defaults are what the presets always did:
 
-| preset | engine quality | `r.ShadowQuality` | `r.ScreenPercentage` | view distance | grass / tree draw distance | grass layers | grass shadows + DF/indirect |
+| preset | every engine quality group | `r.ShadowQuality` | `r.ScreenPercentage` | view distance | grass / tree draw distance | grass layers | grass shadows + DF/indirect |
 |---|---|---|---|---|---|---|---|
 | Low | 0 | 1 | 70 | 40% | 28 m / 120 m | 1 | off |
 | Medium | 1 | 2 | 85 | 60% | 42 m / 180 m | 2 | off |
@@ -265,8 +265,9 @@ into the HUD. Enter on a number saves nothing in this tab.
 - **An old CSV is in the old units.** A `graphics_tuning.csv` saved before this (0.4, 1.0)
   reads as 0.4% and 1 m; the tracked one was rewritten.
 
-- **Performance rows are per preset:** engine quality (the scalability level), resolution,
-  shadow quality and distance (%), view distance (%), grass and tree draw distance (metres),
+- **Performance rows are per preset:** the ten engine quality groups (below), resolution,
+  shadow quality and distance (%), the sun's shadow resolution, the lamps' and the cascade
+  count (below), view distance (%), grass and tree draw distance (metres),
   grass density (layers 1-4), grass shadows, leaf cut-outs
   (`r.Nanite.ProgrammableRaster`: off draws every leaf card solid), tree coarseness
   (`r.Nanite.MaxPixelsPerEdge`), fog and volumetric fog on/off, GI, reflections, AA,
@@ -284,6 +285,54 @@ into the HUD. Enter on a number saves nothing in this tab.
   both reach the engine through that one hand-over, on the next Tick.
   `GfxQualityApplied` starts at -1, so the first Tick of every session applies whatever
   BeginPlay left in `Quality` (the saved pick, else the CSV's default).
+- **Engine quality is ten rows, one per group** (`gfx_stats.GROUP_STATS`, each 0-3; until
+  13 Oct 2026 one `engine quality` row moved them all through
+  `SetOverallScalabilityLevel`): Lumen GI quality, reflection quality, shadow detail,
+  post-processing, effects, textures, shading, foliage, anti-aliasing quality and
+  character LOD (the view distance group). Every preset's default is the level its one
+  engine quality was (0, 1, 3, 3), so no preset changed.
+  - **Applied by the group's own setter on GameUserSettings**
+    (`Set<Group>Quality`, then `ApplyNonResolutionSettings`; `gfx_tuner._author_groups`),
+    each behind its own `<Group>QualityApplied` variable: a group that did not move is not
+    applied again. The engine sets `sg.<Group>` and that level's section of
+    `BaseScalability.ini`, cvar by cvar, at scalability priority
+    (`Scalability.cpp` `SetGroupQualityLevel`).
+  - **A row's cvar stays the row's.** The cvar rows set theirs by console command, which
+    outranks scalability, so the group cannot move them and need not be applied first.
+    The other way round holds too: a group still moves every other cvar of its section
+    after rows have console-set some of it (measured: shadow detail 3 to 2 moved its 12
+    other cvars while the 6 a row holds stayed), and a row still moves its cvar after its
+    group moved. **Never console-set an `sg.*` variable:** that would put the group out of
+    the setter's reach for the session (`probe_perf_audit.py` does, in a game of its own).
+  - **Two groups are rows though rows cover their best-known cvar.** The view distance
+    group also sets `r.SkeletalMeshLODBias` and the anti-aliasing group
+    `r.TemporalAA.Quality`, `r.FXAA.Quality` and the `r.TSR.*` numbers, none of which has
+    a row: without them a preset would no longer be what it was. Left out: the resolution
+    group (its one cvar, `r.ScreenPercentage`, is the resolution row's) and the landscape
+    group (no section in `BaseScalability.ini`).
+  - **`DefaultEngine.ini`'s own cvars are out of every group's reach** (project settings
+    outrank scalability): the GI, reflection and AA methods, `r.ShadowQuality`,
+    `r.TemporalAA.Quality`, `r.Lumen.TraceMeshSDFs`, the screen traces. A row moves the
+    first four.
+- **Three shadow numbers have rows of their own,** the three that differ between the
+  tiers of `[ShadowQuality@0..3]` in UE 5.8: shadow resolution
+  (`r.Shadow.MaxCSMResolution`, 512 / 1024 / 2048 / 2048: the sun's cascades, which is
+  what the shadow atlas is made of here, virtual shadow maps being off), lamp shadow
+  resolution (`r.Shadow.MaxResolution`, 512 / 1024 / 1024 / 2048: spot and point lights)
+  and shadow cascades (`r.Shadow.CSM.MaxCascades`, 1 / 1 / 4 / 10). Their defaults are
+  levels 0, 1, 3, 3 of that table (`gfx_stats.SHADOW_BY_LEVEL`). All three are
+  `ECVF_Scalability | ECVF_RenderThreadSafe`, and the `sg.*` variables
+  `ECVF_ScalabilityGroup`: none is a cheat or read-only, so they move in a shipping build.
+- **A save from before the groups is spread, not dropped** (`gfx_save.author_legacy_row`).
+  A saved table of the old length (4 x 28) has its Custom row copied stat by stat
+  (`GfxLegacySource`: each new row's place in the old table; the ten groups all read the
+  old engine quality), and the three shadow rows take what that engine quality gave
+  (`GfxLegacyByLevel`). `gfx_stats.migrate_row` is the same rule in Python, which
+  rewrote the CSV; `dev/tests/test_gfx_stats.py` holds both to it.
+- **Measured** (`probe_gfx_groups.py`, windowed, 200 m map, the perf audit's forest spot at
+  noon, High, 13 Oct 2026): 40.7 ms; Lumen GI quality 2, 34.9 ms (-5.8); reflection
+  quality 2 as well, 33.7 ms (-7.0, beside the strategy's 8 ms for Lumen one level down,
+  which was both groups); shadow resolution 1536 on top, 30.4 ms.
 - **The console commands are needed.** `DefaultEngine.ini` pins `r.ShadowQuality` (and the
   GI, reflection and AA methods) at project-setting priority, which outranks scalability.
   A console command outranks both. One command per cvar stat, on every apply.
@@ -325,6 +374,11 @@ into the HUD. Enter on a number saves nothing in this tab.
 - **The verifier's whole-graph scans see none of this in the HUD:** the HUD graph holds no
   console command, scalability call or tag walk (asserted), which is why the apply is a
   component of its own.
+- **Probe:** `probe_gfx_groups.py` (`--windowed` for its frame times; 7 checks: every
+  cvar of every section of the engine's `BaseScalability.ini`, the `sg.*` levels and the
+  rows' cvars read before and after each step: High at 3 everywhere, the Lumen GI row
+  moving its 25 cvars and no other, the shadow resolution row its one, the shadow group
+  under rows, the cascades row after its group, Low as level 0's 128 cvars).
 - **Probe:** `probe_graphics_tuning.py` (23 checks: with no save, the CSV's default
   applied at the start, a preset
   switch, cvars, both draw distances in metres, the same metres after a view distance

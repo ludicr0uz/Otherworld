@@ -325,6 +325,15 @@ Moved word for word: `docs/history/menu.md#the-mouse-cursor`.
 
 Moved word for word: `docs/history/menu.md#presets-and-the-graphics-settings-tab`.
 
+- **Engine quality is one row per group** (`gfx_stats.GROUP_STATS`, ten of them, each 0-3),
+  applied by that group's setter on GameUserSettings and `ApplyNonResolutionSettings`,
+  only when it moved (`gfx_tuner._author_groups`). A cvar row wins over its group because
+  a console command outranks scalability; **never console-set an `sg.*` variable**, which
+  would take the group out of the setter's reach. Never `ApplySettings`.
+- **A new row moves `STAT_COUNT`, and a save of another length is another build's.** Add
+  the old layout to the load (`gfx_save.author_legacy_row`, `gfx_stats.LEGACY_COLUMNS`) or
+  every player's Custom row is dropped. Probe: `probe_gfx_groups.py` (`--windowed`).
+
 ## Settings screen
 
 - **The way in:** the menu's `settings` row, on the title or in play (above: "One menu").

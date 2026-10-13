@@ -153,7 +153,10 @@ def _check_presets(check, nodes):
                   and not (BEL.find_input_pin(n, "Command") is not None and str(
                       BEL.find_input_pin(n, "Command").get_pin_value()) in SESSION_COMMANDS))
               or ("Tag" in _pins(n) and "ComponentClass" not in _pins(n))
-              or "ScalabilityLevel" in _title(n).replace(" ", "")]
+              or "ScalabilityLevel" in _title(n).replace(" ", "")
+              or (_title(n).replace(" ", "").startswith("Set")
+                  and _title(n).replace(" ", "").endswith("Quality")
+                  and {"Value", "self"} <= _pins(n))]
     check("the HUD graph issues no console command (but the session's leave "
           "and cancel), scalability call or tag walk "
           "of its own: BP_GraphicsTuner applies a preset",
@@ -175,18 +178,23 @@ def _check_graph(check, nodes):
               and f"Get {TAB.values_var}" in _feeds(n, "TargetArray")]
     nudged = [n for n in writes if any("Min" in t for t in _feeds(n, "Item"))]
     held = [f for n in nudged for m in _sources(n, "Item") for f in _feeds(m, "A")]
-    # The third write is BeginPlay's: the saved Custom row (gfx_save_checks.py).
+    # The rest are BeginPlay's (gfx_save_checks.py): the saved Custom row, the
+    # same of a save from before the engine quality row was split, and that
+    # one's shadow numbers by level.
     loaded = [n for n in writes if any("TargetArray" in _pins(s) for s in _sources(n, "Item"))
               and not _sources(n, "Item")[0] in nudged
               and any(f"Get {GC.GFX_SAVE_TABLE_FIELD}" in _feeds(s, "TargetArray")
                       for s in _sources(n, "Item"))]
-    spread = [n for n in writes if n not in nudged and n not in loaded]
+    by_level = [n for n in writes
+                if any(f"Get {GC.GFX_LEGACY_BY_LEVEL_VAR}" in _feeds(s, "TargetArray")
+                       for s in _sources(n, "Item"))]
+    spread = [n for n in writes if n not in nudged + loaded + by_level]
     check("a graphics nudge writes GfxTuneValues, held between the stat's minimum "
           "and maximum (FMin of FMax)",
           len(nudged) == 1 and any("Max" in t for t in held), f"{len(nudged)}: {held}")
     check("...and a second write spreads the picked preset's look stats over every "
           f"preset (stat index >= {GS.LOOK_FROM})",
-          len(writes) == 3 and len(spread) == 1 and len(loaded) == 1
+          len(spread) == 1 and len(loaded) == 2 and len(by_level) == len(GS.BY_LEVEL_COLUMNS)
           and any(str(BEL.find_input_pin(n, "B").get_pin_value()) == str(GS.LOOK_FROM)
                   for n in nodes if "GreaterEqual" in _title(n).replace(" ", "")
                   or ">=" in _title(n)),

@@ -24,7 +24,9 @@ the caret, and the bar is dragged: tune_scroll.py). The rows, their steps and li
 gfx_stats.GFX_STATS.
 """
 
-from graphics_menu.gfx_stats import GFX_STATS, PRESET_LABELS, STAT_COUNT
+from graphics_menu.gfx_stats import (
+    GFX_STATS, GROUP, LEGACY_STAT_COUNT, PRESET_LABELS, STAT_COUNT, by_level_values,
+    legacy_sources, stats_by)
 from graphics_menu.tune_tab import TuneTab, save_command
 from uebp.vars import BOOL, FLOAT, INT, Var, array
 
@@ -54,7 +56,12 @@ GFX_TUNE_PICK_SEEN_VAR = Var("GfxTunePickSeen", INT, 0)
 GFX_APPLIED_DEFAULT = -1
 GFX_APPLIED_VAR = Var("GfxQualityApplied", INT, GFX_APPLIED_DEFAULT)
 # The HUD's two beside the tab's own (tune_tab.tab_table): gfx_tune_tick.py declares them.
-GFX_TUNE_TABLE = (GFX_TUNE_PICK_SEEN_VAR, GFX_APPLIED_VAR)
+# A save from before the engine quality row was split (gfx_save.py): which
+# cell of its row each stat is read from, and the shadow numbers per level.
+GFX_LEGACY_SOURCE_VAR = Var("GfxLegacySource", array(INT), legacy_sources())
+GFX_LEGACY_BY_LEVEL_VAR = Var("GfxLegacyByLevel", array(FLOAT), by_level_values())
+GFX_TUNE_TABLE = (GFX_TUNE_PICK_SEEN_VAR, GFX_APPLIED_VAR, GFX_LEGACY_SOURCE_VAR,
+                  GFX_LEGACY_BY_LEVEL_VAR)
 
 # The HUD's BP_GraphicsTuner component (gfx_tuner.py), which applies a row.
 TUNER_COMPONENT = "GraphicsTuner"
@@ -102,7 +109,9 @@ TUNER_BASE_VAR = Var("Base", INT, 0)
 # What the world was last set to, so an apply only redoes what moved. The
 # distances start at 1 (a level is saved at its own distances); the rest at
 # -1, no value, so the first apply of a session always does them.
-TUNER_LEVEL_APPLIED_VAR = Var("LevelApplied", INT, TUNER_NEVER)
+# One per engine quality group, by its column: "ShadowQualityApplied".
+TUNER_GROUP_APPLIED = {st.column: Var(f"{st.target[len('Set'):]}Applied", INT, TUNER_NEVER)
+                       for _i, st in stats_by(GROUP)}
 TUNER_GRASS_DISTANCE_APPLIED_VAR = Var("GrassDistanceApplied", FLOAT, 1.0)
 TUNER_TREE_DISTANCE_APPLIED_VAR = Var("TreeDistanceApplied", FLOAT, 1.0)
 TUNER_GRASS_SHADOWS_APPLIED_VAR = Var("GrassShadowsApplied", INT, TUNER_NEVER)
@@ -111,7 +120,7 @@ TUNER_WIND_APPLIED_VAR = Var("WindApplied", INT, TUNER_NEVER)
 TUNER_WIND_DISTANCE_APPLIED_VAR = Var("WindDistanceApplied", INT, TUNER_NEVER)   # metres
 # In the order gfx_tuner.py has always declared them.
 TUNER_TABLE = (TUNER_VALUES_VAR, TUNER_DIRTY_VAR, TUNER_PRESET_VAR, TUNER_BASE_VAR,
-               TUNER_LEVEL_APPLIED_VAR, TUNER_GRASS_SHADOWS_APPLIED_VAR,
+               *TUNER_GROUP_APPLIED.values(), TUNER_GRASS_SHADOWS_APPLIED_VAR,
                TUNER_GRASS_LAYERS_APPLIED_VAR, TUNER_WIND_APPLIED_VAR,
                TUNER_WIND_DISTANCE_APPLIED_VAR, TUNER_GRASS_DISTANCE_APPLIED_VAR,
                TUNER_TREE_DISTANCE_APPLIED_VAR)
@@ -122,9 +131,11 @@ GFX_SAVE_CLASS_PATH = f"{GFX_SAVE_BP_PATH}.BP_GraphicsSave_C"
 GFX_SAVE_SLOT = "OtherworldGraphics"
 GFX_SAVE_USER_INDEX = 0
 # The picked preset, and the HUD's whole table as it stood. Only Custom's row
-# of it is read back; a table of any other length is from an older build
-# (another STAT_COUNT) and is left alone, pick and all.
+# of it is read back. A table of GFX_SAVE_LEGACY_LEN is from before the engine
+# quality row was split, and its Custom row is spread over today's; one of
+# any other length is another build's and is left alone, pick and all.
 GFX_SAVE_QUALITY_FIELD = Var("SavedQuality", INT)
 GFX_SAVE_TABLE_FIELD = Var("SavedTable", array(FLOAT))
 GFX_SAVE_FIELDS = (GFX_SAVE_QUALITY_FIELD, GFX_SAVE_TABLE_FIELD)   # gfx_save.py declares them
 GFX_SAVE_TABLE_LEN = len(PRESET_LABELS) * STAT_COUNT
+GFX_SAVE_LEGACY_LEN = len(PRESET_LABELS) * LEGACY_STAT_COUNT

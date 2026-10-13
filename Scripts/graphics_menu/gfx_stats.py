@@ -26,6 +26,12 @@ scalability level (High and Custom both run Epic, 3; BaseScalability.ini's
 view and shadow distance scales and volumetric fog for that level), the two
 console overrides, and the grass layers and grass lighting per preset.
 
+That one level was a row, "engine quality", until it was split: a row per
+engine quality group (GROUP_STATS, each 0-3 and each starting at the level
+its preset had), and the shadow group's three numbers that set the size of
+the shadow maps as rows of their own (SHADOW_BY_LEVEL). A Custom row saved
+before the split is spread over them (LEGACY_COLUMNS, migrate_row).
+
 Units are the ones a person reads, not the engine's. A scale is a
 percentage (100 is the engine's own), and Stat.scale (0.01) is what turns
 it back into the number a cvar or the cycle takes. The grass and tree draw
@@ -57,7 +63,8 @@ DEFAULT_COLUMN = "default"
 FALLBACK_DEFAULT_PRESET = 0  # Low: no CSV, or no row marked
 
 # How BP_GraphicsTuner applies a stat (Stat.how); Stat.target says to what.
-LEVEL = "level"                  # GameUserSettings' overall scalability level
+GROUP = "group"                  # one engine quality group: target is its
+                                 # GameUserSettings setter
 CVAR = "cvar"                    # a console variable, named by target
 GRASS_DISTANCE = "grass_distance"    # the grass and bush cells' cull distances
 TREE_DISTANCE = "tree_distance"      # the tree cells' cull distances
@@ -94,12 +101,59 @@ def _metres(column):
     return tuple(round(FULL_VIEW_M[column] * pct * PERCENT) for pct in _VIEW_PCT)
 
 
-PERFORMANCE_STATS = (
-    Stat("engine_quality", "engine quality (0-3)", 1, 0, 3, int, LEVEL, "", (0, 1, 3, 3)),
+# The engine quality level each preset ran when one row set every group.
+_LEVELS = (0, 1, 3, 3)
+
+
+def _group(column, label, setter):
+    return Stat(column, f"{label} (0-3)", 1, 0, 3, int, GROUP, setter, _LEVELS)
+
+
+# One row per group of BaseScalability.ini that has cvars. Not here: the
+# resolution quality (its one cvar, r.ScreenPercentage, is the resolution
+# row's) and the landscape quality (no section in the ini, no landscape).
+# The view distance and anti-aliasing groups each hold cvars no row drives
+# (r.SkeletalMeshLODBias; r.TemporalAA.Quality, r.FXAA.Quality, r.TSR.*), so
+# they keep a row: without one those would stay wherever the session began.
+GROUP_STATS = (
+    _group("gi_quality", "Lumen GI quality", "SetGlobalIlluminationQuality"),
+    _group("reflection_quality", "reflection quality", "SetReflectionQuality"),
+    _group("shadow_detail", "shadow detail", "SetShadowQuality"),
+    _group("post_quality", "post-processing", "SetPostProcessingQuality"),
+    _group("effects_quality", "effects", "SetVisualEffectQuality"),
+    _group("texture_quality", "textures", "SetTextureQuality"),
+    _group("shading_quality", "shading", "SetShadingQuality"),
+    _group("foliage_quality", "foliage", "SetFoliageQuality"),
+    _group("aa_quality", "AA quality", "SetAntiAliasingQuality"),
+    _group("character_lod", "character LOD", "SetViewDistanceQuality"),
+)
+
+# The shadow group's numbers that size the shadow maps, per engine quality
+# level 0-3 (BaseScalability.ini, [ShadowQuality@N], UE 5.8). All three
+# differ between the tiers. The sun's and the moon's cascades are sized by
+# MaxCSMResolution; MaxResolution is every other light's (the fire's).
+SHADOW_BY_LEVEL = {
+    "shadow_resolution": (512, 1024, 2048, 2048),         # r.Shadow.MaxCSMResolution
+    "light_shadow_resolution": (512, 1024, 1024, 2048),   # r.Shadow.MaxResolution
+    "shadow_cascades": (1, 1, 4, 10),                     # r.Shadow.CSM.MaxCascades
+}
+
+
+def _by_level(column):
+    return tuple(SHADOW_BY_LEVEL[column][level] for level in _LEVELS)
+
+
+PERFORMANCE_STATS = GROUP_STATS + (
     Stat("resolution_pct", "resolution (%)", 5, 25, 200, int, CVAR,
          "r.ScreenPercentage", (70, 85, 100, 100)),
     Stat("shadow_quality", "shadow quality (0-5)", 1, 0, 5, int, CVAR,
          "r.ShadowQuality", (1, 2, 3, 3)),
+    Stat("shadow_resolution", "shadow resolution (px)", 512, 512, 4096, int, CVAR,
+         "r.Shadow.MaxCSMResolution", _by_level("shadow_resolution")),
+    Stat("light_shadow_resolution", "lamp shadow resolution (px)", 256, 256, 4096, int,
+         CVAR, "r.Shadow.MaxResolution", _by_level("light_shadow_resolution")),
+    Stat("shadow_cascades", "shadow cascades (1-10)", 1, 1, 10, int, CVAR,
+         "r.Shadow.CSM.MaxCascades", _by_level("shadow_cascades")),
     Stat("shadow_distance", "shadow distance (%)", 10, 10, 300, int, CVAR,
          "r.Shadow.DistanceScale", (60, 70, 100, 100), PERCENT),
     Stat("view_distance", "view distance (%)", 10, 10, 300, int, CVAR,
@@ -168,6 +222,50 @@ assert len(set(GFX_COLUMNS)) == STAT_COUNT and DEFAULT_COLUMN not in GFX_COLUMNS
 assert all(len(s.defaults) == len(PRESET_LABELS) and s.lo <= min(s.defaults)
            and max(s.defaults) <= s.hi for s in GFX_STATS)
 assert all(len(set(s.defaults)) == 1 for s in LOOK_STATS)
+
+
+# A row as it was before the one engine quality row was split (a saved
+# Custom row of that length is one of these: gfx_save.py).
+LEGACY_LEVEL_COLUMN = "engine_quality"
+LEGACY_COLUMNS = (
+    LEGACY_LEVEL_COLUMN, "resolution_pct", "shadow_quality", "shadow_distance",
+    "view_distance", "grass_distance", "tree_distance", "grass_layers", "grass_shadows",
+    "leaf_cutouts", "tree_coarseness", "fog", "volumetric_fog", "global_illumination",
+    "reflections", "anti_aliasing", "wind", "wind_distance", "brightness", "sun_light",
+    "sun_disc", "moon_light", "moon_disc", "stars", "ambient_light", "fog_density",
+    "wind_strength", "wind_speed")
+LEGACY_STAT_COUNT = len(LEGACY_COLUMNS)
+LEGACY_LEVEL_INDEX = LEGACY_COLUMNS.index(LEGACY_LEVEL_COLUMN)
+# In SHADOW_BY_LEVEL's order: the stats read off the old level by a table.
+BY_LEVEL_COLUMNS = tuple(SHADOW_BY_LEVEL)
+LEVEL_COUNT = len(next(iter(SHADOW_BY_LEVEL.values())))
+
+assert LEGACY_STAT_COUNT != STAT_COUNT
+assert all(s.column in LEGACY_COLUMNS or s.how == GROUP or s.column in SHADOW_BY_LEVEL
+           for s in GFX_STATS)
+
+
+def legacy_sources():
+    """For each stat of today's row, the cell of a legacy row it is read
+    from: its own old column, or the old engine quality (a group's level; and
+    the by-level stats, which by_level_values() then turns into their number)."""
+    return [LEGACY_COLUMNS.index(s.column) if s.column in LEGACY_COLUMNS
+            else LEGACY_LEVEL_INDEX for s in GFX_STATS]
+
+
+def by_level_values():
+    """SHADOW_BY_LEVEL flattened: values[k * LEVEL_COUNT + level] for the
+    k-th of BY_LEVEL_COLUMNS."""
+    return [float(v) for column in BY_LEVEL_COLUMNS for v in SHADOW_BY_LEVEL[column]]
+
+
+def migrate_row(old):
+    """A legacy row as today's: what gfx_save's load does in the HUD's graph."""
+    row = [float(old[src]) for src in legacy_sources()]
+    level = max(0, min(LEVEL_COUNT - 1, int(round(old[LEGACY_LEVEL_INDEX]))))
+    for k, column in enumerate(BY_LEVEL_COLUMNS):
+        row[index_of(column)] = by_level_values()[k * LEVEL_COUNT + level]
+    return row
 
 
 def index_of(column):

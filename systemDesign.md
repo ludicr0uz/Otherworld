@@ -77,7 +77,10 @@ Debug, Dev All Guns (in play only: the title has no such row), the GUN / MONSTER
 the gun, monster, world and player tables are the server's: a change is sent to it and
 applied there, by `BP_GameTuner` on the GameState, only where the server was started with
 `-AllowDevTuning`, and the rows are read-only and say so otherwise; sound and graphics stay
-this machine's; M32, `Scripts/graphics_menu/CLAUDE.md`, "The tuning tabs by mode"), and Exit Game on the
+this machine's; M32, `Scripts/graphics_menu/CLAUDE.md`, "The tuning tabs by mode"; the graphics tab's
+rows per preset include one for each engine quality group, Lumen GI, reflections, shadow detail,
+post-processing, effects, textures, shading, foliage, anti-aliasing and character LOD, each 0-3 and
+applied by itself, and the sun's shadow resolution, the lamps' and the cascade count), and Exit Game on the
 title or Save and Exit in play (a 15 s countdown, cancelled by a hit, a move, the
 trigger or leaving the ground, with the movement left walking so the feet stay fitted
 to the ground; saves stats, inventory and worn garments, not the location; death deletes the

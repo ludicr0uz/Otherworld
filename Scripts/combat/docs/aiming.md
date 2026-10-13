@@ -246,18 +246,17 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     gun stood still in the view and the hand moved under it.
   - A Two Bone IK on the left arm, last in the player's anim BP's chain (after the pitch's
     ModifyBones), puts the hand at a point in the **right hand's bone space**: where the
-    ready clip holds it at its start (`support_at`, sampled at build time). The point is
-    each gun's own, `SupportPoint` on `BP_WeaponItem`, read off its `AimPose`: the shotgun's
-    pose seats the hand on the pump (`pump_seat.py`), which is not where the rifle pose has
-    it, so two points picked by a flag would not do. The joint target is the
+    ready clip holds it at its start (`support_at`, sampled at build time), moved onto
+    the gun's own model ("Both hands are fitted to each gun's model" below). The point is
+    each gun's own, `SupportPoint` on `BP_WeaponItem`: one clip is the ready pose of three
+    guns, and each has its handguard somewhere else. The joint target is the
     forearm bone itself, so the elbow stays on the side the pose has it.
   - The component writes `SupportHand = SightBlend` (the IK's weight) and
     `SupportPoint = HeldSupportPoint` (its copy of `Held.SupportPoint`, made beside
     `HeldTwoHanded`). **Only down the sights:** at the hip and on the shoulder
     the upper-body slot also plays things the left hand must be free for (a throw, a
     search), and the camera is not on the gun.
-  - The point is the clip's at its start, 0.7 cm from where the walking hand used to
-    average; it eases in with `SightBlend`.
+  - It eases in with `SightBlend`.
   - `aim_pitch._remove_previous` takes the IK out with its own nodes, so the build order is
     the pitch, the body poses, then `patch_support_hand`.
   - `probes/probe_sight_hands.py`: rifle and pistol, standing and walking, both hands within
@@ -494,6 +493,47 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     (`SHOTGUN_TRIGGER_REACH_CM`); the others keep 2.5. The pistol (the 1911) fits like the
     rest: furthest joint 2.9 cm off; its index lies 3.8 cm above the guard's bar, inside
     the pistol pose's 4.5 (`PISTOL_POSE_TRIGGER_REACH_CM`).
+- **Both hands are fitted to each gun's model** (`gun_hold.py`, `hand_seat.py`), at the
+  build, for every row of `weapon_specs`: no gun's hands are placed by hand.
+  - **The right hand** is the one the gun is rigid to: the grip's solve seats the model's
+    "Grip" in the fist (`grip.py`, above).
+  - **The left hand** is carried by the IK to the gun's `SupportPoint`, and that point is
+    where the ready pose has the wrist, moved by `gun_hold.support_move()`: the rigid hand
+    (its shape is the clip's; the fingers are not posed here) is brought to where its own
+    finger joints and tips ride `SEAT_OFF_CM` (0.75) off the part the row names, the worst
+    of them as near as it can be (`hand_seat.seat`, a descent from where the clip has the
+    hand), with no joint deeper than 0.5 cm in it, none in a part of the outline beside
+    it (an AK's magazine and receiver), the thumb under the sight line, and the wrist no
+    further from the shoulder than the arm is long.
+  - **The arm's reach is part of the seat** (`hand_seat.reached`). The IK does not
+    stretch: a point further from the shoulder than the arm is long is never reached, and
+    the hand stops short along the line from the shoulder. The pump-action's first seat
+    was 3.7 cm past the arm and its live wrist read 3.69 cm short of the point. So every
+    trial move is cut to what the arm makes before its fit is measured, and the point
+    saved is one the hand arrives at (live: 0.07 to 0.15 cm off on the five guns).
+  - **What a row says** (`support`, a `<GUN>_SUPPORT` of `weapon_models.py`):
+    `dict(part="Handguard")`, a part of the gun's outline; `dict(box=((lo), (hi)))`, a box
+    measured off the mesh where the outline has no such part (the Val's handguard is the
+    front of its "Receiver"); `under="Barrel"` keeps the thumb under that part's top
+    rather than the sight line (the shotgun); `fist=True` grows the part to hold the right
+    hand's three wrapping fingers, for a pistol held in both hands (the 1911, the MAC-11).
+    A row with no `support` stops the build.
+  - **What it did** (the worn body, cm from the part, before and after): the AK's hand hung
+    1.9 to 7.5 under its handguard with a knuckle 1.9 inside the magazine, now 0.3 to 4.2
+    on it; the Val's 1.5 to 7.1 under, now -0.4 to 1.9; the pistol's and the SMG's left
+    fingers lay through the right hand's (-2.8 to 3.2 of the fist), now -0.5 to 2.0; the
+    shotgun's is -0.75 to 5.0 (its hand is wider than the pump is deep, and its thumb is
+    held under the barrel).
+  - **A new gun's hands:** give its row `support=` and its line of
+    `weapon_models.GUN_HOLDS` (the outline and the support by the Blueprint's name, which
+    is how a running game finds them), build, and read the `[GUN] <name>: the left hand's
+    point moved ...` line. `verify/gun_hold.py` holds both hands of every row to its
+    model (the left: on its part, within 5.25 cm, in no part beside it, thumb under the
+    sight line, the arm long enough; the right: no joint more than 1.5 cm in any part,
+    thumb 2 cm under the sight line; `verify/grip_fit.py` has its fingers on the Grip),
+    and `probes/probe_gun_hands.py` reads the live hands down each gun's sights, the wrist
+    against the point first. A hand that cannot be fitted says so there: move the row's
+    box, or the grip (a fist further back takes the handguard out of the arm's reach).
 - **The shotgun is held in the rifle's ready pose** (C3; until then a pose keyed for it,
   `A_AimShotgun`), and its left hand has a point of its own (`shotgun_hold.py`).
   - **Why:** the rifle pose stands the left thumb up the handguard, far under the AK's and
@@ -502,11 +542,12 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     finger beside the bead, and the hand is at the pump's back end (a bar 4.8 cm deep,
     `weapon_models.SHOTGUN_PUMP`), one joint 1.4 cm inside the wood.
   - **What moves:** the shotgun's `SupportPoint` (the IK's point, in the right hand's
-    space) is the pose's moved by `support_move()`: straight down until the thumb is under
-    the barrel's top, then `pump_seat.seat`'s descent to where the fingers' joints fit the
-    pump best (6 cm forward and 5.4 down). The hand is moved as one piece; its shape is
-    the clip's. The barrel lies only 2.2 cm over the pump's wood, so the thumb holds the
-    hand low: its joints ride 0.9 to 4.7 cm off the wood.
+    space) is the pose's moved by `gun_hold.support_move()`, as every gun's: straight down
+    until the thumb is under the barrel's top, then `hand_seat.seat`'s descent to where the
+    fingers' joints fit the pump best within the arm's reach (2.6 cm forward, 2.2 left
+    and 5.4 down). The hand is moved as one piece; its shape is the clip's. The barrel
+    lies only 2.2 cm over the pump's wood, so the thumb holds the hand low: its joints
+    ride up to 5.0 cm off the wood.
   - **Only down the sights** (`SupportHand` is `SightBlend`): at the hip and on the
     shoulder the hand is the clip's own. `probes/probe_shotgun_hands.py` reads the live
     joints against the pump both ways; with `--windowed` and `OW_GRIP_SHOTS=1` it saves

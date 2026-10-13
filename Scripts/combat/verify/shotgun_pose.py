@@ -7,13 +7,11 @@ the fingers are round the wood, not in it.
 
 from asset_pipeline import lyra_paths as LYRA
 from combat import item_vars as IV
-from combat import pump_seat
+from combat import hand_seat
 from combat.grip import _grip_rotation
 from combat.paths import RETIRED_SHOTGUN_AIM_ANIM_PATH, SHOTGUN_BP_PATH
-from combat.shotgun_hold import (
-    THUMB_TIP_CM, barrel_top, finger_points, hand_points, held, support_move,
-    support_point,
-)
+from combat.gun_hold import THUMB_TIP_CM, finger_points, hand_points
+from combat.shotgun_hold import barrel_top, held, support_move, support_point
 from combat.skin import player_skin
 from combat.support_hand import SUPPORT_POINT_VAR, support_at
 from combat.verify.common import cdo, check, load
@@ -31,7 +29,9 @@ SINK_CM = 1.0
 # Measured at most 4.66, the little finger's knuckle (3.8 on the gun before
 # this one, whose barrel was 0.8 cm higher over its pump; the pose keyed until
 # C3 closed every joint within 1.6).
-PUMP_REACH_CM = 4.75
+# Since the seat keeps the wrist where the arm reaches (hand_seat.reached):
+# 5.02, the hand a little further back along the pump.
+PUMP_REACH_CM = 5.25
 # The grip thumb lies forward along the top of the stock's wrist: at least
 # this far under the sight line (cm; measured 3.6).
 GRIP_THUMB_UNDER_CM = 3.0
@@ -46,7 +46,7 @@ def _fmt(v):
 def pump_distance(point):
     """Signed distance from a point in the weapon's frame to the pump's box
     (SHOTGUN_PUMP): negative inside."""
-    return pump_seat.box_distance(SHOTGUN_PUMP, point)
+    return hand_seat.box_distance(SHOTGUN_PUMP, point)
 
 
 def check_shotgun_clip():
@@ -101,12 +101,6 @@ def check_support_point():
     moved = sum((g - p) ** 2 for g, p in zip(got, pose)) ** 0.5
     check(f"...at least {MOVED_CM:g} cm from where the pose has the hand",
           moved > MOVED_CM, f"{moved:.2f} cm from {pose}")
-    for spec in _weapon_specs():
-        if spec["path"] == SHOTGUN_BP_PATH or spec["aim"] != skin.aim_rifle:
-            continue
-        theirs = cdo(load(spec["path"])).get_editor_property(SUPPORT_POINT_VAR).to_tuple()
-        check(f"...and the {spec['display']} keeps the pose's own point",
-              max(abs(t - p) for t, p in zip(theirs, pose)) < 0.01, str(theirs))
 
 
 def _seated():

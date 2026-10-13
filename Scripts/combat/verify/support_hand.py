@@ -73,7 +73,8 @@ def check_anim_bp_support_hand():
         got = cdo(load(spec["path"])).get_editor_property(SUPPORT_POINT_VAR)
         want = support_point_of(skin, spec, quiet=True)
         check(f"...{spec['display']}'s is where its ready pose holds the left hand "
-              "at its start (the shotgun's, that point moved onto its pump), re-measured",
+              "at its start, moved onto the part of its model the row names "
+              "(combat/gun_hold.py), re-measured",
               max(abs(g - w) for g, w in zip(got.to_tuple(), want)) < 0.01,
               f"{got.to_tuple()} against {want}")
     after = linked(BEL.find_output_pin(ik, "Pose"))

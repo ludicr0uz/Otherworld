@@ -275,8 +275,10 @@ BP_HealthComponent (health_component wires the fragments together)
   hit_zones         head/limb bone tables and multipliers
   hit_bodies        the physics bodies fitted to each model (fit_hit_bodies),
                     and body_coverage(): bodies against the mesh, ray by ray
-  pump_seat         pure: the move that closes the left hand's fingers on the
-                    shotgun's pump, for whatever hand is worn (shotgun_hold)
+  hand_seat         pure: the move that closes the left hand's fingers on the
+                    part of a gun it holds, for whatever hand is worn (gun_hold)
+  gun_hold          both hands fitted to every gun's model in its aimed hold:
+                    the row's `support`, the left hand's point seated on it
   capsule_fit       pure geometry for hit_bodies: a cloud of vertices to its
                     long axis and one to four capsules along it
   ragdoll           joint limits and tune_ragdolls()

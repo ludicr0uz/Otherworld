@@ -48,7 +48,7 @@ A body whose spec names `compatible_with` goes through the same importer as any 
 | clavicles resting far off the source's (the shoulders set back) | `clavicle_align.py` in the retarget pose; `CLAVICLE_DIR` in the keyed poses (`combat/body_pose.py`, `hold_pose.py`) |
 | the two hands' spacing in the two-handed ready poses | `two_hands.py`: the left wrist put back on the source's spacing |
 | hand size against a handle | `combat/grip.py` `_eased`: the handle eased out of a joint that would stand in it |
-| hand size and wrist place against the shotgun's pump | `combat/pump_seat.py`: the hand moved to where its own fingers close on the wood |
+| hand size and wrist place against the shotgun's pump | `combat/hand_seat.py` (every gun's, through `gun_hold.py`): the hand moved to where its own fingers close on the wood |
 | where the crawl clip carries the hips | `combat/body_pose.crawl_hips_z`: measured off the body's own clip |
 
 Each of these was a constant measured on `adventurer_01`, or an accident of its rig, until

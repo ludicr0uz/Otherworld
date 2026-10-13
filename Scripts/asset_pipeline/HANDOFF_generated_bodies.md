@@ -140,7 +140,7 @@ spine line is too tight.
 | the same, in the procedurally keyed poses | the guard and hold poses start from the clavicle, set straight out to the side (`CLAVICLE_DIR`) | `combat/body_pose.py`, `combat/hold_pose.py` |
 | hand spacing in the two-handed ready poses | left wrist put back on the source's spacing by a two-bone reach when more than 3 cm off | `asset_pipeline/two_hands.py` (called in `build_retarget.py`) |
 | hand size against a handle | the handle is eased out of a finger joint that would stand in it, up to 0.4 cm, as far as helps | `combat/grip.py` `_eased` |
-| hand size and wrist place against the shotgun's pump | the shaped left hand is moved to where its own finger joints ride 0.75 cm off the wood; the left arm is turned to carry it | `combat/pump_seat.py` (pure, tested), `combat/shotgun_pose.py` |
+| hand size and wrist place against the shotgun's pump | the shaped left hand is moved to where its own finger joints ride 0.75 cm off the wood; the left arm is turned to carry it | `combat/hand_seat.py` (pure, tested), `combat/shotgun_pose.py` |
 | where the left hand is held down the sights | each gun carries its own `SupportPoint` (read off its own ready pose); the old `SupportRifle` flag and its two fixed points are gone | `combat/support_hand.py`, `combat/weapon_component/support_hand.py`, `pose_weights.py`, `weapon_items.py`, `weapon_specs.py` |
 | where the crawl clip carries the hips | measured off the worn body's own clip | `combat/body_pose.crawl_hips_z` |
 | which side of a flat open hand is the palm | the two hands vote together (mirror images) | `asset_pipeline/palm_twist.hand_frame` |
@@ -222,7 +222,7 @@ Clip-normalisation numbers logged at build time, for reference:
    hand, thick handle. Fixed by `grip._eased` (best effort up to 0.4 cm). If a still smaller
    hand fails, the honest fix is opening the fingers per handle thickness, not the bound.
 8. **Shotgun: left hand in the wood or off it, at the hip or down the sights.** At the hip
-   it is the pose (`pump_seat.py`). Down the sights it is the support-hand IK target, which
+   it is the pose (`hand_seat.py`). Down the sights it is the support-hand IK target, which
    must be the shotgun's own `SupportPoint`; `verify/support_hand.py` re-measures each gun's.
 9. **A body looks blotched or scrambled in a capture.** Not a texture or UV fault. Meshy's
    remeshed atlas is hundreds of islands packed edge to edge; a capture taken a moment after

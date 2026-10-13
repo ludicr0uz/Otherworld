@@ -18,8 +18,7 @@ from combat.paths import (
 )
 from combat.skin import player_skin
 from Sound.sound_weapons import fire_sound, reload_sound
-from combat.shotgun_hold import support_point
-from combat.support_hand import support_at
+from combat import gun_hold
 from item_icons.items import icon_name
 from combat.weapon_models import (
     PISTOL_MODEL, PISTOL_MUZZLE, PISTOL_SIGHT, PISTOL_SIGHT_FRONT,
@@ -30,6 +29,7 @@ from combat.weapon_models import (
     SMG_SIGHT_FRONT, SMG_SIGHT_REAR, SNIPER_MODEL, SNIPER_MUZZLE, SNIPER_SIGHT,
     SNIPER_SIGHT_FRONT, SNIPER_SIGHT_REAR, pistol_outline, rifle_outline,
     shotgun_outline, smg_outline, sniper_outline,
+    PISTOL_SUPPORT, RIFLE_SUPPORT, SHOTGUN_SUPPORT, SMG_SUPPORT, SNIPER_SUPPORT,
 )
 from combat.tuning import (
     GUN_LOOT_TABLE, RIFLE_RESERVE, SHOTGUN_RESERVE, SMG_RESERVE, SNIPER_RESERVE,
@@ -117,13 +117,13 @@ def _weapon_specs():
     # The rifle's pose: the left hand's point is its own (shotgun_hold.py).
     AIM_SHOTGUN = AIM_RIFLE
     specs = (
-        dict(path=SHOTGUN_BP_PATH, parts=shotgun_outline(), model=SHOTGUN_MODEL, muzzle=SHOTGUN_MUZZLE, sight=SHOTGUN_SIGHT,
+        dict(path=SHOTGUN_BP_PATH, parts=shotgun_outline(), model=SHOTGUN_MODEL, muzzle=SHOTGUN_MUZZLE, sight=SHOTGUN_SIGHT, support=SHOTGUN_SUPPORT,
              sight_rear=SHOTGUN_SIGHT_REAR, sight_front=SHOTGUN_SIGHT_FRONT,
              display="Shotgun", automatic=False,
              sound=fire_sound(SHOTGUN_BP_PATH), reload_sound=reload_sound(SHOTGUN_BP_PATH), aim=AIM_SHOTGUN,
              grip_rot=_grip_rotation(AIM_SHOTGUN), trigger_reach=SHOTGUN_TRIGGER_REACH_CM,
              uses_ammo=True, reserve=SHOTGUN_RESERVE),
-        dict(path=PISTOL_BP_PATH, parts=pistol_outline(), model=PISTOL_MODEL, muzzle=PISTOL_MUZZLE, sight=PISTOL_SIGHT,
+        dict(path=PISTOL_BP_PATH, parts=pistol_outline(), model=PISTOL_MODEL, muzzle=PISTOL_MUZZLE, sight=PISTOL_SIGHT, support=PISTOL_SUPPORT,
              sight_rear=PISTOL_SIGHT_REAR, sight_front=PISTOL_SIGHT_FRONT,
              display="Pistol", automatic=False,
              sound=fire_sound(PISTOL_BP_PATH), reload_sound=reload_sound(PISTOL_BP_PATH), aim=AIM_PISTOL,
@@ -133,7 +133,7 @@ def _weapon_specs():
         # per round of the five and the highest per second, which is the whole
         # identity: it wins a fight it is already in and empties fast. The SMG11
         # is a machine pistol, so it is held in the pistol's ready pose.
-        dict(path=SMG_BP_PATH, parts=smg_outline(), model=SMG_MODEL, muzzle=SMG_MUZZLE, sight=SMG_SIGHT,
+        dict(path=SMG_BP_PATH, parts=smg_outline(), model=SMG_MODEL, muzzle=SMG_MUZZLE, sight=SMG_SIGHT, support=SMG_SUPPORT,
              sight_rear=SMG_SIGHT_REAR, sight_front=SMG_SIGHT_FRONT,
              display="SMG", automatic=True,
              sound=fire_sound(SMG_BP_PATH), reload_sound=reload_sound(SMG_BP_PATH), aim=AIM_PISTOL,
@@ -141,7 +141,7 @@ def _weapon_specs():
              uses_ammo=True, reserve=SMG_RESERVE),
         # Five rounds to a kill at 0.14 s apart, accurate to 90 m. The generalist,
         # and the one a player who finds it will simply keep.
-        dict(path=RIFLE_BP_PATH, parts=rifle_outline(), model=RIFLE_MODEL, muzzle=RIFLE_MUZZLE, sight=RIFLE_SIGHT,
+        dict(path=RIFLE_BP_PATH, parts=rifle_outline(), model=RIFLE_MODEL, muzzle=RIFLE_MUZZLE, sight=RIFLE_SIGHT, support=RIFLE_SUPPORT,
              sight_rear=RIFLE_SIGHT_REAR, sight_front=RIFLE_SIGHT_FRONT,
              display="Rifle", automatic=True,
              sound=fire_sound(RIFLE_BP_PATH), reload_sound=reload_sound(RIFLE_BP_PATH), aim=AIM_RIFLE,
@@ -152,7 +152,7 @@ def _weapon_specs():
         # The cost is 1.6 s between shots, which against a pack of five that
         # runs at 600 cm/s is the difference between opening at distance and
         # being caught reloading.
-        dict(path=SNIPER_BP_PATH, parts=sniper_outline(), model=SNIPER_MODEL, muzzle=SNIPER_MUZZLE, sight=SNIPER_SIGHT,
+        dict(path=SNIPER_BP_PATH, parts=sniper_outline(), model=SNIPER_MODEL, muzzle=SNIPER_MUZZLE, sight=SNIPER_SIGHT, support=SNIPER_SUPPORT,
              sight_rear=SNIPER_SIGHT_REAR, sight_front=SNIPER_SIGHT_FRONT,
              display="Sniper", automatic=False,
              sound=fire_sound(SNIPER_BP_PATH), reload_sound=reload_sound(SNIPER_BP_PATH), aim=AIM_RIFLE,
@@ -170,19 +170,17 @@ def _weapon_specs():
         # the gun across the body on it.
         spec["two_handed"] = spec["aim"] in two_handed_poses(skin)
         spec["grip_loc"] = _grip_location(spec["aim"], spec["grip_rot"], spec["parts"])
-        # Where its own ready pose has the left hand: held there down the
-        # sights (support_hand.py).
+        # Where the left hand is held down the sights (support_hand.py):
+        # its ready pose's place, moved onto the part the row names.
         spec["support_point"] = support_point_of(skin, spec)
     return specs
 
 
 def support_point_of(skin, spec, quiet=False):
     """Where ``spec``'s gun has the left hand down the sights, in the right
-    hand's bone space: where its ready pose has it, and for the shotgun that
-    point moved onto its pump (shotgun_hold.py)."""
-    if spec["path"] == SHOTGUN_BP_PATH:
-        return support_point(skin, quiet)
-    return support_at(skin, spec["aim"])
+    hand's bone space: where its ready pose has it, moved onto the part of
+    the model its row names (`support`, gun_hold.py)."""
+    return gun_hold.support_point(skin, spec, quiet)
 
 
 def two_handed_poses(skin):

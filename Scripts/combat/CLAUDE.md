@@ -108,7 +108,11 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   - `Inventory` is one typed array of `BP_WeaponItem`;
   - firing reads every stat off `Held`, with one cast and no per-weapon branching.
 - **A new weapon is a row plus a model and its outline.** Add a row in
-  `weapon_specs._weapon_specs()`. Adding the SMG, the rifle and the sniper changed **no** node
+  `weapon_specs._weapon_specs()`. Both hands are fitted to its model by the build
+  (`gun_hold.py`): the row's `support` names the part the left hand holds down the sights,
+  and `weapon_models.GUN_HOLDS` has the gun's line; `verify/gun_hold.py` and
+  `probes/probe_gun_hands.py` hold every gun to it (`docs/aiming.md`, "Both hands are
+  fitted to each gun's model"). Adding the SMG, the rifle and the sniper changed **no** node
   in the fire, reload or gate graphs.
 - **The pistol is a 1911** (`weapon_models.py`): Stein Games' `SM_1911_02`, a Fab listing
   taken raw ("1911 Pistol - High Poly" in `fab_library.json`, under
@@ -133,7 +137,7 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   its guard from the rifle's ready pose (`docs/aiming.md`). The shotgun is held in the
   rifle's ready pose, a shipped clip, and down the sights its left hand is held on a point
   of its own, on the pump with the thumb under the barrel's top (`shotgun_hold.py`,
-  `pump_seat.py`; "The gun poses" below).
+  `gun_hold.py`; "The gun poses" below).
 - **The SMG, the rifle and the sniper are Fab models**: `docs/history/combat.md#the-smg-the-rifle-and-the`
 - **Equipping is authored once.** BeginPlay, a slot key, drop and pick-up only change an
   item's `Slot` or `Inventory`; the slot sync raises `NeedsRefresh` when the hand slot's item
@@ -401,13 +405,19 @@ the asset from a checkout that has it).
   (`aim_pitch.py`); no aim offset asset is used.
 - **The shotgun is the rifle's clip with one offset** (`shotgun_hold.py`): its
   `SupportPoint`, the point the support hand's IK holds the left wrist on down the sights,
-  is the pose's point moved onto the pump (6 cm forward, 5.4 down on the worn hand), found
-  by `pump_seat.seat` with the thumb kept under the barrel's top. Unmoved, the thumb's tip
-  is 4.2 cm above the shotgun's sight line. The hand's shape is the clip's, so its joints
-  ride up to 4.7 cm off the wood (`verify/shotgun_pose.PUMP_REACH_CM`), and the point
+  is the pose's point moved onto the pump (2.6 cm forward, 5.4 down on the worn hand: as
+  far forward as the arm reaches), found by `hand_seat.seat` with the thumb kept under the
+  barrel's top. Unmoved, the thumb's tip is 4.2 cm above the shotgun's sight line. The
+  hand's shape is the clip's, so its joints ride up to 5.0 cm off the wood
+  (`verify/shotgun_pose.PUMP_REACH_CM`), and the point
   holds only down the sights: at the hip the hand is where the clip has it. Lyra's own
   `MM_Shotgun_Idle_ADS` is the rifle's with the left hand 2 cm further back, further from
   this pump, so it is not taken.
+- **Every gun's left hand is seated on its own model** (`gun_hold.py`), the shotgun's
+  being one case: the AK's on its handguard clear of the magazine, the Val's on the front
+  of its receiver, the pistol's and the SMG's over the right hand's fingers on the grip.
+  The seat counts the arm's reach, because the IK does not stretch: a point past the arm
+  is never arrived at (`docs/aiming.md`).
 - **Lyra's pistol pose lays the trigger finger straight along the frame.** Three things
   follow. `grip.fist_in_socket` leaves a finger on a circle wider than
   `CURL_MAX_RADIUS_CM` out of the fist's middle (the index's was 44 cm, which put the

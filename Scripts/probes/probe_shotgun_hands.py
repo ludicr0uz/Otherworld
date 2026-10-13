@@ -13,7 +13,7 @@ right, +Z up) against the pump's measured box (weapon_models.SHOTGUN_PUMP):
   - at the hip the hand is where the clip has it (noted, not checked);
   - down the sights no joint is more than 1.5 cm inside the wood (a joint is
     the bone's axis, about a centimetre under the skin), every joint is
-    within 4.75 cm of it, and the hand has come down and forward onto it;
+    within 5.25 cm of it, and the hand has come down and forward onto it;
   - and the thumb's joints are under the barrel's top, so under the sight
     line.
 
@@ -45,7 +45,9 @@ SEATED = 0.99           # the camera is on the sights
 # blend: the pose is layered over the idle, and the arms drift a little apart
 # (measured live on the pump-action of Oct 2026: 0.40 inside at most, 4.54 off).
 SINK_CM = 1.5
-REACH_CM = 4.75
+# Since the seat keeps the wrist where the arm reaches (it was 3.7 cm past
+# it, and the live wrist stopped that short): the static fit is 5.02.
+REACH_CM = 5.25
 # The hand comes at least this far down onto the pump from the hip's (cm).
 DOWN_CM = 3.0
 # (name, the camera in the gun's frame, what it looks at there), cm.

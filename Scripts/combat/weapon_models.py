@@ -97,6 +97,10 @@ SMG_SIGHT_REAR = (-9.1, 0.0, 11.7)
 SMG_SIGHT_FRONT = (14.1, 0.0, 11.7)
 SMG_SIGHT = _eye_behind(SMG_SIGHT_REAR, SMG_SIGHT_FRONT, -24.0)
 
+# What the left hand holds down the sights (gun_hold.py): a machine pistol in
+# the pistol's pose, so the right hand's fingers on the grip.
+SMG_SUPPORT = dict(part="Grip", fist=True)
+
 
 def smg_outline():
     return (
@@ -141,6 +145,10 @@ RIFLE_SIGHT_REAR = (20.35, 0.0, 13.77)
 RIFLE_SIGHT_FRONT = (59.3, 0.0, 13.30)
 RIFLE_SIGHT = _eye_behind(RIFLE_SIGHT_REAR, RIFLE_SIGHT_FRONT, -17.0)
 
+# What the left hand holds down the sights (gun_hold.py): the wooden
+# handguard, ahead of the magazine.
+RIFLE_SUPPORT = dict(part="Handguard")
+
 
 def rifle_outline():
     return (
@@ -183,6 +191,14 @@ SNIPER_SIGHT_REAR = (SCOPE_EYEPIECE_X, 0.0, SCOPE_AXIS_Z)
 SNIPER_SIGHT_FRONT = (SCOPE_AT[0] + 22.8, 0.0, SCOPE_AXIS_Z)
 SNIPER_SIGHT = _eye_behind(SNIPER_SIGHT_REAR, SNIPER_SIGHT_FRONT,
                            SCOPE_EYEPIECE_X - 10.0)
+
+# The Val's handguard, where the left hand closes: the receiver's front, ahead
+# of the magazine and behind the suppressor, measured off the mesh (its
+# underside is at z 6.0 to 6.5 there; the outline's "Receiver" box is the
+# whole receiver, whose underside behind the magazine is 3 cm lower).
+SNIPER_HANDGUARD = ((26.0, -2.2, 6.0), (36.0, 2.3, 13.1))
+# What the left hand holds down the sights (gun_hold.py).
+SNIPER_SUPPORT = dict(box=SNIPER_HANDGUARD)
 
 
 def sniper_outline():
@@ -261,6 +277,9 @@ SHOTGUN_WRIST = ((-7.4, -1.5, -7.1), (2.2, 1.5, 0.9))
 # reaching half a centimetre up the sides of the barrel (which runs
 # y -1.1..1.1, z 2.3..4.6, a rib on it to 5.0), measured.
 SHOTGUN_PUMP = ((29.1, -2.1, -2.0), (47.7, 2.1, 2.8))
+# What the left hand holds down the sights (gun_hold.py): the pump, its thumb
+# under the barrel's top, which is under the sight line.
+SHOTGUN_SUPPORT = dict(part="Pump", under="Barrel")
 
 
 def shotgun_outline():
@@ -319,6 +338,10 @@ PISTOL_SIGHT_REAR = (-0.58, 0.0, 8.064)
 PISTOL_SIGHT_FRONT = (15.01, 0.0, 7.902)
 PISTOL_SIGHT = _eye_behind(PISTOL_SIGHT_REAR, PISTOL_SIGHT_FRONT, -25.0)
 
+# What the left hand holds down the sights (gun_hold.py): the right hand's
+# fingers on the grip, a two-handed pistol hold.
+PISTOL_SUPPORT = dict(part="Grip", fist=True)
+
 
 def pistol_outline():
     return (
@@ -336,3 +359,17 @@ def pistol_outline():
         # The guard's bar under the trigger.
         _box("TriggerGuard", (1.8, -0.5, 0.9),    (7.4, 0.5, 1.45)),
     )
+
+
+# Each gun Blueprint's outline and what its left hand holds, by the
+# Blueprint's name: what a running game can read (a probe has the held item's
+# class and no weapon_specs, which measures assets only the editor loads).
+# The rows of weapon_specs carry the same two; verify/gun_hold.py holds the
+# two tables together, so a new gun is added to both.
+GUN_HOLDS = {
+    "BP_Shotgun": (shotgun_outline, SHOTGUN_SUPPORT),
+    "BP_Pistol": (pistol_outline, PISTOL_SUPPORT),
+    "BP_SMG": (smg_outline, SMG_SUPPORT),
+    "BP_AssaultRifle": (rifle_outline, RIFLE_SUPPORT),
+    "BP_SniperRifle": (sniper_outline, SNIPER_SUPPORT),
+}

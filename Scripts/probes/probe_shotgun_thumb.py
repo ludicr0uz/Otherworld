@@ -34,7 +34,7 @@ import unreal
 from combat.grip import part_placement
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import SEAT_VAR, SIGHTS_FORCED_VAR
-from combat.shotgun_hold import THUMB_TIP_CM
+from combat.gun_hold import THUMB_TIP_CM
 from combat.skin import skin_of_mesh
 from combat.weapon_models import shotgun_outline
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR

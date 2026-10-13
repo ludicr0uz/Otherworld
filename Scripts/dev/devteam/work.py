@@ -447,6 +447,7 @@ def resume(args, wanted, meter, pauser):
             print(f"dev-team: {error}")
             return 1
         print(f"    on {branch}, the parked work uncommitted again")
+    base = pause.tip(ROOT) if branch else None
     run_dir = record.get("run_dir") or ""
     if not os.path.isdir(run_dir):
         run_dir = os.path.join(LOG_ROOT, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -474,7 +475,7 @@ def resume(args, wanted, meter, pauser):
         print(f"dev-team: the resumed task failed; its work is on {branch or 'this branch'}")
         return 1
     if branch:
-        print(f"dev-team: {pause.land(ROOT, branch, record.get('original'))}")
+        print(f"dev-team: {pause.land(ROOT, branch, record.get('original'), base)}")
     task_file = record.get("task_file")
     if task_file and task.line is not None and os.path.isfile(task_file):
         tick(task_file, task)

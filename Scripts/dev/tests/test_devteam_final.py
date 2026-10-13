@@ -236,7 +236,7 @@ class GatedRun(unittest.TestCase):
     def test_the_terminal_output_is_kept_in_run_log(self):
         _code, out, _progress = self.run_cli()
         logs = os.path.join(self.tmp, "logs")
-        run = os.listdir(logs)[0]
+        run = next(d for d in os.listdir(logs) if os.path.isdir(os.path.join(logs, d)))
         with open(os.path.join(logs, run, "run.log")) as fh:
             kept = fh.read()
         self.assertIn(f"run {run} -- logs in", out)

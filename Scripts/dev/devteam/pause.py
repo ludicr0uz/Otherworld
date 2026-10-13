@@ -15,7 +15,8 @@ task in hand:
 again (the work is uncommitted once more, as the session left it), puts the
 transcript back if Claude Code has cleaned it up meanwhile, and resumes the
 same session. When the task then finishes, the branch it was paused from is
-fast-forwarded to it if it has not moved, and the pause branch deleted.
+moved up to it if it has not moved since the pause, and the pause branch
+deleted.
 
 The WIP commit holds *everything* that was uncommitted, edits that were there
 before the task began included: they are parked with the task and come back
@@ -260,13 +261,21 @@ def unpark(root, name, branch, keep=()):
     return None
 
 
-def land(root, branch, original):
-    """After a resumed task finished: fast-forward the branch it was paused
-    from, if that has not moved, and delete the pause branch. Returns one
-    line saying where the work is now."""
+def tip(root, ref="HEAD"):
+    return git(root, "rev-parse", "--verify", "-q", ref).stdout.strip()
+
+
+def land(root, branch, original, base=None):
+    """After a resumed task finished: move the branch it was paused from up
+    to it, if that has not moved since the pause, and delete the pause
+    branch. ``base`` is the pause branch's tip when the resumed half began
+    (``tip`` after ``unpark``): the write-up amends the task's commit, and
+    when the session made that commit before the pause it is the original
+    branch's tip too, so the finished branch no longer descends from it.
+    Returns one line saying where the work is now."""
     if not original or not branch or original == branch:
         return f"the work is on {branch or current_branch(root)}"
-    if git(root, "merge-base", "--is-ancestor", original, branch).returncode:
+    if git(root, "merge-base", "--is-ancestor", original, base or branch).returncode:
         return (f"{original} has moved since the pause, so the work stays on {branch}: "
                 f"merge it when you are ready")
     # Move the name, then change to it: the same commit, so nothing uncommitted
@@ -274,7 +283,7 @@ def land(root, branch, original):
     if (git(root, "branch", "-f", original, branch).returncode
             or git(root, "switch", original).returncode):
         return f"could not move {original} up; the work stays on {branch}"
-    git(root, "branch", "-d", branch)
+    git(root, "branch", "-D" if base else "-d", branch)
     return f"{original} now has the work; {branch} is deleted"
 
 

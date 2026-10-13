@@ -317,6 +317,39 @@ class LandTest(Repo):
         self.assertEqual(self.status(), [" M tasks.md"])
         self.assertEqual(git(self.root, "branch", "--list", "paused/*").stdout.strip(), "")
 
+    def test_a_commit_made_before_the_pause_and_amended_after_still_lands(self):
+        # The session committed, the pause came in the sweep after it, and the
+        # resumed task's write-up amended that commit: the original branch's
+        # tip is the commit as it was.
+        self.write("code.py", "one\ntwo\n")
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "-qm", "the task")
+        pause.park(self.root, "t-1", "Do it")
+        pause.unpark(self.root, "t-1", "paused/t-1")
+        base = pause.tip(self.root)
+        git(self.root, "commit", "-q", "--amend", "--allow-empty", "-m", "the task\n\nTime: 1m")
+        done = self.head()
+        self.assertNotEqual(done, base)
+        said = pause.land(self.root, "paused/t-1", "work", base)
+        self.assertIn("work now has the work", said)
+        self.assertEqual(pause.current_branch(self.root), "work")
+        self.assertEqual(self.head(), done)
+        self.assertEqual(git(self.root, "branch", "--list", "paused/*").stdout.strip(), "")
+
+    def test_an_original_branch_that_moved_is_left_alone_whatever_the_base(self):
+        self.write("code.py", "one\ntwo\n")
+        pause.park(self.root, "t-1", "Do it")
+        self.write("other.py", "meanwhile\n")
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "-qm", "other work")
+        moved = self.head()
+        pause.unpark(self.root, "t-1", "paused/t-1")
+        base = pause.tip(self.root)
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "-qm", "the task")
+        self.assertIn("has moved", pause.land(self.root, "paused/t-1", "work", base))
+        self.assertEqual(self.head("work"), moved)
+
     def test_an_original_branch_that_moved_is_left_alone(self):
         self.write("code.py", "one\ntwo\n")
         pause.park(self.root, "t-1", "Do it")

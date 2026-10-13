@@ -4405,30 +4405,31 @@ dev/devteam/limits.py:112: clock
 dev/devteam/limits.py:116: wait
 dev/devteam/nightly.py:25: DEFAULT_SET
 dev/devteam/nightly.py:28: report
-dev/devteam/pause.py:49: WORD
-dev/devteam/pause.py:50: STOP_WORD
-dev/devteam/pause.py:51: MARK
-dev/devteam/pause.py:52: MANIFEST
-dev/devteam/pause.py:53: INTERRUPT_WAITS
-dev/devteam/pause.py:56: class Paused
-dev/devteam/pause.py:67: class Pauser
-dev/devteam/pause.py:124: interrupt
-dev/devteam/pause.py:141: claude_projects
-dev/devteam/pause.py:147: transcript
-dev/devteam/pause.py:155: backup_session
-dev/devteam/pause.py:170: restore_session
-dev/devteam/pause.py:190: slug
-dev/devteam/pause.py:195: current_branch
-dev/devteam/pause.py:199: is_wip
-dev/devteam/pause.py:205: _dirty
-dev/devteam/pause.py:211: park
-dev/devteam/pause.py:243: unpark
-dev/devteam/pause.py:263: land
-dev/devteam/pause.py:283: pause_dir
-dev/devteam/pause.py:287: save
-dev/devteam/pause.py:297: find
-dev/devteam/pause.py:312: listing
-dev/devteam/pause.py:326: forget
+dev/devteam/pause.py:50: WORD
+dev/devteam/pause.py:51: STOP_WORD
+dev/devteam/pause.py:52: MARK
+dev/devteam/pause.py:53: MANIFEST
+dev/devteam/pause.py:54: INTERRUPT_WAITS
+dev/devteam/pause.py:57: class Paused
+dev/devteam/pause.py:68: class Pauser
+dev/devteam/pause.py:125: interrupt
+dev/devteam/pause.py:142: claude_projects
+dev/devteam/pause.py:148: transcript
+dev/devteam/pause.py:156: backup_session
+dev/devteam/pause.py:171: restore_session
+dev/devteam/pause.py:191: slug
+dev/devteam/pause.py:196: current_branch
+dev/devteam/pause.py:200: is_wip
+dev/devteam/pause.py:206: _dirty
+dev/devteam/pause.py:212: park
+dev/devteam/pause.py:244: unpark
+dev/devteam/pause.py:264: tip
+dev/devteam/pause.py:268: land
+dev/devteam/pause.py:292: pause_dir
+dev/devteam/pause.py:296: save
+dev/devteam/pause.py:306: find
+dev/devteam/pause.py:321: listing
+dev/devteam/pause.py:335: forget
 dev/devteam/probe_gate.py:20: PREFIX
 dev/devteam/probe_gate.py:21: PER_PROBE_SECONDS
 dev/devteam/probe_gate.py:25: MAX_RERUNS

@@ -374,13 +374,18 @@ ThrowDueTime = Var("ThrowDueTime", FLOAT, 0.0)
 # The pick-up's clip (pickup_clip.py): the reach down for an item taken off
 # the ground. The builder fills it where the skin has one.
 PickUpAnim = Var("PickUpAnim", _CLIP)
-# The reload's clip (reload_clip.py): the magazine change, the ready clips of
-# the guns that reload with it (the AKM's and the sniper's), the world time
-# the ready pose takes the slot back, and how far the left hand has let go
-# of the gun down the sights. The builder fills the first two where the skin
-# has the clip.
+# The reload's clip (reload_clip.py): the ready clips of the guns that
+# reload with one (ReloadFor), each one's clip and play rate beside it
+# (ReloadClips, ReloadRates: three arrays read by one index, filled by the
+# builder where the skin has the clip); the clip the last reload played and
+# the ready pose it was played for (ReloadAnim, ReloadPose, written by the
+# play); the world time the ready pose takes the slot back, and how far the
+# left hand has let go of the gun down the sights.
 ReloadAnim = Var("ReloadAnim", _CLIP)
+ReloadPose = Var("ReloadPose", _CLIP)
 ReloadFor = Var("ReloadFor", array(_CLIP))
+ReloadClips = Var("ReloadClips", array(_CLIP))
+ReloadRates = Var("ReloadRates", array(FLOAT))
 ReloadClipEnds = Var("ReloadClipEnds", FLOAT, 0.0)
 ReloadHand = Var("ReloadHand", FLOAT, 0.0)
 # Chopping a tree (chop.py): the tree being cut, the blows on it, where the
@@ -427,7 +432,8 @@ STATE = (
     Thrown, ThrowStart, ThrowVelocity, ThrowLast, ThrowTime, ThrowFlyer, ThrowStamp,
     ThrowStopped, ThrowEnded, ThrowEndFrom, ThrowEndAt, ThrowEndOff, ThrowEndParent,
     ThrowEndBone, ThrowEndTime, ThrowTwin, ThrowLetGo, ThrowPast, ThrowBone, ThrowSkin,
-    ThrowAnim, ThrowReadyAnim, ThrowWinding, ThrowDueTime, PickUpAnim, ReloadAnim, ReloadFor,
+    ThrowAnim, ThrowReadyAnim, ThrowWinding, ThrowDueTime, PickUpAnim, ReloadAnim, ReloadPose, ReloadFor,
+    ReloadClips, ReloadRates,
     ReloadClipEnds, ReloadHand, ChopTree, ChopItem,
     ChopCount,
     WoodSpot, WoodClass, LightWood, ThrowArc, ThrowArcClass,

@@ -256,11 +256,11 @@ def _author_equip(ed, exec_in):
     _connect(picking_up(ed, anim_out, keep), _pin(taken_up, "B"))
     # ...nor the reload's (reload_clip.py): the reload raises a lowered gun,
     # and that raise runs this equip the frame after the clip starts. Only
-    # while the pose in hand is still a gun's that reloads with the clip:
+    # while the pose in hand is still the one the clip was played for:
     # another gun taken out cuts it.
     reloading = keep(_node(ed, FN_AND))
     _connect(reload_clip.holding(ed, anim_out, keep), _pin(reloading, "A"))
-    _connect(reload_clip.reloads_with_clip(ed, keep), _pin(reloading, "B"))
+    _connect(reload_clip.same_gun(ed, keep), _pin(reloading, "B"))
     busy = keep(_node(ed, FN_OR))
     _connect(out(taken_up), _pin(busy, "A"))
     _connect(out(reloading), _pin(busy, "B"))

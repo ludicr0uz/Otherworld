@@ -1,9 +1,10 @@
 """verify.reload_clip -- the reload's clip (weapon_component/reload_clip.py):
-the AKM and the sniper change their magazine in one clip, Lyra's rifle
-reload on the player's skeleton, played by Fx_Reload into the upper-body
-slot on every machine that plays the clack; the keep-alive and the equip
-leave it there and the ready pose takes over at its end; the left hand's
-hold down the sights lets go for it.
+the AKM and the sniper change their magazine in Lyra's rifle reload, the
+pistol and the SMG in its pistol reload, each on the player's skeleton and
+at the rate that fits its gun's reload, played by Fx_Reload into the
+upper-body slot on every machine that plays the clack; the keep-alive and
+the equip leave it there and the ready pose takes over at its end; the left
+hand's hold down the sights lets go for it.
 """
 
 import unreal
@@ -12,6 +13,8 @@ from asset_pipeline import lyra_paths as LYRA
 from combat import item_vars as IV
 from combat.anim_blueprint import AIM_SLOT
 from combat.fx_vars import RELOAD, fx_event
+from combat.finger_pose import clip_for
+from combat.gun_rows import gun_row
 from combat.reload_tuning import (
     RELOAD_BLEND_IN_S, RELOAD_BLEND_OUT_S, RELOAD_CLIP_GUNS, RELOAD_HANDOVER_S)
 from combat.skin import player_skin
@@ -27,9 +30,11 @@ from combat.weapon_specs import _weapon_specs
 ANIM = unreal.AnimationLibrary
 ROOT_MOTION = "enable_root_motion"
 # How far the left hand has to leave where the clip starts it, in the right
-# hand's frame: a magazine change, not a pose. Measured 100 cm (it reaches
-# for the pouch 0.6 s in, 87 cm from the right hand).
+# hand's frame: a magazine change, not a pose. Measured 100 cm in the
+# rifle's (it reaches for the pouch 0.6 s in, 87 cm from the right hand).
 HAND_TRAVEL_CM = 15.0
+# The skin's clips and the Lyra clip each is.
+SOURCES = {"reload_rifle": LYRA.RELOAD_RIFLE, "reload_pistol": LYRA.RELOAD_PISTOL}
 
 
 def _path(asset):
@@ -67,39 +72,71 @@ def hand_travel(clip, skin, steps=22):
     return max((at(length * i / steps) - first).length() for i in range(1, steps + 1))
 
 
-def check_clip():
-    """The clip itself and the guns it is for."""
+def _rows():
+    """What the component's three arrays should hold: (gun, ready pose,
+    clip, reload seconds) for each gun whose clip the worn skin has."""
     skin = player_skin()
-    clip = w.get_editor_property(str(WV.ReloadAnim))
-    check("the reload's clip is the worn skin's (none on a skin without one)",
-          _path(clip) == skin.reload_rifle, f"{_path(clip)} for {skin.reload_rifle}")
+    return [(name, clip_for(name), getattr(skin, field), gun_row(display)["reload_s"])
+            for name, (display, field) in RELOAD_CLIP_GUNS.items() if getattr(skin, field)]
+
+
+def check_clip():
+    """The clips themselves, the guns each is for and its rate."""
+    skin = player_skin()
+    rows = _rows()
+    poses = [_path(c) for c in w.get_editor_property(str(WV.ReloadFor))]
+    clips = [_path(c) for c in w.get_editor_property(str(WV.ReloadClips))]
+    rates = [float(r) for r in w.get_editor_property(str(WV.ReloadRates))]
+    check(f"the guns that reload with a clip are {', '.join(RELOAD_CLIP_GUNS)}, each by "
+          f"its own ready clip ({WV.ReloadFor}; none on a skin without the clips)",
+          poses == [r[1] for r in rows] and len(set(poses)) == len(poses), str(poses))
     guns = {sp["path"].rsplit("/", 1)[1]: _path(cdo(load(sp["path"])).get_editor_property(
         str(IV.AimPose))) for sp in _weapon_specs()}
-    want = sorted(guns[name] for name in RELOAD_CLIP_GUNS) if clip else []
-    got = sorted(_path(c) for c in w.get_editor_property(str(WV.ReloadFor)))
-    others = sorted(name for name, pose in guns.items()
-                    if pose in got and name not in RELOAD_CLIP_GUNS)
-    check(f"...played for the ready poses of {' and '.join(RELOAD_CLIP_GUNS)} and no "
-          f"other gun's ({WV.ReloadFor}: the AKM and the sniper reload alike)",
-          got == want and not others, f"{got}; also {others}")
-    if clip is None:
+    wrong = sorted(name for name, pose in guns.items()
+                   if (pose in poses) != (name in [r[0] for r in rows])
+                   or (pose in poses and poses.index(pose) != [r[0] for r in rows].index(name)))
+    check("...which is what each of those guns is held in, and no other gun "
+          "(the shotgun reloads with its sound alone)", not wrong, f"wrong: {wrong}")
+    check(f"...each with its clip beside it ({WV.ReloadClips}: the rifle's for the AKM "
+          "and the sniper, the pistol's for the pistol and the SMG)",
+          clips == [r[2] for r in rows], str(clips))
+    check(f"{WV.ReloadAnim} and {WV.ReloadPose} are the play's to write: none until a "
+          "reload",
+          w.get_editor_property(str(WV.ReloadAnim)) is None
+          and w.get_editor_property(str(WV.ReloadPose)) is None)
+    if clips != [r[2] for r in rows]:
         return
-    source = load(LYRA.RELOAD_RIFLE)
-    check("the clip is Lyra's rifle reload on the player's skeleton, as long as "
-          "Lyra's, and in place (a slot play with root motion roots the player)",
-          skin.reload_rifle == LYRA.uefn_clip(LYRA.RELOAD_RIFLE)
-          and clip.get_editor_property("skeleton")
-          == load(skin.mesh).get_editor_property("skeleton")
-          and abs(clip.get_play_length() - source.get_play_length()) < 0.05
-          and not clip.get_editor_property(ROOT_MOTION),
-          f"{clip.get_play_length():.2f} s against {source.get_play_length():.2f}")
-    travel = hand_travel(clip, skin)
-    check(f"...in which the left hand leaves the gun: over {HAND_TRAVEL_CM:g} cm from "
-          "where the clip starts it, in the right hand's frame",
-          travel > HAND_TRAVEL_CM, f"{travel:.1f} cm")
-    check(f"the ready pose takes over {RELOAD_HANDOVER_S:g} s before the clip's end: "
-          f"before its own blend out ({RELOAD_BLEND_OUT_S:g} s) begins",
-          RELOAD_BLEND_OUT_S < RELOAD_HANDOVER_S < clip.get_play_length() / 2)
+    fits = [f"{name} {rate:.2f} for {load(clip).get_play_length() / secs:.2f}"
+            for (name, _pose, clip, secs), rate in zip(rows, rates)
+            if abs(rate - load(clip).get_play_length() / secs) > 0.005]
+    check(f"...and the rate that ends the clip with the gun's reload ({WV.ReloadRates}: "
+          "the clip's length over the row's reload time)",
+          len(rates) == len(rows) and not fits, f"{[round(r, 2) for r in rates]}; {fits}")
+    for field, source_path in SOURCES.items():
+        path = getattr(skin, field)
+        if not path:
+            continue
+        clip, source = load(path), load(source_path)
+        label = source_path.rsplit("/", 1)[1]
+        check(f"{field} is Lyra's {label} on the player's skeleton, as long as Lyra's, "
+              "and in place (a slot play with root motion roots the player)",
+              path == LYRA.uefn_clip(source_path)
+              and clip.get_editor_property("skeleton")
+              == load(skin.mesh).get_editor_property("skeleton")
+              and abs(clip.get_play_length() - source.get_play_length()) < 0.05
+              and not clip.get_editor_property(ROOT_MOTION),
+              f"{clip.get_play_length():.2f} s against {source.get_play_length():.2f}")
+        travel = hand_travel(clip, skin)
+        check(f"...in which the left hand leaves the gun: over {HAND_TRAVEL_CM:g} cm from "
+              "where the clip starts it, in the right hand's frame",
+              travel > HAND_TRAVEL_CM, f"{travel:.1f} cm")
+    shortest = min((load(clip).get_play_length() / rate
+                    for (_n, _p, clip, _s), rate in zip(rows, rates)), default=None)
+    check(f"the ready pose takes over {RELOAD_HANDOVER_S:g} s before a clip's end: "
+          f"before its own blend out ({RELOAD_BLEND_OUT_S:g} s) begins, and under half "
+          "of the shortest reload",
+          shortest is None or RELOAD_BLEND_OUT_S < RELOAD_HANDOVER_S < shortest / 2,
+          f"the shortest lasts {shortest}")
 
 
 def check_play():
@@ -108,10 +145,11 @@ def check_play():
     fx_plays = in_fx(RELOAD, plays)
     check(f"the clip is played once, in {fx_event(RELOAD)} (so by the owner as its "
           f"prediction and by everyone else at the server's word), into {AIM_SLOT}, "
-          "whole, at its own rate",
+          f"whole, at its gun's rate (the row of {WV.ReloadRates})",
           len(plays) == 1 and fx_plays == plays
           and pin_value(plays[0], "SlotNodeName") == AIM_SLOT
-          and num_pin(plays[0], "InPlayRate") in (None, 1.0)
+          and f"Get {WV.ReloadRates}" in {
+              _title(f) for f in _feeds(BEL.find_input_pin(plays[0], "InPlayRate"))}
           and num_pin(plays[0], "LoopCount") in (None, 1.0)
           and num_pin(plays[0], "InTimeToStartMontageAt") in (None, 0.0)
           and num_pin(plays[0], "BlendInTime") == RELOAD_BLEND_IN_S
@@ -119,22 +157,35 @@ def check_play():
           f"{len(plays)} play(s), {len(fx_plays)} in the cosmetic")
     if len(plays) != 1:
         return
-    gates = _exec_from(plays[0])
+    # Before the play, the two it reads back: the clip chosen and its pose.
+    gates, wrote = _exec_from(plays[0]), []
+    while len(gates) == 1 and _title(gates[0][0]).startswith("Set ") and len(wrote) < 2:
+        wrote.append(gates[0][0])
+        gates = _exec_from(gates[0][0])
+    fed = {_title(n): {_title(f) for f in _feeds(BEL.find_input_pin(
+        n, _title(n).split(" ", 1)[1]))} for n in wrote}
+    check(f"the play writes what the slot's readers ask for first: {WV.ReloadAnim}, the "
+          f"row's clip of {WV.ReloadClips}, and {WV.ReloadPose}, the {HandPose} it is for",
+          sorted(fed) == [f"Set {WV.ReloadAnim}", f"Set {WV.ReloadPose}"]
+          and f"Get {WV.ReloadClips}" in fed[f"Set {WV.ReloadAnim}"]
+          and f"Get {HandPose}" in fed[f"Set {WV.ReloadPose}"],
+          str({k: sorted(v) for k, v in fed.items()}))
     asked = ({_title(f) for f in _feeds(BEL.find_input_pin(gates[0][0], "Condition"))}
              if len(gates) == 1 and _title(gates[0][0]) == "Branch" else set())
-    check(f"...only with a clip and a gun that reloads with it: a Branch on IsValid of "
-          f"{WV.ReloadAnim} AND {HandPose} in {WV.ReloadFor} ({HandPose}, which every "
-          "machine's copy has, and not Held)",
+    check(f"...only for a gun that reloads with a clip: a Branch on where {HandPose} is "
+          f"in {WV.ReloadFor} ({HandPose}, which every machine's copy has, and not "
+          "Held), with the rows read behind it",
           len(gates) == 1 and gates[0][1] == "then"
-          and {f"Get {WV.ReloadAnim}", f"Get {WV.ReloadFor}", f"Get {HandPose}"} <= asked
-          and "Get Held" not in asked, str(sorted(asked)))
+          and {f"Get {WV.ReloadFor}", f"Get {HandPose}"} <= asked
+          and not {"Get Held", f"Get {WV.ReloadClips}", f"Get {WV.ReloadRates}"} & asked,
+          str(sorted(asked)))
     ends = [n for n in wg if _title(n) == f"Set {WV.ReloadClipEnds}"]
     fed = ({_title(f) for f in _feeds(BEL.find_input_pin(ends[0], str(WV.ReloadClipEnds)))}
            if len(ends) == 1 else set())
     check(f"...and {WV.ReloadClipEnds} is stamped right after it: now + the clip's "
-          f"length - {RELOAD_HANDOVER_S:g} s",
+          f"length over its rate - {RELOAD_HANDOVER_S:g} s",
           len(ends) == 1 and _exec_from(ends[0]) == [(plays[0], "then")]
-          and f"Get {WV.ReloadAnim}" in fed
+          and {f"Get {WV.ReloadAnim}", f"Get {WV.ReloadRates}"} <= fed
           and any("Play Length" in t.replace("Get", "Get ").replace("  ", " ")
                   or "PlayLength" in t.replace(" ", "") for t in fed),
           str(sorted(fed)))
@@ -181,6 +232,13 @@ def check_slot_kept():
           "the reload's clip is in the slot first: the equip once (held), the "
           "keep-alive twice (held: leave it; its time up: take over)",
           len(poses) == 2 and sorted(asked) == [1, 2], f"{len(poses)} play(s), asks {asked}")
+    same = [n for n in by_pins(wg, "A", "B")
+            if {_title(f) for f in _feeds(BEL.find_input_pin(n, "A"), 3)
+                | _feeds(BEL.find_input_pin(n, "B"), 3)}
+            == {f"Get {HandPose}", f"Get {WV.ReloadPose}"}]
+    check(f"...the equip only while {HandPose} is still {WV.ReloadPose}, the pose the "
+          "clip was played for: another gun taken out cuts it, one with a reload "
+          "clip of its own too", len(same) == 1, f"{len(same)} comparison(s)")
     timed = [n for n in wg if _title(n) == f"Get {WV.ReloadClipEnds}"]
     check(f"...each against {WV.ReloadClipEnds}, as the left hand's hold does",
           len(readers) == 4 and len(timed) == 4,

@@ -1,26 +1,32 @@
-"""The reload's clip: the magazine change of the AKM and the sniper, one clip
-for both (PlayerSkin.reload_rifle, Lyra's MM_Rifle_Reload retargeted onto the
+"""The reload's clip: the magazine change of the AKM and the sniper (Lyra's
+MM_Rifle_Reload, PlayerSkin.reload_rifle) and of the pistol and the SMG (its
+MM_Pistol_Reload, PlayerSkin.reload_pistol), each retargeted onto the
 player's skeleton by asset_pipeline/import_lyra.py; reload_tuning.py has the
-numbers).
+guns and the numbers.
 
 Who plays it: every machine that plays the reload's clack, since it is the
 start of Fx_Reload's body (shot.py): the owner as its prediction, everyone
 else at the server's word. Which gun: the one whose ready pose is in hand,
-HandPose in ReloadFor (the ready clips of reload_tuning.RELOAD_CLIP_GUNS),
-and not Held's class, because HandPose is on every machine's copy (look.py)
-and Held is the player's item only where the keys are. A skin with no clip
-(ReloadAnim is None), or any other gun, plays nothing: the reload is its
-sound and its pause.
+HandPose found in ReloadFor (the ready clips of reload_tuning.
+RELOAD_CLIP_GUNS), and not Held's class, because HandPose is on every
+machine's copy (look.py) and Held is the player's item only where the keys
+are. Where it is found is the row: ReloadClips has that gun's clip and
+ReloadRates the rate that fits the clip to the gun's reload time
+(reload_defaults, at the build). A skin with no clip (the arrays are
+empty), or any other gun, plays nothing: the reload is its sound and its
+pause.
 
-It plays into the upper-body slot, where the ready pose is, so three things
-ask about it:
+The play writes ReloadAnim (the clip it chose) and ReloadPose (the ready
+pose it chose it for). It plays into the upper-body slot, where the ready
+pose is, so three things ask about it:
 
-    holding(...)   the clip is in the slot and its time is not up: the ready
-                   pose's keep-alive (ready_pose.py) and the equip
+    holding(...)   ReloadAnim is in the slot and its time is not up: the
+                   ready pose's keep-alive (ready_pose.py) and the equip
                    (inventory.py, which the reload's own raise of a lowered
                    gun runs a frame later) leave the slot alone. The equip
-                   asks only while HandPose is still one of ReloadFor, so
-                   taking another gun out cuts the clip.
+                   asks only while HandPose is still ReloadPose (same_gun),
+                   so taking another gun out cuts the clip, a gun with a
+                   reload clip of its own too.
     ending(...)    the clip is in the slot and its time is up
                    (ReloadClipEnds, RELOAD_HANDOVER_S before its end): the
                    keep-alive takes that for a quiet slot and plays the ready
@@ -36,18 +42,22 @@ ReloadNow's, on the press.
 """
 
 from combat.anim_blueprint import AIM_SLOT
+from combat.finger_pose import clip_for
+from combat.gun_rows import gun_row
 from combat.reload_tuning import (
-    RELOAD_BLEND_IN_S, RELOAD_BLEND_OUT_S, RELOAD_HAND_SPEED, RELOAD_HANDOVER_S)
+    RELOAD_BLEND_IN_S, RELOAD_BLEND_OUT_S, RELOAD_CLIP_GUNS, RELOAD_HAND_SPEED,
+    RELOAD_HANDOVER_S, reload_rate)
+from combat.skin import player_skin
 from combat.weapon_component.look_vars import HandPose
-from combat.weapon_component.slot_nodes import op, valid
+from combat.weapon_component.slot_nodes import op
 from combat.weapon_component import vars as WV
 from uebp.g import _G
-from uebp.graph import _connect, _node, _pin, _set, out, then
+from uebp.graph import _connect, _must_load, _node, _pin, _set, out, then
 from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_IS_PLAYING_SLOT, FN_PLAY_LENGTH, FN_PLAY_SLOT
-from uebp.nodes.array import FN_ARR_CONTAINS
+from uebp.nodes.array import FN_ARR_FIND, FN_ARR_GET
 from uebp.nodes.math import (
-    FN_ADD_FF, FN_AND, FN_BOOL_TO_FLOAT, FN_INTERP_FF, FN_LESS_FF, FN_MUL_FF, FN_NOT,
-    FN_SUB_FF)
+    FN_ADD_FF, FN_AND, FN_BOOL_TO_FLOAT, FN_DIV_FF, FN_EQ_OO, FN_GE_II, FN_INTERP_FF,
+    FN_LESS_FF, FN_MUL_FF, FN_NOT, FN_SUB_FF)
 from uebp.nodes.system import FN_DELTA_SECONDS, FN_TIME_SECONDS
 
 
@@ -103,31 +113,64 @@ def ending(ed, anim_out, pose_pin, keep=lambda n: n):
     return _both(ed, due, out(not_posed), keep)
 
 
-def reloads_with_clip(ed, keep=lambda n: n):
-    """Is the ready pose in hand one of ReloadFor's? A bool pin."""
-    has = keep(_node(ed, FN_ARR_CONTAINS))
-    _connect(_get(ed, WV.ReloadFor, keep), _pin(has, "TargetArray"))
-    _connect(_get(ed, HandPose, keep), _pin(has, "ItemToFind"))
-    return out(has)
+def reload_defaults():
+    """{variable: default} for ReloadFor, ReloadClips and ReloadRates: a row
+    for each gun of RELOAD_CLIP_GUNS whose clip the worn skin has, its rate
+    the one that ends the clip with the gun's reload (its row's reload_s)."""
+    skin = player_skin()
+    poses, clips, rates = [], [], []
+    for name, (display, field) in RELOAD_CLIP_GUNS.items():
+        path = getattr(skin, field)
+        if not path:
+            continue
+        clip = _must_load(path)
+        poses.append(_must_load(clip_for(name)))
+        clips.append(clip)
+        rates.append(reload_rate(clip.get_play_length(), gun_row(display)["reload_s"]))
+    return {WV.ReloadFor: poses, WV.ReloadClips: clips, WV.ReloadRates: rates}
+
+
+def _row(ed, keep=lambda n: n):
+    """Where the ready pose in hand is in ReloadFor (-1: no clip). An int pin."""
+    at = keep(_node(ed, FN_ARR_FIND))
+    _connect(_get(ed, WV.ReloadFor, keep), _pin(at, "TargetArray"))
+    _connect(_get(ed, HandPose, keep), _pin(at, "ItemToFind"))
+    return out(at)
+
+
+def same_gun(ed, keep=lambda n: n):
+    """Is the ready pose in hand the one the last reload's clip was played
+    for? A bool pin."""
+    same = keep(_node(ed, FN_EQ_OO))
+    _connect(_get(ed, HandPose, keep), _pin(same, "A"))
+    _connect(_get(ed, WV.ReloadPose, keep), _pin(same, "B"))
+    return out(same)
 
 
 def author_reload_clip(g, exec_in):
-    """The clip into the upper-body slot and ReloadClipEnds, behind a clip
-    and a gun that reloads with it. Returns the exec pins after, played or
-    not: the start of Fx_Reload's body."""
+    """The gun's clip into the upper-body slot at its rate, and ReloadAnim,
+    ReloadPose and ReloadClipEnds, behind a gun that reloads with one.
+    Returns the exec pins after, played or not: the start of Fx_Reload's
+    body."""
     ed = g.ed
-    clip = g.get(WV.ReloadAnim)
-    mine = op(g, FN_AND, valid(g, clip), reloads_with_clip(ed, g.keep))
-    plays, silent = g.branch(mine, [exec_in])
+    mine = g.call(FN_GE_II, A=_row(ed, g.keep))
+    _set(mine, "B", 0)
+    plays, silent = g.branch(out(mine), [exec_in])
+    # Read behind the Branch only: Array_Get at -1 is a runtime error.
+    clip = g.call(FN_ARR_GET, TargetArray=g.get(WV.ReloadClips), Index=_row(ed, g.keep))
+    chosen = g.put(WV.ReloadAnim, out(clip, "Item"), [plays])
+    posed = g.put(WV.ReloadPose, g.get(HandPose), [chosen])
+    rate = g.call(FN_ARR_GET, TargetArray=g.get(WV.ReloadRates), Index=_row(ed, g.keep))
     anim = g.call(FN_ANIM_INSTANCE, self=g.get(WV.OwnerMesh))
-    play = g.call(FN_PLAY_SLOT, [plays], self=out(anim), Asset=g.get(WV.ReloadAnim))
+    play = g.call(FN_PLAY_SLOT, [posed], self=out(anim), Asset=g.get(WV.ReloadAnim),
+                  InPlayRate=out(rate, "Item"))
     _set(play, "SlotNodeName", AIM_SLOT)
     _set(play, "BlendInTime", RELOAD_BLEND_IN_S)
     _set(play, "BlendOutTime", RELOAD_BLEND_OUT_S)
-    _set(play, "InPlayRate", 1.0)
     _set(play, "LoopCount", 1)
     length = out(g.call(FN_PLAY_LENGTH, self=g.get(WV.ReloadAnim)))
-    left = g.call(FN_SUB_FF, A=length)
+    lasts = op(g, FN_DIV_FF, length, out(rate, "Item"))
+    left = g.call(FN_SUB_FF, A=lasts)
     _set(left, "B", RELOAD_HANDOVER_S)
     until = op(g, FN_ADD_FF, out(g.call(FN_TIME_SECONDS)), out(left))
     timed = g.put(WV.ReloadClipEnds, until, [then(play)])

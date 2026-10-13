@@ -333,6 +333,9 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_lyra.py
   the left hand to the pouch and back): the AKM's and the sniper's magazine change
   (`Scripts/combat/CLAUDE.md`, "The weapon layers"). Without Lyra there is no clip and
   they reload with the sound alone (`skin._gas_skin` drops `reload_rifle`).
+- **The pistols' reload** is `Actions/MM_Pistol_Reload` (`lyra_paths.RELOAD_PISTOL`,
+  2.0 s, the left hand to the belt and back under the grip): the pistol's and the SMG's,
+  the same way (`reload_pistol`).
 - **A checkout without Lyra** still wears the motion-matching skin: `combat/skin._gas_skin`
   falls back to the mannequin's `MM_Attack_01` on the UEFN skeleton
   (`retarget_to_uefn.py` still makes it) and says so in the build's log; the punch

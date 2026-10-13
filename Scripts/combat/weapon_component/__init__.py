@@ -132,7 +132,8 @@ _author_* fragment per concern, each in its own module:
               nearest AimPoint, the point the reticle rests on. KINDS lists
               what can be interacted with (today: an item, which is picked
               up, and a campfire, which heats the blade in hand)
-  reload_clip the reload's clip (the AKM's and the sniper's magazine change):
+  reload_clip the reload's clip (the AKM's and the sniper's magazine change,
+              the pistol's and the SMG's; the rows the builder fills):
               played at the start of Fx_Reload, holding() and ending() for the
               keep-alive and the equip, the left hand's weight down the sights
   pickup_clip the reach down for an item taken: the skin's pick-up clip into

@@ -72,9 +72,12 @@ AIM_PISTOL = f"{LOCOMOTION}/Pistol/MM_Pistol_Idle_ADS"
 # reload_clip.py): one clip for both, 2.2 s.  It starts and ends in Lyra's
 # hip pose, which the ready pose is blended over at both ends.
 RELOAD_RIFLE = f"{ACTIONS}/MM_Rifle_Reload"
+# The pistol's and the SMG's (a machine pistol, held in the pistol's pose):
+# 2.0 s, the left hand to the belt and back under the grip.
+RELOAD_PISTOL = f"{ACTIONS}/MM_Pistol_Reload"
 
 # Every Lyra clip the game plays.  A later one is a row here and a re-run.
-CLIPS = (PUNCH, AIM_RIFLE, AIM_PISTOL, RELOAD_RIFLE)
+CLIPS = (PUNCH, AIM_RIFLE, AIM_PISTOL, RELOAD_RIFLE, RELOAD_PISTOL)
 
 
 def uefn_clip(source):

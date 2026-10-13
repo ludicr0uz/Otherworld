@@ -145,6 +145,7 @@ and it never relies on a variable another section left behind.
               the kept target cast to an item, with room in the bag, and
               detaches it from what it was left in
   reload_clip the reload's clip: Lyra's rifle reload for the AKM and the sniper,
+              its pistol reload for the pistol and the SMG, each at its rate,
               played by Fx_Reload, left in the slot by the keep-alive and the
               equip, handed over to the ready pose, the left hand let go
   world_items an item in the world is the server's: the drop key asks, the

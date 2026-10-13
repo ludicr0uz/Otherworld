@@ -15,12 +15,12 @@ from combat.paths import (
     CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, THROW_ARC_BP_PATH,
     THROW_READY_ANIM_PATH, WEAPON_COMP_BP_PATH,
 )
-from combat.finger_pose import carry_clips, clip_for
-from combat.reload_tuning import RELOAD_CLIP_GUNS
+from combat.finger_pose import carry_clips
 from combat.skin import player_skin
 from combat.weapon_component.interact import INTERACT_NO_GAP, RETIRED_VARS
 from combat.weapon_component.inventory import _author_wc_begin_play
 from combat.weapon_component.knife import axe_clip_defaults
+from combat.weapon_component.reload_clip import reload_defaults
 from combat.weapon_component.stance import STAND
 from combat.weapon_component.asks import author_asks
 from combat.weapon_component.tune_ask import author_tune_ask
@@ -209,9 +209,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
            if player_skin().throw else {}),
         **({WV.PickUpAnim: _must_load(player_skin().pickup)}
            if player_skin().pickup else {}),
-        **({WV.ReloadAnim: _must_load(player_skin().reload_rifle),
-            WV.ReloadFor: [_must_load(clip_for(name)) for name in RELOAD_CLIP_GUNS]}
-           if player_skin().reload_rifle else {}),
+        **reload_defaults(),
         **({WV.CarryFor: _must_load(player_skin().aim_rifle),
             WV.CarryAlso: [_must_load(clip) for clip in carry_clips()]}
            if player_skin().carry_idle else {}),

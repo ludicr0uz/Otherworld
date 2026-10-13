@@ -56,8 +56,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     gun up (CARRY_RAISE_HOLD_S), Lowered / PoseLowered
   chop_tuning       chopping a tree: blows per piece of wood, where it lands
                     (WOOD_*), Chops and the component's Chop* variables
-  reload_tuning     the reload clip's numbers (RELOAD_*): the guns that
-                    reload with it, its blends, when the ready pose takes over
+  reload_tuning     the reload clips' numbers (RELOAD_*): the guns that
+                    reload with one and which, the rate that fits a clip to a
+                    reload, its blends, when the ready pose takes over
   pickup_tuning     the pick-up clip's numbers (PICKUP_*): where in the clip
                     the play starts and its blend
   throw_tuning      the throw's numbers (THROW_*): speed, the lob's angle,

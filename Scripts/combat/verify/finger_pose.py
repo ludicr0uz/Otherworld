@@ -37,7 +37,10 @@ KEYED_CM = 0.05
 # The left thumb's nearest point to the part (cm; measured 0.81 and 0.82).
 THUMB_CM = 1.0
 # How many of a gun's seven bent fingers must be laid on it (measured 6 on
-# the AK, whose left index is past the front of its handguard; 7 on the Val).
+# the AK, whose left index is past the front of its handguard, and on the
+# 1911, whose left index stands 2 cm in front of the closed fist; 7 on the
+# Val and the SMG). A pistol's left fingers are measured against the right
+# fist as the fit closes it (finger_pose.fist), not the model: 0.46 to 1.48.
 FITTED = 5
 # Bones that are not fingers, read on both clips' first and last frame.
 _BODY = ("hand_r", "hand_l", "lowerarm_r", "lowerarm_l", "upperarm_r", "spine_05", "head")
@@ -58,8 +61,9 @@ def _worst(near, far):
 
 def check_rows():
     specs = {s["path"].rsplit("/", 1)[-1]: s for s in _weapon_specs()}
-    check("every name of weapon_models.GUN_FINGERS is a gun's row, held in both hands",
-          all(n in specs and specs[n]["two_handed"] for n in GUN_FINGERS),
+    check("every name of weapon_models.GUN_FINGERS is a gun's row with a part "
+          "for its left hand",
+          all(n in specs and specs[n].get("support") for n in GUN_FINGERS),
           f"{GUN_FINGERS} against {sorted(specs)}")
     for name, spec in sorted(specs.items()):
         fitted = name in GUN_FINGERS

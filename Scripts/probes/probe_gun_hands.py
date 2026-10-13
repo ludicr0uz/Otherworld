@@ -31,7 +31,9 @@ the saved clip). Here the live fingers: the gun's AimPose is that clip, and
 each of the seven bent fingers (the left hand's four, the right's middle,
 ring and little) lies on the model, its riding points (its two outer joints,
 its tip, the middles of its outer bones) a skin off it. And lowered again it
-is still carried in both hands (CarryPose): the carry knows its clip.
+is still carried in both hands (CarryPose): the carry knows its clip. A
+pistol's left fingers lie on the live right fist (the grip and the right
+hand's wrapping fingers, closed on it), and lowered it is not carried so.
 """
 
 SYSTEMS = ('weapons', 'animation')
@@ -83,6 +85,7 @@ FINGER_BOUNDS = {"BP_Shotgun": (-0.1, 3.0)}
 FINGERS_LAID = 6
 CARRIED = 0.95          # the carry's weight, eased up
 CARRY_WAIT_S = 6.0      # wall seconds for it
+CARRY_SETTLE_S = 1.5    # how long a lowered pistol is watched not to be
 
 
 def _points(mesh, held, fingers, thumb):
@@ -176,6 +179,10 @@ def _check_fingers(p, mesh, held, skin, name):
     parts = outline()
     boxes = [gun_hold.part_box(parts, part[0]) for part in parts]
     box = support["box"] if "box" in support else gun_hold.part_box(parts, support["part"])
+    if support.get("fist"):
+        # A pistol: the right fist, closed on the grip by its own clip.
+        box = gun_hold.fist_box(box, [pt for bones in skin.grip_fingers[1:]
+                                      for pt in _finger(mesh, held, bones)])
     # What the left fingers lie on, as finger_pose.solid has it.
     beside = boxes if finger_fit.through(support) else (
         [box] + [b for b in boxes if not hand_seat.overlaps(b, box)])
@@ -236,7 +243,16 @@ def probe(p):
         p.set(wc, SIGHTS_FORCED_VAR, False)
         p.set(wc, RAISE_FORCED_VAR, False)
         yield lambda: p.get(wc, SEAT_VAR) < 0.01
-        if name in GUN_FINGERS:
+        if name in GUN_FINGERS and GUN_HOLDS[name][1].get("fist"):
+            # A pistol's own clip is not one of CarryAlso: lowered, it is
+            # not carried in both hands.
+            yield CARRY_SETTLE_S
+            p.check("...and lowered it is not carried in both hands: "
+                    f"{CARRY_POSE} stays down",
+                    p.get(wc, LOWERED_VAR) and p.get(layers, CARRY_POSE) < 1.0 - CARRIED,
+                    f"{CARRY_POSE} {p.get(layers, CARRY_POSE):.2f}, lowered "
+                    f"{p.get(wc, LOWERED_VAR)}")
+        elif name in GUN_FINGERS:
             # Its HandPose is no longer the rifle's ready pose, which the
             # carry asks for: its own clip is one of CarryAlso.
             end = time.time() + CARRY_WAIT_S

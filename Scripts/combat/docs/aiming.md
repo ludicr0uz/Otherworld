@@ -534,9 +534,9 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     and `probes/probe_gun_hands.py` reads the live hands down each gun's sights, the wrist
     against the point first. A hand that cannot be fitted says so there: move the row's
     box, or the grip (a fist further back takes the handguard out of the arm's reach).
-- **A long gun's fingers are bent onto its model** (`finger_pose.py`, `finger_fit.py`), for
-  the guns `weapon_models.GUN_FINGERS` names (the AK, the Val and the shotgun; the
-  pistols are not yet). The hands above are rigid pieces of a clip made for Lyra's rifle:
+- **A gun's fingers are bent onto its model** (`finger_pose.py`, `finger_fit.py`), for
+  the guns `weapon_models.GUN_FINGERS` names (all five: the AK, the Val, the shotgun,
+  and the 1911 and the SMG, "The pistols" below). The hands above are rigid pieces of a clip made for Lyra's rifle:
   on the AK the left fingers hang up to 2.9 cm off the handguard and the right's up to
   2.4 off the grip; the Val's left joints start up to 0.8 cm inside its receiver.
   - **Each such gun is held in a clip of its own**, `/Game/Weapons/Anims/A_Aim<Blueprint>`
@@ -569,7 +569,8 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     those of the seat. The carry's clips are untouched. A fist that closes moves its
     middle, so `verify/grip_fit.py` measures the grip in the row's `pose`.
   - **The carry** asked `HandPose == CarryFor` (the rifle's ready pose); a fitted gun's
-    HandPose is its own clip, so the component has `CarryAlso`, every fitted clip, and
+    HandPose is its own clip, so the component has `CarryAlso`, every fitted clip that
+    is the rifle's pose (`finger_pose.carry_clips`: not a pistol's), and
     the test is `== CarryFor OR CarryAlso contains` (`weapon_component/carry_weights.py`).
   - **A new gun:** its Blueprint's name in `GUN_FINGERS`, build, and read the
     `[GUN] <name>: built ... its fingers bent onto the model` line (each finger's bend,
@@ -593,6 +594,27 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
       the outer joints 40 degrees was tried by hand: the middle then lies 0.47 to 1.49,
       but the index's best fit has one point on the wood and is refused; the limits are
       the rifles' still.
+  - **The pistols** (`A_AimPistol`, `A_AimSMG`: the rows whose `support` says `fist`,
+    held in Lyra's pistol pose with the left hand closed over the right). What they
+    needed:
+    - The left fingers lie on the right fist, not the model. The seat's fist
+      (`gun_hold.support_box`) is the grip with the pose's right fingers on it, which
+      stand 0.3 to 2 cm off the grip; the fit closes those first, so the left fingers
+      are laid on the fist as closed (`finger_pose.fist`: the grip and the right hand's
+      three wrapping fingers bent by `finger_fit.wrapped`, skin and all, 0.8 cm
+      shallower in front and at the fingertips), and on the parts beside it. It is
+      worked out off the row's `pose` whichever clip is measured, so the pose and the
+      clip are measured against one thing.
+    - Their clips are not the carry's: `CarryAlso` is `finger_pose.carry_clips()`, and
+      `probe_gun_hands` holds a lowered pistol to `CarryPose` 0.
+    - `verify/finger_pose` no longer asks `two_handed` of a fitted row (that is the
+      rifle's pose), only a `support`.
+    - Measured, saved clip: the 1911's six fitted fingers 0.63 to 1.15 cm off (0.12 to
+      1.96 before), its left index left as the pose has it (0.85 to 2.79: it stands 2 cm
+      in front of the closed fist and cannot be laid on it within the 20 degree
+      opening); the SMG's seven 0.46 to 1.48 (-0.24 to 2.25 before); the left thumbs
+      swung 30 and 26 degrees to 0.76 and 0.79 cm off the fist (5.2 before). Live
+      (`probe_gun_hands`): 0.62 to 1.20 and 0.43 to 1.45. The rifles' bounds hold both.
 - **The shotgun is held in the rifle's ready pose** (C3; until then a whole pose keyed
   for it; its fingers alone are bent since, above), and its left hand has a point of
   its own (`shotgun_hold.py`).

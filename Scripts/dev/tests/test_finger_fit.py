@@ -141,6 +141,24 @@ class Swing(unittest.TestCase):
         self.assertEqual(finger_fit.swing(self.THUMB, [], 10.0)[1], 0.0)
 
 
+class Wrapped(unittest.TestCase):
+    """A pistol's fist: the right fingers as close() lays them on the grip."""
+
+    def test_each_finger_is_laid_on_the_boxes(self):
+        fingers = [finger(at=(10.0 + 2.0 * i, -3.5, -1.5)) for i in range(3)]
+        points = finger_fit.wrapped(fingers, [GUARD])
+        self.assertEqual(len(points), 12)
+        for i, was in enumerate(fingers):
+            now = points[4 * i:4 * i + 4]
+            self.assertEqual(now[0], was[0])
+            self.assertGreaterEqual(finger_fit.on([GUARD], now), finger_fit.ON_POINTS)
+            self.assertLess(finger_fit.misfit([GUARD], now), finger_fit.misfit([GUARD], was))
+
+    def test_a_finger_that_meets_nothing_is_where_it_was(self):
+        far = finger(at=(100.0, -3.5, -1.5))
+        self.assertEqual(finger_fit.wrapped([far], [GUARD]), far)
+
+
 class Through(unittest.TestCase):
     def test_a_named_part_has_the_parts_that_run_through_it(self):
         # The shotgun's pump (its tube and barrel inside it), the AK's handguard.

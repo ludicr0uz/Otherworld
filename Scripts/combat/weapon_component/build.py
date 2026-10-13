@@ -15,7 +15,7 @@ from combat.paths import (
     CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, THROW_ARC_BP_PATH,
     THROW_READY_ANIM_PATH, WEAPON_COMP_BP_PATH,
 )
-from combat.finger_pose import clips as finger_clips
+from combat.finger_pose import carry_clips
 from combat.skin import player_skin
 from combat.weapon_component.interact import INTERACT_NO_GAP, RETIRED_VARS
 from combat.weapon_component.inventory import _author_wc_begin_play
@@ -209,7 +209,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         **({WV.PickUpAnim: _must_load(player_skin().pickup)}
            if player_skin().pickup else {}),
         **({WV.CarryFor: _must_load(player_skin().aim_rifle),
-            WV.CarryAlso: [_must_load(clip) for clip in finger_clips()]}
+            WV.CarryAlso: [_must_load(clip) for clip in carry_clips()]}
            if player_skin().carry_idle else {}),
         WV.ThrowArcClass: arc_class,
     })

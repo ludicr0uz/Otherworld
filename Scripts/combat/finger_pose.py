@@ -32,6 +32,14 @@ The left fingers lie on what the hand holds and the parts beside it; where
 that is a part of the outline itself, on the parts running through it too
 (finger_fit.through: the shotgun's tube and barrel, bare behind its pump).
 
+A PISTOL (a `fist` row: the 1911, and the SMG in the pistol's pose) is held
+with the left hand closed over the right. Its right fingers close on the
+grip like any gun's; its left fingers are then laid on that closed fist
+(fist(): the grip and the right hand's three wrapping fingers as bent, skin
+and all) and the parts beside it, and the left thumb is swung in against it.
+Its clip is not one of the carry's (carry_clips): a pistol lowered is not
+carried in both hands.
+
 A NEW GUN: its Blueprint's name in weapon_models.GUN_FINGERS; the build logs
 each finger's bend, verify/finger_pose.py holds the saved clip to the model
 and probes/probe_gun_hands.py reads the live fingers.
@@ -45,7 +53,7 @@ from combat.body_pose import _conj, _mul, _turn
 from combat.hold_pose import _copy_of
 from combat.log import _log
 from combat.paths import WEAPON_DIR
-from combat.weapon_models import GUN_FINGERS
+from combat.weapon_models import GUN_FINGERS, GUN_HOLDS
 from uebp.graph import _assets
 
 FINGER_NAMES = ("index", "middle", "ring", "little")
@@ -72,8 +80,32 @@ def clip_path(spec):
 
 
 def clips():
-    """Every fitted gun's ready clip."""
+    """Every fitted gun's ready clip (what the finger_poses step makes)."""
     return tuple(clip_for(name) for name in GUN_FINGERS)
+
+
+def fist(skin, spec):
+    """A pistol's right fist as the fit closes it, a box in the weapon's
+    frame: the part the row names with the right hand's three wrapping
+    fingers on it, each bent onto the model first (finger_fit.wrapped), skin
+    and all. Always off the row's pose, whichever clip is measured: it is
+    what the left fingers are laid on, and the pose's open fist
+    (gun_hold.support_box, which the hand is seated on) stands up to a
+    centimetre proud of it."""
+    comp, _weapon, placed = gun_hold.held(skin, spec)
+    parts = [gun_hold.part_box(spec["parts"], part[0]) for part in spec["parts"]]
+    fingers = [[placed(p) for p in gun_hold.finger_points(bones, comp, gun_hold.FINGER_TIP_CM)]
+               for bones in skin.grip_fingers[1:]]
+    return gun_hold.fist_box(gun_hold.held_box(spec), finger_fit.wrapped(fingers, parts))
+
+
+def carry_clips():
+    """The fitted clips that are the rifle's ready pose with a gun's own
+    fingers, which the lowered carry takes as that pose (CarryAlso): every
+    fitted gun's but a pistol's (a `fist` row is held in the pistol's pose,
+    and is not carried in both hands)."""
+    return tuple(clip_for(name) for name in GUN_FINGERS
+                 if not GUN_HOLDS[name][1].get("fist"))
 
 
 def solid(skin, spec, comp, placed):
@@ -83,12 +115,16 @@ def solid(skin, spec, comp, placed):
     whose outline box reaches under its handguard) is not one, but a part
     that runs through a part of the outline the row names is (the shotgun's
     magazine tube and barrel, bare behind and in front of its pump: the
-    little finger lies behind the wood, on the tube). The right: every part
-    of the outline."""
-    box = gun_hold.support_box(skin, spec, comp, placed)
+    little finger lies behind the wood, on the tube). A pistol's (`fist`):
+    the right fist as the fit closes it (fist()), and every part beside
+    that. The right: every part of the outline."""
+    support = gun_hold.support_of(spec)
     parts = [gun_hold.part_box(spec["parts"], part[0]) for part in spec["parts"]]
-    return (parts if finger_fit.through(gun_hold.support_of(spec)) else [box] + list(gun_hold.beside(spec, box).values()),
-            parts)
+    if finger_fit.through(support):
+        return parts, parts
+    box = (fist(skin, spec) if support.get("fist")
+           else gun_hold.support_box(skin, spec, comp, placed))
+    return [box] + list(gun_hold.beside(spec, box).values()), parts
 
 
 def hands(skin, spec, comp, placed):

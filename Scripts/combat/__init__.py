@@ -315,7 +315,9 @@ wrong module.
   finger_fit        how far a finger bends to lie on a gun (pure): the bend of its
                     three joints that lays it best a skin off the model's boxes,
                     within the joints' limits; the swing that lays a thumb on a part
-  finger_pose       a fitted gun's own ready clip (weapon_models.GUN_FINGERS: the
-                    rifles and the shotgun): its row's pose frame for frame with the fingers bent
-                    onto that gun's model, which its item is held in (AimPose)
+  finger_pose       a fitted gun's own ready clip (weapon_models.GUN_FINGERS: every
+                    gun): its row's pose frame for frame with the fingers bent
+                    onto that gun's model, which its item is held in (AimPose); a
+                    pistol's left fingers on the right fist as fitted (fist), and
+                    which clips the carry takes (carry_clips)
 """

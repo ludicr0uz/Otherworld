@@ -22,7 +22,7 @@ piece, brought to where its fingers' joints fit the part the row names
 
 Only the place moves. The hand's turn is the clip's, and so are its fingers
 here: finger_pose.py bends them onto the model afterwards, for the rows
-weapon_models.GUN_FINGERS names.
+weapon_models.GUN_FINGERS names (every gun today).
 
 A NEW GUN
 ---------
@@ -182,14 +182,20 @@ def ceiling(spec):
     return part_box(spec["parts"], under)[1][2] if under else sight_line_z(spec)
 
 
+def held_box(spec):
+    """The row's own box, in the weapon's frame: its measured box, else the
+    part of its outline it names."""
+    support = support_of(spec)
+    return support["box"] if "box" in support else part_box(spec["parts"], support["part"])
+
+
 def support_box(skin, spec, comp, placed):
     """The box the left hand closes on, in the weapon's frame: the row's part
     or its measured box; with `fist`, that box grown to hold the right hand's
     three wrapping fingers closed on it, skin and all (a pistol's hold: the
     left hand closes over the right)."""
-    support = support_of(spec)
-    box = support["box"] if "box" in support else part_box(spec["parts"], support["part"])
-    if not support.get("fist"):
+    box = held_box(spec)
+    if not support_of(spec).get("fist"):
         return box
     fingers, _thumb = grip_points(skin, comp, placed)
     wrapping = {b for finger in skin.grip_fingers[1:] for b in finger}

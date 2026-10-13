@@ -255,6 +255,18 @@ def close(points, boxes):
     return best, True
 
 
+def wrapped(fingers, boxes):
+    """A fist closed on ``boxes``: the points of every finger of ``fingers``
+    (each its three joints and its tip) as close() lays it on them, one after
+    another in one list; a finger close() leaves is where it was. What the
+    other hand closes over in a pistol's hold."""
+    out = []
+    for points in fingers:
+        angles, met = close(points, boxes)
+        out += posed(points, hinge(points), angles) if met else list(points)
+    return out
+
+
 def swung(points, axis, deg):
     """A thumb's ``points`` swung ``deg`` about ``axis`` through its first."""
     return [points[0]] + [_add(points[0], turned(_sub(p, points[0]), axis, deg))

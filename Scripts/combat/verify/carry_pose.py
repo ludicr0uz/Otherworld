@@ -18,7 +18,7 @@ from combat.carry_pose_consts import (
     CARRY_ALSO_VAR, CARRY_BLEND_SPEED, CARRY_CROUCH_WALK_FULL_CM_S, CARRY_FOR_VAR,
     CARRY_JOG_FULL_CM_S, CARRY_POSE, CARRY_SPRINT, CARRY_SPRINT_BLEND_SPEED,
 )
-from combat.finger_pose import clips as finger_clips
+from combat.finger_pose import carry_clips, clip_path, fitted
 from combat.gas_moves import slide_on, traversal_on
 from combat.gas_moves_tuning import DOING_VAR
 from combat.skin import player_skin
@@ -219,8 +219,11 @@ def check_carried_guns():
           pose is not None and pose.get_path_name().split(".")[0] == skin.aim_rifle,
           str(pose.get_path_name() if pose else None))
     also = sorted(a.get_path_name().split(".")[0] for a in w.get_editor_property(CARRY_ALSO_VAR))
-    check(f"{CARRY_ALSO_VAR} is that pose with a gun's own fingers: every fitted gun's clip",
-          also == sorted(finger_clips()), str(also))
+    check(f"{CARRY_ALSO_VAR} is that pose with a gun's own fingers: the clip of "
+          "every fitted gun held in it, and no pistol's",
+          also == sorted(carry_clips())
+          and also == sorted(clip_path(sp) for sp in _weapon_specs()
+                             if fitted(sp) and sp["pose"] == skin.aim_rifle), str(also))
     carried = sorted(sp["display"] for sp in _weapon_specs() if sp["pose"] == skin.aim_rifle)
     check("...which the rifle, the sniper and the shotgun are held in, and no "
           "one-handed gun", len(carried) == 3, str(carried))

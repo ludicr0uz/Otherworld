@@ -13,8 +13,9 @@ For the same reason every density tier above Low (grass_cells.GRASS_TIERS) is
 saved hidden in game, and the menu unhides the tiers its preset draws. So a
 cell is one species, one tier, one 100 m square.
 
-The meshes are opaque generated patches (forest_generator/foliage_meshes.py),
-built by forest_import/foliage_assets.py before this runs.
+The mesh is a clump out of the grass library, planted with its own material
+(forest_generator/undergrowth_meshes.py; forest_import/undergrowth_assets.py
+checks it is there before this runs).
 """
 
 import json

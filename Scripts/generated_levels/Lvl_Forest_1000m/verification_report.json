@@ -108,7 +108,7 @@
     {
       "name": "Grass Upscale Factor",
       "passed": true,
-      "message": "worst upscale 1.08x (HISM_Grass_Patch_A), limit 2.40x",
+      "message": "worst upscale 0.96x (HISM_Grass_02_09), limit 2.40x",
       "details": []
     },
     {
@@ -120,10 +120,9 @@
     {
       "name": "Grass Species Spread",
       "passed": true,
-      "message": "2 species represented",
+      "message": "1 of 1 species represented",
       "details": [
-        "HISM_Grass_Patch_A: 641,621",
-        "HISM_Grass_Patch_B: 384,367"
+        "HISM_Grass_02_09: 1,025,988"
       ]
     },
     {
@@ -133,14 +132,12 @@
       "details": []
     },
     {
-      "name": "Foliage Meshes",
+      "name": "Undergrowth Meshes",
       "passed": true,
-      "message": "2 grass patches, 2 bushes, within budget",
+      "message": "1 grass, 1 bush, the right size",
       "details": [
-        "SM_GrassPatch_A: 1600 tris, 53 cm tall, 147 cm wide",
-        "SM_GrassPatch_B: 1614 tris, 61 cm tall, 137 cm wide",
-        "SM_Bush_Round: 3462 tris, 121 cm tall, 166 cm wide",
-        "SM_Bush_Tall: 3126 tris, 167 cm tall, 131 cm wide"
+        "Grass_02_09: 2152 tris in LOD0 of 4, 60 cm tall, 54 cm wide",
+        "Bush_02: 1304 tris in LOD0 of 4, 195 cm tall, 349 cm wide"
       ]
     },
     {

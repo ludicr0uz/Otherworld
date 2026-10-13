@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Animation Library</title>
+<style>
+  :root {
+    --bg: #14161a; --panel: #1c1f25; --card: #222630; --line: #2f3440; --text: #e6e8ec;
+    --dim: #8c94a3; --accent: #5aa9ff; --left: #5aa9ff; --right: #ffa24a; --mid: #c9ced8; --ok: #6fd08c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #app { display: grid; grid-template-columns: 220px 1fr; grid-template-rows: auto 1fr auto; height: 100%; }
+  header { grid-column: 1 / 3; display: flex; gap: 10px; align-items: center; padding: 8px 12px;
+    background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 14px; margin: 0 8px 0 0; font-weight: 600; }
+  input[type=search], select { background: var(--card); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 5px 8px; font: inherit; }
+  input[type=search] { width: 240px; }
+  label.chk { color: var(--dim); display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
+  button { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+    padding: 4px 9px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.on { border-color: var(--accent); color: var(--accent); }
+  aside { overflow: auto; padding: 8px; background: var(--panel); border-right: 1px solid var(--line); }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 10px 6px 4px; }
+  .cat { display: flex; justify-content: space-between; padding: 5px 8px; border-radius: 6px; cursor: pointer; }
+  .cat:hover { background: var(--card); }
+  .cat.on { background: var(--card); color: var(--accent); }
+  .cat span:last-child { color: var(--dim); }
+  main { overflow: auto; padding: 12px; }
+  #count { color: var(--dim); margin: 0 0 8px; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; position: relative; }
+  .card canvas { width: 100%; height: 210px; display: block; cursor: pointer; }
+  .card .t { padding: 6px 8px 8px; }
+  .card .n { font-weight: 600; word-break: break-all; font-size: 12px; }
+  .card .m { color: var(--dim); font-size: 11px; margin-top: 2px; }
+  .card.game { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok), 0 0 14px rgba(111,208,140,.28); }
+  .card.pool { border-color: #6c7a99; border-style: dashed; }
+  .badge { position: absolute; top: 6px; left: 6px; font-size: 10px; font-weight: 700; letter-spacing: .05em;
+    padding: 1px 6px; border-radius: 4px; text-transform: uppercase; pointer-events: none; }
+  .badge.game { background: var(--ok); color: #0c1a10; }
+  .badge.pool { background: #3a4460; color: #cdd6f0; }
+  .card .pin { position: absolute; top: 6px; right: 6px; padding: 1px 7px; opacity: .85; }
+  .pill { display: inline-block; padding: 0 6px; border-radius: 9px; border: 1px solid var(--line); margin-right: 3px; }
+  .pill.ok { color: var(--ok); border-color: var(--ok); }
+  #more { display: block; margin: 14px auto; }
+  #tray { grid-column: 1 / 3; background: var(--panel); border-top: 1px solid var(--line); padding: 6px 12px;
+    display: none; }
+  #tray.on { display: block; }
+  #trayHead { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; color: var(--dim); }
+  #trayRow { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .pinned { background: var(--card); border: 1px solid var(--line); border-radius: 8px; min-width: 230px; position: relative; }
+  .pinned canvas { width: 230px; height: 250px; display: block; }
+  .pinned .n { padding: 4px 8px 6px; font-size: 11px; word-break: break-all; }
+  .pinned button { position: absolute; top: 4px; right: 4px; padding: 0 6px; }
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: none; align-items: center; justify-content: center; z-index: 5; }
+  #modal.on { display: flex; }
+  #mbox { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; width: min(920px, 94vw);
+    max-height: 94vh; display: grid; grid-template-columns: 1fr 260px; overflow: hidden; }
+  #mcanvas { width: 100%; height: min(70vh, 640px); background: var(--card); cursor: grab; display: block; }
+  #minfo { padding: 12px; overflow: auto; }
+  #minfo h3 { margin: 0 0 6px; word-break: break-all; font-size: 14px; }
+  #minfo dl { margin: 8px 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+  #minfo dt { color: var(--dim); } #minfo dd { margin: 0; word-break: break-all; }
+  .row { display: flex; gap: 6px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+  input[type=range] { flex: 1; min-width: 100px; }
+  @media (max-width: 700px) {
+    #app { grid-template-columns: 1fr; }
+    aside { display: none; }
+    header, #tray { grid-column: 1; }
+    #mbox { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Animation Library</h1>
+    <input id="q" type="search" placeholder="Search name, folder, tag (e.g. rifle walk)">
+    <select id="src"><option value="">All sources</option></select>
+    <select id="sort">
+      <option value="name">Sort: name</option>
+      <option value="length">Sort: length</option>
+      <option value="speed">Sort: speed</option>
+      <option value="rise">Sort: height change</option>
+    </select>
+    <select id="use" title="What the game plays now">
+      <option value="">Use: any</option>
+      <option value="game">In game now</option>
+      <option value="usedpool">In game + motion-matching pool</option>
+      <option value="pool">Motion-matching pool only</option>
+      <option value="none">Not used</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="loopOnly"> loops only</label>
+    <label class="chk"><input type="checkbox" id="hideVar" checked> hide right-foot twins</label>
+    <label class="chk"><input type="checkbox" id="player"> on the player rig</label>
+    <button id="norm" title="Play every clip over the same duration to compare shape, not length">same duration: off</button>
+    <span style="flex:1"></span>
+    <label class="chk">view <input id="yaw" type="range" min="0" max="360" value="35" style="width:90px"></label>
+  </header>
+  <aside>
+    <h2>Category</h2>
+    <div id="cats"></div>
+  </aside>
+  <main>
+    <p id="count"></p>
+    <div id="grid"></div>
+    <button id="more" style="display:none">Show more</button>
+  </main>
+  <section id="tray">
+    <div id="trayHead"><strong>Compare</strong><span id="trayN"></span>
+      <button id="trayClear">Clear</button>
+      <button id="tbody">Stick figure</button></div>
+    <div id="trayRow"></div>
+  </section>
+</div>
+
+<div id="modal">
+  <div id="mbox">
+    <canvas id="mcanvas"></canvas>
+    <div id="minfo">
+      <h3 id="mname"></h3>
+      <div class="row">
+        <button id="mplay">Pause</button>
+        <select id="mrate"><option value="0.25">0.25x</option><option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option><option value="2">2x</option></select>
+        <button id="mpin">Pin to compare</button>
+        <button id="mbody" title="Mannequin or stick figure">Stick figure</button>
+      </div>
+      <div class="row"><input id="mscrub" type="range" min="0" max="1000" value="0"></div>
+      <dl id="mdl"></dl>
+      <div class="row"><button id="mcopy">Copy asset path</button><button id="mclose">Close</button></div>
+      <div style="color:var(--dim)">Drag the figure to turn it. Blue is the left side, orange the right.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const PAGE = 120;
+const S = { cat: "", src: "", use: "", q: "", sort: "name", loopOnly: false, hideVar: true, player: false,
+            norm: false, yaw: 35 * Math.PI / 180, shown: PAGE, body: "mannequin" };
+let catalog = null, list = [];
+const poses = new Map();          // id -> {frames, data:Int16Array} | "loading" | "none"
+const visible = new Set();        // card elements in view
+let pinned = [];
+try { pinned = JSON.parse(localStorage.getItem("animlib.pinned") || "[]"); } catch (e) {}
+
+const $ = id => document.getElementById(id);
+const byId = new Map();
+
+async function boot() {
+  const res = await fetch("catalog.json");
+  catalog = await res.json();
+  for (const c of catalog.clips) byId.set(c.id, c);
+  pinned = pinned.filter(id => byId.has(id));
+  const srcs = [...new Set(catalog.clips.map(c => c.source))].sort();
+  for (const s of srcs) $("src").add(new Option(s, s));
+  bind();
+  // A link can carry a view: #cat=sprint&q=relaxed&open=<clip name>&pin=<name>,<name>
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get("cat")) S.cat = h.get("cat");
+  if (h.get("q")) { S.q = h.get("q").toLowerCase(); $("q").value = h.get("q"); }
+  if (h.get("src")) { S.src = h.get("src"); $("src").value = S.src; }
+  if (h.get("use")) { S.use = h.get("use"); $("use").value = S.use; }
+  const named = n => catalog.clips.find(c => c.name === n);
+  if (h.get("pin")) {
+    pinned = h.get("pin").split(",").map(named).filter(Boolean).map(c => c.id);
+  }
+  refresh();
+  drawTray();
+  if (h.get("open") && named(h.get("open"))) openModal(named(h.get("open")));
+  requestAnimationFrame(tick);
+}
+
+function bind() {
+  $("q").addEventListener("input", e => { S.q = e.target.value.trim().toLowerCase(); S.shown = PAGE; refresh(); });
+  $("src").addEventListener("change", e => { S.src = e.target.value; S.shown = PAGE; refresh(); });
+  $("use").addEventListener("change", e => { S.use = e.target.value; S.shown = PAGE; refresh(); });
+  $("sort").addEventListener("change", e => { S.sort = e.target.value; refresh(); });
+  $("loopOnly").addEventListener("change", e => { S.loopOnly = e.target.checked; S.shown = PAGE; refresh(); });
+  $("hideVar").addEventListener("change", e => { S.hideVar = e.target.checked; S.shown = PAGE; refresh(); });
+  $("player").addEventListener("change", e => { S.player = e.target.checked; S.shown = PAGE; refresh(); });
+  $("norm").addEventListener("click", () => {
+    S.norm = !S.norm; $("norm").textContent = "same duration: " + (S.norm ? "on" : "off");
+    $("norm").classList.toggle("on", S.norm);
+  });
+  $("yaw").addEventListener("input", e => { S.yaw = e.target.value * Math.PI / 180; });
+  $("more").addEventListener("click", () => { S.shown += PAGE; render(); });
+  $("trayClear").addEventListener("click", () => { pinned = []; savePins(); drawTray(); markPins(); });
+  const flipBody = () => {
+    S.body = S.body === "mannequin" ? "stick" : "mannequin";
+    const t = S.body === "mannequin" ? "Stick figure" : "Mannequin";
+    $("mbody").textContent = t; $("tbody").textContent = t;
+    try { localStorage.setItem("animlib.body", S.body); } catch (e) {}
+  };
+  try { if (localStorage.getItem("animlib.body") === "stick") flipBody(); } catch (e) {}
+  $("mbody").addEventListener("click", flipBody);
+  $("tbody").addEventListener("click", flipBody);
+  $("mclose").addEventListener("click", closeModal);
+  $("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+  $("mplay").addEventListener("click", () => { M.paused = !M.paused; $("mplay").textContent = M.paused ? "Play" : "Pause"; });
+  $("mrate").addEventListener("change", e => { M.rate = +e.target.value; });
+  $("mscrub").addEventListener("input", e => { M.paused = true; $("mplay").textContent = "Play"; M.t = e.target.value / 1000; });
+  $("mpin").addEventListener("click", () => { if (M.clip) togglePin(M.clip.id); });
+  $("mcopy").addEventListener("click", () => { if (M.clip) navigator.clipboard && navigator.clipboard.writeText(M.clip.path); });
+  const mc = $("mcanvas");
+  let drag = null;
+  mc.addEventListener("pointerdown", e => { drag = e.clientX; mc.setPointerCapture(e.pointerId); mc.style.cursor = "grabbing"; });
+  mc.addEventListener("pointermove", e => { if (drag !== null) { S.yaw += (e.clientX - drag) * 0.012; drag = e.clientX; $("yaw").value = ((S.yaw * 180 / Math.PI) % 360 + 360) % 360; } });
+  mc.addEventListener("pointerup", () => { drag = null; mc.style.cursor = "grab"; });
+}
+
+function matches(c) {
+  if (S.cat && c.cat !== S.cat) return false;
+  if (S.src && c.source !== S.src) return false;
+  if (S.loopOnly && !c.loop) return false;
+  if (S.use === "game" && c.use !== "game") return false;
+  if (S.use === "usedpool" && !c.use) return false;
+  if (S.use === "pool" && c.use !== "pool") return false;
+  if (S.use === "none" && c.use) return false;
+  if (S.player && !c.tags.includes("on the player")) return false;
+  if (S.hideVar && c.tags.includes("R foot")) return false;
+  if (S.q) {
+    const hay = (c.name + " " + c.folder + " " + c.tags.join(" ") + " " + c.cat + " " + c.source).toLowerCase();
+    for (const w of S.q.split(/\s+/)) if (!hay.includes(w)) return false;
+  }
+  return true;
+}
+
+function refresh() {
+  // Category counts reflect every other filter, so the sidebar says what is left.
+  const prev = S.cat; S.cat = "";
+  const counts = new Map(); let total = 0;
+  for (const c of catalog.clips) if (matches(c)) { counts.set(c.cat, (counts.get(c.cat) || 0) + 1); total++; }
+  S.cat = prev;
+  const el = $("cats"); el.textContent = "";
+  const add = (name, label, n) => {
+    const d = document.createElement("div");
+    d.className = "cat" + (S.cat === name ? " on" : "");
+    d.innerHTML = "<span></span><span>" + n + "</span>";
+    d.firstChild.textContent = label;
+    d.addEventListener("click", () => { S.cat = name; S.shown = PAGE; refresh(); });
+    el.appendChild(d);
+  };
+  add("", "All", total);
+  for (const [k, n] of [...counts].sort((a, b) => b[1] - a[1])) add(k, k, n);
+  list = catalog.clips.filter(matches);
+  const key = { name: c => c.name.toLowerCase(), length: c => c.length, speed: c => -c.speed, rise: c => -c.rise }[S.sort];
+  list.sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : 0; });
+  render();
+}
+
+function fmtSpeed(c) {
+  if (!c.frames) return "additive";
+  if (c.speed > 20) return (c.speed / 100).toFixed(1) + " m/s";
+  return "in place";
+}
+
+function render() {
+  const grid = $("grid"); grid.textContent = "";
+  visible.clear(); io.disconnect();
+  $("count").textContent = list.length + " clips" + (S.cat ? " in " + S.cat : "") +
+    (list.length > S.shown ? " (showing " + S.shown + ")" : "");
+  for (const c of list.slice(0, S.shown)) grid.appendChild(card(c));
+  $("more").style.display = list.length > S.shown ? "block" : "none";
+  markPins();
+}
+
+const io = new IntersectionObserver(entries => {
+  for (const e of entries) {
+    if (e.isIntersecting) { visible.add(e.target); load(e.target._clip); }
+    else visible.delete(e.target);
+  }
+}, { rootMargin: "150px" });
+
+function card(c) {
+  const d = document.createElement("div");
+  d.className = "card" + (c.use ? " " + c.use : ""); d._clip = c;
+  if (c.use) {
+    const b = document.createElement("div");
+    b.className = "badge " + c.use;
+    b.textContent = c.use === "game" ? "in game" : "mm pool";
+    b.title = c.why.join("\n");
+    d.appendChild(b);
+  }
+  const cv = document.createElement("canvas");
+  cv.addEventListener("click", () => openModal(c));
+  const t = document.createElement("div"); t.className = "t";
+  const n = document.createElement("div"); n.className = "n"; n.textContent = c.name;
+  const m = document.createElement("div"); m.className = "m";
+  m.textContent = c.source + " · " + c.length.toFixed(2) + " s · " + fmtSpeed(c);
+  if (c.loop) { const p = document.createElement("span"); p.className = "pill ok"; p.textContent = "loop"; m.append(" ", p); }
+  const pin = document.createElement("button"); pin.className = "pin"; pin.textContent = "+";
+  pin.title = "Pin to compare";
+  pin.addEventListener("click", ev => { ev.stopPropagation(); togglePin(c.id); });
+  t.append(n, m);
+  d.append(cv, t, pin);
+  d._cv = cv; d._pin = pin;
+  io.observe(d);
+  return d;
+}
+
+async function load(c) {
+  if (!c.frames || poses.has(c.id)) return;
+  poses.set(c.id, "loading");
+  try {
+    const r = await fetch("poses/" + c.id + ".json");
+    const j = await r.json();
+    poses.set(c.id, { frames: j.f, data: Int16Array.from(j.p) });
+  } catch (e) { poses.set(c.id, "none"); }
+}
+
+function togglePin(id) {
+  const i = pinned.indexOf(id);
+  if (i >= 0) pinned.splice(i, 1); else pinned.push(id);
+  savePins(); drawTray(); markPins();
+  for (const id2 of pinned) load(byId.get(id2));
+}
+function savePins() { try { localStorage.setItem("animlib.pinned", JSON.stringify(pinned)); } catch (e) {} }
+function markPins() {
+  for (const d of $("grid").children) {
+    const on = pinned.includes(d._clip.id);
+    d._pin.textContent = on ? "✓" : "+"; d._pin.classList.toggle("on", on);
+  }
+  if (M.clip) $("mpin").textContent = pinned.includes(M.clip.id) ? "Unpin" : "Pin to compare";
+}
+function drawTray() {
+  $("tray").classList.toggle("on", pinned.length > 0);
+  $("trayN").textContent = pinned.length + " pinned";
+  const row = $("trayRow"); row.textContent = "";
+  for (const id of pinned) {
+    const c = byId.get(id); load(c);
+    const d = document.createElement("div"); d.className = "pinned"; d._clip = c;
+    const cv = document.createElement("canvas");
+    cv.addEventListener("click", () => openModal(c));
+    const n = document.createElement("div"); n.className = "n";
+    n.textContent = c.name + " · " + c.length.toFixed(2) + " s";
+    const x = document.createElement("button"); x.textContent = "×";
+    x.addEventListener("click", () => togglePin(id));
+    d.append(cv, n, x); d._cv = cv;
+    row.appendChild(d);
+  }
+}
+
+// ---- drawing -------------------------------------------------------------
+
+function frameAt(c, t01) {
+  const p = poses.get(c.id);
+  if (!p || p === "loading" || p === "none") return null;
+  const f = p.frames, x = ((t01 % 1) + 1) % 1 * f;
+  const a = Math.floor(x) % f, b = (a + 1) % f, k = x - Math.floor(x);
+  return { p, a, b, k: c.loop || c.length < 0.3 ? k : (a === f - 1 ? 0 : k), b2: c.loop ? b : Math.min(a + 1, f - 1) };
+}
+
+function draw(cv, c, t01, yaw, big, style) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (!w || !h) return;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  }
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const s = h * 0.78 / 200, gy = h * 0.88, cx = w / 2;
+  // ground
+  g.strokeStyle = "rgba(255,255,255,.12)"; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(w * .1, gy); g.lineTo(w * .9, gy); g.stroke();
+  const f = frameAt(c, t01);
+  if (!f) {
+    g.fillStyle = "rgba(255,255,255,.35)"; g.font = "12px sans-serif"; g.textAlign = "center";
+    g.fillText(c.frames ? "loading…" : "additive: no pose", cx, h / 2);
+    return;
+  }
+  const sk = catalog.skeletons[c.skeleton], nb = sk.bones.length, d = f.p.data;
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const pt = new Array(nb), depth = new Array(nb);
+  for (let i = 0; i < nb; i++) {
+    const o1 = (f.a * nb + i) * 3, o2 = (f.b2 * nb + i) * 3;
+    const x = d[o1] + (d[o2] - d[o1]) * f.k, y = d[o1 + 1] + (d[o2 + 1] - d[o1 + 1]) * f.k,
+          z = d[o1 + 2] + (d[o2 + 2] - d[o1 + 2]) * f.k;
+    pt[i] = [cx + (x * cy + y * sy) * s, gy - z * s];
+    depth[i] = -x * sy + y * cy;
+  }
+  if (style === "body") { drawBody(g, sk, pt, depth, s, gy); return; }
+  const side = n => /(_l|Left)/.test(n) ? 0 : /(_r|Right)/.test(n) ? 1 : 2;
+  const col = ["#5aa9ff", "#ffa24a", "#c9ced8"];
+  g.lineCap = "round";
+  for (let i = 0; i < nb; i++) {
+    const p = sk.parents[i];
+    if (p < 0) continue;
+    g.strokeStyle = col[side(sk.bones[i])];
+    g.lineWidth = (big ? 4 : 2.4) * (1 + depth[i] / 600);
+    g.globalAlpha = 0.9;
+    g.beginPath(); g.moveTo(pt[p][0], pt[p][1]); g.lineTo(pt[i][0], pt[i][1]); g.stroke();
+  }
+  g.globalAlpha = 1;
+  const hd = sk.bones.findIndex(n => /^(head|Head)$/.test(n));
+  if (hd >= 0) {
+    g.strokeStyle = "#c9ced8"; g.lineWidth = 2;
+    g.beginPath(); g.arc(pt[hd][0], pt[hd][1] - 8 * s, 8 * s, 0, 7); g.stroke();
+  }
+  // shadow under the pelvis, so a jump reads against the ground
+  const pel = Math.max(0, sk.bones.indexOf(sk.pelvis));
+  g.fillStyle = "rgba(0,0,0,.35)";
+  g.beginPath(); g.ellipse(pt[pel][0], gy, 18 * s, 5 * s, 0, 0, 7); g.fill();
+}
+
+// ---- the mannequin ---------------------------------------------------------
+// Built from the same joints: tapered capsules for the limbs and torso, a head,
+// hands and feet, shaded by a light from the upper left and drawn far to near.
+
+const SEG = {
+  upperarm: [4.6, 3.7], lowerarm: [3.7, 2.9], hand: [3.0, 2.2],
+  thigh: [7.4, 5.4], calf: [5.4, 3.9], foot: [3.9, 3.3], toe: [3.3, 2.8],
+};
+const TORSO_R = { pelvis: 12, spine1: 12.5, spine2: 13.5, spine3: 15.5, spine4: 16, spine5: 16.5,
+  neck1: 4.8, neck2: 4.4, head: 4 };
+const TORSO = ["pelvis", "spine1", "spine2", "spine3", "spine4", "spine5", "neck1", "neck2", "head"];
+
+function canon(sk) {
+  if (sk._c) return sk._c;
+  const m = {}, part = { Shoulder: "clavicle", Arm: "upperarm", ForeArm: "lowerarm", Hand: "hand",
+    UpLeg: "thigh", Leg: "calf", Foot: "foot", ToeBase: "ball" };
+  sk.bones.forEach((n, i) => {
+    let r = null, a;
+    if (n === "pelvis" || n === "Hips") r = "pelvis";
+    else if ((a = /^spine_0(\d)$/.exec(n))) r = "spine" + a[1];
+    else if ((a = /^Spine(\d?)$/.exec(n))) r = "spine" + ((+a[1] || 0) + 1);
+    else if ((a = /^neck_0(\d)$/.exec(n))) r = "neck" + a[1];
+    else if (n === "Neck") r = "neck1";
+    else if (n === "head" || n === "Head") r = "head";
+    else if (n === "HeadTop_End") r = "headtop";
+    else if ((a = /^(clavicle|upperarm|lowerarm|hand|thigh|calf|foot|ball)_([lr])$/.exec(n))) r = a[1] + "_" + a[2];
+    else if ((a = /^(Left|Right)(Shoulder|Arm|ForeArm|Hand|UpLeg|Leg|Foot|ToeBase)$/.exec(n)))
+      r = part[a[2]] + "_" + (a[1] === "Left" ? "l" : "r");
+    if (r) m[r] = i;
+  });
+  return (sk._c = m);
+}
+
+// Three separate fills (two caps and the quad between them): one path of the
+// three would cancel where their windings oppose and leave holes at the joints.
+function capsuleFill(g, A, B, ra, rb, style) {
+  g.fillStyle = style;
+  g.beginPath(); g.arc(A[0], A[1], ra, 0, 7); g.fill();
+  g.beginPath(); g.arc(B[0], B[1], rb, 0, 7); g.fill();
+  const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy) || 1;
+  const nx = -dy / L, ny = dx / L;
+  g.beginPath();
+  g.moveTo(A[0] + nx * ra, A[1] + ny * ra); g.lineTo(B[0] + nx * rb, B[1] + ny * rb);
+  g.lineTo(B[0] - nx * rb, B[1] - ny * rb); g.lineTo(A[0] - nx * ra, A[1] - ny * ra);
+  g.closePath(); g.fill();
+}
+
+function shade(g, A, B, ra, rb, light) {
+  const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+  const cx = (A[0] + B[0]) / 2, cy = (A[1] + B[1]) / 2, r = Math.max(ra, rb) + L * 0.12;
+  const gr = g.createLinearGradient(cx - light[0] * r, cy - light[1] * r, cx + light[0] * r, cy + light[1] * r);
+  gr.addColorStop(0, "#f1f4f9"); gr.addColorStop(0.45, "#c3cad6"); gr.addColorStop(1, "#7a8394");
+  return gr;
+}
+
+// One rim under all the parts of a group, then each part shaded: a limb gets
+// its own rim, the torso a single silhouette.
+function paint(g, parts, light, rim) {
+  for (const t of parts) capsuleFill(g, t.a, t.b, t.ra + 1.3, t.rb + 1.3, rim);
+  for (const t of parts) capsuleFill(g, t.a, t.b, t.ra, t.rb, shade(g, t.a, t.b, t.ra, t.rb, light));
+}
+
+function drawBody(g, sk, pt, depth, s, gy) {
+  const c = canon(sk);
+  const P = r => c[r] === undefined ? null : pt[c[r]];
+  const D = r => c[r] === undefined ? 0 : depth[c[r]];
+  const items = [], light = [-0.62, -0.78];
+  const add = (a, b, ra, rb, side, da, db) => {
+    if (!a || !b) return;
+    items.push({ a, b, ra: ra * s, rb: rb * s, side, d: ((da || 0) + (db || 0)) / 2 });
+  };
+  const ext = (a, b, len) => {                 // a point past b along a->b, len cm
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+    return [b[0] + dx / L * len * s, b[1] + dy / L * len * s];
+  };
+  // torso, neck
+  const chain = TORSO.filter(k => P(k));
+  for (let i = 0; i + 1 < chain.length; i++) {
+    const a = chain[i], b = chain[i + 1];
+    add(P(a), P(b), TORSO_R[a] || 6, b === "head" ? 4.2 : (TORSO_R[b] || 6), 2, D(a), D(b));
+  }
+  // the hips and the shoulders as bars across the body
+  add(P("thigh_l"), P("thigh_r"), 8.5, 8.5, 2, D("thigh_l"), D("thigh_r"));
+  add(P("upperarm_l"), P("upperarm_r"), 5.6, 5.6, 2, D("upperarm_l"), D("upperarm_r"));
+  for (const sd of ["l", "r"]) {
+    const k = sd === "l" ? 0 : 1;
+    const top = P("spine5") || P("spine3") || P("spine2");
+    add(top, P("clavicle_" + sd), 5, 5, k, D("spine5") || D("spine3"), D("clavicle_" + sd));
+    add(P("clavicle_" + sd), P("upperarm_" + sd), 5, SEG.upperarm[0], k, D("clavicle_" + sd), D("upperarm_" + sd));
+    add(P("upperarm_" + sd), P("lowerarm_" + sd), ...SEG.upperarm, k, D("upperarm_" + sd), D("lowerarm_" + sd));
+    add(P("lowerarm_" + sd), P("hand_" + sd), ...SEG.lowerarm, k, D("lowerarm_" + sd), D("hand_" + sd));
+    if (P("lowerarm_" + sd) && P("hand_" + sd))
+      add(P("hand_" + sd), ext(P("lowerarm_" + sd), P("hand_" + sd), 9), ...SEG.hand, k, D("hand_" + sd), D("hand_" + sd));
+    add(P("thigh_" + sd), P("calf_" + sd), ...SEG.thigh, k, D("thigh_" + sd), D("calf_" + sd));
+    add(P("calf_" + sd), P("foot_" + sd), ...SEG.calf, k, D("calf_" + sd), D("foot_" + sd));
+    add(P("foot_" + sd), P("ball_" + sd), ...SEG.foot, k, D("foot_" + sd), D("ball_" + sd));
+    if (P("foot_" + sd) && P("ball_" + sd))
+      add(P("ball_" + sd), ext(P("foot_" + sd), P("ball_" + sd), 5), ...SEG.toe, k, D("ball_" + sd), D("ball_" + sd));
+  }
+  // head: a sphere a little above the head joint (or half way to the top)
+  const h = P("head");
+  let hc = null;
+  if (h) {
+    const t = P("headtop");
+    hc = t ? [(h[0] + t[0]) / 2, (h[1] + t[1]) / 2] : [h[0], h[1] - 8 * s];
+  }
+  // The torso, hips and shoulders are one group, drawn at their mean depth.
+  const body = items.filter(i => i.side === 2), limbs = items.filter(i => i.side !== 2);
+  if (body.length) limbs.push({ group: body, d: body.reduce((n, i) => n + i.d, 0) / body.length, side: 2 });
+  limbs.sort((x, y) => x.d - y.d);
+  g.save();
+  const edge = ["#3f7fc4", "#c97b2e", "#4a5160"];
+  for (const it of limbs) paint(g, it.group || [it], light, edge[it.side]);
+  if (hc) {
+    const r = 9.6 * s, gr = g.createRadialGradient(hc[0] - r * .35, hc[1] - r * .4, r * .15, hc[0], hc[1], r);
+    gr.addColorStop(0, "#f6f8fb"); gr.addColorStop(0.55, "#c3cad6"); gr.addColorStop(1, "#6f7889");
+    g.beginPath(); g.ellipse(hc[0], hc[1], r * .92, r * 1.08, 0, 0, 7);
+    g.fillStyle = gr; g.fill();
+    g.strokeStyle = "#59606f"; g.lineWidth = 1.1; g.stroke();
+  }
+  g.restore();
+  const pel = P("pelvis");
+  if (pel) {
+    g.fillStyle = "rgba(0,0,0,.35)";
+    g.beginPath(); g.ellipse(pel[0], gy, 20 * s, 5.5 * s, 0, 0, 7); g.fill();
+  }
+}
+
+const M = { clip: null, t: 0, paused: false, rate: 1 };
+let last = performance.now();
+function tick(now) {
+  const dt = Math.min((now - last) / 1000, 0.1); last = now;
+  const step = c => (S.norm ? 1 / 2 : 1 / Math.max(c.length, 0.05)) * dt;
+  for (const d of visible) {
+    const c = d._clip;
+    d._t = ((d._t || 0) + step(c)) % 1;
+    draw(d._cv, c, d._t, S.yaw, false);
+  }
+  for (const d of $("trayRow").children) {
+    const c = d._clip;
+    d._t = ((d._t || 0) + step(c)) % 1;
+    draw(d._cv, c, d._t, S.yaw, false, S.body === "mannequin" ? "body" : "stick");
+  }
+  if (M.clip && $("modal").classList.contains("on")) {
+    if (!M.paused) { M.t = (M.t + step(M.clip) * M.rate) % 1; $("mscrub").value = Math.round(M.t * 1000); }
+    draw($("mcanvas"), M.clip, M.t, S.yaw, true, S.body === "mannequin" ? "body" : "stick");
+  }
+  requestAnimationFrame(tick);
+}
+
+function openModal(c) {
+  M.clip = c; M.t = 0; M.paused = false; $("mplay").textContent = "Pause";
+  load(c);
+  $("mname").textContent = c.name;
+  const dl = $("mdl"); dl.textContent = "";
+  const rows = [["Source", c.source], ["Category", c.cat], ["Skeleton", c.skeleton],
+    ["Length", c.length.toFixed(2) + " s (" + c.frames + " frames sampled)"],
+    ["Travel", c.frames ? (c.travel + " cm over the clip, " + fmtSpeed(c)) : "-"],
+    ["Pelvis height change", c.frames ? c.rise + " cm" : "-"],
+    ["Used by the game", c.use === "game" ? "yes" : c.use === "pool" ? "only in the motion-matching pool" : "no"],
+    ["Evidence", c.why.length ? c.why.join("; ") : "-"],
+    ["Loops", c.loop ? "yes" : "no"], ["Root motion", c.rootMotion ? "yes" : "no"],
+    ["Folder", c.folder], ["Tags", c.tags.join(", ") || "-"], ["Asset", c.path]];
+  for (const [k, v] of rows) {
+    const a = document.createElement("dt"), b = document.createElement("dd");
+    a.textContent = k; b.textContent = v; dl.append(a, b);
+  }
+  $("modal").classList.add("on");
+  markPins();
+}
+function closeModal() { $("modal").classList.remove("on"); M.clip = null; }
+
+boot();
+</script>
+</body>
+</html>

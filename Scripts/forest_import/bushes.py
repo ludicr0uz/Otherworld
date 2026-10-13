@@ -1,8 +1,9 @@
 """Plant the bushes from the grass sidecar as per-cell HISMs, and verify them.
 
 Called by the generated import_<Level>.py (step 5c) and verify_<Level>.py.
-Placement is forest_generator/bush_placement.py; the meshes are generated
-(forest_generator/foliage_meshes.py) and built by foliage_assets.py.
+Placement is forest_generator/bush_placement.py; the mesh is a bush out of a
+Fab pack (forest_generator/undergrowth_meshes.py), planted with its own
+materials.
 
 A bush cell is a grass cell in every way that matters (grass.spawn_cell): no
 collision and no navmesh footprint, so the player and the wanderers walk

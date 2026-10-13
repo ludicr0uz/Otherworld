@@ -43,8 +43,7 @@ import math
 import random
 from dataclasses import dataclass
 
-from .foliage_meshes import (
-    GRASS_PATCH_A, GRASS_PATCH_B, MI_GRASS, asset_path, mesh_height_cm)
+from .undergrowth_meshes import GRASS_02_09, asset_path
 from .grass_cells import GRASS_TIERS
 from .terrain import get_exact_mesh_z
 
@@ -67,27 +66,25 @@ class GrassSpec:
     width_jitter: tuple[float, float] = (0.90, 1.18)
     max_tilt_deg: float = 4.0      # random lean, keeps the field from looking stamped
     sink_cm: float = 4.0           # push the base below the surface at knee height
-    # Authored height of the mesh (foliage_meshes.mesh_height_cm).  Only used
+    # Bounds height of the mesh (undergrowth_meshes).  Only used
     # offline to flag excessive upscaling — the import script re-reads the
     # real bounds at plant time.
     nominal_mesh_height_cm: float = 0.0
 
 
-# Two generated patch meshes (forest_generator/foliage_meshes.py), each a
-# ~1.1 m disc of a few hundred opaque blades authored at knee height -- so
-# planting scales them by 0.8-1.1 instead of stretching 15-30 cm scans by up to
-# 3x. The patch itself is the thickness: one instance carries what took a
-# dozen scanned clumps, so the field is dense at the instance count the scans
-# used to be sparse at.
+# One clump out of the grass library (forest_generator/undergrowth_meshes.py):
+# 60 cm tall and about 54 cm across as authored, so planting scales it by
+# 0.7-1.0 to reach knee height. No material is named: a cell draws the mesh's
+# own.
+#
+# The clump is a third of the width of the generated patch it replaced
+# (1.1 m), so at the same count the ground is far more open: tufts with
+# terrain between them, where the patches overlapped into a field.
 DEFAULT_GRASS_SPECS = [
-    GrassSpec("HISM_Grass_Patch_A", asset_path(GRASS_PATCH_A), [MI_GRASS],
-              weight=1.25, height_ratio=1.00, height_jitter=(0.85, 1.15),
+    GrassSpec("HISM_Grass_02_09", asset_path(GRASS_02_09), [],
+              weight=1.0, height_ratio=1.00, height_jitter=(0.85, 1.15),
               width_jitter=(0.85, 1.20), sink_cm=3.0,
-              nominal_mesh_height_cm=mesh_height_cm(GRASS_PATCH_A)),
-    GrassSpec("HISM_Grass_Patch_B", asset_path(GRASS_PATCH_B), [MI_GRASS],
-              weight=0.75, height_ratio=1.00, height_jitter=(0.85, 1.15),
-              width_jitter=(0.85, 1.20), sink_cm=3.0,
-              nominal_mesh_height_cm=mesh_height_cm(GRASS_PATCH_B)),
+              nominal_mesh_height_cm=GRASS_02_09.height_cm),
 ]
 
 # Upscaling a patch much past this starts to read as oversized blades.
@@ -96,9 +93,9 @@ MAX_UPSCALE_FACTOR = 2.4
 # Specs whose height_ratio is at or above this count as the "knee" layer.
 KNEE_LAYER_MIN_RATIO = 0.85
 
-# Patches per m² of map with every tier drawn (Ultra); Low draws
-# GRASS_TIERS[0].share of it. ~1.1 m² per patch, so ~1.2 layers of blades
-# over the ground at Ultra and about half cover on Low.
+# Clumps per m² of map with every tier drawn (Ultra); Low draws
+# GRASS_TIERS[0].share of it. A clump covers about 0.15 m², so that is roughly
+# a sixth of the ground under grass at Ultra and a fifteenth on Low.
 DEFAULT_DENSITY_PER_SQM = 1.1
 DEFAULT_PATCHINESS = 0.25       # 0 = perfectly even, ->1 = heavily clustered
 SPAWN_CLEAR_RADIUS_CM = 150.0   # keep the PlayerStart from being submerged

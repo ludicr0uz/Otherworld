@@ -350,20 +350,21 @@ from forest_import import trees as trees_import
 from forest_import import tree_assets
 tree_assets.ensure_tree_assets()
 trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
-                         editor_asset_sub)
+                         editor_asset_sub, level=LEVEL_NAME)
 
-# ── 5a. Build the generated grass and bush meshes ────────────────────
-# Opaque Nanite patches and bushes, rebuilt in place every import --
-# see forest_import/foliage_assets.py.
+# ── 5a. The wind, and the grass and bush meshes ──────────────────────
+# The meshes come out of two Fab packs and are planted as they are --
+# see forest_import/undergrowth_assets.py.
 GRASS_DATA_PATH = r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/generated_levels/Lvl_Forest_200m/grass_Lvl_Forest_200m.json"
 EXPECTED_GRASS_COUNT = 40521
 EXPECTED_BUSH_COUNT = 328
-GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_Patch_A": {"mesh": "/Game/Forest/Procedural/SM_GrassPatch_A.SM_GrassPatch_A", "mats": ["/Game/Forest/Procedural/MI_ProcGrass"]}, "HISM_Grass_Patch_B": {"mesh": "/Game/Forest/Procedural/SM_GrassPatch_B.SM_GrassPatch_B", "mats": ["/Game/Forest/Procedural/MI_ProcGrass"]}}""")
-BUSH_CONFIGS = json.loads(r"""{"HISM_Bush_Round": {"mesh": "/Game/Forest/Procedural/SM_Bush_Round.SM_Bush_Round", "mats": ["/Game/Forest/Procedural/MI_ProcBush"]}, "HISM_Bush_Tall": {"mesh": "/Game/Forest/Procedural/SM_Bush_Tall.SM_Bush_Tall", "mats": ["/Game/Forest/Procedural/MI_ProcBush"]}}""")
+GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_02_09": {"mesh": "/Game/PN_GrassLibrary/Meshes/grassMesh/grass_02_09_mesh.grass_02_09_mesh", "mats": []}}""")
+BUSH_CONFIGS = json.loads(r"""{"HISM_Bush_02": {"mesh": "/Game/Light_Foliage/Meshes/SM_Bush_02.SM_Bush_02", "mats": []}}""")
 if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
-    unreal.log_warning("[GEN] 5a. Building generated grass and bush meshes...")
-    from forest_import import foliage_assets
-    foliage_assets.ensure_foliage_assets()
+    unreal.log_warning("[GEN] 5a. Wind, and the grass and bush meshes...")
+    from forest_import import undergrowth_assets, wind as wind_import
+    wind_import.ensure_wind()
+    undergrowth_assets.ensure_undergrowth_assets()
 
 # ── 5b. Plant knee-high grass ────────────────────────────────────────
 # Per-cell, per-tier HISMs, saved unlit and (above Low) hidden in game

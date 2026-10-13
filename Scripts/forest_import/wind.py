@@ -5,9 +5,10 @@ forest_generator/wind.py.
     Scripts/dev/uepy.py Scripts/forest_import/wind.py   # standalone
 
 ensure_wind() makes the collection and patches the two tree masters;
-foliage_assets.build_material() calls author_grass_wind() into
-M_ProcFoliage, which it rebuilds whole. ensure_foliage_assets() (the level
-import) runs both.
+the level import runs it. foliage_assets.build_material() calls
+author_grass_wind() into M_ProcFoliage, which it rebuilds whole; no level
+plants anything on that material now (the grass and the bushes are library
+meshes with their pack's own wind: forest_generator/undergrowth_meshes.py).
 
 The masters are patched, not rebuilt: M_Master_Bark and M_Master_Foliage
 have no builder any more (it went in a cleanup), and every tree, shrub and

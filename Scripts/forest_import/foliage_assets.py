@@ -2,8 +2,10 @@
 
     Scripts/dev/uepy.py Scripts/forest_import/foliage_assets.py   # standalone
 
-The generated import_<Level>.py calls ensure_foliage_assets() before it plants
-anything. Geometry is forest_generator/foliage_meshes.py; this file only turns
+No level plants these any more: the grass and the bushes are library meshes
+(forest_generator/undergrowth_meshes.py), and the level import no longer calls
+this. It still runs on its own, and the assets are still committed.
+Geometry is forest_generator/foliage_meshes.py; this file only turns
 it into assets under /Game/Forest/Procedural. Everything is rebuilt on every
 run -- it is deterministic and takes a second or two -- and meshes are updated
 IN PLACE, so cells already planted in an open level keep pointing at them.

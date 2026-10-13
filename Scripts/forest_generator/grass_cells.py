@@ -26,8 +26,8 @@ from collections import namedtuple
 # it to switch their lighting with the preset.
 GRASS_TAG = "OW_Grass"
 
-# Cell edge. 100 m makes 100 cells on the 1 km map (x 2 grass species x 4
-# tiers, plus 2 bush species = up to 1000 actors) and 4 on the 200 m map.
+# Cell edge. 100 m makes 100 cells on the 1 km map (x 4 grass tiers, plus the
+# bushes = up to 500 actors) and 4 on the 200 m map.
 # Smaller cells cull tighter but multiply the actor count, and every one of
 # them is a primitive the renderer tracks.
 GRASS_CELL_CM = 10000.0
@@ -79,7 +79,7 @@ def tier_of_label(label):
 # ─── Bushes ──────────────────────────────────────────────────────────────────
 #
 # Bushes are drawn at every preset -- a bush you can hide behind on Ultra must
-# be there on Low -- and further out than grass, since at 1-1.7 m tall they
+# be there on Low -- and further out than grass, since at 1.5-2.1 m tall they
 # read against the trunks. They share the grass tag, so Ultra lights them too.
 BUSH_CULL_START_CM = 8000
 BUSH_CULL_END_CM = 11000

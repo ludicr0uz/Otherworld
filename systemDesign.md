@@ -289,26 +289,20 @@ measure in world space) plus independent height and width multipliers; the gener
 script divides that target by the mesh's *actual* `get_bounds().box_extent.z * 2` at plant
 time. "Knee high" therefore stays true if an asset is ever re-exported at a different size.
 
-**Layering.** `DEFAULT_GRASS_SPECS` is two layers, nine HISM actors:
+**One species.** `DEFAULT_GRASS_SPECS` is a single clump, `grass_02_09_mesh` from the grass
+library pack (`forest_generator/undergrowth_meshes.py`): 60 cm tall and 54 cm across as
+authored, four mesh LODs, a masked material and the pack's own wind. It is planted with the
+mesh's own material at 0.7–1.0× to reach knee height; the offline `Grass Upscale Factor` check
+still fails the build past **2.4×**. Per-instance jitter is height ×0.85–1.15, width
+×0.85–1.20, and a ±4° lean so the field does not look stamped.
 
-| Layer | Species | `height_ratio` | Result at the 50 cm default |
-|---|---|---|---|
-| Knee | `Tall_A/B/C`, `Clump_C`, `Mid_A` | 0.92–1.00 | ~46–50 cm, ~77 % of clumps |
-| Understory | `Under_Mid_B`, `Under_Large_A/B`, `Under_Clump_A` | 0.52–0.60 | shin height, breaks the silhouette |
-
-The split is driven by the *measured* mesh heights recorded on each spec as
-`nominal_mesh_height_cm`: the tallest scans carry the knee layer because reaching 50 cm from a
-15 cm clump needs a 3.4× upscale and the blades read as coarse. As built, the worst upscale is
-2.34× and the offline `Grass Upscale Factor` check fails the build past **2.4×**. Per-instance
-jitter is height ×0.85–1.20 (tightened per species where the upscale budget is thin), width
-×0.90–1.18, and a ±4° lean so the field does not look stamped.
-
-200 m at the defaults ⇒ **44,368 clumps**, 1.11/m² realised against 1.20 requested (the
-difference is the spawn ring, the trunk rings and the coverage inset).
+200 m at the defaults ⇒ **40,521 clumps**, about 1.0/m² with every density tier drawn. A clump
+covers about 0.15 m², so the ground reads as tufts with terrain between them, not a field.
 
 **Bushes** (`bush_placement.py`) are a third layer: loose clusters of one to four on a coarse
 jittered grid with most cells left empty, so the floor alternates between open grass and
-thickets. They never block (planted with no collision), and the player's or a wanderer's
+thickets. The mesh is `SM_Bush_02` from the Light Foliage pack, 1.95 m tall and 3.5 m across,
+planted at 0.75–1.10×. They never block (planted with no collision), and the player's or a wanderer's
 passage through one is heard as a rustle (`Scripts/Sound/CLAUDE.md`).
 
 ### 3.2c NPC placement — `forest_generator/npc_placement.py`

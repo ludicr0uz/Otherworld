@@ -85,10 +85,40 @@ Content/Python/__pycache__/
 /Content/FP_AKS74U_Animation/
 /Content/FreeAnimationLibrary/
 /Content/FreeLadderAnimationSet/
-/Content/Light_Foliage/
 /Content/Megaplant_Library/
-/Content/PN_GrassLibrary/
 /Content/Survival_Character/
+
+# Two library packs the levels plant one mesh each from: the grass and the
+# bushes (Scripts/forest_generator/undergrowth_meshes.py, whose
+# gitignore_lines() prints the `!` lines). Everything in them is ignored but
+# what those two meshes need; `**` and not the folder, because git cannot
+# re-include a file whose folder is ignored.
+/Content/Light_Foliage/**
+!/Content/Light_Foliage/**/
+!/Content/Light_Foliage/Materials/MI_Branch.uasset
+!/Content/Light_Foliage/Materials/MI_Bush_02.uasset
+!/Content/Light_Foliage/Materials/Master_Materials/M_Master_Foliage.uasset
+!/Content/Light_Foliage/Meshes/SM_Bush_02.uasset
+!/Content/Light_Foliage/Textures/T_Bush_02_Mask.uasset
+!/Content/Light_Foliage/Textures/T_Bush_02_Normal.uasset
+!/Content/Light_Foliage/Textures/T_Bush_04_Normal.uasset
+!/Content/Light_Foliage/Textures/T_Bush_Branch_Mask.uasset
+/Content/PN_GrassLibrary/**
+!/Content/PN_GrassLibrary/**/
+!/Content/PN_GrassLibrary/Materials/MaterialFunctions/PN_AnimationShader.uasset
+!/Content/PN_GrassLibrary/Materials/MaterialFunctions/PN_Bending.uasset
+!/Content/PN_GrassLibrary/Materials/MaterialFunctions/PN_BendingParameters.uasset
+!/Content/PN_GrassLibrary/Materials/MaterialFunctions/PN_MultiBend.uasset
+!/Content/PN_GrassLibrary/Materials/MaterialFunctions/PN_WindAnimation.uasset
+!/Content/PN_GrassLibrary/Materials/PN_WindParameters.uasset
+!/Content/PN_GrassLibrary/Materials/grassMaterials/MA_Grass.uasset
+!/Content/PN_GrassLibrary/Materials/grassMaterials/grassMaterials/grass_02_09_Mat.uasset
+!/Content/PN_GrassLibrary/Meshes/grassMesh/grass_02_09_mesh.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/MasterTextures/springGrass_Albedo_8k_I.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/MasterTextures/springGrass_Normal_springGrass_8k.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/MasterTextures/springGrass_Opacity_8k.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/PivPainterTextures/grass_02_09_PIV.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/PivPainterTextures/grass_02_09_VEC.uasset
 
 # Generator sidecars: megabytes apiece, and fully determined by the seed.
 Scripts/generated_levels/*/grass_*.json

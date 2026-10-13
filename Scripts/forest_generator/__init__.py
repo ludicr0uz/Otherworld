@@ -23,4 +23,6 @@
   wind                Wind in the grass and the trees: the numbers
 
   tree_lods  Which levels plant the trees with a LOD chain and an impostor, and which mesh that is
+
+  undergrowth_meshes  The meshes the grass and the bushes are planted from
 """

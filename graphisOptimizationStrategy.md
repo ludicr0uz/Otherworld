@@ -223,3 +223,26 @@ Not measured: night, Retina-equivalent pixels, the distance each LOD actually sw
 Open choice: the close-range look is not paid for at Low and Medium. Building LOD0 from the full source (`--set lod0_triangles=250000`, then a re-import) should bring trees within 30 m close to the Nanite ones; whether the High gain survives that depends on how much of it comes from the distant trees, which is not yet measured. The other option is to take the level back to Nanite (remove it from `TREE_LOD_LEVELS` and re-import) and keep the LOD build for a High-only or lower-end path.
 
 `probe_perf_audit_1km.py` no longer runs to the end: it waits for the Low preset at start, and the game starts on the saved preset. These numbers came from a scratch probe that sets each preset itself.
+
+## Library grass and bushes (2026-10-12)
+
+The grass and the bushes are no longer the generated opaque Nanite meshes. Both forest levels now plant one mesh each out of a Fab pack, with the pack's material (`forest_generator/undergrowth_meshes.py`): `grass_02_09_mesh` from the optimized Grass Library and `SM_Bush_02` from Light Foliage. Neither is Nanite; each has four mesh LODs and a masked material. Counts, cells, tiers and cull distances are unchanged.
+
+Same spot and probe as the tree table above (densest cluster, noon, 720p), on the 1 km map with the LOD trees:
+
+| Preset | Generated grass and bushes | Library grass and bushes |
+|---|---|---|
+| Low | 15.9 ms (63 fps) | 14.6–15.0 ms (67–69 fps) |
+| Medium | 21.0 ms (48 fps) | 20.5–21.9 ms (46–49 fps) |
+| High | 46.3 ms (22 fps) | 44.9–46.4 ms (22 fps) |
+
+The left column is the earlier run, so the two are an hour and a re-import apart; the differences are within what two runs of one build differ by. At Medium, hiding the new grass saved 3.4 ms in one run and 5.5 ms in another; hiding the bushes saved nothing measurable; hiding the trees still saves about 9 ms.
+
+What changed is the look, not the frame time:
+
+- **The grass is tufts, not a field.** A clump is 54 cm across where a generated patch was 1.1 m, so at the same one clump per square metre about a sixth of the ground is covered at Ultra and less below. Covering the ground as before would take about seven times the instances (7 million on the 1 km map), which the map file and the frame cannot carry; widening each clump, or a wider mesh from the same pack, is the cheaper way.
+- **The bushes are larger and read as shrubs:** 1.5–2.1 m tall and up to 3.8 m across, against 1.2–1.65 m before.
+- **The wind is the packs' own.** The menu's wind strength and speed no longer move the grass and bushes.
+- **The grass pack's atlas is three 8k textures (109 MB on disk)** for the one clump the levels use.
+
+Pictures at each preset: `assets/generated/undergrowth/` (git-ignored). Not measured: night, Retina-equivalent pixels, texture memory.

@@ -837,18 +837,19 @@ def _write_unreal_import_script(
         trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
                                  editor_asset_sub, level=LEVEL_NAME)
 
-        # ── 5a. Build the generated grass and bush meshes ────────────────────
-        # Opaque Nanite patches and bushes, rebuilt in place every import --
-        # see forest_import/foliage_assets.py.
+        # ── 5a. The wind, and the grass and bush meshes ──────────────────────
+        # The meshes come out of two Fab packs and are planted as they are --
+        # see forest_import/undergrowth_assets.py.
         GRASS_DATA_PATH = r"{grass_data_path}"
         EXPECTED_GRASS_COUNT = {grass_count}
         EXPECTED_BUSH_COUNT = {bush_count}
         GRASS_CONFIGS = json.loads(r"""{grass_configs_json}""")
         BUSH_CONFIGS = json.loads(r"""{bush_configs_json}""")
         if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
-            unreal.log_warning("[GEN] 5a. Building generated grass and bush meshes...")
-            from forest_import import foliage_assets
-            foliage_assets.ensure_foliage_assets()
+            unreal.log_warning("[GEN] 5a. Wind, and the grass and bush meshes...")
+            from forest_import import undergrowth_assets, wind as wind_import
+            wind_import.ensure_wind()
+            undergrowth_assets.ensure_undergrowth_assets()
 
         # ── 5b. Plant knee-high grass ────────────────────────────────────────
         # Per-cell, per-tier HISMs, saved unlit and (above Low) hidden in game
@@ -1322,15 +1323,16 @@ def _write_unreal_verify_script(
             grass_import.verify_grass(check, actors, EXPECTED_GRASS_SPEC_COUNTS,
                                       EXPECTED_GRASS_HEIGHTS, EXPECTED_GRASS_COUNT)
 
-        # ── 5b. Bushes and the generated meshes (forest_import/bushes.py,
-        #        foliage_assets.py) ──────────────────────────────────────────
+        # ── 5b. Bushes, the meshes and the wind (forest_import/bushes.py,
+        #        undergrowth_assets.py, wind.py) ─────────────────────────────
         if EXPECTED_BUSH_COUNT > 0:
             from forest_import import bushes as bushes_import
             bushes_import.verify_bushes(check, actors, EXPECTED_BUSH_SPEC_COUNTS,
                                         EXPECTED_BUSH_COUNT)
         if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
-            from forest_import import foliage_assets
-            foliage_assets.verify_foliage_assets(check)
+            from forest_import import undergrowth_assets, wind as wind_import
+            wind_import.verify_wind(check)
+            undergrowth_assets.verify_undergrowth_assets(check, actors)
 
         # ── 6. Navigation + NPCs ─────────────────────────────────────────────
         if EXPECTED_NPCS:

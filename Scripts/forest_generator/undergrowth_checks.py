@@ -1,63 +1,52 @@
-"""Offline checks for the generated foliage meshes, the grass density tiers
-and the bushes. Pure Python; run_all_checks (verification.py) calls these.
+"""Offline checks for the meshes the undergrowth is planted from, the grass
+density tiers and the bushes. Pure Python; run_all_checks (verification.py) calls these.
 
 The in-editor half -- that the saved cells carry these tiers, tags, distances
 and no collision -- is forest_import/grass.py's and bushes.py's verify_*.
 """
 
-import math
-
 from .bush_placement import (
-    BUSH_SPAWN_CLEAR_CM, BUSH_TREE_CLEAR_CM, bush_spec_by_name)
-from .foliage_meshes import (
-    BUSH_RECIPES, BUSH_TRI_BUDGET, GRASS_RECIPES, GRASS_TRI_BUDGET, build)
+    BUSH_SPAWN_CLEAR_CM, BUSH_TREE_CLEAR_CM, DEFAULT_BUSH_SPECS,
+    bush_spec_by_name)
 from .grass_cells import GRASS_TIERS
 from .grass_placement import KNEE_HEIGHT_CM, MAX_UPSCALE_FACTOR
 from .terrain import get_exact_mesh_z
+from .undergrowth_meshes import BUSH_MESHES, GRASS_MESHES, UNDERGROWTH_MESHES
 from .verification import CheckResult
 
-
-def _tri_area2(a, b, c):
-    ux, uy, uz = b[0] - a[0], b[1] - a[1], b[2] - a[2]
-    vx, vy, vz = c[0] - a[0], c[1] - a[1], c[2] - a[2]
-    cx, cy, cz = uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx
-    return math.sqrt(cx * cx + cy * cy + cz * cz)
+# A planted bush, shortest to tallest: waist high to a head above the player.
+BUSH_HEIGHT_CM = (90.0, 230.0)
 
 
-def check_foliage_meshes() -> CheckResult:
-    """Every generated mesh: inside its triangle budget, no degenerate
-    triangles, unit normals, rooted at the origin, and the right size -- grass
-    near knee height (so planting barely scales it), bushes waist to head."""
+def check_undergrowth_meshes() -> CheckResult:
+    """The library meshes the grass and bushes are planted from
+    (undergrowth_meshes.py): the grass near knee height, so planting barely
+    scales it, and the bushes waist to above head at either end of their
+    scale. The sizes are the recorded ones; the level verifier re-measures."""
     problems, details = [], []
-    for recipe in GRASS_RECIPES + BUSH_RECIPES:
-        buf = build(recipe)
-        is_grass = recipe in GRASS_RECIPES
-        budget = GRASS_TRI_BUDGET if is_grass else BUSH_TRI_BUDGET
-        (x0, y0, z0), (x1, y1, z1) = buf.bounds()
-        details.append(f"{recipe.name}: {buf.triangle_count} tris, "
-                       f"{z1:.0f} cm tall, {x1 - x0:.0f} cm wide")
-        if buf.triangle_count > budget:
-            problems.append(f"{recipe.name}: {buf.triangle_count} tris > {budget}")
-        degenerate = sum(1 for t in buf.triangles
-                         if _tri_area2(*(buf.vertices[i] for i in t)) < 1e-4)
-        if degenerate:
-            problems.append(f"{recipe.name}: {degenerate} degenerate triangles")
-        bad_n = sum(1 for n in buf.normals
-                    if abs(math.sqrt(n[0] ** 2 + n[1] ** 2 + n[2] ** 2) - 1.0) > 1e-3)
-        if bad_n:
-            problems.append(f"{recipe.name}: {bad_n} non-unit normals")
-        if z0 < -5.0 or abs((x0 + x1) / 2) > 15.0 or abs((y0 + y1) / 2) > 15.0:
-            problems.append(f"{recipe.name}: pivot is not at the base centre")
-        if is_grass:
-            scale = KNEE_HEIGHT_CM / z1
-            if not (1.0 / MAX_UPSCALE_FACTOR <= scale <= MAX_UPSCALE_FACTOR):
-                problems.append(f"{recipe.name}: {z1:.0f} cm needs x{scale:.2f} "
-                                f"to reach knee height")
-        elif not (90.0 <= z1 <= 200.0):
-            problems.append(f"{recipe.name}: {z1:.0f} cm is not bush height")
-    return CheckResult("Foliage Meshes", not problems,
-                       f"{len(GRASS_RECIPES)} grass patches, {len(BUSH_RECIPES)} "
-                       f"bushes, within budget" if not problems
+    for mesh in UNDERGROWTH_MESHES:
+        details.append(f"{mesh.name}: {mesh.lod0_triangles} tris in LOD0 of "
+                       f"{mesh.lods}, {mesh.height_cm:.0f} cm tall, "
+                       f"{mesh.width_cm:.0f} cm wide")
+        if mesh.mesh not in mesh.packages:
+            problems.append(f"{mesh.name}: its own package is not in its list")
+    for mesh in GRASS_MESHES:
+        scale = KNEE_HEIGHT_CM / mesh.height_cm
+        if not (1.0 / MAX_UPSCALE_FACTOR <= scale <= MAX_UPSCALE_FACTOR):
+            problems.append(f"{mesh.name}: {mesh.height_cm:.0f} cm needs "
+                            f"x{scale:.2f} to reach knee height")
+    planted = {s.mesh_path.split(".")[0]: s for s in DEFAULT_BUSH_SPECS}
+    for mesh in BUSH_MESHES:
+        spec = planted.get(mesh.mesh)
+        if not spec:
+            problems.append(f"{mesh.name}: no bush spec plants it")
+            continue
+        lo, hi = (mesh.height_cm * s for s in spec.scale_jitter)
+        if lo < BUSH_HEIGHT_CM[0] or hi > BUSH_HEIGHT_CM[1]:
+            problems.append(f"{mesh.name}: {lo:.0f}-{hi:.0f} cm is not bush height")
+    return CheckResult("Undergrowth Meshes", not problems,
+                       f"{len(GRASS_MESHES)} grass, {len(BUSH_MESHES)} bush, "
+                       f"the right size" if not problems
                        else f"{len(problems)} problems", problems + details)
 
 

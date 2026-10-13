@@ -1,0 +1,6 @@
+# <clip name>,<category>: build_library.py reads this before its guesses.
+# The player's crawl is a zombie's by name; it belongs beside the prone clips.
+A_Mx_Scary_ZombieCrawl,prone / crawl
+A_UEFN_Player_Mx_Scary_ZombieCrawl,prone / crawl
+A_Mx_Scary_RunningCrawl,prone / crawl
+A_AxeSwing,melee

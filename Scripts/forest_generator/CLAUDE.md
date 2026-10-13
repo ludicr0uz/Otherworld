@@ -26,6 +26,8 @@ The generator's code lives in this package. The level-side import code is in
 | `tree_meshes.py` | the meshes the trees are planted from: a recipe per species (`TREE_MESH_RECIPES`) that cuts a scan down. `forest_import/tree_assets.py` builds them under `/Game/Forest/Trees`; the level import calls it |
 | `tree_lods.py` | which levels plant the trees' other build, a LOD chain ending in an impostor (`TREE_LOD_LEVELS`: the 1 km map), and where that mesh is |
 | `grass_placement.py` | `DEFAULT_GRASS_SPECS` and a stratified scatter |
+| `bush_placement.py` | `DEFAULT_BUSH_SPECS` and the clustered scatter |
+| `undergrowth_meshes.py` | the two library meshes the grass and the bushes are planted from, and the packages of each that the repository carries ("Rendering gotchas", below) |
 | `npc_placement.py` | NPC numbers (see `Scripts/npc/CLAUDE.md`) |
 | `npc_agro.py` | sense and patrol numbers |
 | `npc_strafe.py` | the step a wanderer takes between two swings |
@@ -37,13 +39,13 @@ The generator's code lives in this package. The level-side import code is in
 ## The two maps
 
 - **`Lvl_Forest_200m`** (`--size 200`):
-  - night, 136 trees, ~44k grass clumps, ten NPCs at 75–78 m;
+  - night, 68 trees, ~41k grass clumps, 328 bushes, ten NPCs at 75–79 m;
   - it is the `EditorStartupMap`: the debug map.
 - **`Lvl_Forest_1000m`** (`--size 1000`, tree density 0.5):
-  - 1,700 trees, ~1.1 M grass clumps;
+  - 1,700 trees, ~1.0 M grass clumps, 8,239 bushes;
   - its trees are the LOD build, not the Nanite one ("Rendering gotchas", below);
   - it is the `GameDefaultMap`: what a packaged or standalone run boots;
-  - the `.umap` is 161 MB;
+  - the `.umap` is 185 MB;
   - the import takes about a minute. `uepy.py` reports that the editor stopped responding, but
     the job keeps going; read the editor log.
 
@@ -110,8 +112,33 @@ the day/night cycle actor.
     `<spec>__±ix_±iy`, tagged `OW_Grass`;
   - no collision, saved unlit;
   - they cull at 60–90 m × `r.ViewDistanceScale`.
-- **The scanned grass meshes are only 15–32 cm tall.** Scale them to the target height from their
-  real bounds at plant time. The offline check caps the upscale at 2.4×.
+- **Grass and bushes are one library mesh each, planted where its Fab pack put it**
+  (`undergrowth_meshes.py`): `grass_02_09_mesh` (60 cm tall, 54 cm across, 2,152 triangles)
+  and `SM_Bush_02` (1.95 m tall, 3.5 m across, 1,304 triangles).
+  - Neither is Nanite. Each has four mesh LODs and a masked two-sided material, and a cell
+    draws the mesh's own materials (the specs name none).
+  - **They sway by their pack's wind, not `MPC_Wind`.** The graphics menu's wind strength and
+    speed do not reach them; its world-position-offset switch still does.
+  - **The packs are git-ignored but these two meshes are committed.** `.gitignore`
+    re-includes exactly the packages each needs (22 files, 116 MB, of which the grass pack's
+    8k atlas is 109 MB). To plant another library mesh, add its record and its packages to
+    `undergrowth_meshes.py` and its `gitignore_lines()` to `.gitignore`;
+    `dev/tests/test_undergrowth_meshes.py` holds the two together, and the level verifier
+    fails if a mesh references a package outside its list.
+  - Nothing writes to a pack asset. `forest_import/undergrowth_assets.py` only checks them:
+    the import stops if one is missing, and the verifier re-measures height, LOD count and
+    triangles, so a pack update that changes the mesh fails there.
+  - **A grass clump is a third of the width of the generated patch it replaced,** so at the
+    same count (about 1/m² with every tier drawn) the ground is tufts with terrain between
+    them. Grass is scaled to the target height from the mesh's real bounds at plant time;
+    the offline check caps the upscale at 2.4×.
+  - **The generated patches and bushes are still in the tree but no level plants them:**
+    `foliage_meshes.py`, `forest_import/foliage_assets.py` and `/Game/Forest/Procedural`.
+    The level import no longer builds them.
+  - After changing a bush spec's mesh, run
+    `uepy.py --only footsteps Scripts/build_weapons_and_combat.py`: the footstep component
+    holds the bush meshes for the rustle (`Scripts/Sound/CLAUDE.md`), and
+    `verify_weapons_and_combat.py` fails until it is rebuilt.
 - **Trees are cut-down copies of dense scans.** The scans (0.14–4.2 M triangles, 13–112 MB) stay
   under `/Game/Forest/Scanned` as imported; the levels plant the copies under
   `/Game/Forest/Trees` (33–240 k triangles), in the same per-cell HISMs as the grass
@@ -168,15 +195,15 @@ the day/night cycle actor.
     instance's own (`PerInstanceRandom`). The gusts are the same two trains, and a tree also
     rocks across its heading. The numbers are the `*_VEER_*`, `*_SCATTER_TURNS` and
     `*_CROSS_*` constants; `verify_wind` checks each material turns its heading.
-  - `M_ProcFoliage` (grass, bushes) leans and sways by its vertex alpha, in gusts across
-    the field; it is rebuilt whole by `foliage_assets.build_material` (to rebuild it alone:
-    `foliage_assets.build_material()`, no level import needed).
+  - `M_ProcFoliage` (the generated grass and bushes, which no level plants now) leans and
+    sways by its vertex alpha, in gusts across the field; it is rebuilt whole by
+    `foliage_assets.build_material`. The library grass and bushes are not on it.
   - **`M_Master_Bark` and `M_Master_Foliage` have no builder** (it was deleted), so the wind
     is **patched** into them: every node it adds has the desc `OW_Wind`, and a re-run deletes
     those first. Both bend by `(local height / 15 m)^2` (the mesh's origin is the trunk
     base), so trunk, branches and leaves move together; the leaves flutter on top. The rocks,
     stumps, shrubs and ferns on these masters get the same bend, which is tiny at their height.
-  - The level import runs it (`ensure_foliage_assets`), and the level verifiers check it
+  - The level import runs it (`ensure_wind`), and the level verifiers check it
     (`verify_wind`); standalone: `uepy.py Scripts/forest_import/wind.py`.
   - `PreSkinnedPosition` is the local position under Nanite too. A tree that does not move
     in a shot is most likely past the WPO disable distance the graphics menu set.

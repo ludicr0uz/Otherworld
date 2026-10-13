@@ -8,8 +8,11 @@ bush every few metres. They never block: forest_import/bushes.py plants them
 with no collision, so the player and the wanderers walk straight through, and
 the navmesh never sees them.
 
-The meshes are generated (forest_generator/foliage_meshes.py) at their real
-size, so the scale here is only jitter around 1.0.
+The mesh is one bush out of a Fab pack (forest_generator/undergrowth_meshes.py),
+1.95 m tall and 3.5 m across as authored, so the scale here is only jitter
+around its own size. It is twice the width of the generated bushes it
+replaced: the bushes of one cluster grow into each other, and one near a
+trunk grows round it.
 
 A bush stands halfway between plumb and the terrain normal: fully aligned on
 a 30-degree slope it leans out over the hill like it is falling, fully plumb
@@ -20,7 +23,7 @@ import math
 import random
 from dataclasses import dataclass
 
-from .foliage_meshes import BUSH_ROUND, BUSH_TALL, MI_BUSH, asset_path
+from .undergrowth_meshes import BUSH_02, asset_path
 from .grass_placement import _build_tree_grid, _near_tree, terrain_pose
 from .terrain import get_exact_mesh_z
 
@@ -36,10 +39,10 @@ class BushSpec:
     sink_cm: float = 6.0
 
 
+# No material is named: a cell draws the mesh's own two (leaves, branches).
 DEFAULT_BUSH_SPECS = [
-    BushSpec("HISM_Bush_Round", asset_path(BUSH_ROUND), [MI_BUSH], weight=1.3),
-    BushSpec("HISM_Bush_Tall", asset_path(BUSH_TALL), [MI_BUSH], weight=0.7,
-             scale_jitter=(0.85, 1.15)),
+    BushSpec("HISM_Bush_02", asset_path(BUSH_02), [], weight=1.0,
+             scale_jitter=(0.75, 1.10)),
 ]
 
 # Cluster centres per hectare before the empty share is taken out, and how

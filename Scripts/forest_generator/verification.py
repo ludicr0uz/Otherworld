@@ -11,7 +11,7 @@ import math
 import os
 from dataclasses import dataclass, field
 
-from .terrain import get_exact_mesh_z, compute_grid, make_elevation_fn
+from .terrain import get_exact_mesh_z, make_elevation_fn
 from .npc_placement import (
     NAV_MAX_VERTICAL_SPAN_CM,
     NAV_MAX_HALF_XY_CM,
@@ -26,6 +26,7 @@ from .npc_placement import (
     spawn_band,
 )
 from .grass_placement import (
+    DEFAULT_GRASS_SPECS,
     KNEE_LAYER_MIN_RATIO,
     MAX_UPSCALE_FACTOR,
     grass_spec_by_name,
@@ -117,7 +118,6 @@ def check_obj_file_valid(obj_path: str) -> CheckResult:
 
 def check_terrain_bounds(obj_path: str, world_size_cm: float) -> CheckResult:
     """Verify terrain vertices span the expected world bounds ±5%."""
-    half = world_size_cm / 2.0
     min_x = min_y = float("inf")
     max_x = max_y = float("-inf")
 
@@ -468,8 +468,9 @@ def check_grass_spec_distribution(placed_grass) -> CheckResult:
     from collections import Counter
     counts = Counter(g.spec_name for g in placed_grass)
     details = [f"{n}: {c:,}" for n, c in sorted(counts.items())]
-    ok = len(counts) >= 2 and min(counts.values()) > 0
-    msg = f"{len(counts)} species represented"
+    configured = {s.name for s in DEFAULT_GRASS_SPECS}
+    ok = set(counts) == configured
+    msg = f"{len(counts)} of {len(configured)} species represented"
     return CheckResult("Grass Species Spread", ok, msg, details)
 
 
@@ -777,7 +778,7 @@ def run_all_checks(
                                                                   world_size_cm))
 
     # Generated meshes, and bushes (None when bush generation is disabled)
-    report.checks.append(undergrowth_checks.check_foliage_meshes())
+    report.checks.append(undergrowth_checks.check_undergrowth_meshes())
     if placed_bushes is not None:
         report.checks.append(undergrowth_checks.check_bushes(
             placed_bushes, placed_trees, world_size_cm, grid_z, grid_size))

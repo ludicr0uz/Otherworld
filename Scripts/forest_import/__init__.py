@@ -8,4 +8,6 @@ call, rather than carrying inline. Unlike forest_generator/, these import
   tree_assets     Build the derived tree meshes under /Game/Forest/Trees, and verify them
   trees           Plant the trees into the open level as per-cell HISMs, and verify them
   wind            Wind in the materials: MPC_Wind, and the world-position offset (WPO) that makes the grass and the trees move
+
+  undergrowth_assets  Check the grass and bush meshes are there before a level plants them, and verify them
 """

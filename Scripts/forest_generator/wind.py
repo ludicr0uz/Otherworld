@@ -15,7 +15,10 @@ side by side lean a little apart, and one clump swings left and right of the
 wind as the field passes over it. The gusts are two crossing wave trains
 too, so a gust is a patch that travels, not a wall across the map.
 
-    grass and bushes   (M_ProcFoliage) lean along their heading and sway,
+    generated grass    (M_ProcFoliage: the generated patches and bushes,
+    and bushes         which no level plants now; the library meshes that
+                       replaced them sway by their pack's own wind, not this
+                       one) lean along their heading and sway,
                        weighted by the vertex colour's alpha (0 at the root,
                        1 at the tip: foliage_meshes.py), in gusts that roll
                        across the field (crests every GRASS_WAVE_CM and

@@ -19,6 +19,7 @@ from combat.tuning import BIND_VARS, COMBAT, SIGHTS_KEY
 from combat.weapon_component.head_hide import head_bone
 from combat.weapon_component.sights import SCOPE_HIDE_BLEND, SIGHT_LINE_MIN_CM
 from combat.weapon_specs import _weapon_specs
+from combat.weapon_component import vars as WV
 from combat.verify.fixtures import char, w, wg
 from combat.verify.common import (
     BEL, PIN, cdo, check, component_template, components, in_pins, load,
@@ -376,13 +377,22 @@ def check_sight_camera():
           str([_title(n) for n in unhide]))
 
     prereq = [n for n in wg if "PrerequisiteComponent" in in_pins(n)]
+
+    def feeds(n):
+        return [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+            BEL.find_input_pin(n, "PrerequisiteComponent"))]
+
     check("the weapon component ticks after the camera boom, so the sight "
           "camera is not a frame behind it",
-          len(prereq) == 1 and any(
-              "SpringArm" in pin_value(PIN.get_owning_node(q), "ComponentClass")
-              for q in PIN.list_connected_pins(
-                  BEL.find_input_pin(prereq[0], "PrerequisiteComponent"))),
+          len(prereq) == 2 and any(
+              "SpringArm" in pin_value(f, "ComponentClass")
+              for n in prereq for f in feeds(n)),
           str(len(prereq)))
+    check(f"...and after the owner's mesh ({WV.OwnerMesh}), so the camera, the "
+          "muzzle and the light read this frame's hand (probe_sight_lag.py)",
+          any(str(WV.OwnerMesh) in _title(f).replace(" ", "")
+              for n in prereq for f in feeds(n)),
+          str([[_title(f) for f in feeds(n)] for n in prereq]))
 
     cams = [c for c in (component_template(char, n) for n in components(char))
             if isinstance(c, unreal.CameraComponent)]

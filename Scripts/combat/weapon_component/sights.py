@@ -130,24 +130,38 @@ def _boom(ed, owner_out):
     return arm
 
 
-def _author_camera_after_boom(ed, owner_out, exec_in):
-    """BeginPlay: tick this component after the camera boom.
+def _author_tick_order(ed, owner_out, exec_in):
+    """BeginPlay: tick this component after the camera boom and after the
+    owner's mesh (OwnerMesh, cached just before this runs).
 
-    Both tick in TG_PostPhysics, in no promised order. The boom moves its end
-    to follow the character and the control rotation when it ticks, and the
-    camera rides along at whatever offset it had. Placed before the boom has
-    moved, the camera would sit one frame's walk off the sight -- a few
-    centimetres of shimmer while strafing with the sights up.
+    The boom: both tick in TG_PostPhysics, in no promised order. The boom
+    moves its end to follow the character and the control rotation when it
+    ticks, and the camera rides along at whatever offset it had. Placed before
+    the boom has moved, the camera would sit one frame's walk off the sight --
+    a few centimetres of shimmer while strafing with the sights up.
+
+    The mesh: the held item rides its hand, and the Tick reads that pose --
+    the sight camera (the eye point and the sight line), the muzzle, the
+    light, the throw. The mesh's tick group is earlier, but that is not an
+    order: on Lvl_Horde_Survival, on about one frame in seven, the hand was
+    posed after the camera had been put on the gun, and walking down the
+    sights the gun left the crosshair by up to 2.5 degrees
+    (probes/probe_sight_lag.py; 0 on Lvl_Forest_1000m with the same code).
     """
     arm = _boom(ed, owner_out)
     after = _node(ed, FN_ADD_TICK_PREREQ)
     _connect(out(arm), _pin(after, "PrerequisiteComponent"))
     _connect(exec_in, _pin(after, "execute"))
+    mesh = ed.add_get_member_variable_node(WV.OwnerMesh)
+    posed = _node(ed, FN_ADD_TICK_PREREQ)
+    _connect(out(mesh, WV.OwnerMesh), _pin(posed, "PrerequisiteComponent"))
+    _connect(then(after), _pin(posed, "execute"))
     ed.add_comment_to_nodes(
-        "Tick after the camera boom, so the sight camera is placed against "
-        "where the boom is this frame rather than where it was last frame.",
-        [arm, after])
-    return then(after)
+        "Tick after the camera boom and after the owner's mesh, so the sight "
+        "camera, the muzzle and the light read this frame's boom and this "
+        "frame's hand, not last frame's.",
+        [arm, after, mesh, posed])
+    return then(posed)
 
 
 def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):

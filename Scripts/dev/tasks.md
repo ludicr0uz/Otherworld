@@ -1519,4 +1519,4 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 
 - [x] On the horde level implement difficulty levels that gradually increase every 3 minutes. Difficulty levels increase the number of total NPC monsters that exist on the level. Level 1 - 4 monsters, Level 2 - 6 monsters, Level 3- 8x etc. For every 9 zombies spawned there should be one wendiego. I.E no wendiegos until level 4 - where there is one, then level 8 there is 2 etc.
 
-- [ ] On the horde level update the permanent campfire to have an attraction range that is indefinite (I.E applies to the whole level)
+- [x] On the horde level update the permanent campfire to have an attraction range that is indefinite (I.E applies to the whole level)

@@ -16,7 +16,7 @@ from combat.carry_tuning import LOWERED_VAR
 from combat.light_tuning import MATCHES_CLASS_VAR
 from combat.torch_tuning import STICK_CLASS_VAR
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS
-from combat.weapon_component.sights import _author_camera_after_boom
+from combat.weapon_component.sights import _author_tick_order
 from combat.weapon_component.starter_worn import author_starter_worn
 from uebp.nodes.actor import (
     FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_ATTACH, FN_DETACH, FN_GET_COMP, FN_GET_OWNER,
@@ -367,7 +367,7 @@ def _author_wc_begin_play(ed, begin):
 
     # The loadout is the server's to issue (and single player's): a client's
     # items are made from the record it is sent (view.py).
-    prev = _author_camera_after_boom(ed, as_char, then(now_fov))
+    prev = _author_tick_order(ed, as_char, then(now_fov))
     owns = keep(ed.add_macro_node(MACRO_SWITCH_AUTHORITY_COMP))
     _connect(prev, _pin(owns, "execute"))
     prev = out(owns, "Authority")

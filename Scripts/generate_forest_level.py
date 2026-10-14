@@ -20,6 +20,7 @@ This script:
 
 import argparse
 import json
+import math
 import os
 import sys
 import textwrap
@@ -49,6 +50,9 @@ from forest_generator.bush_placement import (
     BUSH_CLUSTERS_PER_HA,
 )
 from forest_generator.grass_cells import tier_spec
+from forest_generator.grass_sidecar import write_grass_data
+from forest_generator.horde_layout import (
+    fort_rock_data, fort_rocks, layout_for, scatter_horde_trees)
 from Sound.sound_monsters import voices_of
 from forest_generator.npc_placement import (
     NPC_VARIANTS,
@@ -189,13 +193,25 @@ def main():
 
     # ── Step 2: Scatter trees ────────────────────────────────────────────
     print(f"\n[2/6] Scattering trees (seed={args.seed})...")
-    placed_trees = scatter_trees(
-        world_size_cm=world_size_cm,
-        grid_z=grid_z,
-        grid_size=grid_size,
-        seed=args.seed,
-        density=args.tree_density,
-    )
+    horde = layout_for(level_name)
+    if horde:
+        # A dense ring round a sparse clearing, and a fort in it
+        # (forest_generator/horde_layout.py).
+        placed_trees = scatter_horde_trees(horde, world_size_cm, grid_z, grid_size,
+                                           seed=args.seed)
+        placed_rocks = fort_rocks(horde, world_size_cm, grid_z, grid_size,
+                                  seed=args.seed)
+        print(f"       Fort: {len(placed_rocks)} rocks, openings at "
+              f"{', '.join(f'{y:g}' for y in horde.opening_yaws_deg)} deg")
+    else:
+        placed_trees = scatter_trees(
+            world_size_cm=world_size_cm,
+            grid_z=grid_z,
+            grid_size=grid_size,
+            seed=args.seed,
+            density=args.tree_density,
+        )
+        placed_rocks = []
 
     # Count per spec
     counts = Counter(t.spec_name for t in placed_trees)
@@ -236,6 +252,9 @@ def main():
         placed_bushes = scatter_bushes(world_size_cm, grid_z, grid_size,
                                        seed=args.seed, placed_trees=placed_trees,
                                        clusters_per_ha=args.bush_clusters)
+        if horde:
+            placed_bushes = [b for b in placed_bushes
+                             if math.hypot(b.x, b.y) >= horde.keep_out_cm]
         for name, cnt in sorted(Counter(b.spec_name for b in placed_bushes).items()):
             print(f"       {name}: {cnt:,} instances")
         print(f"       TOTAL: {len(placed_bushes):,} bushes")
@@ -306,6 +325,7 @@ def main():
         expected_npc_count=args.npc_count,
         nav_bounds=nav_bounds,
         placed_bushes=placed_bushes,
+        horde_rocks=placed_rocks,
     )
     print()
     print(report.summary)
@@ -323,7 +343,7 @@ def main():
     # Tens of thousands of transforms would bloat the generated script, so the
     # grass instances live in their own JSON file the import script reads.
     grass_data_path = os.path.join(output_dir, f"grass_{level_name}.json")
-    _write_grass_data(grass_data_path, placed_grass, placed_bushes or [])
+    write_grass_data(grass_data_path, placed_grass, placed_bushes or [])
     if placed_grass or placed_bushes:
         print(f"\n       Grass data → {grass_data_path} "
               f"({os.path.getsize(grass_data_path):,} bytes)")
@@ -345,6 +365,7 @@ def main():
         nav_bounds=nav_bounds,
         lighting=lighting,
         tree_density=args.tree_density,
+        fort_rocks=fort_rock_data(placed_rocks),
     )
     print(f"       Script → {ue_script_path}")
 
@@ -361,6 +382,7 @@ def main():
         placed_npcs=placed_npcs,
         nav_bounds=nav_bounds,
         lighting=lighting,
+        fort_rocks=fort_rock_data(placed_rocks),
     )
     print(f"       Verify → {ue_verify_path}")
 
@@ -375,51 +397,6 @@ def main():
     print(f"  \"{UE_CMD}\" \"{UPROJECT}\" \\")
     print(f"    -ExecutePythonScript=\"{ue_verify_path}\" -NoUI -stdout")
     print(f"{'═' * 60}\n")
-
-
-# ─── Grass sidecar writer ───────────────────────────────────────────────────
-
-def _write_grass_data(path: str, placed_grass, placed_bushes) -> None:
-    """
-    Write grass and bush instance transforms to a compact JSON sidecar.
-
-    One record per patch, and there are hundreds of thousands of them on a
-    big map — so spec names are interned into an index table and each
-    instance is a flat rounded array:
-        [spec_idx, x, y, z, yaw, pitch, roll, height_mul, width_mul,
-         target_h_cm, tier]
-    Bushes, under "bushes", carry their final scale instead:
-        [spec_idx, x, y, z, yaw, pitch, roll, scale_xy, scale_z]
-    """
-    spec_names = sorted({g.spec_name for g in placed_grass})
-    spec_idx = {n: i for i, n in enumerate(spec_names)}
-    payload = {
-        "specs": spec_names,
-        "instances": [
-            [
-                spec_idx[g.spec_name],
-                round(g.x, 1), round(g.y, 1), round(g.placed_z, 1),
-                round(g.yaw_deg, 1), round(g.pitch_deg, 2), round(g.roll_deg, 2),
-                round(g.height_scale, 3), round(g.width_scale, 3),
-                round(g.target_height_cm, 2), g.tier,
-            ]
-            for g in placed_grass
-        ],
-    }
-    bush_names = sorted({b.spec_name for b in placed_bushes})
-    bush_idx = {n: i for i, n in enumerate(bush_names)}
-    payload["bushes"] = {
-        "specs": bush_names,
-        "instances": [
-            [bush_idx[b.spec_name], round(b.x, 1), round(b.y, 1),
-             round(b.placed_z, 1), round(b.yaw_deg, 1), round(b.pitch_deg, 2),
-             round(b.roll_deg, 2), round(b.scale_xy, 3), round(b.scale_z, 3)]
-            for b in placed_bushes
-        ],
-    }
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(payload, f, separators=(",", ":"))
 
 
 # ─── Unreal import script generator ─────────────────────────────────────────
@@ -438,6 +415,7 @@ def _write_unreal_import_script(
     nav_bounds,
     lighting: dict,
     tree_density: float,
+    fort_rocks=(),
 ):
     """Generate a self-contained Unreal Python script that imports everything."""
 
@@ -570,7 +548,8 @@ def _write_unreal_import_script(
                 if (lbl.startswith(LEVEL_NAME)
                         or lbl.startswith("HISM_Tree")
                         or lbl.startswith("HISM_Grass")
-                        or lbl.startswith("HISM_Bush")):
+                        or lbl.startswith("HISM_Bush")
+                        or lbl.startswith("Fort_Rock_")):
                     editor_actor_sub.destroy_actor(a)
         else:
             level_editor_sub.new_level(map_path)
@@ -884,6 +863,13 @@ def _write_unreal_import_script(
         else:
             unreal.log_warning("[GEN] 5c. Bushes skipped (none generated).")
 
+        # ── 5d. The fort's rocks (a horde level: forest_import/fort.py) ─────
+        FORT_ROCKS = json.loads(r"""{json.dumps(list(fort_rocks))}""")
+        if FORT_ROCKS:
+            unreal.log_warning("[GEN] 5d. Placing the fort's rocks...")
+            from forest_import import fort as fort_import
+            fort_import.place_fort(FORT_ROCKS, editor_actor_sub, editor_asset_sub)
+
         # ── 6. Spawn Player Start ────────────────────────────────────────────
         unreal.log_warning("[GEN] 6. Spawning player start...")
         ps = editor_actor_sub.spawn_actor_from_class(
@@ -1048,6 +1034,7 @@ def _write_unreal_verify_script(
     placed_npcs,
     nav_bounds,
     lighting: dict,
+    fort_rocks=(),
 ):
     """Generate an Unreal Python script that verifies the level after import."""
 
@@ -1342,6 +1329,12 @@ def _write_unreal_verify_script(
             undergrowth_assets.verify_undergrowth_assets(check, actors, LEVEL_NAME)
             from forest_import import grass_look as grass_look_import
             grass_look_import.verify_grass_look(check)
+
+        # ── 5c. The fort's rocks (a horde level: forest_import/fort.py) ─────
+        FORT_ROCKS = json.loads(r"""{json.dumps(list(fort_rocks))}""")
+        if FORT_ROCKS:
+            from forest_import import fort as fort_import
+            fort_import.verify_fort(check, actors, FORT_ROCKS, LEVEL_NAME)
 
         # ── 6. Navigation + NPCs ─────────────────────────────────────────────
         if EXPECTED_NPCS:

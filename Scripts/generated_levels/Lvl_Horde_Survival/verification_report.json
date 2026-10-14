@@ -1,0 +1,253 @@
+{
+  "level_name": "Lvl_Horde_Survival",
+  "world_size_m": 400.0,
+  "all_passed": true,
+  "checks": [
+    {
+      "name": "OBJ File Valid",
+      "passed": true,
+      "message": "9248 vertices, 18492 faces, 9248 normals",
+      "details": []
+    },
+    {
+      "name": "Terrain Bounds",
+      "passed": true,
+      "message": "X span: 40000 cm, Y span: 40000 cm (expected 40000 cm)",
+      "details": []
+    },
+    {
+      "name": "Center Spawn Flat",
+      "passed": true,
+      "message": "Max |Z| in spawn zone: 0.00 cm (threshold: 1.0 cm)",
+      "details": [
+        "(0, 0) \u2192 Z=0.00",
+        "(2000, 0) \u2192 Z=0.00",
+        "(-2000, 0) \u2192 Z=0.00",
+        "(0, 2000) \u2192 Z=0.00",
+        "(0, -2000) \u2192 Z=0.00"
+      ]
+    },
+    {
+      "name": "Top Normals Upward",
+      "passed": true,
+      "message": "Checked 9248 normals, 0 bad top-surface normals",
+      "details": []
+    },
+    {
+      "name": "Barycentric Consistency",
+      "passed": true,
+      "message": "Max barycentric error at grid vertices: 0.0000 cm",
+      "details": []
+    },
+    {
+      "name": "Tree Count / Density",
+      "passed": true,
+      "message": "1575 trees on 16.0 ha = 98.4 trees/ha",
+      "details": []
+    },
+    {
+      "name": "Trees Within Bounds",
+      "passed": true,
+      "message": "All trees within map bounds",
+      "details": []
+    },
+    {
+      "name": "Trees Not Floating",
+      "passed": true,
+      "message": "All trees at or below terrain",
+      "details": []
+    },
+    {
+      "name": "Trees Not Over-Buried",
+      "passed": true,
+      "message": "All sinks within 200 cm",
+      "details": []
+    },
+    {
+      "name": "Trees Vertical",
+      "passed": true,
+      "message": "All trees placed with pitch=0, roll=0 (vertical)",
+      "details": []
+    },
+    {
+      "name": "Tree Spacing (>100cm)",
+      "passed": true,
+      "message": "Min spacing: 151 cm, 0 overlaps",
+      "details": []
+    },
+    {
+      "name": "Spawn Zone Clear",
+      "passed": true,
+      "message": "Spawn zone (5m radius) clear",
+      "details": []
+    },
+    {
+      "name": "Grass Count / Density",
+      "passed": true,
+      "message": "159,827 clumps, 159,827 spots on 160,000 m\u00b2 = 1.00/m\u00b2 (requested 1.10/m\u00b2)",
+      "details": []
+    },
+    {
+      "name": "Grass Within Bounds",
+      "passed": true,
+      "message": "All grass within map bounds",
+      "details": []
+    },
+    {
+      "name": "Grass Snapped To Terrain",
+      "passed": true,
+      "message": "All 502 sampled clumps seated on the mesh",
+      "details": []
+    },
+    {
+      "name": "Grass Knee Height",
+      "passed": true,
+      "message": "knee layer = 82% of clumps, avg 51.3 cm (target 50 cm)",
+      "details": []
+    },
+    {
+      "name": "Grass Upscale Factor",
+      "passed": true,
+      "message": "worst upscale 1.41x (HISM_Grass_Low_01_02), limit 2.40x",
+      "details": []
+    },
+    {
+      "name": "Grass Coverage",
+      "passed": true,
+      "message": "144/144 cells of a 12\u00d712 grid covered",
+      "details": []
+    },
+    {
+      "name": "Grass Species Spread",
+      "passed": true,
+      "message": "7 of 7 species represented",
+      "details": [
+        "HISM_Grass_02_09: 22,353",
+        "HISM_Grass_Low_01_02: 27,999",
+        "HISM_Grass_Low_02_02: 21,862",
+        "HISM_Grass_Low_03_03: 24,216",
+        "HISM_Grass_Low_04_06: 21,664",
+        "HISM_Grass_Low_06_02: 21,813",
+        "HISM_Grass_Low_07_03: 19,920"
+      ]
+    },
+    {
+      "name": "Grass Density Tiers",
+      "passed": true,
+      "message": "T0 63,975, T1 31,966, T2 31,956, T3 31,930",
+      "details": []
+    },
+    {
+      "name": "Undergrowth Meshes",
+      "passed": true,
+      "message": "8 grass, 1 bush, the right size",
+      "details": [
+        "Grass_02_09: 2152 tris in LOD0 of 4, 60 cm tall, 54 cm wide",
+        "Grass_Patch: 3766 tris in LOD0 of 4, 49 cm tall, 120 cm wide",
+        "LowGrass_01_02: 537 tris in LOD0 of 4, 22 cm tall, 62 cm wide",
+        "LowGrass_02_02: 728 tris in LOD0 of 4, 42 cm tall, 82 cm wide",
+        "LowGrass_03_03: 904 tris in LOD0 of 4, 66 cm tall, 86 cm wide",
+        "LowGrass_04_06: 756 tris in LOD0 of 4, 92 cm tall, 90 cm wide",
+        "LowGrass_06_02: 1416 tris in LOD0 of 4, 93 cm tall, 112 cm wide",
+        "LowGrass_07_03: 456 tris in LOD0 of 4, 84 cm tall, 103 cm wide",
+        "Bush_02: 1304 tris in LOD0 of 4, 195 cm tall, 349 cm wide"
+      ]
+    },
+    {
+      "name": "Bushes",
+      "passed": true,
+      "message": "1,355 bushes (85/ha) in 34% of 10 m squares",
+      "details": []
+    },
+    {
+      "name": "NPC Count",
+      "passed": true,
+      "message": "10 wanderer(s) placed",
+      "details": []
+    },
+    {
+      "name": "NPC Spawn Band",
+      "passed": true,
+      "message": "75.1-99.0 m from the player start, band 75.0-100.0 m",
+      "details": []
+    },
+    {
+      "name": "NPC Separation",
+      "passed": true,
+      "message": "closest pair (NPC 1, NPC 2) 9.8 m apart (minimum 6.0 m)",
+      "details": []
+    },
+    {
+      "name": "NPC Within Bounds",
+      "passed": true,
+      "message": "all 10 inside +/-16000 cm",
+      "details": []
+    },
+    {
+      "name": "NPC Clear Of Trees",
+      "passed": true,
+      "message": "tightest spawn has 257 cm to the nearest trunk (minimum 220 cm)",
+      "details": []
+    },
+    {
+      "name": "NPC Grounded",
+      "passed": true,
+      "message": "all 10 capsule centres 88 cm above the exact mesh Z",
+      "details": []
+    },
+    {
+      "name": "NPC Route Is Obstructed",
+      "passed": true,
+      "message": "all 10 routes cross at least one trunk \u2014 pathfinding must detour",
+      "details": []
+    },
+    {
+      "name": "Nav Bounds Sane",
+      "passed": true,
+      "message": "+/-20000 cm XY covering +/-20000 cm of terrain, 3159 cm vertical span (terrain -379..2380)",
+      "details": []
+    },
+    {
+      "name": "NPC Inside Nav Bounds",
+      "passed": true,
+      "message": "all 10 stand inside +/-20000 cm XY, feet within -579..2580",
+      "details": []
+    },
+    {
+      "name": "Horde Ring Density",
+      "passed": true,
+      "message": "1507 trees on 12.7 ha = 118.9/ha (asked 120)",
+      "details": []
+    },
+    {
+      "name": "Horde Clearing Scarce",
+      "passed": true,
+      "message": "9 trees in the clearing (9.1/ha, asked 12), 0 inside 21 m",
+      "details": []
+    },
+    {
+      "name": "Horde Fort Clear of Bushes",
+      "passed": true,
+      "message": "0 bushes inside 21 m",
+      "details": []
+    },
+    {
+      "name": "Horde Fort Openings",
+      "passed": true,
+      "message": "3 openings, 363, 383, 405 cm clear (at least 340)",
+      "details": []
+    },
+    {
+      "name": "Horde Fort Wall Closed",
+      "passed": true,
+      "message": "32 rocks, the least overlap 0.36",
+      "details": []
+    },
+    {
+      "name": "Horde Fort Chest High",
+      "passed": true,
+      "message": "tops 127-139 cm above the ground (asked 125-140)",
+      "details": []
+    }
+  ]
+}

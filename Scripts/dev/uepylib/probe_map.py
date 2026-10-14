@@ -55,11 +55,14 @@ RULES = (
 # verifier reads, and the gate runs the whole suite around the session anyway.
 WEAPONS = "verify_weapons_and_combat.py"
 LEVELS = tuple(f"generated_levels/{n}/verify_{n}.py"
-               for n in ("Lvl_Probe_50m", "Lvl_Forest_200m", "Lvl_Forest_1000m"))
+               for n in ("Lvl_Probe_50m", "Lvl_Forest_200m", "Lvl_Forest_1000m",
+                         "Lvl_Horde_Survival"))
 VERIFIER_RULES = (
     ("Scripts/generated_levels/Lvl_Probe_50m/", LEVELS[:1]),
     ("Scripts/generated_levels/Lvl_Forest_200m/", LEVELS[1:2]),
-    ("Scripts/generated_levels/Lvl_Forest_1000m/", LEVELS[2:]),
+    ("Scripts/generated_levels/Lvl_Forest_1000m/", LEVELS[2:3]),
+    ("Scripts/generated_levels/Lvl_Horde_Survival/", LEVELS[3:]),
+    ("Scripts/forest_import/fort.py", LEVELS[3:]),
     # The title level plants the 1 km scatter's middle trees (Scripts/title).
     ("Scripts/forest_generator/", ("verify_title_level.py",) + LEVELS),
     ("Scripts/forest_import/trees.py", ("verify_title_level.py",) + LEVELS),

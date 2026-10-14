@@ -16,4 +16,6 @@ call, rather than carrying inline. Unlike forest_generator/, these import
   grass_recolour  Give a planted level's grass cells the materials its specs name, without planting it again
 
   grass_patch  Build the grass patch under /Game/Forest/Undergrowth, and verify it
+
+  fort  Place the Horde Survival fort's rocks into the open level, and verify them
 """

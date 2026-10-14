@@ -178,14 +178,17 @@ def check_normals_upward(obj_path: str) -> CheckResult:
     return CheckResult("Top Normals Upward", ok, msg, bad_normals[:10])
 
 
-def check_tree_count(placed_trees, world_size_cm: float) -> CheckResult:
-    """Verify reasonable tree density (not empty, not absurdly dense)."""
+def check_tree_count(placed_trees, world_size_cm: float,
+                     max_per_ha: float = 100.0) -> CheckResult:
+    """Verify reasonable tree density (not empty, not absurdly dense). A
+    horde level's ring is denser than the forest's average, so it passes its
+    own ceiling (horde_layout)."""
     area_hectares = (world_size_cm / 100.0) ** 2 / 10_000.0
     count = len(placed_trees)
     density = count / area_hectares if area_hectares > 0 else 0
 
     # Expect 30-50 trees/hectare (our specs sum to ~34/ha)
-    ok = 10 < density < 100
+    ok = 10 < density < max_per_ha
     msg = f"{count} trees on {area_hectares:.1f} ha = {density:.1f} trees/ha"
     return CheckResult("Tree Count / Density", ok, msg)
 
@@ -747,6 +750,7 @@ def run_all_checks(
     expected_npc_count: int = 0,
     nav_bounds=None,
     placed_bushes=None,
+    horde_rocks=None,
 ) -> VerificationReport:
     """Run the complete verification suite and return a report."""
     # Imported here: undergrowth_checks imports CheckResult from this module.
@@ -764,7 +768,11 @@ def run_all_checks(
     report.checks.append(check_barycentric_consistency(world_size_cm, grid_z, grid_size))
 
     # Tree checks
-    report.checks.append(check_tree_count(placed_trees, world_size_cm))
+    from .horde_layout import layout_for
+    horde = layout_for(level_name)
+    report.checks.append(check_tree_count(
+        placed_trees, world_size_cm,
+        1.25 * horde.dense_trees_per_ha if horde else 100.0))
     report.checks.append(check_trees_within_bounds(placed_trees, world_size_cm))
     report.checks.append(check_trees_not_floating(placed_trees))
     report.checks.append(check_trees_not_buried(placed_trees))
@@ -805,5 +813,10 @@ def run_all_checks(
         report.checks.append(check_npc_routes_are_obstructed(placed_npcs))
         report.checks.append(check_nav_bounds_sane(nav_bounds, world_size_cm))
         report.checks.append(check_npcs_inside_nav_bounds(placed_npcs, nav_bounds))
+
+    if horde:
+        from .horde_checks import run_horde_checks
+        report.checks.extend(run_horde_checks(horde, placed_trees, horde_rocks or [],
+                                              placed_bushes, world_size_cm))
 
     return report

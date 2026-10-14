@@ -348,8 +348,9 @@ GENERATED = (
         dest="Content/Maps",
         kind="generated",
         builders=("Scripts/generate_forest_level.py", "Scripts/build_title_level.py"),
-        note="Lvl_Forest_200m.umap (--size 200) and Lvl_Forest_1000m.umap "
-             "(--size 1000), each with its World Partition sidecars. The "
+        note="Lvl_Forest_200m.umap (--size 200), Lvl_Forest_1000m.umap "
+             "(--size 1000) and Lvl_Horde_Survival.umap (--size 400 --name "
+             "Lvl_Horde_Survival: the fort, horde_layout.py), each with its World Partition sidecars. The "
              "forage (place_forage.py), the test garments (build_clothing.py) "
              "and the day/night cycle actor (build_day_night.py) are added to "
              "them afterwards. Lvl_Title.umap, the stage the game opens on "

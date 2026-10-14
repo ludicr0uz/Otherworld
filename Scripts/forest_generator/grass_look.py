@@ -47,22 +47,23 @@ from .undergrowth_meshes import (
     LOW_GRASS_04_06, LOW_GRASS_06_02, LOW_GRASS_07_03, asset_path)
 
 # The levels whose grass draws the dark instance.
-DARK_GRASS_LEVELS = ("Lvl_Forest_200m", "Lvl_Forest_1000m")
+DARK_GRASS_LEVELS = ("Lvl_Forest_200m", "Lvl_Forest_1000m", "Lvl_Horde_Survival")
 # The levels that plant the patch. The 1 km map has the colour only: its
 # million clumps keep their places and their mesh.
 PATCH_GRASS_LEVELS = ("Lvl_Forest_200m",)
 # Clumps per m2 a level is held at when the default moves on without it. The
 # 1 km map stays at 1.1 (1.0 M clumps, a 185 MB .umap): at the default's 2.2
-# it would be about 2 million.
-HELD_DENSITY_PER_SQM = {"Lvl_Forest_1000m": 1.1}
+# it would be about 2 million. The 400 m horde map is held with it: 176 k
+# clumps, where the default's eight layers would be over a million.
+HELD_DENSITY_PER_SQM = {"Lvl_Forest_1000m": 1.1, "Lvl_Horde_Survival": 1.1}
 # The levels that plant all seven grass types (GRASS_TYPES, below), each
 # owning its own stretches of the forest (grass_regions.py). Every one is a
 # dark grass level too: a type's colour is its own instance's.
-VARIED_GRASS_LEVELS = ("Lvl_Forest_200m", "Lvl_Forest_1000m")
+VARIED_GRASS_LEVELS = ("Lvl_Forest_200m", "Lvl_Forest_1000m", "Lvl_Horde_Survival")
 # How many of grass_cells.GRASS_TIERS a level plants when it is held to fewer
 # than all. The 1 km map has the four it was planted with: layers 5-8 (F1)
 # would add another million clumps to it.
-HELD_TIER_COUNT = {"Lvl_Forest_1000m": 4}
+HELD_TIER_COUNT = {"Lvl_Forest_1000m": 4, "Lvl_Horde_Survival": 4}
 
 # ─── The grass's colour ──────────────────────────────────────────────────────
 

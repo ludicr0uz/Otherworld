@@ -28,7 +28,7 @@ The generator's code lives in this package. The level-side import code is in
 | `grass_placement.py` | `DEFAULT_GRASS_SPECS` and a stratified scatter; with several specs it picks each spot's by `grass_regions`, and plants a spot `density_scale` times |
 | `grass_regions.py` | where each grass type grows (F2): one value-noise field per type, the type whose field is highest owns the ground, close fields mix (`RegionMix`, pure Python) |
 | `bush_placement.py` | `DEFAULT_BUSH_SPECS` and the clustered scatter |
-| `grass_look.py` | the dark, ground-filling grass: the colours of its material instance and of the ground under it (each with its reason), the levels that have the colour (`DARK_GRASS_LEVELS`: the 200 m and 1 km maps) and the ones that plant the patch (`PATCH_GRASS_LEVELS`: the 200 m map alone; `grass_specs_for(level)`), the density a level is held at when the default moves (`HELD_DENSITY_PER_SQM`: the 1 km map at 1.1/m²; `density_for(level)`, the generator's default for `--grass-density`), and the seven grass types of a varied level (`VARIED_GRASS_LEVELS`, `LOW_GRASS_TYPES`: F2). `forest_import/grass_look.py` builds the instances and patches the ground material from it ("Rendering gotchas", below) |
+| `grass_look.py` | the dark, ground-filling grass: the colours of its material instance and of the ground under it (each with its reason), the levels that have the colour (`DARK_GRASS_LEVELS`: the 200 m, 1 km and horde maps) and the ones that plant the patch (`PATCH_GRASS_LEVELS`: the 200 m map alone; `grass_specs_for(level)`), the density a level is held at when the default moves (`HELD_DENSITY_PER_SQM`: the 1 km and horde maps at 1.1/m²; `density_for(level)`, the generator's default for `--grass-density`), and the seven grass types of a varied level (`VARIED_GRASS_LEVELS`, `LOW_GRASS_TYPES`: F2). `forest_import/grass_look.py` builds the instances and patches the ground material from it ("Rendering gotchas", below) |
 | `undergrowth_meshes.py` | the library meshes the grass and the bushes are planted from (the clump, the bush and the six low grasses of F2), the grass patch made of one (`GRASS_PATCH`), and the packages of each that the repository carries ("Rendering gotchas", below) |
 | `grass_patch.py` | the grass patch's numbers (G3): the seven copies of the clump, their LOD chain and its distances, and the Pivot Painter 2 texels moved with each copy, each with its reason. `forest_import/grass_patch.py` builds it (`Scripts/build_grass_patch.py`) and verifies it |
 | `pivot_images.py` | the two image files the patch's pivot textures are imported from (a half-float EXR, an 8-bit PNG), in plain Python |
@@ -37,10 +37,13 @@ The generator's code lives in this package. The level-side import code is in
 | `npc_strafe.py` | the step a wanderer takes between two swings |
 | `wind.py` | the wind's numbers: `MPC_Wind`, amplitudes and frequencies. `forest_import/wind.py` writes it into the materials (below) |
 | `lighting.py` | time-of-day presets (star_brightness 2.5, sun 0.12, exposure bias 1.6) and `SHADOW_DISTANCE_CM`. The level's rig is the static sky; at runtime `BP_DayNightCycle` replaces it and reuses these values (`Scripts/world/CLAUDE.md`) |
+| `horde_layout.py` | the Horde Survival map's shape (`HORDE_LEVELS`, `layout_for(level)`: None for every other level): the trees scattered by a density field (a dense ring, a sparse clearing, nothing in the fort), and the fort's rocks laid round a ring with three openings (`fort_rocks`, `fort_rock_data`), each number with its reason. `forest_import/fort.py` places the rocks and verifies the wall with rays in the editor |
+| `horde_checks.py` | the offline checks of a horde level, appended to `verification.run_all_checks` |
+| `grass_sidecar.py` | writes the grass and bush sidecar JSON (moved out of the over-budget generator) |
 | `verification.py` | the offline suite (over budget) |
 | `asset_sources.py` | what produces each `Content/` directory, and `RESTORE_ORDER` |
 
-## The two maps
+## The maps
 
 - **`Lvl_Forest_200m`** (`--size 200`):
   - night, 68 trees, 289,450 grass clumps of seven types on 162,534 spots (4.4/m² requested
@@ -58,6 +61,22 @@ The generator's code lives in this package. The level-side import code is in
   - the `.umap` is 181 MB;
   - the import takes about a minute. `uepy.py` reports that the editor stopped responding, but
     the job keeps going; read the editor log.
+
+- **`Lvl_Horde_Survival`** (`--size 400 --name Lvl_Horde_Survival`; the shape is
+  `horde_layout.py`, not the flags):
+  - a dense forest ring at the 1 km map's middle density (120 trees/ha; that map measured
+    118/ha inside 100 m of its centre, falling to 18/ha at its edge, since its scatter is
+    uniform in radius), feathered over 60–75 m into a clearing of 12/ha; 1,575 trees, LOD
+    build, grass held at 1.1/m² over four tiers, 1,355 bushes, ten NPCs;
+  - in the middle the fort: 32 moss rock scans (`rock_moss_set_01`) in a 13 m ring, sunk
+    to show 125–140 cm (chest high), overlapping 35 % or more so the wall is shut, with
+    three openings at 0°, 120° and 240°. Openings are 3.4 m between the rocks' footprint
+    boxes on paper; the rocks are rounded, so the walked width (the verifier's rays at
+    30 and 80 cm) is 4.5–5.9 m. At 80 cm two pointed scans leave an 11 cm V, tolerated
+    up to 40 cm (`fort.RAY_HEIGHTS_CM`); at 30 cm no crack is;
+  - nothing grows inside 21 m (the fort and 8 m round it); the PlayerStart is the middle;
+  - nothing opens it yet (the menu's mode choice is a later task), and it is not in
+    `MapsToCook`.
 
 **Terrain past 200 m is a different shape** (`terrain._make_large_elevation_fn`). The radial
 bowl's corners outgrow the navmesh's Z limit, so larger maps use:
@@ -197,7 +216,7 @@ that imported a level is 13 GB, most of it in swap on this machine).
       clumps where the ground shows between them, and nothing changes for a shipped
       preset. A level held to fewer tiers is in `grass_look.HELD_TIER_COUNT` (the 1 km map,
       four: eight would add a million clumps); the generator plants `tiers_for(level)`. Only the 200 m map has it: the 1 km map is held at
-      1.1 ("The two maps", above).
+      1.1 ("The maps", above).
     - **What the pack's `MA_Grass` does with the instance's numbers:** base colour is
       `desaturate(variation(albedo × Brightness) × Tint.rgb, 1 − Saturation)`. **`Tint`'s
       alpha is wired to nothing** (the pack ships it 0; only the RGB output is linked).

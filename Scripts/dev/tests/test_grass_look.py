@@ -21,7 +21,8 @@ ROOT = os.path.dirname(_paths.SCRIPTS)
 
 class Levels(unittest.TestCase):
     def test_the_forest_levels_have_the_colour_and_the_200_m_one_the_patch(self):
-        self.assertEqual(L.DARK_GRASS_LEVELS, ("Lvl_Forest_200m", "Lvl_Forest_1000m"))
+        self.assertEqual(L.DARK_GRASS_LEVELS,
+                         ("Lvl_Forest_200m", "Lvl_Forest_1000m", "Lvl_Horde_Survival"))
         self.assertEqual(L.PATCH_GRASS_LEVELS, ("Lvl_Forest_200m",))
 
     def test_any_other_level_plants_the_default_specs(self):
@@ -40,7 +41,8 @@ class Levels(unittest.TestCase):
     def test_the_density_grew_everywhere_but_on_the_1_km_level(self):
         # 4.4 with all eight layers: the first four are G2's 2.2 (F1).
         self.assertEqual(DEFAULT_DENSITY_PER_SQM, 4.4)
-        self.assertEqual(L.HELD_DENSITY_PER_SQM, {"Lvl_Forest_1000m": 1.1})
+        self.assertEqual(L.HELD_DENSITY_PER_SQM,
+                         {"Lvl_Forest_1000m": 1.1, "Lvl_Horde_Survival": 1.1})
         self.assertEqual(L.density_for("Lvl_Forest_1000m"), 1.1)
         for level in ("Lvl_Forest_200m", "Lvl_Probe_50m", None):
             self.assertEqual(L.density_for(level), DEFAULT_DENSITY_PER_SQM, level)
@@ -122,7 +124,8 @@ class VariedGrass(unittest.TestCase):
     """F2: seven grass types on the two forest levels, the meadow first."""
 
     def test_the_forest_levels_plant_seven_types(self):
-        self.assertEqual(L.VARIED_GRASS_LEVELS, ("Lvl_Forest_200m", "Lvl_Forest_1000m"))
+        self.assertEqual(L.VARIED_GRASS_LEVELS,
+                         ("Lvl_Forest_200m", "Lvl_Forest_1000m", "Lvl_Horde_Survival"))
         for level in L.VARIED_GRASS_LEVELS:
             specs = L.grass_specs_for(level)
             self.assertEqual(len(specs), 7, level)

@@ -2,16 +2,21 @@
 
 Mirrors weapon_component/wear_draw.py: the DrawWorn event (what it sets on
 the garment's component, on and off, and that a dedicated server does none of
-it) and its six calls from the wears, the take-off and the drop. Checked on
-the wiring; probes/probe_clothing.py wears the jacket and the pants in a game.
+it, and the skin it cuts out of the body: asset_pipeline/body_cover.py) and
+its six calls from the wears, the take-off and the drop. Checked on the wiring; probes/probe_clothing.py wears the jacket and the pants in a game.
 """
 
+import unreal
+
+from asset_pipeline.metahuman_paths import (
+    BODY_COVER_MASK, BODY_MATERIAL_BARE, BODY_SKIN_WORN, CLOTHING, COVER_PARTS,
+)
 from combat.verify.common import check, graph, in_pins, pin_value
 from combat.verify.fixtures import wc, wg
 from combat.verify.record import _upstream
 from combat.record_vars import VIEW_WORN
 from combat.verify.wear import _chain, _feeders, _title
-from combat.wear_tuning import DRAW_WORN, STARTER_PANTS_CLASS_VAR, WORN_VAR
+from combat.wear_tuning import DRAW_WORN, STARTER_PANTS_CLASS_VAR, WORN_PART_VAR, WORN_VAR
 from combat.weapon_component.wear_draw import (
     ITEM_PARAM, ON_PARAM, TICK_ALWAYS, TICK_OPTION_VAR,
 )
@@ -105,8 +110,62 @@ def check_draw_event():
     check("...and shows it, or hides it again",
           sorted((pin_value(n, "NewHidden") or "false").lower() for n in hides)
           == ["false", "true"], str([pin_value(n, "NewHidden") for n in hides]))
+    cuts = [n for n in body if {"ParameterName", "ParameterValue"} <= set(in_pins(n))]
+    check(f"...and cuts the skin under it out of the body while it is worn: the body's "
+          f"material parameter named by its {WORN_PART_VAR} at 1 on, 0 off, set on the "
+          "part's parent past a cast that held",
+          sorted(float(pin_value(n, "ParameterValue") or 0.0) for n in cuts) == [0.0, 1.0]
+          and all(_title(f) == f"Get {WORN_PART_VAR}" for n in cuts
+                  for f in _feeders(n, "ParameterName"))
+          and all(any("Cast" in _title(f).replace(" ", "") for f in _feeders(n, "self"))
+                  for n in cuts),
+          str([(pin_value(n, "ParameterValue"), [_title(f) for f in _feeders(n, "self")])
+               for n in cuts]))
+
+
+def check_body_cut():
+    """The material the body wears cuts each part's skin by its parameter."""
+    eal, mel = unreal.EditorAssetLibrary, unreal.MaterialEditingLibrary
+    bare = eal.load_asset(BODY_MATERIAL_BARE)
+    parent = bare and bare.get_editor_property("parent")
+    check(f"the body's material ({BODY_MATERIAL_BARE.rsplit('/', 1)[1]}) is an instance of "
+          f"{BODY_SKIN_WORN.rsplit('/', 1)[1]} (asset_pipeline/body_cover.py)",
+          bool(parent) and parent.get_path_name().split(".")[0] == BODY_SKIN_WORN,
+          parent.get_path_name() if parent else str(bare))
+    mat = eal.load_asset(BODY_SKIN_WORN)
+    if not mat:
+        return
+    params = list(mel.get_scalar_parameter_names(mat))
+    defaults = {p: mel.get_material_default_scalar_parameter_value(mat, p)
+                for p in COVER_PARTS if p in params}
+    check(f"...which is Masked, with a parameter per garment drawn on the body "
+          f"({', '.join(COVER_PARTS)}), each 0 by default, so a bare body is whole",
+          mat.get_editor_property("blend_mode") == unreal.BlendMode.BLEND_MASKED
+          and set(COVER_PARTS) == set(CLOTHING)
+          and defaults == {p: 0.0 for p in COVER_PARTS},
+          f"{mat.get_editor_property('blend_mode')}, {defaults}")
+    # The graph behind the opacity mask, not get_used_textures: that list is
+    # the shader map's, and a headless editor never compiles a new one.
+    used, todo = [], [mel.get_material_property_input_node(
+        mat, unreal.MaterialProperty.MP_OPACITY_MASK)]
+    while todo:
+        node = todo.pop()
+        if not node:
+            continue
+        if isinstance(node, unreal.MaterialExpressionTextureSample):
+            t = node.get_editor_property("texture")
+            used.append(t.get_path_name().split(".")[0] if t else None)
+        todo.extend(mel.get_inputs_for_material_expression(mat, node))
+    tex = eal.load_asset(BODY_COVER_MASK)
+    check(f"...cut by {BODY_COVER_MASK.rsplit('/', 1)[1]} (its opacity mask samples it), "
+          f"a linear mask with no mips",
+          BODY_COVER_MASK in used and bool(tex) and not tex.get_editor_property("srgb")
+          and tex.get_editor_property("mip_gen_settings")
+          == unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS,
+          str(used))
 
 
 def run():
     check_draw_calls()
     check_draw_event()
+    check_body_cut()

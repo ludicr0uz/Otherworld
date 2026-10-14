@@ -9,6 +9,7 @@ import unreal
 
 from asset_pipeline.metahuman_paths import (
     ABP_RETARGET, ABP_RETARGET_SAMPLE, BODY_HIDE_PARAM, BODY_MATERIAL, BODY_MATERIAL_BARE,
+    BODY_SKIN_WORN,
 )
 from asset_pipeline.rig_util import _load, _log, _reuse_or_create
 
@@ -83,17 +84,22 @@ def build_anim_blueprint(rtg, pkg=ABP_RETARGET):
 def build_bare_body_material():
     """BODY_MATERIAL_BARE: the sample's body material, copied (never edited
     under /Game/MetaHumans) with the skin no longer pulled in where the
-    clothes were.  The player starts undressed (combat/metahuman_body.py)."""
+    clothes were.  The player starts undressed (combat/metahuman_body.py).
+    Its parent is BODY_SKIN_WORN (body_cover.py, built first), which cuts
+    the skin under a worn garment; Taro's own parent instance sets nothing
+    his copy does not set again."""
     mel = unreal.MaterialEditingLibrary
     if not EAL.does_asset_exist(BODY_MATERIAL_BARE):
         if not EAL.duplicate_asset(BODY_MATERIAL, BODY_MATERIAL_BARE):
             raise RuntimeError(f"could not duplicate {BODY_MATERIAL}")
     mi = _load(BODY_MATERIAL_BARE)
+    mel.set_material_instance_parent(mi, _load(BODY_SKIN_WORN))
     mel.set_material_instance_scalar_parameter_value(mi, BODY_HIDE_PARAM, 0.0)
     mel.update_material_instance(mi)
     got = mel.get_material_instance_scalar_parameter_value(mi, BODY_HIDE_PARAM)
     if got != 0.0:
         raise RuntimeError(f"{BODY_HIDE_PARAM} did not stick on {BODY_MATERIAL_BARE}: {got}")
     EAL.save_asset(BODY_MATERIAL_BARE)
-    _log(f"{BODY_MATERIAL_BARE}: {BODY_MATERIAL} with {BODY_HIDE_PARAM} at 0")
+    _log(f"{BODY_MATERIAL_BARE}: {BODY_MATERIAL} with {BODY_HIDE_PARAM} at 0, "
+         f"under {BODY_SKIN_WORN}")
     return mi

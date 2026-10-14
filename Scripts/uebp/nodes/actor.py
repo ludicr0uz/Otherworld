@@ -101,6 +101,8 @@ FN_MID_SCALAR = "/Script/Engine.MaterialInstanceDynamic.SetScalarParameterValue"
 FN_MID_VECTOR = "/Script/Engine.MaterialInstanceDynamic.SetVectorParameterValue"
 
 FN_SET_OVERLAY = "/Script/Engine.MeshComponent.SetOverlayMaterial"
+# A scalar on every material of a mesh, each made a dynamic instance first.
+FN_SET_SCALAR_ON_MATERIALS = "/Script/Engine.MeshComponent.SetScalarParameterValueOnMaterials"
 
 FN_IS_CROUCHING = "/Script/Engine.NavMovementComponent.IsCrouching"
 # The ground test. UCharacterMovementComponent's own IsMovingOnGround is not

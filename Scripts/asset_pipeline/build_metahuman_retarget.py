@@ -49,6 +49,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 for _name in [m for m in sys.modules if m.startswith("asset_pipeline")]:
     del sys.modules[_name]          # a warm editor keeps yesterday's modules
 
+from asset_pipeline import body_cover                               # noqa: E402
 from asset_pipeline.metahuman_paths import (                       # noqa: E402
     BODY_MESH, IK_METAHUMAN, RTG_FROM_MANNEQUIN, SOURCED_DIR,
 )
@@ -81,6 +82,7 @@ def main():
                        root_motion_bone=ROOT_MOTION_BONE_MANNEQUIN)
     rtg = build_retargeter(src, tgt, RTG_FROM_MANNEQUIN, _load(BODY_MESH))
     build_anim_blueprint(rtg)
+    body_cover.build()
     build_bare_body_material()
     _log("done")
 

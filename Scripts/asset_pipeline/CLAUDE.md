@@ -211,7 +211,10 @@ python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_metah
   material), in `MI_BodyUnderwear`, a copy of Taro's `MI_BodySynthesized` under
   `/Game/Sourced/MetaHuman` with `BodyHideScale` at 0 (`build_metahuman_retarget.py`). With one
   LOD the body is passive in the LOD sync and the face alone drives. The rigs are still built
-  on `BODY_MESH`.
+  on `BODY_MESH`. Since 14 Oct 2026 `MI_BodyUnderwear`'s parent is `M_BodySkinWorn`, which
+  cuts the skin under each worn garment (`body_cover.py`; `Scripts/clothing/CLAUDE.md`,
+  "Drawn on the body"). **`unreal.Vector`'s unary minus turns the vector itself round**
+  (`-n` returns n, negated): write `unreal.Vector(-n.x, -n.y, -n.z)`.
 - **Five skeletal meshes now, not in tree order**: anything that wants "the player's mesh"
   takes the component named `Mesh` (`skin.mannequin_component`, `verify.common._mesh_asset`),
   never the first SkeletalMeshComponent. Per-view hides (OwnerNoSee behind a scope, the head

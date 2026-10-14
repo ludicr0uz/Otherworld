@@ -151,6 +151,20 @@ python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_c
   of its own (the hoodie, the shoes) has a post-process anim Blueprint on the mesh asset
   that copies the attach parent's pose, started when the mesh is set; a leader pose
   would stop it, so it is cleared.
+- **The skin under a worn garment is cut out of the body** (`asset_pipeline/body_cover.py`),
+  or it shows through the jeans (which lie up to 3 cm inside the whole body's skin) and the
+  hoodie's sleeves as the body moves. The body's material, `MI_BodyUnderwear`, is an
+  instance of `M_BodySkinWorn`: the sample's `M_BodySkin` copied and Masked, its opacity
+  cut by `T_BodyCoverMask` (a UV mask, a channel per part) times a scalar parameter per
+  part named as the part (`Torso`, `Legs`, `Feet`: `metahuman_paths.COVER_PARTS`).
+  `DrawWorn` sets the garment's `WornPart` parameter on the Body component to 1 on and 0
+  off (`SetScalarParameterValueOnMaterials`, which makes the dynamic instance). What may
+  be cut is Epic's own: Taro's body is the whole one with the skin under his three
+  garments removed, vertex for vertex; which garment covers each removed vertex is
+  measured by rays along its normal (`body_cover_mask.py`, its rule unit-tested). Built by
+  `build_metahuman_retarget.py`; a new garment mesh in `CLOTHING` needs that build again
+  and is cut only inside Taro's outline. Checked: `combat/verify/wear_draw.py`; in a game:
+  `probes/probe_clothing_cut.py`.
 - **The component is posed whether or not it is rendered**
   (`AlwaysTickPoseAndRefreshBones`, as the body is). `MetaHumanComponentUE` leaves the
   garments `OnlyTickPoseWhenRendered`: measured in a headless game, the hoodie then

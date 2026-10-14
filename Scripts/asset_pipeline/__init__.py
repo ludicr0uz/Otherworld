@@ -93,6 +93,12 @@ Editor-side, in pipeline order:
     metahuman_retarget.py       a retargeter between two rigs and the retargeting
                                 anim blueprint pointed at it (the mannequin's
                                 bridge, build_metahuman_retarget.py, and the UEFN's)
+    body_cover.py               the skin each worn garment covers, cut out of the
+                                whole body: T_BodyCoverMask and M_BodySkinWorn
+                                (run by build_metahuman_retarget.py)
+    body_cover_mask.py          constants and pure rule of it: which vertex each
+                                garment covers, the UV mask, its PNG (tests:
+                                dev/tests/test_body_cover_mask.py)
     measure_gas_bridge.py       entry point: what the UEFN mannequin lacks that the
                                 game names on SK_Mannequin (Saved/gas_bridge.txt)
     import_bound.py             entry point: bound GLBs -> /Game/Sourced/Bound on

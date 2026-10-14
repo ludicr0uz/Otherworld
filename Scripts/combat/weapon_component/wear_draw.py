@@ -12,7 +12,9 @@
                  its leader pose = its attach parent, the body, when both
                  are on one skeleton (the jeans), else none
                  posed whether or not it is rendered, shown
-            off: no leader pose, no mesh, hidden
+                 the body's material cuts the skin under it: its scalar
+                 parameter named Item.WornPart at 1
+            off: no leader pose, no mesh, hidden; the parameter at 0
 
 How the mesh follows the body is the MetaHuman's own two ways, and
 MetaHumanComponentUE sets them only at BeginPlay, when these components are
@@ -28,6 +30,11 @@ MetaHumanComponentUE leaves the garments OnlyTickPoseWhenRendered, which
 freezes one behind the scope, where the body is hidden from its own camera
 and still casts a shadow, and in a headless game, where nothing renders.
 
+The skin the garment covers is cut out of the body while it is worn
+(asset_pipeline/body_cover.py: the body's material has a scalar parameter
+per part, named as the part, over a mask of what that garment covers), so
+it never shows through the jeans or the hoodie as the body moves.
+
 The callers pass an Item they hold in a variable, or call before Worn's
 slot is rewritten: Worn[slot] is a pure read.
 """
@@ -41,7 +48,7 @@ from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, t
 from uebp.net import custom_event
 from uebp.nodes.actor import (
     FN_ATTACH_PARENT, FN_SET_HIDDEN_IN_GAME, FN_SET_LEADER_POSE, FN_SET_SKELETAL_MESH,
-    FN_SET_VISIBILITY, FN_SKELETAL_MESH_OF, FN_SKELETON_OF,
+    FN_SET_SCALAR_ON_MATERIALS, FN_SET_VISIBILITY, FN_SKELETAL_MESH_OF, FN_SKELETON_OF,
 )
 from uebp.nodes.math import FN_EQ_OO
 from uebp.nodes.system import FN_EQ_SS, FN_IS_DEDICATED_SERVER, FN_NAME_TO_STRING, FN_OBJECT_NAME
@@ -76,9 +83,26 @@ def _shown(g, part, shown, execs):
     return then(hide)
 
 
+def _parent_body(g, part, exec_in):
+    """Cast ``part``'s attach parent, the body, from ``exec_in``. Returns
+    (the cast node, its then, the body pin)."""
+    cast = g.keep(_palette(g.ed, NODE_CAST_SKELETAL))
+    _connect(out(g.call(FN_ATTACH_PARENT, self=part)), _pin(cast, "Object"))
+    _connect(exec_in, _pin(cast, "execute"))
+    return cast, then(cast), _loose_pin(cast, AS_SKELETAL, is_input=False)
+
+
+def _cut(g, part, item, cut, exec_in):
+    """The body's skin under ``item``'s part cut (1) or whole (0), past a
+    cast of the part's parent that held."""
+    _cast, held, body = _parent_body(g, part, exec_in)
+    g.call(FN_SET_SCALAR_ON_MATERIALS, [held], self=body,
+           ParameterName=g.iget(item, WORN_PART_VAR),
+           ParameterValue="1.0" if cut else "0.0")
+
+
 def _author_part(g, part, exec_in, item, on):
     """What DrawWorn does to one component under the mannequin."""
-    ed = g.ed
     mesh = g.iget(item, WORN_MESH_VAR)
     named = g.call(FN_EQ_SS, A=out(g.call(FN_OBJECT_NAME, Object=part)),
                    B=out(g.call(FN_NAME_TO_STRING, InName=g.iget(item, WORN_PART_VAR))))
@@ -87,26 +111,23 @@ def _author_part(g, part, exec_in, item, on):
 
     # On: the mesh, then how it follows the body.
     put = g.call(FN_SET_SKELETAL_MESH, [dress], self=part, NewMesh=mesh)
-    cast = g.keep(_palette(ed, NODE_CAST_SKELETAL))
-    _connect(out(g.call(FN_ATTACH_PARENT, self=part)), _pin(cast, "Object"))
-    _connect(then(put), _pin(cast, "execute"))
-    body = _loose_pin(cast, AS_SKELETAL, is_input=False)
+    cast, cast_then, body = _parent_body(g, part, then(put))
     same = g.call(FN_EQ_OO,
                   A=out(g.call(FN_SKELETON_OF, self=out(g.call(FN_SKELETAL_MESH_OF, self=body)))),
                   B=out(g.call(FN_SKELETON_OF, self=mesh)))
-    shared, own = g.branch(out(same), [then(cast)])
+    shared, own = g.branch(out(same), [cast_then])
     led = g.call(FN_SET_LEADER_POSE, [shared], self=part, NewLeaderBoneComponent=body)
     # NewLeaderBoneComponent left unconnected: no leader, the mesh's own
     # post-process anim Blueprint copies the body's pose.
     free = g.call(FN_SET_LEADER_POSE, [own, _loose_pin(cast, "CastFailed", is_input=False)], self=part)
     flow = g.iput(part, TICK_OPTION_VAR, TICK_ALWAYS, [then(led), then(free)],
                   class_path=SKINNED_CLASS)
-    _shown(g, part, True, [flow])
+    _cut(g, part, item, True, _shown(g, part, True, [flow]))
 
-    # Off: as metahuman_body leaves it.
+    # Off: as metahuman_body leaves it, and the skin whole again.
     loose = g.call(FN_SET_LEADER_POSE, [bare], self=part)
     off = g.call(FN_SET_SKELETAL_MESH, [then(loose)], self=part)
-    _shown(g, part, False, [then(off)])
+    _cut(g, part, item, False, _shown(g, part, False, [then(off)]))
 
 
 def author_draw_worn_event(ed):

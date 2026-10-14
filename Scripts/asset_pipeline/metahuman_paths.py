@@ -85,3 +85,15 @@ ABP_RETARGET = f"{SOURCED_DIR}/ABP_MetaHuman_Retarget"
 # BODY_MATERIAL copied with BODY_HIDE_PARAM at 0: the whole body, in its
 # underwear.  What the Body component wears (combat/metahuman_body.py).
 BODY_MATERIAL_BARE = f"{SOURCED_DIR}/MI_BodyUnderwear"
+
+# What the garments cover of the whole body, so its skin never shows through
+# one as it moves (asset_pipeline/body_cover.py builds both).  The sample's
+# own body material, M_BodySkin (BODY_MATERIAL's parent's), copied and made
+# Masked: its opacity is cut where the mask's channel for a worn garment is
+# set.  One channel per CLOTHING part, in COVER_PARTS order (R, G, B), and
+# one scalar parameter per part named as the part: 1 while it is worn
+# (combat/weapon_component/wear_draw.py sets it on the Body component).
+BODY_SKIN_MATERIAL = f"{COMMON}/Materials/M_BodySkin"
+BODY_SKIN_WORN = f"{SOURCED_DIR}/M_BodySkinWorn"
+BODY_COVER_MASK = f"{SOURCED_DIR}/T_BodyCoverMask"
+COVER_PARTS = ("Torso", "Legs", "Feet")

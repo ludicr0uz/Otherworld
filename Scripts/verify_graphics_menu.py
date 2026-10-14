@@ -38,6 +38,7 @@ from graphics_menu.ask_checks import check_asks
 from graphics_menu.tune_checks import check_tune
 from graphics_menu.monster_tune_checks import check_monster_tune
 from graphics_menu.player_tune_checks import check_player_tune
+from graphics_menu.debug_tune_checks import check_debug_tune
 from graphics_menu.sound_tune_checks import check_sound_tune
 from graphics_menu.world_tune_checks import check_world_tune
 from graphics_menu.gfx_checks import check_gfx_tune
@@ -282,9 +283,10 @@ def main():
                     "MaxHealth" in pin_names(n, False)]
     # Two pairs now: the player's bar and the NPC bars read the same component.
     # Plus three Health reads for the profile: the death test, the save's
-    # copy off the component, and the load's copy off BP_Profile.
+    # copy off the component, and the load's copy off BP_Profile. Plus the
+    # debug tab's FULL STATS, which reads MaxHealth to fill Health.
     check("HUD reads Health and MaxHealth for both the player and the NPCs",
-          len(health_reads) == 4 + 3, str(len(health_reads)))
+          len(health_reads) == 4 + 3 + 1, str(len(health_reads)))
 
     # --- the reticle
     # It must be nailed to the centre of the viewport. Drawing it at the
@@ -466,9 +468,11 @@ def main():
     # (title_figure.py, through player_parts.py).
     # Twenty-eight: and one per gameplay tuning tab, the weapon component a
     # client's nudge sends its table through (tune_mode.py).
+    # Thirty-one: and the three the debug tab's FULL STATS fills
+    # (debug_tune_tick.py, through player_parts.py).
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 28 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 31 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # The canvas's sized draws: a wanderer's fill from its health fraction,
@@ -614,41 +618,39 @@ def main():
                   for n in by_pins("A", "B", "bPickA")),
           str(sum(1 for t in titles if t == "Get InfiniteReserve")))
 
-    # --- debug mode
-    # The flag lives on the GameState, because BP_WeaponComponent draws the
-    # tracers and a component cannot reach a HUD variable.
-    check("the debug row toggles debug mode on the GameState, not on the HUD",
-          any(t == f"Set {G.DEBUG_MODE_VAR}" for t in titles),
-          str(sorted({t for t in titles if G.DEBUG_MODE_VAR in t})))
-    # Three reads: the toggle reads the GameState's to flip it, DrawHUD reads
-    # it to copy it, and BeginPlay reads the saved one off BP_Settings.
-    check("...by flipping what is already there, so it is a toggle",
-          sum(1 for t in titles if t == f"Get {G.DEBUG_MODE_VAR}") == 3,
-          str(sum(1 for t in titles if t == f"Get {G.DEBUG_MODE_VAR}")))
-    # Three writes: BeginPlay restores the saved value onto the GameState, and
-    # the toggle writes both the GameState and the save.
-    check("debug mode is restored from the save and written back to it",
-          sum(1 for t in titles if t == f"Set {G.DEBUG_MODE_VAR}") == 3,
-          str(sum(1 for t in titles if t == f"Set {G.DEBUG_MODE_VAR}")))
-    # Copied once per frame into DebugOn. The point is the cast-failed path:
-    # it reaches the same drawing code, and a Get off an invalid object is an
-    # "Accessed None" per wanderer per frame. Two writes -- the real value and
-    # the false the failed cast gets.
-    check("this frame's copy is taken once, with an answer for a failed cast",
-          sum(1 for t in titles if t == "Set DebugOn") == 2,
-          str(sum(1 for t in titles if t == "Set DebugOn")))
-    # Three readers: the menu row that reports the state, the NPC number and
-    # the crosshair down a gun's sights (reticle_checks.py). Not the FPS
-    # readout: that is on screen whatever debug mode says (umg_checks.py).
-    check("the wanderer's number is gated on the copy, and the FPS readout is not",
-          sum(1 for t in titles if t == "Get DebugOn") == 3,
-          str(sum(1 for t in titles if t == "Get DebugOn")))
+    # --- the debug flags
+    # They live on the GameState, because BP_WeaponComponent draws the
+    # tracers and a component cannot reach a HUD variable. The DEBUG SETTINGS
+    # tab writes them (debug_tune_checks.py); DrawHUD copies them.
+    for flag, copy in ((G.DEBUG_MODE_VAR, "DebugOn"), (G.DEBUG_SHOTS_VAR, "ShotsOn")):
+        check(f"{flag} is written once (the debug tab) and read once (DrawHUD's "
+              f"copy into {copy})",
+              sum(1 for t in titles if t == f"Set {flag}") == 1
+              and sum(1 for t in titles if t == f"Get {flag}") == 1,
+              str(sorted(t for t in titles if flag in t)))
+        # Copied once per frame. The point is the cast-failed path: it reaches
+        # the same drawing code, and a Get off an invalid object is an
+        # "Accessed None" per wanderer per frame. Two writes -- the real value
+        # and the false the failed cast gets.
+        check(f"...this frame's {copy} is taken once, with an answer for a failed cast",
+              sum(1 for t in titles if t == f"Set {copy}") == 2,
+              str(sum(1 for t in titles if t == f"Set {copy}")))
+    # One reader each: the wanderer's number reads DebugOn, the crosshair down
+    # a gun's sights ShotsOn (reticle_checks.py). Not the FPS readout: that is
+    # on screen whatever the switches say (umg_checks.py).
+    check("the wanderer's number is gated on DebugOn, the sights' crosshair on "
+          "ShotsOn, and the FPS readout on neither",
+          sum(1 for t in titles if t == "Get DebugOn") == 1
+          and sum(1 for t in titles if t == "Get ShotsOn") == 1,
+          f"{sum(1 for t in titles if t == 'Get DebugOn')} DebugOn, "
+          f"{sum(1 for t in titles if t == 'Get ShotsOn')} ShotsOn")
     check("the FPS readout counts real time, so it runs under the paused menus",
           any("Real Time" in t or "RealTime" in t for t in titles),
           str(sorted({t for t in titles if "Time" in t})))
     hud_cdo = unreal.get_default_object(BEL.generated_class(bp))
     check("the HUD starts with the overlays off",
-          hud_cdo.get_editor_property("DebugOn") is False)
+          hud_cdo.get_editor_property("DebugOn") is False
+          and hud_cdo.get_editor_property("ShotsOn") is False)
 
     # ─── Settings: mouse sensitivity, keybinds, and the save behind them ─────
     # The requirement these serve is "loadable across future game runs", so the
@@ -681,11 +683,11 @@ def main():
     writes = [n for n in by_pins("SaveGameObject", "SlotName")
               if BEL.find_input_pin(n, "SlotName").get_pin_value() not in other_slots]
     # BeginPlay's repair of a save from an older build, a rebind, one nudge per
-    # slider, the difficulty's nudge, the debug toggle, and the server address
+    # slider, the difficulty's nudge, and the server address
     # as a join is asked for. Written at the moment of the change and not
     # on leaving the page, because a game quit from the settings screen still
     # has to remember what was set -- which is the whole of "across future game runs".
-    want_writes = 5 + len(S.SLIDERS)
+    want_writes = 4 + len(S.SLIDERS)
     check("every change is written to disk on the spot",
           len(writes) == want_writes, f"{len(writes)}, want {want_writes}")
     check("...and there is a load and a create, so a first run is not an error",
@@ -875,6 +877,7 @@ def main():
     check_monster_tune(check, bp, nodes)
     check_world_tune(check, bp, nodes)
     check_player_tune(check, bp, nodes)
+    check_debug_tune(check, bp, nodes)
     check_sound_tune(check, bp, nodes)
     check_gfx_tune(check, bp, nodes)
     check_kept(check, bp, nodes)

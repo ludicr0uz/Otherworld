@@ -15,6 +15,7 @@ from graphics_menu import inv_consts as IC
 from graphics_menu import settings_rows as S
 from ui_art.slot_ghosts import ghost_name
 from graphics_menu import umg_consts as C
+from graphics_menu.debug_tune_consts import DEBUG_TUNE_ACTION, DEBUG_TUNE_ROW_LABEL
 from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT, EXIT_ROW_LABEL
 from graphics_menu.tune_tab import READ_ONLY_HINT
 from graphics_menu.tune_tabs import TABS
@@ -126,13 +127,13 @@ def check_trees(check):
           len(S.BIND_LABELS) == len(S.BIND_VARS), f"{len(S.BIND_LABELS)} labels")
     pause_rows = _labels(pause, C.PAUSE_ROWS)
     check("the menu lists single player first and multiplayer second, then "
-          "controls, debug, the cheat and the tabs, and the one way out last "
+          "controls, the debug settings, the cheat and the tabs, and the one way out last "
           "(exit game; save and exit in play)",
           pause_rows == list(C.PAUSE_ROW_LABELS)
           and pause_rows[C.PAUSE_START_ROW] == C.SINGLE_ROW_LABEL
           and pause_rows[1] == C.MULTI_ROW_LABEL
           and pause_rows[2] == C.SETTINGS_ROW_LABEL
-          and pause_rows[C.PAUSE_DEBUG_ROW] == C.DEBUG_ROW_LABEL
+          and pause_rows[C.PAUSE_ROW_ACTIONS.index(DEBUG_TUNE_ACTION)] == DEBUG_TUNE_ROW_LABEL
           and pause_rows[-1] == C.QUIT_ROW_LABEL, str(pause_rows))
 
     texts = set()
@@ -321,21 +322,22 @@ def check_hud_graph(check, nodes):
                     (backs if at_or_past else saves).extend(_source_titles(eq, "A"))
     # The I panel has no rows: its caret is a lit slot (wear_checks.py).
     # MenuRow is the settings page's caret and each mode page's (mode_draw.py).
-    check("the settings page, the two mode pages, the menu, loot window and the six tuning tabs "
+    check("the settings page, the two mode pages, the menu, loot window and the seven tuning tabs "
           "light the selected row's caret (the menu's is its own PauseRow)",
           sorted(selected) == sorted(
-              ["Get GfxTuneRow", "Get LootSel", "Get MenuRow", "Get MenuRow", "Get MenuRow",
+              ["Get DebugTuneRow", "Get GfxTuneRow", "Get LootSel", "Get MenuRow", "Get MenuRow", "Get MenuRow",
                "Get MonTuneRow",
                f"Get {C.PAUSE_ROW_VAR}", "Get PlayerTuneRow", "Get SoundTuneRow",
                "Get TuneRow", "Get WorldTuneRow"]),
           str(sorted(selected)))
     check("...and each tab's BACK row, the settings page's and each mode page's, lights its caret "
           "while the caret is on it",
-          sorted(backs) == ["Get GfxTuneRow", "Get MenuRow", "Get MenuRow", "Get MenuRow",
+          sorted(backs) == ["Get DebugTuneRow", "Get GfxTuneRow", "Get MenuRow", "Get MenuRow", "Get MenuRow",
                             "Get MonTuneRow", "Get PlayerTuneRow",
                             "Get SoundTuneRow", "Get TuneRow", "Get WorldTuneRow"], str(sorted(backs)))
-    check("...and the graphics tab's SAVE DEFAULT row lights its own while the caret "
-          "is on it", saves == ["Get GfxTuneRow"], str(saves))
+    check("...and the graphics tab's SAVE DEFAULT row and the debug tab's FULL STATS "
+          "light their own while the caret is on them",
+          sorted(saves) == ["Get DebugTuneRow", "Get GfxTuneRow"], str(saves))
 
     texts = [n for n in nodes if {"self", "InText"} <= _pins(n)]
     blank = [n for n in texts if not text_literal(n) and not _sources(n, "InText")]
@@ -351,13 +353,13 @@ def check_hud_graph(check, nodes):
         check(f"{name} is written from the game, not a literal",
               f"Get {name}" in written)
     literal = {text_literal(n) for n in texts if not _sources(n, "InText")}
-    check("the menu's rows are the only literals written: debug reads ON or OFF, "
-          "the first row single player or resume, the Single Player page's new "
-          "game or continue game, the last row exit game or save and exit, "
+    check("the menu's rows are the only literals written: the first row single "
+          "player or resume, the Single Player page's new game or continue "
+          "game, the last row exit game or save and exit, "
           "the mode under the title, and the rows that need a game, or the "
           "title, say so; the death menu's hint as a client of a server; and each "
           "gameplay tuning tab's hint line, its own words or why its rows are read-only",
-          literal == {C.DEBUG_ON, C.DEBUG_OFF, C.START_ROW_LABEL, C.RESUME_ROW_LABEL,
+          literal == {C.START_ROW_LABEL, C.RESUME_ROW_LABEL,
                       C.CONTINUE_ROW_LABEL, C.IN_GAME_ONLY, C.SINGLE_ROW_LABEL, C.TITLE_ONLY,
                       EXIT_ROW_LABEL, C.QUIT_ROW_LABEL, C.MODE_SINGLE_TEXT,
                       C.MODE_MULTI_TEXT, C.DEATH_HINT_SERVER, "", READ_ONLY_HINT,

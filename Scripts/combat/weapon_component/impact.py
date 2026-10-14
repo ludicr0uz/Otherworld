@@ -9,7 +9,7 @@ itself, on every machine with a screen.
 from combat.blood import (
     BLOOD_REFERENCE_DAMAGE, BLOOD_SCALE_MAX, BLOOD_SCALE_MIN,
 )
-from combat.game_state import DAMAGE_TEXT_COLOR, DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS
+from combat.game_state import DAMAGE_TEXT_COLOR, DEBUG_SHOTS_VAR, TRACE_DEBUG_SECONDS
 from uebp.graph import _connect, _node, _palette, _pin, _set, out, then
 from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.paths import ITEM_CLASS_PATH
@@ -130,7 +130,7 @@ def _author_damage_readout(ed, flew, exec_in):
     stopped. ``flew`` is the PelletFlew event node, whose Damage already
     holds the zone's Worth.
 
-    Behind the same cached DebugMode the tracer branches on, and for the same
+    Behind the same cached DebugShots the tracer branches on, and for the same
     TRACE_DEBUG_SECONDS, so the number appears at the end of the line that
     explains it. DrawDebugString rather than anything on the HUD: it is world
     space, needs no projection, and is compiled out of shipping builds like
@@ -142,9 +142,9 @@ def _author_damage_readout(ed, flew, exec_in):
         made.append(n)
         return n
 
-    seen = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR))
+    seen = keep(ed.add_get_member_variable_node(DEBUG_SHOTS_VAR))
     showing = keep(ed.add_branch_node())
-    _connect(out(seen, DEBUG_MODE_VAR), _pin(showing, "Condition"))
+    _connect(out(seen, DEBUG_SHOTS_VAR), _pin(showing, "Condition"))
     _connect(exec_in, _pin(showing, "execute"))
 
     dmg_str = keep(_node(ed, FN_FLOAT_TO_STR))

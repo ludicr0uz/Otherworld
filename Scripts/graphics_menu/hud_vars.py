@@ -15,6 +15,8 @@ from graphics_menu.umg_consts import GAME_STARTED_VAR, PAUSE_ROW_VAR
 MenuOpen = Var("MenuOpen", BOOL, False)
 # This frame's copy of the GameMode's DebugMode. Taken once at the top of DrawHUD.
 DebugOn = Var("DebugOn", BOOL, False)
+# ...and of its DebugShots (the shot trajectory switch), taken beside it.
+ShotsOn = Var("ShotsOn", BOOL, False)
 Quality = Var("Quality", INT)
 # Which page of the menu panel is on screen, and which line of it the caret is on.
 MenuPage = Var("MenuPage", INT, PAGE_TITLE)
@@ -30,7 +32,7 @@ Settings = Var("Settings", obj(SETTINGS_CLASS_PATH))
 # graph tests every entry with the same three nodes.
 KeyPool = Var("KeyPool", array(struct("/Script/InputCore.Key")))
 
-TABLE = (MenuOpen, DebugOn, Quality, MenuPage, MenuRow, Capturing, Settings, KeyPool)
+TABLE = (MenuOpen, DebugOn, ShotsOn, Quality, MenuPage, MenuRow, Capturing, Settings, KeyPool)
 
 # Whether the controller was told to ignore move input for the open panel
 # (menu_still.py).

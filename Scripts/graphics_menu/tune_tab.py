@@ -11,7 +11,9 @@ all take a TuneTab. Only what the table is applied to differs
 world_tune_tick: the day/night cycle; gfx_tune_tick: BP_GraphicsTuner).
 The PLAYER SETTINGS and SOUND SETTINGS tabs (player_tune_consts.PLAYER_TAB,
 sound_tune_consts.SOUND_TAB) are two more: the player's weapon component,
-and the game's sound mix.
+and the game's sound mix. DEBUG SETTINGS (debug_tune_consts.DEBUG_TAB) is a
+tab of switches, OFF or ON (``words``), onto the GameState's debug flags, and
+its save row is a cheat (debug_tune_tick.py).
 
     its row in the M panel        open the tab (and shut the others). An open
                                   tab stands in place of the panel's rows
@@ -112,6 +114,9 @@ class TuneTab:
     # (a client of a server sends it there: tune_mode.py). "" = it tunes only
     # this machine (graphics, sound).
     gameplay: str = ""
+    # A tab of switches (DEBUG SETTINGS): each value is shown as (off, on),
+    # on above a half, in place of its number; () = the number.
+    words: tuple = ()
 
     @property
     def row_count(self):

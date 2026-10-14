@@ -79,7 +79,8 @@ rows: Single Player (its page: Survival, or Continue Survival with a saved profi
 `Lvl_Forest_1000m`; Horde Mode opens `Lvl_Horde_Survival`; one profile for both, and
 neither in multiplayer), Multiplayer (a
 server address and Join Server), Controls (rebinding, difficulty EASY/MEDIUM/SURVIVOR),
-Debug, Dev All Guns (in play only: the title has no such row), the GUN / MONSTER / PLAYER / SOUND / WORLD / GRAPHICS SETTINGS tabs
+Debug Settings (monster vision and agro, and the shot trajectory, two switches, and a FULL
+STATS cheat), Dev All Guns (in play only: the title has no such row), the GUN / MONSTER / PLAYER / SOUND / WORLD / GRAPHICS SETTINGS tabs
 (live tuning, each saved to a tracked CSV the matching build reads; as a client of a server
 the gun, monster, world and player tables are the server's: a change is sent to it and
 applied there, by `BP_GameTuner` on the GameState, only where the server was started with
@@ -628,7 +629,7 @@ each of these outlives every actor that touches it, the player's own components 
 | the wanderer population (a server's only) | `UOtherworldPopulation`, a world subsystem that does nothing in single player | each AI controller on possession (`RegisterWanderer`, with its creature's budget) | its own pass, once a second: who is removed, who is spawned |
 | the noise list | `UOtherworldNoiseList`, a world subsystem (written on the server only) | whatever made a noise (`MakeNoise`) | every controller's hearing (`HearNoise`) |
 | `NpcKillCount`, `PlayerKillCount`, `PlayerDead` | `BP_OtherworldPlayerState`, replicated | the death path on the server, a kill credited only when `DamagedByPlayer` or the striker was a player | that player's HUD and death menu |
-| `DebugMode` | `BP_OtherworldGameState`, replicated | the HUD's BeginPlay and the menu's debug row, where the machine owns the GameState | the weapon component (tracers), the HUD, the wanderers' AI (cones) |
+| `DebugMode`, `DebugShots` | `BP_OtherworldGameState`, replicated | the DEBUG SETTINGS tab's two switches, where the machine owns the GameState | `DebugMode`: the HUD, the wanderers' AI (cones, agro log); `DebugShots`: the weapon component (tracers, impact damage), the HUD's crosshair |
 
 Health is the value a cheater most wants, so only the server changes it and every blow says
 who struck it (`TakeHit` on the health component's native parent; its `Health` and `Dead`

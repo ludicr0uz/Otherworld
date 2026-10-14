@@ -4,7 +4,7 @@ probed by real traces.
 
 import unreal
 
-from combat.game_state import DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS
+from combat.game_state import DEBUG_SHOTS_VAR, TRACE_DEBUG_SECONDS
 from uebp.graph import _component_object, _handles
 from combat.grip import _mesh_bone_names
 from combat.hit_zones import (
@@ -210,7 +210,7 @@ def check_player_body():
                  PIN.list_connected_pins(BEL.find_input_pin(ro, "execute"))]
         check("...drawn only in debug mode",
               any("Branch" in str(BEL.get_node_title(g))
-                  and any(DEBUG_MODE_VAR in str(BEL.get_node_title(PIN.get_owning_node(q)))
+                  and any(DEBUG_SHOTS_VAR in str(BEL.get_node_title(PIN.get_owning_node(q)))
                           for q in PIN.list_connected_pins(BEL.find_input_pin(g, "Condition")))
                   for g in gates))
         check("...at the impact point (PelletFlew's Stop)",

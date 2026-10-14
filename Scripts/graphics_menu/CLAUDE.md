@@ -34,8 +34,8 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   `Resume` and shuts the menu; as a client in play the row is not there: collapsed, and the
   caret goes round it, `mode_draw.author_mode_words`), `Multiplayer` (on the title it opens the Multiplayer page: the server's
   address and `Join Server`; in play it does nothing and says `from the title`), `Controls` (the settings page, titled
-  **CONTROLS**; the code still calls it the settings page), `Debug` (wanderer numbers, pellet tracers and impact damage,
-  the wanderers' sight cones; not the FPS readout, which is always on), `Dev All Guns` (in play only: on the title the row is collapsed and the caret goes past it, `mode_draw.author_mode_words`), `Gun Settings`,
+  **CONTROLS**; the code still calls it the settings page), `Debug Settings` (the DEBUG SETTINGS tab, below;
+  not the FPS readout, which is always on), `Dev All Guns` (in play only: on the title the row is collapsed and the caret goes past it, `mode_draw.author_mode_words`), `Gun Settings`,
   `Monster Settings`, `World Settings`, `Player Settings`, `Sound Settings`, `Graphics Settings`, and last
   the one way out (`EXIT_ACTION`): on the title it reads `Exit Game` and quits to the desktop,
   saving nothing; in play it reads `Save and Exit`, in single player and as a client of a
@@ -570,6 +570,27 @@ only names itself: `TuneTab.kept` (default true), and from it `keep_slot` and `b
 - **To drop a save:** delete `Saved/SaveGames/OtherworldTune_*.sav`. There is no reset row.
 - **Checks:** `tune_keep_checks.check_kept` (which also runs `gfx_save_checks`).
 - **Still needs a play session:** a nudge, quit, relaunch, and the number is still there.
+
+## The DEBUG SETTINGS tab (`debug_tune_*.py`)
+
+A tab like the others (a `TuneTab` in `TABS`, laid out by `wbp_tune`, its keys and nudge
+`tune_tick`'s), over one subject, `overlays`, and two switches, each OFF or ON (the tab's
+`words`: `tune_draw` shows the word, not the number; min 0, max 1, step 1):
+
+- **Monster vision & agro** sets the GameState's `DebugMode`: the sight cones (now drawn
+  with thickness 0, a hairline: `npc/paths.SIGHT_CONE_THICKNESS`), the `[NPC-AGRO]` log, the
+  wanderers' numbers.
+- **Shot trajectory** sets the GameState's `DebugShots` (replicated): the pellet tracers,
+  the impact damage numbers, the crosshair down the sights (the HUD's `ShotsOn`, copied as
+  `DebugOn` is).
+
+The switches are applied once per change (`DebugTuneTouched`), only where this machine owns
+the GameState, so a probe's direct write on the GameState stands. They are kept between
+sessions like any kept tab (`tune_keep.py`); `BP_Settings` no longer holds a debug flag.
+The tab's save row is **FULL STATS**, a cheat: Health, Stamina (and the movement's, by
+`SetStamina`), Hunger, Thirst and Temperature to their maximums, where the GameState is
+owned; it runs no Python. `debug_tune_checks.py` verifies it,
+`probes/probe_debug_tab.py` plays it.
 
 ## The GUN SETTINGS tab (`tune_*.py`, `wbp_tune.py`)
 

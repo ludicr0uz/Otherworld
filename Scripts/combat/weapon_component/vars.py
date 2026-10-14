@@ -276,9 +276,13 @@ AimForced = Var("AimForced", BOOL, False)
 # loot window): the shoulder aim key is a click there, not an aim
 # (graphics_menu/cursor.author_hold_fire writes it; ads.py reads it).
 AimHeld = Var("AimHeld", BOOL, False)
-# The GameMode's DebugMode, cached at the moment of firing so the pellet loop
-# can branch on a plain bool instead of casting eight times.
-DebugMode = Var("DebugMode", BOOL, False)
+# The GameState's DebugShots (the debug tab's shot trajectory switch), cached
+# at the moment of firing so the pellet loop can branch on a plain bool
+# instead of casting eight times.
+DebugShots = Var("DebugShots", BOOL, False)
+# What this cache was called while one switch drew every overlay: taken off a
+# component built before the split (build.py).
+RETIRED = ("DebugMode",)
 # The bone the current pellet struck and where it landed (hit_zones.py).
 HitBone = Var("HitBone", NAME)
 HitPoint = Var("HitPoint", VECTOR)
@@ -423,7 +427,7 @@ STATE = (
     AimSpread, RecoilScale, ReticleSpread, ShotDirection, TriggerSpent, Worn, WearItem,
     DropItem, TakeOffSlot, TakeOffTo, WearRequest, WearSlot, OwnerDead, FireForced,
     FirePressedAt,
-    SprintForced, AimForced, AimHeld, DebugMode, HitBone, HitPoint, ShotgunClass, PistolClass,
+    SprintForced, AimForced, AimHeld, DebugShots, HitBone, HitPoint, ShotgunClass, PistolClass,
     KnifeClass, AxeClass, MatchesClass, StickClass, StarterPantsClass,
     ImpactClass, CampfireClass, PunchAnim, CarryFor, CarryAlso,
     PunchQueued, PunchPending, NextPunchTime, PunchDueTime, BlowDamage, KnifeAnim, AxeAnim,

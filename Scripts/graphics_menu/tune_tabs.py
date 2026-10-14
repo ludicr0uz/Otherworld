@@ -5,6 +5,7 @@ DrawHUD fragment hides its own rows while any of them is open.
 Constants only. Each tab's names are its own module's (tune_tab.TuneTab).
 """
 
+from graphics_menu.debug_tune_consts import DEBUG_TAB
 from graphics_menu.gfx_tune_consts import GFX_TAB
 from graphics_menu.monster_tune_consts import MONSTER_TAB
 from graphics_menu.player_tune_consts import PLAYER_TAB
@@ -12,7 +13,7 @@ from graphics_menu.sound_tune_consts import SOUND_TAB
 from graphics_menu.tune_consts import GUN_TAB
 from graphics_menu.world_tune_consts import WORLD_TAB
 
-TABS = (GUN_TAB, MONSTER_TAB, WORLD_TAB, PLAYER_TAB, SOUND_TAB, GFX_TAB)
+TABS = (DEBUG_TAB, GUN_TAB, MONSTER_TAB, WORLD_TAB, PLAYER_TAB, SOUND_TAB, GFX_TAB)
 
 
 def other_open_vars(tab):

@@ -6,7 +6,7 @@ from the tab's variables. For the guns:
                    is TuneValues[TuneWeapon * STAT_COUNT + i - 1] (up to
                    the tab's fraction_digits decimals, no grouping; a dash
                    where the tab's live mask says the stat is not the
-                   subject's own), the
+                   subject's own; OFF or ON in a tab of switches), the
                    caret on TuneRow -- on BACK, over the list, when it is
                    past the list, or on the save row of a tab that has one --
                    and "saved to ..." while TuneSaved. A scrolling tab's
@@ -30,12 +30,14 @@ from graphics_menu.ui_graph import mark_rows, member, part, row_value, set_shown
 from graphics_menu.umg_consts import ROW_CARET, WBP_MENU_ROW, WBP_PAUSE_MENU
 from uebp.nodes.array import FN_ARR_GET
 from uebp.nodes.math import (
-    FN_ADD_II, FN_AND, FN_EQ_II, FN_GE_II, FN_MIN_II, FN_MUL_II, FN_SELECT_FF, FN_SELECT_STR,
+    FN_ADD_II, FN_AND, FN_EQ_II, FN_GE_II, FN_GREATER_FF, FN_MIN_II, FN_MUL_II, FN_SELECT_FF, FN_SELECT_STR,
     FN_SUB_II)
 from uebp.nodes.palette import MACRO_FOR_LOOP
 from uebp.nodes.system import FN_TEXT_TO_STR, FN_TO_TEXT
 from uebp.nodes.umg import FN_CHILD_AT, FN_SCROLL_TO, FN_SET_OPACITY
 from graphics_menu import hud_vars as MV
+
+SWITCH_HALF = 0.5   # a switch's value above this reads its on word
 
 
 def _item(ed, array_var, index, made):
@@ -59,8 +61,16 @@ def _author_stats(ed, tab, box, in_execs, made):
     base = _call(ed, FN_MUL_II, made, A=_get(ed, tab.pick_var, made), B=tab.stat_count)
     s = _call(ed, FN_SUB_II, made, A=i, B=1)
     idx = _call(ed, FN_ADD_II, made, A=out(base), B=out(s))
-    words = _call(ed, FN_TO_TEXT, made,
-                  Value=_item(ed, tab.values_var, out(idx), made),
+    cell = _item(ed, tab.values_var, out(idx), made)
+    if tab.words:
+        # A switch: its word, on above a half. ON on A: SelectString's A
+        # holds a literal (the reserve's infinity is one, hud_inventory.py).
+        off, on = tab.words
+        lit = _call(ed, FN_GREATER_FF, made, A=cell, B=SWITCH_HALF)
+        value = out(_call(ed, FN_SELECT_STR, made, A=on, B=off, bPickA=out(lit)))
+        row_value(ed, box, i, value, [out(loop, "LoopBody")])
+        return out(loop, "Completed")
+    words = _call(ed, FN_TO_TEXT, made, Value=cell,
                   bUseGrouping="false", MaximumFractionalDigits=tab.fraction_digits)
     value = ("text", out(words))
     if tab.live_var:

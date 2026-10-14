@@ -270,4 +270,9 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   tune_mode          the gameplay tabs by mode: the nudge allowed or read-only, kept or
                      sent to the server (AskTune), the hint line's words (M32)
   tune_mode_checks   the tabs by mode in the HUD's graph, and BP_GameTuner
+
+  debug_tune_consts  the DEBUG SETTINGS tab: its row, variables, widgets, the two switches
+  debug_tune_tick    the DEBUG SETTINGS tab's Tick: keys, nudge, FULL STATS cheat, the
+                     switches onto the GameState's DebugMode and DebugShots
+  debug_tune_checks  verify_graphics_menu.py's checks for the DEBUG SETTINGS tab
 """

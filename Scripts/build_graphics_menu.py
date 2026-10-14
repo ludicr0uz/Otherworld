@@ -28,16 +28,16 @@ Event graph:
 
   [Event BeginPlay] --> create the four screens, add them to the viewport
                     --> Quality := the startup preset (Low)
-                    --> load BP_Settings --> GameMode.DebugMode = saved
+                    --> load BP_Settings
                     --> pause on the menu (unless -nomenu), with the HUD
                         ticking while paused (graphics_menu/menu_main.py)
 
   [Event Tick] --> in play: save and exit (graphics_menu/save_exit.py) and
                    the loot window (graphics_menu/loot_tick.py); then, on the
                    title too, the tuning tabs, the menu's own rows and M
-                   (graphics_menu/menu_main.py) and the debug row
+                   (graphics_menu/menu_main.py)
 
-  [Event ReceiveDrawHUD] --> DebugOn copy, settings pushed onto the weapon
+  [Event ReceiveDrawHUD] --> DebugOn and ShotsOn copies, settings pushed onto the weapon
                              component, difficulty onto the GameMode, FPS
     --> GameStarted?   no: the HUD hidden and the menu held open (the title)
     --> PlayerDead?    yes: the death menu and [R]
@@ -74,7 +74,7 @@ from graphics_menu.tune_keep import (                               # noqa: E402
 # The FPS readout, on screen whatever debug mode says; see graphics_menu/fps.py.
 from net.state_consts import GAME_STATE_CLASS_PATH, PLAYER_STATE_CLASS_PATH  # noqa: E402
 from net.state_graph import (                                      # noqa: E402
-    CONTROLLER_CLASS_PATH, game_state, owned_game_state, player_state_of)
+    CONTROLLER_CLASS_PATH, game_state, player_state_of)
 from net.game_instance import build_game_instance                  # noqa: E402
 from net.session_consts import GAME_INSTANCE_BP_PATH               # noqa: E402
 from graphics_menu.fps import author_fps, declare_fps_vars          # noqa: E402
@@ -89,7 +89,7 @@ from graphics_menu.settings_input import _emit_save                # noqa: E402
 from graphics_menu.settings_page import _author_push_settings      # noqa: E402
 # The UMG screens: their layouts, their creation at BeginPlay, and the
 # DrawHUD fragments that write into them.
-from graphics_menu.umg_consts import DEBUG_ACTION, GAME_STARTED_VAR, HUD_BP_PATH   # noqa: E402
+from graphics_menu.umg_consts import GAME_STARTED_VAR, HUD_BP_PATH   # noqa: E402
 from graphics_menu.wbp_hud import build_hud_widget                  # noqa: E402
 from graphics_menu.wbp_parts import (                              # noqa: E402
     build_inventory_slot, build_menu_row)
@@ -126,7 +126,6 @@ from graphics_menu.wear_tick import (                               # noqa: E402
     author_wear_tick, declare_wear_vars, wear_defaults)
 from graphics_menu.cursor import (                                  # noqa: E402
     author_cursor_read, author_take_mouse, cursor_defaults, declare_cursor_vars)
-from graphics_menu.menu_nav import pause_row_taken                  # noqa: E402
 from graphics_menu.menu_main import (                               # noqa: E402
     author_in_play, author_main_rows_tick)
 from graphics_menu.mode_consts import (                             # noqa: E402
@@ -139,6 +138,9 @@ from graphics_menu.monster_tune_consts import MONSTER_TAB           # noqa: E402
 from graphics_menu.monster_tune_tick import (                       # noqa: E402
     author_monster_tune_tick, declare_monster_tune_vars, monster_tune_defaults)
 from graphics_menu.player_tune_consts import PLAYER_TAB             # noqa: E402
+from graphics_menu.debug_tune_consts import DEBUG_TAB               # noqa: E402
+from graphics_menu.debug_tune_tick import (                         # noqa: E402
+    author_debug_tune_tick, declare_debug_tune_vars, debug_tune_defaults)
 from graphics_menu.player_tune_tick import (                        # noqa: E402
     author_player_tune_tick, declare_player_tune_vars, player_tune_defaults)
 from graphics_menu.sound_tune_consts import SOUND_TAB               # noqa: E402
@@ -182,17 +184,15 @@ GAME_MODE_PATH = "/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
 
 MENU_KEY = "M"
 
-# Debug mode: the developer overlays, on one key in the same menu.  The flag
-# itself lives on the GameMode (declared by build_weapons_and_combat.py), not
-# here, because the *weapon component* is the other thing that reads it and a
-# HUD variable is not reachable from a component.  What lives here is DebugOn,
-# a copy taken once per frame at the top of DrawHUD so the draw code can branch
-# on a plain bool instead of casting to the GameMode for every wanderer.
-#
-# The player's choice is kept in BP_Settings.DebugMode (default OFF), so it
-# survives a restart: BeginPlay copies it onto the GameMode once the save is
-# loaded, and the M panel's debug row writes it back and saves on the spot.
+# The debug overlays: two flags on the GameState (combat/game_state.py), not
+# here, because the weapon component and the NPCs read them too and a HUD
+# variable is not reachable from a component.  The DEBUG SETTINGS tab sets
+# them (graphics_menu/debug_tune_tick.py) and keeps them between sessions.
+# What lives here is DebugOn and ShotsOn, copies taken once per frame at the
+# top of DrawHUD so the draw code can branch on a plain bool instead of
+# casting to the GameState for every wanderer.
 DEBUG_MODE_VAR = "DebugMode"
+DEBUG_SHOTS_VAR = "DebugShots"
 
 # Where the player's health lives.  Built by build_weapons_and_combat.py; the
 # HUD degrades to drawing nothing if the pawn has no such component.
@@ -312,6 +312,7 @@ def _ensure_variables(ed, bp):
     declare_monster_tune_vars(ed)
     declare_world_tune_vars(ed)
     declare_player_tune_vars(ed)
+    declare_debug_tune_vars(ed)
     declare_sound_tune_vars(ed)
     declare_gfx_tune_vars(ed)
     declare_cursor_vars(ed)
@@ -467,30 +468,6 @@ def _author_load_settings(ed, in_exec):
     return (saved, else_(repair))
 
 
-def _author_restore_debug(ed, in_execs):
-    """BeginPlay: GameState.DebugMode = Settings.DebugMode.
-
-    The save is the record and the GameState is where the game reads it, so
-    the one copy happens as soon as Settings is known to be valid. Only where
-    this machine owns the GameState (net/state_graph.py): a client of a
-    server takes the server's, and goes on without.
-    """
-    state = owned_game_state(ed, in_execs)
-    settings = ed.add_get_member_variable_node(MV.Settings)
-    saved = ed.add_get_member_variable_node(DEBUG_MODE_VAR, SETTINGS_CLASS_PATH)
-    _connect(out(settings, MV.Settings), _pin(saved, "self"))
-    put = ed.add_set_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH)
-    _connect(state.pin, _pin(put, "self"))
-    _connect(out(saved, DEBUG_MODE_VAR), _pin(put, DEBUG_MODE_VAR))
-    _connect(state.then, _pin(put, "execute"))
-    ed.add_comment_to_nodes(
-        "Debug mode as the player last left it (BP_Settings.DebugMode, off for "
-        "a first run), onto the GameState where the HUD and the weapon read "
-        "it, on the machine that owns it.",
-        [*state.nodes, settings, saved, put])
-    return (then(put), *state.fails)
-
-
 # ─── Event BeginPlay: the startup default ────────────────────────────────────
 
 def _author_begin_play(ed, begin_play):
@@ -512,7 +489,6 @@ def _author_begin_play(ed, begin_play):
     # access in front of the preset would let a failed load hide a failed
     # preset.
     loaded_tails = _author_load_settings(ed, then(made[-1]))
-    loaded_tails = _author_restore_debug(ed, loaded_tails)
     # The player's own preset, Custom row and tuning tables, over the defaults.
     loaded_tails = author_load_kept(ed, loaded_tails)
 
@@ -604,57 +580,11 @@ def _author_tick(ed, tick):
     tuned = author_player_tune_tick(ed, pc_out, tuned)
     # The sound one also tells the game's sound mix its volumes, first Tick on.
     tuned = author_sound_tune_tick(ed, pc_out, tuned)
+    # The debug one sets the GameState's two debug flags (debug_tune_tick.py).
+    tuned = author_debug_tune_tick(ed, pc_out, tuned)
     # Then the menu's own rows (new game or resume, settings, the title's exit
     # game) and M.
-    toggled = author_main_rows_tick(ed, pc_out, tuned)
-
-    # --- the menu's debug row, gated on the menu being open -----------------
-    gate_get = ed.add_get_member_variable_node(MV.MenuOpen)
-    gate = ed.add_branch_node()
-    _connect(out(gate_get, MV.MenuOpen), _pin(gate, "Condition"))
-    for tail in toggled:
-        _connect(tail, _pin(gate, "execute"))
-
-    # --- the debug row toggles debug mode -----------------------------------
-    # Written to the GameState rather than to this HUD: the pellet tracers are
-    # drawn by BP_WeaponComponent, which can reach a GameState and cannot reach
-    # a HUD variable. Only where this machine owns it: on a client of a server
-    # the row changes nothing, the save included (serversupportsysdesign.md
-    # 4.8, the dev settings' row).  The row has no key: Enter on it or a click raises
-    # PauseClick, like every other row of the panel.
-    br_d = ed.add_branch_node()
-    d_taken = []
-    _connect(pause_row_taken(ed, DEBUG_ACTION, d_taken), _pin(br_d, "Condition"))
-    _connect(then(gate), _pin(br_d, "execute"))
-
-    dbg_state = owned_game_state(ed, [then(br_d)])
-    gm_out = dbg_state.pin
-
-    was_on = ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH)
-    _connect(gm_out, _pin(was_on, "self"))
-    flip = _node(ed, FN_NOT)
-    _connect(out(was_on, DEBUG_MODE_VAR), _pin(flip, "A"))
-    set_dbg = ed.add_set_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH)
-    _connect(gm_out, _pin(set_dbg, "self"))
-    _connect(out(flip), _pin(set_dbg, DEBUG_MODE_VAR))
-    _connect(dbg_state.then, _pin(set_dbg, "execute"))
-
-    # ...and into the save, written on the spot like every other setting.
-    settings = ed.add_get_member_variable_node(MV.Settings)
-    settings_out = out(settings, MV.Settings)
-    keep_dbg = ed.add_set_member_variable_node(DEBUG_MODE_VAR, SETTINGS_CLASS_PATH)
-    _connect(settings_out, _pin(keep_dbg, "self"))
-    _connect(out(flip), _pin(keep_dbg, DEBUG_MODE_VAR))
-    _connect(then(set_dbg), _pin(keep_dbg, "execute"))
-    _, writer = _emit_save(ed, settings_out, then(keep_dbg))
-
-    ed.add_comment_to_nodes(
-        "The panel's debug row -> debug mode, held on the GameState so the weapon "
-        "component can read it too, and saved to BP_Settings so it survives a "
-        "restart.  It turns on the pellet tracers and the "
-        "wanderers' numbers.",
-        d_taken + [br_d, *dbg_state.nodes, was_on, flip, set_dbg, settings, keep_dbg,
-         writer])
+    author_main_rows_tick(ed, pc_out, tuned)
 
 
 # ─── The health readout ──────────────────────────────────────────────────────
@@ -860,14 +790,23 @@ def _author_draw(ed):
     _set(no_dbg, MV.DebugOn, False)
     for e in state.fails:
         _connect(e, _pin(no_dbg, "execute"))
+    # ...and of DebugShots (the crosshair down the sights reads it), the same way.
+    shots_get = ed.add_get_member_variable_node(DEBUG_SHOTS_VAR, GAME_STATE_CLASS_PATH)
+    _connect(state.pin, _pin(shots_get, "self"))
+    copy_shots = ed.add_set_member_variable_node(MV.ShotsOn)
+    _connect(out(shots_get, DEBUG_SHOTS_VAR), _pin(copy_shots, MV.ShotsOn))
+    _connect(then(copy_dbg), _pin(copy_shots, "execute"))
+    no_shots = ed.add_set_member_variable_node(MV.ShotsOn)
+    _set(no_shots, MV.ShotsOn, False)
+    _connect(then(no_dbg), _pin(no_shots, "execute"))
 
     # The player's settings, onto the weapon component. Before the menu and
     # before the dead/alive test, because it is the one thing on this event
     # that has to happen on every frame in every state -- a sensitivity changed
     # on the settings screen has to be in effect the moment the world unpauses.
     # The difficulty onto the GameState first, where this machine owns it.
-    to_state = author_push_difficulty(ed, then(copy_dbg), state.pin)
-    pushed = _author_push_settings(ed, (*to_state, then(no_dbg)))
+    to_state = author_push_difficulty(ed, then(copy_shots), state.pin)
+    pushed = _author_push_settings(ed, (*to_state, then(no_shots)))
 
     # The FPS readout, in every state -- title, game, death -- and whether
     # debug mode is on or off. Drawn first, so every panel after it can sit on top.
@@ -924,7 +863,8 @@ def _author_draw(ed):
     world = author_tune_panel(ed, monsters, WORLD_TAB)
     gfx = author_tune_panel(ed, world, GFX_TAB)
     player = author_tune_panel(ed, gfx, PLAYER_TAB)
-    author_tune_panel(ed, player, SOUND_TAB)
+    sound = author_tune_panel(ed, player, SOUND_TAB)
+    author_tune_panel(ed, sound, DEBUG_TAB)
 
 
 # ─── Entry points ────────────────────────────────────────────────────────────
@@ -1024,7 +964,7 @@ def build_hud_blueprint(rebuild=False):
                          **carry_defaults(),
                          **tune_defaults(), **monster_tune_defaults(),
                          **world_tune_defaults(), **gfx_tune_defaults(),
-                         **player_tune_defaults(), **sound_tune_defaults(),
+                         **player_tune_defaults(), **sound_tune_defaults(), **debug_tune_defaults(),
                          **cursor_defaults()})
     _assets().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")

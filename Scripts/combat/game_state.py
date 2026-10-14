@@ -7,7 +7,7 @@ Where each lives (serversupportsysdesign.md 4.2; net/state_consts.py):
                      gun-drop streams, the combat trace's switch (the
                      noises are the world's own list: combat/noise.py)
     the PlayerState  what is one player's: NpcKillCount, PlayerDead
-    the GameState    what every machine reads: DebugMode, Difficulty
+    the GameState    what every machine reads: DebugMode, DebugShots, Difficulty
 A client has no GameMode, so nothing it reads may be declared here.
 """
 
@@ -24,12 +24,18 @@ from combat.weapon_component import vars as WV
 
 
 # --- debug mode --------------------------------------------------------------
-# One flag on the GameState (replicated), toggled from the graphics menu, that turns the
-# developer overlays on and off: the pellet tracers drawn from the muzzle, the
-# wanderer's number beside its health bar and its sight cone
-# (npc/sight_cone.py). Off by default -- they are all instrumentation, and
+# Two flags on the GameState (replicated), the menu's DEBUG SETTINGS tab's two
+# switches (graphics_menu/debug_tune_consts.py), each turning developer
+# overlays on and off. Off by default -- they are all instrumentation, and
 # instrumentation is not what the game looks like.
-DEBUG_MODE_VAR = WV.DebugMode
+#   DebugMode    the monsters': each wanderer's sight cone (npc/sight_cone.py),
+#                its agro log line (npc/agro.py) and the number beside its
+#                health bar
+#   DebugShots   the shots': the pellet tracers drawn from the muzzle, the
+#                damage at each impact, and the crosshair down the sights;
+#                the weapon component caches it per shot under the same name
+DEBUG_MODE_VAR = "DebugMode"
+DEBUG_SHOTS_VAR = WV.DebugShots
 
 # --- combat trace ------------------------------------------------------------
 # A second developer switch on the GameMode, and a log rather than an overlay:

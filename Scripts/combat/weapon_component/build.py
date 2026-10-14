@@ -124,7 +124,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     declare(ed, WV.STATE)
     # The names the interact had as the pick-up are taken off a component
     # built before the rename.
-    for name in RETIRED_VARS + native.RETIRED_VARS + trigger.RETIRED_VARS:
+    for name in RETIRED_VARS + native.RETIRED_VARS + trigger.RETIRED_VARS + WV.RETIRED:
         ed.remove_member_variable(name)
     arc_class = BEL.generated_class(throw_arc_bp)
 

@@ -19,6 +19,7 @@ from graphics_menu import cursor_consts as CC
 from graphics_menu import umg_consts as C
 from graphics_menu.loot_consts import LOOT_OPEN_VAR
 from graphics_menu.settings_rows import BACK_ROW, PAGE_SETTINGS, PAGE_TITLE
+from graphics_menu.debug_tune_consts import DEBUG_TAB
 from graphics_menu.tune_consts import GUN_TAB
 from graphics_menu.mode_consts import SINGLE, SINGLE_START_ROW
 from graphics_menu import hud_vars as MV
@@ -26,7 +27,8 @@ from graphics_menu import hud_vars as MV
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in (
     MV.MenuOpen, C.GAME_STARTED_VAR, MV.MenuPage, MV.MenuRow, LOOT_OPEN_VAR,
-    CC.CURSOR_ACCEPT_VAR, CC.PAUSE_CLICK_VAR, CC.PAGE_CLICK_VAR, GUN_TAB.open_var, GUN_TAB.row_var)]
+    CC.CURSOR_ACCEPT_VAR, CC.PAUSE_CLICK_VAR, CC.PAGE_CLICK_VAR, GUN_TAB.open_var, GUN_TAB.row_var,
+    DEBUG_TAB.open_var)]
 WRITABLE += [(PLAYER_STATE_BP_PATH, "PlayerDead"),
              (WEAPON_COMP_BP_PATH, CC.TRIGGER_SPENT_VAR)]
 
@@ -79,19 +81,18 @@ def probe(p):
             p.controller().is_move_input_ignored())
 
     # --- a row taken (a click, or Enter on the caret's row) is served by Tick ---
-    # The debug row: taken twice, so the saved setting ends as it began.
-    debug_row = C.PAUSE_ROW_ACTIONS.index(C.DEBUG_ACTION)
-    before = p.get(p.game_state(), "DebugMode")
+    # The debug settings row: taken twice, so the tab ends shut as it began.
+    debug_row = C.PAUSE_ROW_ACTIONS.index(DEBUG_TAB.action)
     p.set(hud, CC.PAUSE_CLICK_VAR, debug_row)
-    yield lambda: p.get(p.game_state(), "DebugMode") != before
+    yield lambda: p.get(hud, DEBUG_TAB.open_var)
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
-    flipped = p.get(p.game_state(), "DebugMode")
+    opened = p.get(hud, DEBUG_TAB.open_var)
     p.set(hud, CC.PAUSE_CLICK_VAR, debug_row)
-    yield lambda: p.get(p.game_state(), "DebugMode") == before
+    yield lambda: not p.get(hud, DEBUG_TAB.open_var)
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
-    p.check("taking the debug row toggles debug mode, and again toggles it back",
-            flipped != before and p.get(p.game_state(), "DebugMode") == before,
-            f"{before} -> {flipped} -> {p.get(p.game_state(), 'DebugMode')}")
+    p.check("taking the debug settings row opens its tab, and again shuts it",
+            opened and not p.get(hud, DEBUG_TAB.open_var),
+            f"{opened} -> {p.get(hud, DEBUG_TAB.open_var)}")
 
     ui = p.get(hud, "UiPause")
     own, tab = (ui.get_editor_property(n) for n in (C.PAUSE_PANEL, GUN_TAB.panel))

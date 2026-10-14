@@ -16,12 +16,12 @@ spawn counter: combat/game_state.py): a client has no GameMode. The noises
 the wanderers hear are a native list written there alone (combat/noise.py).
 
 The variables keep the names they had on the GameMode (combat/game_state.py,
-combat/difficulty.py), which the weapon component's own DebugMode copy and
+combat/difficulty.py), which the weapon component's own DebugShots copy and
 the probes share.
 """
 
 from combat.difficulty import DIFFICULTY_VAR
-from combat.game_state import DEBUG_MODE_VAR, KILL_COUNT_VAR, PLAYER_DEAD_VAR
+from combat.game_state import DEBUG_MODE_VAR, DEBUG_SHOTS_VAR, KILL_COUNT_VAR, PLAYER_DEAD_VAR
 from uebp.vars import BOOL, FLOAT, INT, REPLICATED, Var, array
 
 # Beside the health component whose death graph writes them: the weapons
@@ -45,8 +45,11 @@ PlayerKills = Var(PLAYER_KILL_COUNT_VAR, INT, 0, rep=REPLICATED)
 PLAYER_TABLE = (Kills, Dead, PlayerKills)
 
 # --- BP_OtherworldGameState --------------------------------------------------
-# The developer overlays (tracers, sight cones, wanderer numbers) are on.
+# The monsters' developer overlays (sight cones, agro log, wanderer numbers) are on.
 DebugMode = Var(DEBUG_MODE_VAR, BOOL, False, rep=REPLICATED)
+# The shots' developer overlays (tracers, impact damage, the crosshair down the
+# sights) are on.
+DebugShots = Var(DEBUG_SHOTS_VAR, BOOL, False, rep=REPLICATED)
 # The world's difficulty (combat/difficulty.py; 0 is EASY).
 Difficulty = Var(DIFFICULTY_VAR, INT, 0, rep=REPLICATED)
 # The world's clock (M30; world/world_clock.py). The server's BP_DayNightCycle
@@ -82,7 +85,7 @@ TunedMonsters = Var("TunedMonsters", array(FLOAT))
 TunedWorld = Var("TunedWorld", array(FLOAT))
 TunedPlayer = Var("TunedPlayer", array(FLOAT))
 TUNED = (TunedGuns, TunedMonsters, TunedWorld, TunedPlayer)
-GAME_TABLE = (DebugMode, Difficulty, *WORLD_CLOCK, DevTuning, *TUNED)
+GAME_TABLE = (DebugMode, DebugShots, Difficulty, *WORLD_CLOCK, DevTuning, *TUNED)
 
 # The GameMode's class defaults that name the two.
 GAME_STATE_PROP = "game_state_class"

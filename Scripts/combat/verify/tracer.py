@@ -6,7 +6,7 @@ the tracer has to read the trace's own hit result instead.
 """
 
 from combat.game_state import (
-    DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS, TRACER_HIT_COLOR, TRACER_MISS_COLOR,
+    DEBUG_SHOTS_VAR, TRACE_DEBUG_SECONDS, TRACER_HIT_COLOR, TRACER_MISS_COLOR,
     TRACER_POINT_SIZE, TRACER_THICKNESS,
 )
 from combat.shot_vars import PELLET_FLEW
@@ -99,10 +99,10 @@ def check_tracer():
           f"{pin_value(line, 'Duration')}, {pin_value(point, 'Duration')}")
 
     gates = _wired(line, "execute")
-    check(f"both are drawn only behind the cached {DEBUG_MODE_VAR}",
+    check(f"both are drawn only behind the cached {DEBUG_SHOTS_VAR}",
           len(gates) == 1 and _title(gates[0]) == "Branch"
           and [_title(n) for n in _wired(gates[0], "Condition")]
-          == [f"Get {DEBUG_MODE_VAR}"]
+          == [f"Get {DEBUG_SHOTS_VAR}"]
           and [str(PIN.get_pin_name(q)) for q in
                PIN.list_connected_pins(BEL.find_input_pin(line, "execute"))] == ["then"]
           and [n.get_path_name() for n in _wired(point, "execute")]

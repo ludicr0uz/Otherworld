@@ -1,5 +1,6 @@
 """BP_Settings: the SaveGame the graphics menu and the weapon component
-both read, so rebinds, sensitivity and debug mode survive a restart.
+both read, so rebinds, sensitivity, the server address and the difficulty
+survive a restart.
 """
 
 import unreal
@@ -29,6 +30,8 @@ def build_settings_savegame(rebuild=True):
     """
     bp = _create_blueprint(SETTINGS_BP_PATH, unreal.SaveGame)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
+    for name in SV.RETIRED:
+        ed.remove_member_variable(name)
     declare(ed, SV.TABLE)
     arrange(ed)
     if not BEL.compile_blueprint(bp):

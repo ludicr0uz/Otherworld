@@ -77,8 +77,8 @@ def check_reticle_sights(check, bp, nodes):
           f"crosshair is not drawn; the gun's own sights are on the middle of "
           f"the view",
           len(past) == 1, str(sorted(names)))
-    check("...except in debug mode, where it is drawn over them",
-          "Get DebugOn" in names and any("NOT" in t.upper() for t in names),
+    check("...except with the shot trajectory on, where it is drawn over them",
+          "Get ShotsOn" in names and any("NOT" in t.upper() for t in names),
           str(sorted(names)))
     drawn = _after(BEL.find_else_pin(gate))
     check("...otherwise (the hip, the shoulder aim, the sights on their way "

@@ -10,6 +10,7 @@ import unreal
 from graphics_menu import gfx_stats as GS
 from graphics_menu import gfx_tune_consts as GC
 from graphics_menu import umg_consts as UC
+from graphics_menu.debug_tune_consts import DEBUG_TAB
 from graphics_menu.pause_checks import _feeds, _gates, _pins, _sets, _sources, _value
 from graphics_menu.presets import DEFAULT_PRESET
 from graphics_menu.tune_tabs import TABS
@@ -173,10 +174,11 @@ def _check_save_row(check, nodes):
     carets = [n for n in _sets(nodes, TAB.row_var) if not _sources(n, TAB.row_var)
               and _int(n, TAB.row_var) == TAB.save_row]
     check("...and the cursor over it takes the caret", len(carets) == 1, str(len(carets)))
-    others = [t.action for t in TABS
-              if t is not TAB and (t.save_widget or t.back_row != t.row_count)]
-    check("the other tabs keep Enter as their save: no save row, BACK right after "
-          "the list", not others, str(others))
+    # The debug tab's row is its FULL STATS cheat (debug_tune_checks.py).
+    others = [t.action for t in TABS if t not in (TAB, DEBUG_TAB)
+              and (t.save_widget or t.back_row != t.row_count)]
+    check("the other tabs, but the debug tab's FULL STATS, keep Enter as their save: "
+          "no save row, BACK right after the list", not others, str(others))
 
 
 def check_gfx_save(check, nodes):

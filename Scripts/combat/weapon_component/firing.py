@@ -4,7 +4,7 @@ Source/Otherworld, OtherworldWeaponComponentBase). The round and the cooldown
 are that class's Server_Fire's; what each pellet shows is impact.py.
 """
 
-from combat.game_state import DEBUG_MODE_VAR
+from combat.game_state import DEBUG_SHOTS_VAR
 from uebp.g import _G
 from uebp.graph import _connect, _node, _pin, _set, out, then
 from net.state_consts import GAME_STATE_CLASS_PATH
@@ -54,10 +54,10 @@ def _author_fire(ed, held, muzzle, aim, exec_in):
     state = game_state(ed, [exec_in])
     for n in state.nodes:
         keep(n)
-    flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH))
+    flag = keep(ed.add_get_member_variable_node(DEBUG_SHOTS_VAR, GAME_STATE_CLASS_PATH))
     _connect(state.pin, _pin(flag, "self"))
-    note = keep(ed.add_set_member_variable_node(DEBUG_MODE_VAR))
-    _connect(out(flag, DEBUG_MODE_VAR), _pin(note, DEBUG_MODE_VAR))
+    note = keep(ed.add_set_member_variable_node(DEBUG_SHOTS_VAR))
+    _connect(out(flag, DEBUG_SHOTS_VAR), _pin(note, DEBUG_SHOTS_VAR))
     _connect(state.then, _pin(note, "execute"))
     # A GameState of the wrong class cannot say; not drawing is the safe answer,
     # and the component's own default is already false.

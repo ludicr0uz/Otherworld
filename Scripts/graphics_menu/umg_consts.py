@@ -11,6 +11,7 @@ DrawText scale x 10: Roboto's LegacyFontSize is 10, so a DrawText at 2.2 was
 22 pt and a 22 pt TextBlock is the same size at 1080p.
 """
 
+from graphics_menu.debug_tune_consts import DEBUG_TUNE_ACTION, DEBUG_TUNE_ROW_LABEL
 from graphics_menu.dev_consts import DEV_GUNS_ACTION, DEV_GUNS_ROW_LABEL
 from graphics_menu.gfx_tune_consts import GFX_TUNE_ACTION, GFX_TUNE_ROW_LABEL
 from graphics_menu.profile_consts import EXIT_ACTION
@@ -240,7 +241,6 @@ PAUSE_TITLE = GAME_TITLE
 START_ACTION, SETTINGS_ACTION = "start", "settings"
 # The second row: on the title, the Multiplayer page (mode_consts.py).
 MULTI_ACTION = "multiplayer"
-DEBUG_ACTION = "debug"
 # The title offers the two modes, its first two rows, each opening a page of
 # its own in the rows' place (mode_consts.py). In play the first row shuts the
 # menu, as M does, and says so (the HUD writes its label every frame).
@@ -254,23 +254,21 @@ CONTINUE_ROW_LABEL = "Continue Survival"
 HORDE_ROW_LABEL = "Horde Mode"
 # The settings page's row: the page is the key binds and the mouse.
 SETTINGS_ROW_LABEL = "Controls"
-DEBUG_ROW_LABEL = "Debug"
 # The last row is the way out (EXIT_ACTION, one row): on the title it leaves
 # the game for the desktop, saving nothing, and reads this; in play it is
 # save and exit (EXIT_ROW_LABEL, which the HUD writes there every frame).
 QUIT_ROW_LABEL = "Exit Game"
-PAUSE_ROW_LABELS = (SINGLE_ROW_LABEL, MULTI_ROW_LABEL, SETTINGS_ROW_LABEL, DEBUG_ROW_LABEL,
+PAUSE_ROW_LABELS = (SINGLE_ROW_LABEL, MULTI_ROW_LABEL, SETTINGS_ROW_LABEL, DEBUG_TUNE_ROW_LABEL,
                     DEV_GUNS_ROW_LABEL, TUNE_ROW_LABEL,
                     MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL, PLAYER_TUNE_ROW_LABEL,
                     SOUND_TUNE_ROW_LABEL, GFX_TUNE_ROW_LABEL, QUIT_ROW_LABEL)
 # What each row does, in row order: taking row i raises PauseClick = i, and
 # Tick's fragment for that action serves it (menu_nav.pause_row_taken).
-PAUSE_ROW_ACTIONS = (START_ACTION, MULTI_ACTION, SETTINGS_ACTION, DEBUG_ACTION,
+PAUSE_ROW_ACTIONS = (START_ACTION, MULTI_ACTION, SETTINGS_ACTION, DEBUG_TUNE_ACTION,
                      DEV_GUNS_ACTION, TUNE_ACTION, MON_TUNE_ACTION,
                      WORLD_TUNE_ACTION, PLAYER_TUNE_ACTION, SOUND_TUNE_ACTION,
                      GFX_TUNE_ACTION, EXIT_ACTION)
 PAUSE_START_ROW = PAUSE_ROW_ACTIONS.index(START_ACTION)
-PAUSE_DEBUG_ROW = PAUSE_ROW_ACTIONS.index(DEBUG_ACTION)
 # The rows that need a game in play: on the title they do nothing and say so.
 # (Not the exit row: on the title it is exit game.)
 IN_GAME_ACTIONS = (DEV_GUNS_ACTION,)
@@ -287,7 +285,6 @@ PAUSE_POS, PAUSE_W = (60.0, 130.0), 600.0
 PAUSE_TITLE_FONT, PAUSE_HINT_FONT = 22.0, 15.0
 PAUSE_ROW_LABEL_W = 300.0
 PAUSE_ROW_SCALE = 1.25
-DEBUG_ON, DEBUG_OFF = "ON", "OFF"
 
 # ─── WBP_DeathMenu ────────────────────────────────────────────────────────────
 DEATH_SCORE, DEATH_HINT_LINE = "Score", "DeathHint"

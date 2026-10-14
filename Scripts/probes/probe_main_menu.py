@@ -8,7 +8,7 @@ tick flag is what serves a row under a pause, and takes rows by writing
 PauseClick, as a click would.
 
   paused, the HUD not ticking   a taken row is not served: the flag matters
-  paused, ticking               the debug row flips debug mode; a tab opens;
+  paused, ticking               the debug settings row opens its tab; a tab opens;
                                 save and exit does nothing (it needs a game)
   the first row                 the Single Player page in the rows' place;
                                 nothing starts yet
@@ -28,19 +28,19 @@ import time
 
 import unreal
 
-from combat.game_state import DEBUG_MODE_VAR
 from graphics_menu import cursor_consts as CC
 from graphics_menu import mode_consts as MC
 from graphics_menu import umg_consts as C
 from combat.ask_consts import EXIT_PENDING_VAR
 from combat.paths import WEAPON_COMP_CLASS_PATH
 from graphics_menu.settings_rows import PAGE_TITLE
+from graphics_menu.debug_tune_consts import DEBUG_TAB
 from graphics_menu.tune_consts import GUN_TAB
 from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in (MV.MenuOpen, C.GAME_STARTED_VAR, CC.PAUSE_CLICK_VAR,
-                                       GUN_TAB.open_var, GUN_TAB.touched_var,
+                                       GUN_TAB.open_var, GUN_TAB.touched_var, DEBUG_TAB.open_var,
                                        MV.MenuPage, CC.PAGE_CLICK_VAR)]
 
 
@@ -56,8 +56,8 @@ def _after(seconds):
 def probe(p):
     yield lambda: p.hud() is not None and p.get(p.hud(), "UiHud") is not None
     yield 0.3
-    hud, mode, world = p.hud(), p.game_state(), p.world()
-    was_debug = p.get(mode, DEBUG_MODE_VAR)
+    hud, world = p.hud(), p.world()
+    p.set(hud, DEBUG_TAB.open_var, False)
 
     # --- the title, as BeginPlay leaves it, but for the paused tick -----------
     p.set(hud, C.GAME_STARTED_VAR, False)
@@ -65,27 +65,22 @@ def probe(p):
     hud.set_tickable_when_paused(False)
     unreal.GameplayStatics.set_game_paused(world, True)
     yield _after(0.3)
-    p.set(hud, CC.PAUSE_CLICK_VAR, _row(C.DEBUG_ACTION))
+    p.set(hud, CC.PAUSE_CLICK_VAR, _row(DEBUG_TAB.action))
     yield _after(0.5)
     p.check("paused with the HUD not ticking, a taken row is not served",
             unreal.GameplayStatics.is_game_paused(world)
-            and p.get(mode, DEBUG_MODE_VAR) == was_debug, str(p.get(mode, DEBUG_MODE_VAR)))
+            and not p.get(hud, DEBUG_TAB.open_var), str(p.get(hud, DEBUG_TAB.open_var)))
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
 
     # --- ticking while paused: the rows work on the title ----------------------
     hud.set_tickable_when_paused(True)
     yield _after(0.2)
-    p.set(hud, CC.PAUSE_CLICK_VAR, _row(C.DEBUG_ACTION))
-    yield lambda: p.get(mode, DEBUG_MODE_VAR) != was_debug
+    p.set(hud, CC.PAUSE_CLICK_VAR, _row(DEBUG_TAB.action))
+    yield lambda: p.get(hud, DEBUG_TAB.open_var)
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
-    p.check("ticking while paused, the debug row is served on the title",
-            p.get(mode, DEBUG_MODE_VAR) != was_debug)
-    yield _after(0.2)
-    # ...and back, so the saved setting ends as it began. One Tick's worth: the
-    # row held for two would flip it twice.
-    p.set(hud, CC.PAUSE_CLICK_VAR, _row(C.DEBUG_ACTION))
-    yield lambda: p.get(mode, DEBUG_MODE_VAR) == was_debug
-    p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
+    p.check("ticking while paused, the debug settings row is served on the title",
+            p.get(hud, DEBUG_TAB.open_var))
+    p.set(hud, DEBUG_TAB.open_var, False)
 
     yield _after(0.2)
     p.set(hud, CC.PAUSE_CLICK_VAR, _row(GUN_TAB.action))

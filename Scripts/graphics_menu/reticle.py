@@ -81,7 +81,7 @@ def _author_reticle(ed, in_execs):
     the camera has nearly turned onto the sight line (SightLook past
     RETICLE_HIDE_LOOK), which is only once the gun is up: the camera is in
     the sights' view from the key (SightSeat is 1 at once), and the crosshair
-    is the mark the gun rises to. It stays in debug mode (DebugOn), where it
+    is the mark the gun rises to. It stays with the shot trajectory on (ShotsOn), where it
     shows that the two agree. The hip and the shoulder aim keep it.
     """
     made = []
@@ -188,16 +188,16 @@ def _author_reticle(ed, in_execs):
         ("dot",    cx,      -half_d,  cy,       -half_d,  RETICLE_DOT,   RETICLE_DOT),
     )
 
-    # Down the sights, outside debug mode, the gun's own sights are the
+    # Down the sights, with the shot trajectory off, the gun's own sights are the
     # reticle. Under `armed`, so the component is valid.
     look = keep(ed.add_get_member_variable_node(LOOK_VAR, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(look, "self"))
     on_sights = keep(_node(ed, FN_GREATER_FF))
     _connect(out(look, LOOK_VAR), _pin(on_sights, "A"))
     _set(on_sights, "B", RETICLE_HIDE_LOOK)
-    debug = keep(ed.add_get_member_variable_node(MV.DebugOn))
+    debug = keep(ed.add_get_member_variable_node(MV.ShotsOn))
     plain = keep(_node(ed, FN_NOT))
-    _connect(out(debug, MV.DebugOn), _pin(plain, "A"))
+    _connect(out(debug, MV.ShotsOn), _pin(plain, "A"))
     irons = keep(_node(ed, FN_AND))
     _connect(out(on_sights), _pin(irons, "A"))
     _connect(out(plain), _pin(irons, "B"))

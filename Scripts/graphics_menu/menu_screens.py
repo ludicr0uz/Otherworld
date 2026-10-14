@@ -9,7 +9,7 @@
   author_alive       neither: the HUD's Body shown, the death menu hidden
   author_pause_menu  MenuOpen: the menu (WBP_PauseMenu), the same one on the
                      title and in play. Its rows (Up/Down/Enter, the caret,
-                     the rows' words, debug ON/OFF) unless the settings
+                     the rows' words) unless the settings
                      page, a mode page or a tuning tab is open in their place
 
 Each also says whether the mouse cursor shows, and what a click on it does
@@ -40,9 +40,8 @@ from graphics_menu.ui_graph import (
 )
 from graphics_menu.umg_consts import (
     DEATH_HINT_LINE, DEATH_HINT_SERVER, DEATH_PLAYER_SCORE, DEATH_PLAYER_SCORE_PREFIX,
-    DEATH_SCORE, DEATH_SCORE_PREFIX, DEBUG_OFF,
-    DEBUG_ON, GAME_STARTED_VAR,
-    HUD_BODY, IN_GAME_ACTIONS, IN_GAME_ONLY, PAUSE_ACCEPT_KEY, PAUSE_DEBUG_ROW, PAUSE_PANEL,
+    DEATH_SCORE, DEATH_SCORE_PREFIX, GAME_STARTED_VAR,
+    HUD_BODY, IN_GAME_ACTIONS, IN_GAME_ONLY, PAUSE_ACCEPT_KEY, PAUSE_PANEL,
     PAUSE_ROW_ACTIONS, PAUSE_ROW_LABELS, PAUSE_ROW_VAR, PAUSE_ROWS, RESTART_KEY, ROW_VALUE,
     SETTINGS_PANEL, WBP_DEATH_MENU, WBP_HUD, WBP_MAIN_MENU, WBP_MENU_ROW, WBP_PAUSE_MENU,
 )
@@ -279,22 +278,11 @@ def author_pause_menu(ed, in_execs):
     flow = mark_rows(ed, rows, len(PAUSE_ROW_LABELS), out(caret, PAUSE_ROW_VAR), keyed)
     worded = _author_row_words(ed, rows, [flow], made)
 
-    # ON or OFF behind one branch: no SelectText, and a bool converted to text
-    # reads "true", which is a variable's value and not a setting.
-    debug_row, found, missing = row_at(ed, rows, PAUSE_DEBUG_ROW, worded)
-    value = member(ed, debug_row, WBP_MENU_ROW, ROW_VALUE)
-    dbg = ed.add_get_member_variable_node(MV.DebugOn)
-    dbg_br = ed.add_branch_node()
-    _connect(out(dbg, MV.DebugOn), _pin(dbg_br, "Condition"))
-    _connect(found, _pin(dbg_br, "execute"))
-    on = set_text(ed, value, DEBUG_ON, [then(dbg_br)])
-    off = set_text(ed, value, DEBUG_OFF, [else_(dbg_br)])
     ed.add_comment_to_nodes(
         "The menu: the title's, and M's in play. Its rows show unless the "
         "settings page or a tuning tab is open in their place. The caret is "
         "on PauseRow: Up/Down or the cursor move it, Enter or a click takes "
         "the row (PauseClick, served by Tick). The first row reads single "
-        "player or resume; debug mode's row "
-        "says ON or OFF.",
-        [get_open, br, caret, dbg, dbg_br])
-    return [closed, on, off, missing, tabbed]
+        "player or resume.",
+        [get_open, br, caret])
+    return [closed, *worded, tabbed]

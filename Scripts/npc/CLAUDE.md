@@ -584,7 +584,8 @@ controller plays nothing itself: it picks the take or the clip and hands it to i
 - **Debug mode also draws each live wanderer's sight (aggro) cone** (`sight_cone.py`): from the
   pawn, along its forward vector, `TuneSightRange` long and `TuneSightHalfAngle` either side —
   the sight sense's own inputs, so the MONSTER SETTINGS tab moves the cone and the sense together.
-  Yellow on patrol, red once aggro.
+  Yellow on patrol, red once aggro, drawn a hairline thick (`SIGHT_CONE_THICKNESS` 0). Debug mode
+  is the DEBUG SETTINGS tab's Monster vision & agro switch.
   - It is the controller's own **Tick**, not a tree step: the steps run on the tree's 0.5 s
     beat. One frame per draw (`Duration` 0). Gates are nested Branches: `DebugMode`, a pawn,
     not `Corpse`.

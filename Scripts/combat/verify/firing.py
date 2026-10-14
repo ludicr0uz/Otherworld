@@ -4,7 +4,7 @@
 from combat.body_pose import POSE_KNEEL, POSE_WEIGHTS
 from combat.carry_pose_consts import CARRY_POSE, CARRY_SPRINT
 from combat.gas_moves_tuning import POSE_SLIDE
-from combat.game_state import DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS
+from combat.game_state import DEBUG_MODE_VAR, DEBUG_SHOTS_VAR, TRACE_DEBUG_SECONDS
 from net.state_consts import GAME_STATE_BP_PATH
 from combat.tuning import AUTO_DISPLAYS, COMBAT
 from combat.weapon_specs import _weapon_specs
@@ -248,10 +248,13 @@ def check_automatic_fire():
 
 def check_debug_mode():
     mode_cdo = cdo(load(GAME_STATE_BP_PATH))
-    check("the GameState carries the debug flag, where a component can reach it",
-          isinstance(mode_cdo.get_editor_property(DEBUG_MODE_VAR), bool))
-    check("...and it is OFF by default -- the overlays are instrumentation",
-          mode_cdo.get_editor_property(DEBUG_MODE_VAR) is False)
+    check("the GameState carries both debug flags (monsters', shots'), where a "
+          "component can reach them",
+          all(isinstance(mode_cdo.get_editor_property(v), bool)
+              for v in (DEBUG_MODE_VAR, DEBUG_SHOTS_VAR)))
+    check("...and they are OFF by default -- the overlays are instrumentation",
+          all(mode_cdo.get_editor_property(v) is False
+              for v in (DEBUG_MODE_VAR, DEBUG_SHOTS_VAR)))
     check("the pellet tracer is a DrawDebugLine, not a trace that draws itself",
           bool(by_pins(wg, "LineStart", "LineEnd")),
           f"{len(by_pins(wg, 'LineStart', 'LineEnd'))} DrawDebugLine node(s)")
@@ -260,14 +263,16 @@ def check_debug_mode():
               for n in by_pins(wg, "LineStart", "LineEnd")),
           f"{TRACE_DEBUG_SECONDS}s")
     # Read once per shot off the GameState, cached, then branched on per pellet.
-    check("the flag is read off the GameState once per shot and cached",
+    check("the shots' flag is read off the GameState once per shot and cached",
           len([t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
-                           for n in wg) if t == f"Set {DEBUG_MODE_VAR}"]) == 1)
+                           for n in wg) if t == f"Set {DEBUG_SHOTS_VAR}"]) == 1)
+    check("...and the monsters' flag is not the shots' business",
+          not [n for n in wg if DEBUG_MODE_VAR in out_pins(n)])
     # Three reads: the GameState's own (once per shot), then the cached copy twice
     # per pellet -- the tracer's branch and the damage readout's.
     check("...and the pellet loop branches on the cached copy",
-          len([n for n in wg if DEBUG_MODE_VAR in out_pins(n)]) == 3,
-          f"{len([n for n in wg if DEBUG_MODE_VAR in out_pins(n)])} reads")
+          len([n for n in wg if DEBUG_SHOTS_VAR in out_pins(n)]) == 3,
+          f"{len([n for n in wg if DEBUG_SHOTS_VAR in out_pins(n)])} reads")
 
 
 def run():

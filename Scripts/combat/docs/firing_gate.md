@@ -78,11 +78,12 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   `ReloadNow`, and a client of a server runs it on its own copy first. A reload that moved
   rounds raises `Reloaded`, where the graph tells or predicts the clack.
 - **Debug mode:**
-  - `DebugMode` lives on the GameMode, because a component can't reach the HUD. It is off by
-    default and persisted as `BP_Settings.DebugMode`. The HUD copies it at BeginPlay, and D writes
-    both it and the save.
-  - It shows the FPS readout, pellet tracers, per-impact damage (`39.0 (x1.5)`, only on actors
-    with a health component) and wanderer numbers.
+  - Two switches on the GameState, because a component can't reach the HUD: `DebugMode` (the
+    monsters' overlays) and `DebugShots` (the shots'), the menu's DEBUG SETTINGS tab's two rows,
+    off by default and kept by the tab's own save (`graphics_menu/debug_tune_consts.py`).
+  - `DebugShots` shows the pellet tracers, per-impact damage (`39.0 (x1.5)`, only on actors
+    with a health component) and the crosshair down the sights; the weapon component caches
+    it per shot under the same name. `DebugMode` shows the wanderers' sight cones and numbers.
   - The tracer (`weapon_component/tracer.py`) is a separate `DrawDebugLine` behind a Branch,
     since the enum pin can't be driven. Every trace's `DrawDebugType` is `None`.
     - It lasts `TRACE_DEBUG_SECONDS` (3 s) and stops where the pellet did, with a point there:

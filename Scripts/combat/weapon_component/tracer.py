@@ -1,7 +1,7 @@
 """Debug mode's pellet tracer: the line a pellet flew, drawn in the world.
 
-    [DebugMode?] --> DrawDebugLine(TraceStart -> where it stopped)
-                 --> DrawDebugPoint(where it stopped)
+    [DebugShots?] --> DrawDebugLine(TraceStart -> where it stopped)
+                  --> DrawDebugPoint(where it stopped)
 
 Both ends are the PelletFlew event's own parameters (the pellet is flown in
 C++: OtherworldWeaponComponentBase), so the line drawn is the line the pellet
@@ -14,7 +14,7 @@ one that did not runs to the end of the weapon's range in the miss colour.
 """
 
 from combat.game_state import (
-    DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS, TRACER_HIT_COLOR, TRACER_MISS_COLOR,
+    DEBUG_SHOTS_VAR, TRACE_DEBUG_SECONDS, TRACER_HIT_COLOR, TRACER_MISS_COLOR,
     TRACER_POINT_SIZE, TRACER_THICKNESS,
 )
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
@@ -33,9 +33,9 @@ def _author_tracer(ed, flew):
         made.append(n)
         return n
 
-    seen = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR))
+    seen = keep(ed.add_get_member_variable_node(DEBUG_SHOTS_VAR))
     showing = keep(ed.add_branch_node())
-    _connect(out(seen, DEBUG_MODE_VAR), _pin(showing, "Condition"))
+    _connect(out(seen, DEBUG_SHOTS_VAR), _pin(showing, "Condition"))
     _connect(then(flew), _pin(showing, "execute"))
 
     stop = out(flew, "Stop")

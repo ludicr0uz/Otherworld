@@ -537,6 +537,25 @@ controller plays nothing itself: it picks the take or the clip and hands it to i
     players far apart, then together; its `--game` arm that single player registers
     nothing. Not proven in play: the level's-count rule and the 10 s delay (the probe
     overrides the budget), and the cost at 64 players (a pass is players x wanderers).
+- **The horde's difficulty** (the Horde Survival level alone): the level's count is held by
+  the native `AOtherworldHordeDirector` (`Source/CLAUDE.md`), one placed in the level by
+  `forest_import/horde_director.py` with the numbers of `forest_generator/npc_horde.py`:
+  - level 1 at the start and one more every 180 s of play (paused time does not count), at
+    most 20; level L holds 4 + 2(L - 1) monsters, L / 4 of them wendigos: 4, 6, 8 zombies,
+    then 9 and a wendigo at level 4, 16 and 2 at level 8, 37 and 5 at the top;
+  - once a second and per creature (`ZombieClass`, `WendigoClass`): more living than the
+    level holds (the ten the level places, at the first pass) and the furthest from the
+    players are destroyed; fewer for 10 s (none at the first pass) and one is spawned a
+    pass, by the population budget's own rule for where (`OtherworldSpawnPoint`: the
+    75-100 m band round a living player, on the navmesh, out of sight);
+  - **it owns the count, so the single-player replacement is off there:** each pass it
+    empties `RespawnClass` (named by its `ReplacementVar`, written from `health_vars`) on
+    every wanderer it keeps, and on one it spawns as soon as its BeginPlay has set it, so
+    a kill is replaced once. On a client it does nothing; on a server the population
+    budget would run beside it (the horde is offered in single player only).
+  - `probes/probe_horde_difficulty.py` shortens the step and watches 4, 6, 9 + 1 and
+    16 + 2 arrive, out on the band, and a kill replaced once; `verify_fort` checks the
+    placed actor's numbers; `tests/test_npc_horde.py` the rule.
 - **Noise** is a list of recent noises, one entry per maker (M28): the native
   `UOtherworldNoiseList`, a world subsystem (`Source/CLAUDE.md`), written by `MakeNoise`
   (`combat/noise.py`) and asked by `HearNoise` (`senses._author_hearing`; the node paths are

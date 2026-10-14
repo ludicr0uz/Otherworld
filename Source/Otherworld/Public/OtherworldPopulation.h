@@ -70,8 +70,6 @@ class OTHERWORLD_API UOtherworldPopulation : public UTickableWorldSubsystem
 public:
 	/** Seconds between two passes. */
 	static constexpr float PassSeconds = 1.f;
-	/** Bearings tried for one spawn before it waits for the next pass. */
-	static constexpr int32 Attempts = 8;
 
 	/** True where the count is a budget: a server. False in single player and on a client. */
 	bool IsBudget() const;

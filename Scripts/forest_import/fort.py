@@ -18,6 +18,9 @@ survival/permanent_campfire.py): a fire that never burns out, which draws
 every zombie on the map to the fort as a lit campfire does. It stands
 CAMPFIRE_OFFSET_CM from the centre, so the player (who starts at the centre)
 starts beside it, inside its warmth, rather than in its flames.
+
+And the level's horde director (horde_director.py): the difficulty, which
+sets how many zombies and wendigos the level holds.
 """
 
 import math
@@ -25,6 +28,7 @@ import math
 import unreal
 
 from forest_generator.horde_layout import layout_for
+from forest_import.horde_director import check_director, place_director
 from survival.paths import PERMANENT_CAMPFIRE_BP_PATH, PERMANENT_CAMPFIRE_CLASS_PATH
 
 FORT_TAG = "OW_FortRock"
@@ -38,6 +42,9 @@ CAMPFIRE_LABEL = "Fort_Campfire"
 # (x, y) from the level's centre: 2.5 m off the PlayerStart, within the
 # fire's 4 m warmth (survival/tuning.py CAMPFIRE_WARM_RADIUS_CM).
 CAMPFIRE_OFFSET_CM = (-250.0, 0.0)
+# The horde's director (horde_director.py) has no body: it stands over the
+# fort's centre, out of everyone's way.
+DIRECTOR_LIFT_CM = 500.0
 
 
 def _log(msg):
@@ -68,6 +75,7 @@ def place_fort(rocks, actor_sub, asset_sub):
         placed += 1
     _log(f"Placed {placed} fort rocks")
     place_campfire(actor_sub, asset_sub, rocks)
+    place_director(actor_sub, unreal.Vector(0.0, 0.0, _ground_z(rocks) + DIRECTOR_LIFT_CM))
     return placed
 
 
@@ -136,6 +144,7 @@ def verify_fort(check, actors, rocks, level):
     for height, crack_cm in RAY_HEIGHTS_CM:
         _check_wall(check, layout, rocks, height, crack_cm)
     _check_campfire(check, actors, rocks)
+    check_director(check, actors)
 
 
 def _check_campfire(check, actors, rocks):

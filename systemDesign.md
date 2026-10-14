@@ -114,7 +114,11 @@ generated maps, `Lvl_Forest_200m` (the editor's startup map) and `Lvl_Forest_100
 packaged game plays), and a third, `Lvl_Horde_Survival` (400 m): a dense forest ring round a
 sparse clearing, in whose middle a 13 m fort of chest-high moss rocks has three openings
 and holds a campfire that never burns out, drawing the zombies to it
-(`forest_generator/horde_layout.py`, `forest_import/fort.py`, `survival/permanent_campfire.py`). The grass is a dark, dull olive on a ground tinted to match, on both:
+(`forest_generator/horde_layout.py`, `forest_import/fort.py`, `survival/permanent_campfire.py`).
+Its monsters are held by a difficulty that rises a level every three minutes of play: 4 at
+level 1 and 2 more a level, one in every four levels' worth a wendigo (9 zombies and a
+wendigo at level 4, 16 and 2 at level 8), at most level 20; a kill is replaced 10 s later,
+out of sight 75-100 m off (the native `AOtherworldHordeDirector`, `forest_generator/npc_horde.py`). The grass is a dark, dull olive on a ground tinted to match, on both:
 on the 200 m map in patches 1.2 m across, seven of the pack's clump merged (G3), in eight
 density layers the menu's grass density row picks from (1-8; F1): the four a shipped preset
 draws are 2.2 to the square metre (81,697 of them, twice what they drew before G2), and

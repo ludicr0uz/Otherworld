@@ -18,4 +18,6 @@ call, rather than carrying inline. Unlike forest_generator/, these import
   grass_patch  Build the grass patch under /Game/Forest/Undergrowth, and verify it
 
   fort  Place the Horde Survival fort's rocks into the open level, and verify them
+
+  horde_director  Place the Horde Survival level's director into the open level, and verify it
 """

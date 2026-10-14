@@ -39,6 +39,7 @@ The generator's code lives in this package. The level-side import code is in
 | `lighting.py` | time-of-day presets (star_brightness 2.5, sun 0.12, exposure bias 1.6) and `SHADOW_DISTANCE_CM`. The level's rig is the static sky; at runtime `BP_DayNightCycle` replaces it and reuses these values (`Scripts/world/CLAUDE.md`) |
 | `horde_layout.py` | the Horde Survival map's shape (`HORDE_LEVELS`, `layout_for(level)`: None for every other level): the trees scattered by a density field (a dense ring, a sparse clearing, nothing in the fort), and the fort's rocks laid round a ring with three openings (`fort_rocks`, `fort_rock_data`), each number with its reason. `forest_import/fort.py` places the rocks and verifies the wall with rays in the editor |
 | `horde_checks.py` | the offline checks of a horde level, appended to `verification.run_all_checks` |
+| `npc_horde.py` | the horde level's difficulty: a level every 180 s of play (at most 20), 4 monsters at level 1 and 2 more a level, one wendigo for every four levels; the numbers `forest_import/horde_director.py` writes onto the level's `AOtherworldHordeDirector`, and the rule in Python for `tests/test_npc_horde.py` and the probe (`Scripts/npc/CLAUDE.md`, "The horde's difficulty") |
 | `grass_sidecar.py` | writes the grass and bush sidecar JSON (moved out of the over-budget generator) |
 | `verification.py` | the offline suite (over budget) |
 | `asset_sources.py` | what produces each `Content/` directory, and `RESTORE_ORDER` |
@@ -81,8 +82,11 @@ The generator's code lives in this package. The level-side import code is in
     100 m of it, inside the 200 m draw) as a lit fire does. `fort.place_fort` places it with
     the rocks (`place_campfire`, which removes an earlier one first) and `verify_fort` checks
     it; `probes/probe_horde_campfire.py` watches the zombies walk to it;
-  - nothing opens it yet (the menu's mode choice is a later task), and it is not in
-    `MapsToCook`.
+  - the horde's director, `AOtherworldHordeDirector`, 5 m over the fort's centre
+    (`forest_import/horde_director.py`, placed by `place_fort`, checked by `verify_fort`):
+    the difficulty, which cuts the ten placed NPCs to level 1's four zombies at the start
+    and adds more every three minutes (`Scripts/npc/CLAUDE.md`, "The horde's difficulty");
+  - the title's Single Player page opens it (Horde Mode), and it is in `MapsToCook`.
 
 **Terrain past 200 m is a different shape** (`terrain._make_large_elevation_fn`). The radial
 bowl's corners outgrow the navmesh's Z limit, so larger maps use:

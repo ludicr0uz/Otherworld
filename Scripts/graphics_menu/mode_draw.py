@@ -4,8 +4,9 @@
                        caret (Up/Down round the rows and BACK, the cursor),
                        Enter or a click raising PageClick for Tick, BACK and
                        Escape back to the menu's rows
-        Single Player  its row reads continue game while a saved profile
-                       exists, new game otherwise
+        Single Player  its Survival row reads Continue Survival while a
+                       saved profile exists, Survival otherwise; Horde Mode
+                       below it
         Multiplayer    the address row shows the saved address and takes
                        typing while the caret is on it; the status line says
                        a join is under way, or why the last one ended
@@ -162,7 +163,7 @@ def author_mode_pages(ed, in_execs):
         flow = [set_shown(ed, panel, False, [other])]
     ed.add_comment_to_nodes(
         "The title's mode pages, in the menu's rows' place: Single Player "
-        "(continue game or new game) and Multiplayer (the server's address, "
+        "(Survival, or Continue Survival, and Horde Mode) and Multiplayer (the server's address, "
         "typed on its row, the join, and why the last one ended). MenuRow is "
         "the caret; Enter or a click raises PageClick, served by Tick; BACK "
         "or Escape returns to the rows.", made[:2])

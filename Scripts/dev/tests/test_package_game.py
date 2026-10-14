@@ -51,16 +51,17 @@ class CommandTest(unittest.TestCase):
 
 
 class MapsToCookTest(unittest.TestCase):
-    """New Game opens the play level by name, which the cooker cannot follow:
-    a build holds it only because DefaultGame.ini lists it."""
+    """The Single Player page's rows open the play level and the horde level
+    by name, which the cooker cannot follow: a build holds them only because
+    DefaultGame.ini lists them."""
 
-    def test_a_build_ships_the_title_and_the_play_level(self):
+    def test_a_build_ships_the_title_the_play_and_the_horde_level(self):
         tree = ast.parse(open(os.path.join(_paths.SCRIPTS, "title", "paths.py")).read())
         named = {n.targets[0].id: n.value.value for n in tree.body
                  if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant)}
         ini = open(os.path.join(os.path.dirname(_paths.SCRIPTS), "Config",
                                 "DefaultGame.ini")).read()
-        for level in (named["TITLE_LEVEL"], named["PLAY_LEVEL"]):
+        for level in (named["TITLE_LEVEL"], named["PLAY_LEVEL"], named["HORDE_LEVEL"]):
             self.assertIn(f'+MapsToCook=(FilePath="{level}")', ini)
 
 

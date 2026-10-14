@@ -1,5 +1,5 @@
 """The title level, by name, and the stage's numbers. Constants only: the
-HUD's builder (graphics_menu) reads TITLE_LEVEL_NAME and PLAY_LEVEL, the
+HUD's builder (graphics_menu) reads TITLE_LEVEL_NAME, PLAY_LEVEL and HORDE_LEVEL, the
 harness (Scripts/dev/uepylib/game.py) names TITLE_LEVEL once more, held to
 this by a dev unit test."""
 
@@ -7,8 +7,13 @@ this by a dev unit test."""
 # forest in it: the menu stands over the character on this stage.
 TITLE_LEVEL = "/Game/Maps/Lvl_Title"
 TITLE_LEVEL_NAME = "Lvl_Title"
-# What New Game opens: the forest the game is played in.
+# What the Single Player page's Survival row opens: the forest the game is
+# played in (and the one a server serves).
 PLAY_LEVEL = "/Game/Maps/Lvl_Forest_1000m"
+# What its Horde Mode row opens: the 400 m level, a dense forest ring round
+# a clearing and a rock fort (forest_generator/horde_layout.py). Single
+# player only.
+HORDE_LEVEL = "/Game/Maps/Lvl_Horde_Survival"
 
 # The stage's actors, by label (the builder replaces its own, the verifier
 # finds them). The trees' cells are labelled as any level's are

@@ -246,10 +246,12 @@ DEBUG_ACTION = "debug"
 # menu, as M does, and says so (the HUD writes its label every frame).
 SINGLE_ROW_LABEL, RESUME_ROW_LABEL = "Single Player", "Resume"
 MULTI_ROW_LABEL = "Multiplayer"
-# The Single Player page's one row starts the game...
-START_ROW_LABEL = "New Game"
+# The Single Player page's first row starts Survival, the 1 km forest...
+START_ROW_LABEL = "Survival"
 # ...and with a saved profile to load, it says that instead.
-CONTINUE_ROW_LABEL = "Continue Game"
+CONTINUE_ROW_LABEL = "Continue Survival"
+# Its second row starts Horde Mode, the 400 m level round the rock fort.
+HORDE_ROW_LABEL = "Horde Mode"
 # The settings page's row: the page is the key binds and the mouse.
 SETTINGS_ROW_LABEL = "Controls"
 DEBUG_ROW_LABEL = "Debug"

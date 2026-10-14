@@ -75,7 +75,9 @@ the inventory grid, the menu, the death menu and the settings page, all keyboard
 The game opens on a title level of its own (`Lvl_Title`, `Scripts/title`: a clearing in a
 night forest, the 1 km level's own middle trees under the forest's static night, with
 the player's character in the saved profile's garments, empty-handed); M opens the same menu in play. Its
-rows: Single Player (New Game / Continue Game opens `Lvl_Forest_1000m`), Multiplayer (a
+rows: Single Player (its page: Survival, or Continue Survival with a saved profile, opens
+`Lvl_Forest_1000m`; Horde Mode opens `Lvl_Horde_Survival`; one profile for both, and
+neither in multiplayer), Multiplayer (a
 server address and Join Server), Controls (rebinding, difficulty EASY/MEDIUM/SURVIVOR),
 Debug, Dev All Guns (in play only: the title has no such row), the GUN / MONSTER / PLAYER / SOUND / WORLD / GRAPHICS SETTINGS tabs
 (live tuning, each saved to a tracked CSV the matching build reads; as a client of a server

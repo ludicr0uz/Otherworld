@@ -13,7 +13,8 @@ from collections import namedtuple
 
 from uebp.vars import STRING, Var, array, struct
 from graphics_menu.settings_rows import PAGE_SETTINGS
-from graphics_menu.umg_consts import MODE_MULTI_TEXT, MODE_SINGLE_TEXT, START_ROW_LABEL
+from graphics_menu.umg_consts import (
+    HORDE_ROW_LABEL, MODE_MULTI_TEXT, MODE_SINGLE_TEXT, START_ROW_LABEL)
 
 PAGE_SINGLE = PAGE_SETTINGS + 1
 PAGE_MULTI = PAGE_SINGLE + 1
@@ -28,11 +29,13 @@ class Page(namedtuple("Page", "page panel title back rows_box labels")):
         return len(self.labels)
 
 
-# Single Player: today's entry exactly. The HUD writes the row's words:
-# continue game while a saved profile exists, new game otherwise.
+# Single Player: Survival (the 1 km forest; the HUD writes the row's words,
+# Continue Survival while a saved profile exists) and Horde Mode (the 400 m
+# level round the rock fort). One profile for both: it is the character, not
+# a place. Each row opens its level (title/paths.py); multiplayer has neither.
 SINGLE = Page(PAGE_SINGLE, "SinglePanel", MODE_SINGLE_TEXT, "SingleBack", "SingleRows",
-              (START_ROW_LABEL,))
-SINGLE_START_ROW = 0
+              (START_ROW_LABEL, HORDE_ROW_LABEL))
+SINGLE_START_ROW, SINGLE_HORDE_ROW = 0, 1
 # Multiplayer: the server's address, typed on the row itself, and the join.
 MULTI = Page(PAGE_MULTI, "MultiPanel", MODE_MULTI_TEXT, "MultiBack", "MultiRows",
              ("Server Address", "Join Server"))

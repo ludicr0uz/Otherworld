@@ -98,12 +98,15 @@ link under it, names its part there.
   title. `probe_title_figure.py` (`uepy.py --game --title`) is the whole path: in the
   starting pants and empty-handed, then dressed from a written profile, then New Game.
 - **The first row** (`START_ACTION`) lowers `MenuOpen` in play (`resume`); on the title it
-  opens the Single Player page (below: "The two modes"), whose row calls
-  `OpenLevel(title/paths.PLAY_LEVEL)`, the 1 km forest, and nothing else
-  (`menu_main._author_new_game`): the title stands, its page up, until the level
+  opens the Single Player page (below: "The two modes"), whose two rows call
+  `OpenLevel` and nothing else (`menu_main._author_new_game`): Survival
+  `title/paths.PLAY_LEVEL`, the 1 km forest, and Horde Mode `HORDE_LEVEL`,
+  `Lvl_Horde_Survival` (both in `DefaultGame.ini`'s `MapsToCook`, since the cooker
+  cannot follow a name). The title stands, its page up, until the level
   replaces it, and the new level's HUD opens in play and loads the profile if there is
-  one (`save_exit._author_load_once`). DrawHUD writes that row's label every frame:
-  `new game`, or `continue game` while the saved profile exists
+  one (`save_exit._author_load_once`): one profile for both modes, since it holds the
+  character and no place. DrawHUD writes the Survival row's label every frame:
+  `Survival`, or `Continue Survival` while the saved profile exists
   (`mode_draw._author_single`: `DoesSaveGameExist` on the profile's slot, asked every
   frame, because save and exit writes it and a death deletes it under a live HUD).
 - **`settings`** sets `MenuPage` to the settings page and `MenuRow` to 0. The page
@@ -137,8 +140,8 @@ link under it, names its part there.
 - **A probe's game sees the real title only when asked:** `uepy.py --game` passes
   `-nomenu`; `--title` leaves it off, on the title level (`LEVEL = "/Game/Maps/Lvl_Title"`
   in the probe; `docs/headless_runs.md#title`). `probe_title_single.py` is the real
-  BeginPlay path: the menu up, Single Player and New Game served, the forest up and
-  playing; `probe_title_figure.py` the figure and its gear.
+  BeginPlay path: the menu up, Single Player and Survival served, the forest up and
+  playing; `probe_title_horde.py` the same through Horde Mode to the horde level; `probe_title_figure.py` the figure and its gear.
 - **Still needs a play session:** the keys themselves on the title, exit game from a real
   session, and how the title reads with the figure behind it.
 
@@ -156,7 +159,9 @@ The title's first two rows are the modes, each a page in the rows' place. The st
   `mode_tick.page_row_taken(page, row)`, DrawHUD lowers it at the top of the next frame. A
   probe takes a row by writing it (`probes/title.py`).
 - **BACK and Escape** are `cursor.author_back_row` with `closed=PAGE_TITLE`: one gate.
-- **Single Player** holds today's entry exactly: its row is the old first row's start.
+- **Single Player** holds the two single-player modes, Survival (row 0, the old start) and
+  Horde Mode (row 1). Neither is reachable as a client: the page is the title's, and a
+  server serves the 1 km forest.
 - **Multiplayer:**
   - **The address is `BP_Settings.ServerAddress`** (default `127.0.0.1:7777`): the local
     settings, never the profile. It is saved when a join is asked for.
@@ -189,7 +194,7 @@ The title's first two rows are the modes, each a page in the rows' place. The st
   server's character never reads the single-player profile and leaving never writes it.
 - **IsStandalone is false on the title while a join is pending.** Nothing on the title
   but the pause asks it (the last row's label is off `GameStarted`).
-- **Probes:** `probe_title_single.py` and `probe_join_dead_address.py`
+- **Probes:** `probe_title_single.py`, `probe_title_horde.py` and `probe_join_dead_address.py`
   (`uepy.py --game --title`: the real title, no `-nomenu`), `probe_net_title.py`
   (`--net --title --windowed --clients 1`), and `probe_main_menu.py` and
   `probe_umg_screens.py` for the pages under a title held up by hand.

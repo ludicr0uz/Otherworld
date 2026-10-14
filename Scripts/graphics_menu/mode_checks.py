@@ -27,7 +27,7 @@ from net.input_checks import check_local_input
 from net.owner_checks import check_no_player_zero_pawn
 from net.random_checks import check_random_audit
 from net.state_checks import check_no_client_game_mode
-from title.paths import PLAY_LEVEL
+from title.paths import HORDE_LEVEL, PLAY_LEVEL
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -164,23 +164,27 @@ def _check_first_rows(check, nodes):
 
 
 def _check_single(check, nodes):
-    starts = [n for n in _sets(nodes, UC.GAME_STARTED_VAR)
-              if _value(n, UC.GAME_STARTED_VAR) == "true"
-              and _page_gated(n, MC.SINGLE, MC.SINGLE_START_ROW)]
-    opens = [n for n in nodes if "LevelName" in _pins(n) and "execute" in _pins(n)
-             and _page_gated(n, MC.SINGLE, MC.SINGLE_START_ROW)]
-    check("the Single Player page's row opens the play level (title/paths.PLAY_LEVEL) "
-          "and starts nothing itself: the title stands until the level replaces it, "
-          "and that level's HUD opens in play",
-          len(opens) == 1 and _value(opens[0], "LevelName") == PLAY_LEVEL and not starts,
-          f"{len(opens)} OpenLevel ({[_value(n, 'LevelName') for n in opens]}), "
-          f"{len(starts)} GameStarted")
+    for row, level, what in ((MC.SINGLE_START_ROW, PLAY_LEVEL, "Survival row opens the play "
+                              "level (title/paths.PLAY_LEVEL)"),
+                             (MC.SINGLE_HORDE_ROW, HORDE_LEVEL, "Horde Mode row opens the "
+                              "horde level (title/paths.HORDE_LEVEL)")):
+        starts = [n for n in _sets(nodes, UC.GAME_STARTED_VAR)
+                  if _value(n, UC.GAME_STARTED_VAR) == "true"
+                  and _page_gated(n, MC.SINGLE, row)]
+        # The row's own Branch: the next row's hangs off this one's false side.
+        opens = [n for n in nodes if "LevelName" in _pins(n) and "execute" in _pins(n)
+                 and any(_is_page_test(g, MC.SINGLE, row) for g in _gates(n))]
+        check(f"the Single Player page's {what} and starts nothing itself: the title "
+              f"stands until the level replaces it, and that level's HUD opens in play",
+              len(opens) == 1 and _value(opens[0], "LevelName") == level and not starts,
+              f"{len(opens)} OpenLevel ({[_value(n, 'LevelName') for n in opens]}), "
+              f"{len(starts)} GameStarted")
     says = [n for n in nodes if {"self", "InText"} <= _pins(n)
             and UC.CONTINUE_ROW_LABEL in _value(n, "InText")]
     asked = [c for n in says for g in _gates(n) for c in _sources(g, "Condition")
              if "SlotName" in _pins(c) and _value(c, "SlotName") == PROFILE_SLOT]
-    check("its row reads continue game while the saved profile exists "
-          "(DoesSaveGameExist on its slot), and new game otherwise",
+    check("its Survival row reads Continue Survival while the saved profile exists "
+          "(DoesSaveGameExist on its slot), and Survival otherwise",
           len(says) == 1 and len(asked) == 1, f"{len(says)} says, {len(asked)} asked")
 
 
@@ -201,9 +205,12 @@ def _check_pages(check, nodes):
         and any("Get MenuRow" in _feeds(c, "A") and _int(c, "B") == page.back_row
                 and ">=" in _title(c) for g in _gates(n) for c in _deep(g))]
         for page in MC.PAGES}
+    # Pages with as many rows share a BACK number, and so each other's test.
+    shared = {p.title: sum(q.back_row == p.back_row for q in MC.PAGES) for p in MC.PAGES}
     check("each page's BACK row, Enter on it (the caret on its number, the "
           "last), or Escape anywhere, returns to the menu's rows",
-          all(len(v) == 1 for v in backs.values()),
+          all(len(v) == shared[k] for k, v in backs.items())
+          and len({n for v in backs.values() for n in v}) == len(MC.PAGES),
           str({k: len(v) for k, v in backs.items()}))
     shows = {}
     for page in MC.PAGES:

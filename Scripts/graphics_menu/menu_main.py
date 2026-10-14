@@ -4,10 +4,12 @@ the settings page, leaving for the desktop, and M.
     every Tick (the title's too):
         single player / resume    in play: MenuOpen = false. On the title:
         taken                     MenuPage = the Single Player page
-        new game / continue game  that page's row: OpenLevel(the play level,
-        taken                     title/paths.PLAY_LEVEL). The title stands
-                                  until the level replaces it; the new HUD
-                                  opens in play
+        survival / continue       that page's first row: OpenLevel(the play
+        survival taken            level, title/paths.PLAY_LEVEL). The title
+                                  stands until the level replaces it; the new
+                                  HUD opens in play
+        horde mode taken          its second row: OpenLevel(HORDE_LEVEL), the
+                                  same way
         settings taken            MenuPage = the settings page, caret on top
         exit game taken           on the title: QuitGame. (In play the row is
                                   save and exit: save_exit.py)
@@ -28,7 +30,7 @@ from uebp.graph import _connect, _pin, out, then
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.loot_find import put
 from graphics_menu.menu_nav import any_tab_open, escape_pressed, pause_row_taken
-from graphics_menu.mode_consts import PAGE_SINGLE, SINGLE, SINGLE_START_ROW
+from graphics_menu.mode_consts import PAGE_SINGLE, SINGLE, SINGLE_HORDE_ROW, SINGLE_START_ROW
 from graphics_menu.mode_tick import page_row_taken
 from graphics_menu.profile_consts import EXIT_ACTION
 from graphics_menu.settings_rows import PAGE_SETTINGS, PAGE_TITLE
@@ -37,7 +39,7 @@ from graphics_menu.umg_consts import (
 from uebp.nodes.actor import FN_WAS_PRESSED
 from uebp.nodes.math import FN_AND, FN_EQ_II, FN_NOT, FN_OR
 from uebp.nodes.system import FN_OPEN_LEVEL, FN_QUIT
-from title.paths import PLAY_LEVEL
+from title.paths import HORDE_LEVEL, PLAY_LEVEL
 from graphics_menu import hud_vars as MV
 
 
@@ -64,14 +66,18 @@ def _author_start(ed, in_execs, made):
 
 
 def _author_new_game(ed, in_execs, made):
-    """The Single Player page's row, new game or continue game: the play
-    level opens, in this process, alone. The title stands, its page up,
-    until the level replaces it; the play level's HUD starts in play at
-    once (build_graphics_menu._author_begin_play) and loads the profile if
-    there is one (save_exit.py)."""
-    take, rest = _branch(ed, page_row_taken(ed, SINGLE, SINGLE_START_ROW, made), in_execs, made)
-    opened = _call(ed, FN_OPEN_LEVEL, made, LevelName=PLAY_LEVEL)
-    return [_then(opened, [take]), rest]
+    """The Single Player page's rows, Survival (or Continue Survival) and
+    Horde Mode: each opens its level, in this process, alone. The title
+    stands, its page up, until the level replaces it; that level's HUD
+    starts in play at once (build_graphics_menu._author_begin_play) and
+    loads the profile if there is one (save_exit.py)."""
+    flow = in_execs
+    tails = []
+    for row, level in ((SINGLE_START_ROW, PLAY_LEVEL), (SINGLE_HORDE_ROW, HORDE_LEVEL)):
+        take, flow = _branch(ed, page_row_taken(ed, SINGLE, row, made), flow, made)
+        flow = [flow]
+        tails.append(_then(_call(ed, FN_OPEN_LEVEL, made, LevelName=level), [take]))
+    return tails + flow
 
 
 def _author_settings(ed, in_execs, made):

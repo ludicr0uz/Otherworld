@@ -80,10 +80,10 @@ def check_profile(check, bp, nodes):
           str(len(saves)))
     opens = [n for n in nodes if "LevelName" in _pins(n) and "execute" in _pins(n)]
     after_save = [n for n in opens if saves and saves[0] in _feeders(n, "execute")]
-    # The other three: the death menu's restart, Join Server's (mode_tick.py)
-    # and New Game's (menu_main.py).
+    # The other four: the death menu's restart, Join Server's (mode_tick.py)
+    # and the Single Player page's two, Survival and Horde Mode (menu_main.py).
     check("...and then the title level opens (title/paths.TITLE_LEVEL), onto the main menu",
-          len(opens) == 4 and len(after_save) == 1
+          len(opens) == 5 and len(after_save) == 1
           and _value(after_save[0], "LevelName") == TITLE_LEVEL,
           f"{len(opens)} OpenLevel, {len(after_save)} after the save: "
           f"{[_value(n, 'LevelName') for n in after_save]}")

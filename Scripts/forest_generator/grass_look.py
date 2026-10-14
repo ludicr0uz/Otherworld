@@ -22,7 +22,8 @@ The colour and the patch are per level, each by its own list
 ``DEFAULT_GRASS_SPECS`` as before. The ground material is shared by every
 level, so its colour is not. The count is per level too (``density_for``): a
 level held in ``HELD_DENSITY_PER_SQM`` is regenerated at the density it was
-planted at, not at today's default.
+planted at, not at today's default, and with the tiers it was planted with
+(``tiers_for``, ``HELD_TIER_COUNT``).
 
 What the pack's material does with the numbers (MA_Grass, read in the editor):
 
@@ -39,6 +40,7 @@ bright green.
 
 from dataclasses import replace
 
+from .grass_cells import GRASS_TIERS
 from .grass_placement import DEFAULT_DENSITY_PER_SQM, DEFAULT_GRASS_SPECS
 from .undergrowth_meshes import GRASS_02_09, GRASS_PATCH, asset_path
 
@@ -51,6 +53,10 @@ PATCH_GRASS_LEVELS = ("Lvl_Forest_200m",)
 # 1 km map stays at 1.1 (1.0 M clumps, a 185 MB .umap): at the default's 2.2
 # it would be about 2 million.
 HELD_DENSITY_PER_SQM = {"Lvl_Forest_1000m": 1.1}
+# How many of grass_cells.GRASS_TIERS a level plants when it is held to fewer
+# than all. The 1 km map has the four it was planted with: layers 5-8 (F1)
+# would add another million clumps to it.
+HELD_TIER_COUNT = {"Lvl_Forest_1000m": 4}
 
 # ─── The grass's colour ──────────────────────────────────────────────────────
 
@@ -123,6 +129,11 @@ def has_patch_grass(level_name):
 def density_for(level_name):
     """Clumps per m2 ``level_name`` is generated at unless told otherwise."""
     return HELD_DENSITY_PER_SQM.get(level_name, DEFAULT_DENSITY_PER_SQM)
+
+
+def tiers_for(level_name):
+    """The density tiers ``level_name`` plants: all of them unless held."""
+    return GRASS_TIERS[:HELD_TIER_COUNT.get(level_name, len(GRASS_TIERS))]
 
 
 def _object_path(package):

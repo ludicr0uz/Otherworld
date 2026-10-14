@@ -26,7 +26,7 @@ from collections import namedtuple
 # it to switch their lighting with the preset.
 GRASS_TAG = "OW_Grass"
 
-# Cell edge. 100 m makes 100 cells on the 1 km map (x 4 grass tiers, plus the
+# Cell edge. 100 m makes 100 cells on the 1 km map (x 4 grass tiers there, plus the
 # bushes = up to 500 actors) and 4 on the 200 m map.
 # Smaller cells cull tighter but multiply the actor count, and every one of
 # them is a primitive the renderer tracks.
@@ -36,14 +36,22 @@ GRASS_CELL_CM = 10000.0
 #
 # Every grass patch belongs to one tier, and a tier is drawn from its
 # ``min_preset`` up (graphics_menu/gfx_stats.py: 0 Low, 1 Medium, 2 High,
-# 3 Ultra; that is each preset's default "grass layers", which the M panel's
-# GRAPHICS SETTINGS tab can change). Each tier is its own evenly spread layer, so Low is a thinner field,
-# not a field with holes, and each preset above it lays another layer on top.
+# 3 Custom; that is each preset's default "grass layers", which the M panel's
+# GRAPHICS SETTINGS tab can change, 1 to len(GRASS_TIERS)). Each tier is its own evenly spread layer, so Low is a thinner field,
+# not a field with holes, and each layer above it lays another on top.
 #
 # The upper tiers also fade out closer. Thickness only reads near the player;
-# far off, one layer and fifty look the same through the night fog. So Ultra is
-# 2.5x Low's density inside 15 m and the same density at 60 m -- the triangles
-# go where they show.
+# far off, one layer and fifty look the same through the night fog. So four
+# layers are 2.5x one layer's density inside 15 m and the same density at
+# 60 m -- the triangles go where they show.
+#
+# Layers 5 to 8 (F1) are the thick end: no shipped preset draws them
+# (min_preset EXTRA_LAYERS_PRESET, past every preset), the menu's slider
+# does. Each is a quarter denser than one of layers 2-4 and fades out
+# nearer still, so eight layers double four's count where the
+# ground shows between the patches -- at the player's feet -- and cost
+# nothing past 22 m (at High's distances). Their shares are counted in the
+# level's density like any other, so tiers 0-3 hold half of it.
 #
 # A tier above Low is saved HIDDEN IN GAME -- the Low state, as the grass is
 # saved unlit (forest_import/grass.py) -- and the menu unhides it -- see graphics_menu/gfx_tuner_foliage.py.
@@ -51,14 +59,27 @@ GRASS_CELL_CM = 10000.0
 #
 #   min_preset  share of the total density   instance fade start / end (cm)
 GrassTier = namedtuple("GrassTier", "min_preset share cull_start_cm cull_end_cm")
+# Past the last preset (Custom, 3): only the slider draws the tier.
+EXTRA_LAYERS_PRESET = 4
 GRASS_TIERS = (
-    GrassTier(0, 0.40, 4500, 7000),
-    GrassTier(1, 0.20, 3500, 5000),
-    GrassTier(2, 0.20, 2500, 3500),
-    GrassTier(3, 0.20, 1500, 2500),
+    GrassTier(0, 0.20, 4500, 7000),
+    GrassTier(1, 0.10, 3500, 5000),
+    GrassTier(2, 0.10, 2500, 3500),
+    GrassTier(3, 0.10, 1500, 2500),
+    GrassTier(EXTRA_LAYERS_PRESET, 0.125, 1500, 2200),
+    GrassTier(EXTRA_LAYERS_PRESET, 0.125, 1200, 1800),
+    GrassTier(EXTRA_LAYERS_PRESET, 0.125, 1000, 1500),
+    GrassTier(EXTRA_LAYERS_PRESET, 0.125, 800, 1200),
 )
 assert abs(sum(t.share for t in GRASS_TIERS) - 1.0) < 1e-9
 assert [t.min_preset for t in GRASS_TIERS] == sorted(t.min_preset for t in GRASS_TIERS)
+
+
+def tier_densities(density_per_sqm, tiers=GRASS_TIERS):
+    """Clumps per m2 of each tier when ``tiers`` together hold ``density_per_sqm``:
+    each its share of the shares present (a level may plant only the first few)."""
+    total = sum(t.share for t in tiers)
+    return [density_per_sqm * t.share / total for t in tiers]
 
 
 def tier_tag(tier):

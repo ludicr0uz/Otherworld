@@ -50,12 +50,14 @@ def check_undergrowth_meshes() -> CheckResult:
                        else f"{len(problems)} problems", problems + details)
 
 
-def check_grass_tiers(placed_grass, world_size_cm, divisions=8) -> CheckResult:
-    """Each density tier holds its share of the grass, and the Low tier on its
-    own still covers the whole map -- Low is thinner, not patchy."""
+def check_grass_tiers(placed_grass, world_size_cm, tiers=GRASS_TIERS,
+                      divisions=8) -> CheckResult:
+    """Each of the level's density tiers holds its share of the grass, and the
+    Low tier on its own still covers the whole map -- Low is thinner, not patchy."""
     if not placed_grass:
         return CheckResult("Grass Density Tiers", True, "No grass to check")
-    counts = [0] * len(GRASS_TIERS)
+    counts = [0] * len(tiers)
+    shares = [t.share / sum(t.share for t in tiers) for t in tiers]
     half = world_size_cm / 2.0
     cell = 2.0 * half / divisions
     low_cells = set()
@@ -66,11 +68,10 @@ def check_grass_tiers(placed_grass, world_size_cm, divisions=8) -> CheckResult:
                            min(divisions - 1, int((g.y + half) / cell))))
     total = len(placed_grass)
     problems = []
-    for i, (tier, n) in enumerate(zip(GRASS_TIERS, counts)):
+    for i, (want, n) in enumerate(zip(shares, counts)):
         share = n / total
-        if abs(share - tier.share) > 0.25 * tier.share:
-            problems.append(f"tier {i}: {share:.1%} of grass, expected "
-                            f"{tier.share:.0%}")
+        if abs(share - want) > 0.25 * want:
+            problems.append(f"tier {i}: {share:.1%} of grass, expected {want:.1%}")
     if len(low_cells) < divisions * divisions:
         problems.append(f"Low tier covers {len(low_cells)}/{divisions ** 2} cells")
     msg = ", ".join(f"T{i} {n:,}" for i, n in enumerate(counts))

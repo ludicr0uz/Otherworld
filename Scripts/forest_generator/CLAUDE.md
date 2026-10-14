@@ -42,7 +42,8 @@ The generator's code lives in this package. The level-side import code is in
 ## The two maps
 
 - **`Lvl_Forest_200m`** (`--size 200`):
-  - night, 68 trees, 81,697 grass clumps (2.2/m², G2; 40,521 before), 328 bushes, ten NPCs
+  - night, 68 trees, 163,247 grass clumps (4.4/m² over eight layers, F1; the first four
+    are G2's 81,697 at 2.2, unchanged; 40,521 before G2), 328 bushes, ten NPCs
     at 75–79 m;
   - it is the `EditorStartupMap`: the debug map.
 - **`Lvl_Forest_1000m`** (`--size 1000`, tree density 0.5):
@@ -167,9 +168,16 @@ that imported a level is 13 GB, most of it in swap on this machine).
       (`forest_import/grass_recolour.py`): it sets the override the import would have set
       on each grass cell and saves the level, with nothing planted again and so no forage,
       garments, sky or sound beds to put back. It did the 1 km map's 400 cells in 3 s.
-    - **The density is 2.2 clumps/m² (G2; 1.1 before),** `grass_placement.
-      DEFAULT_DENSITY_PER_SQM`, with the tier shares unchanged, so every grass density
-      setting draws twice what it did. Only the 200 m map has it: the 1 km map is held at
+    - **The density is 4.4 clumps/m² over eight tiers (F1; 2.2 over four since G2, 1.1
+      before),** `grass_placement.DEFAULT_DENSITY_PER_SQM`, split by `grass_cells.
+      GRASS_TIERS`' shares (`tier_densities`: each tier its share of the shares the level
+      plants). Tiers 0-3 are G2's to the clump (same density, seed and places, same fades);
+      tiers 4-7 are each 0.55/m², fade out by 22, 18, 15 and 12 m at 100% (scaled by the
+      menu's grass distance like the rest), and have `min_preset` 4, past every preset:
+      only the menu's grass density row, now 1-8, draws them. So eight layers double four's
+      clumps where the ground shows between them, and nothing changes for a shipped
+      preset. A level held to fewer tiers is in `grass_look.HELD_TIER_COUNT` (the 1 km map,
+      four: eight would add a million clumps); the generator plants `tiers_for(level)`. Only the 200 m map has it: the 1 km map is held at
       1.1 ("The two maps", above).
     - **What the pack's `MA_Grass` does with the instance's numbers:** base colour is
       `desaturate(variation(albedo × Brightness) × Tint.rgb, 1 − Saturation)`. **`Tint`'s

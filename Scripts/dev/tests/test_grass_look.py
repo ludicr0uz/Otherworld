@@ -11,7 +11,9 @@ import unittest
 import _paths
 
 from forest_generator import grass_look as L
+from forest_generator.grass_cells import EXTRA_LAYERS_PRESET, GRASS_TIERS, tier_densities
 from forest_generator.grass_placement import DEFAULT_DENSITY_PER_SQM, DEFAULT_GRASS_SPECS
+from graphics_menu.gfx_stats import PRESET_LABELS
 from forest_generator.undergrowth_meshes import GRASS_02_09, GRASS_PATCH, asset_path, content_file
 
 ROOT = os.path.dirname(_paths.SCRIPTS)
@@ -35,12 +37,52 @@ class Levels(unittest.TestCase):
             self.assertEqual(dataclasses.replace(dark, material_paths=plain.material_paths),
                              plain)
 
-    def test_the_density_doubled_everywhere_but_on_the_1_km_level(self):
-        self.assertEqual(DEFAULT_DENSITY_PER_SQM, 2.2)
+    def test_the_density_grew_everywhere_but_on_the_1_km_level(self):
+        # 4.4 with all eight layers: the first four are G2's 2.2 (F1).
+        self.assertEqual(DEFAULT_DENSITY_PER_SQM, 4.4)
         self.assertEqual(L.HELD_DENSITY_PER_SQM, {"Lvl_Forest_1000m": 1.1})
         self.assertEqual(L.density_for("Lvl_Forest_1000m"), 1.1)
         for level in ("Lvl_Forest_200m", "Lvl_Probe_50m", None):
             self.assertEqual(L.density_for(level), DEFAULT_DENSITY_PER_SQM, level)
+
+    def test_the_1_km_level_keeps_its_four_tiers(self):
+        self.assertEqual(L.tiers_for("Lvl_Forest_1000m"), GRASS_TIERS[:4])
+        for level in ("Lvl_Forest_200m", "Lvl_Probe_50m", None):
+            self.assertEqual(L.tiers_for(level), GRASS_TIERS, level)
+
+
+class Tiers(unittest.TestCase):
+    """F1: eight layers, of which the first four are what they were."""
+
+    def test_eight_layers(self):
+        self.assertEqual(len(GRASS_TIERS), 8)
+
+    def test_the_first_four_layers_are_g2_s(self):
+        g2 = [2.2 * s for s in (0.4, 0.2, 0.2, 0.2)]
+        for got, want in zip(tier_densities(DEFAULT_DENSITY_PER_SQM)[:4], g2):
+            self.assertAlmostEqual(got, want)
+        self.assertEqual([(t.cull_start_cm, t.cull_end_cm) for t in GRASS_TIERS[:4]],
+                         [(4500, 7000), (3500, 5000), (2500, 3500), (1500, 2500)])
+
+    def test_the_1_km_level_s_tiers_are_its_old_ones(self):
+        held = tier_densities(L.density_for("Lvl_Forest_1000m"),
+                              L.tiers_for("Lvl_Forest_1000m"))
+        for got, want in zip(held, [1.1 * s for s in (0.4, 0.2, 0.2, 0.2)]):
+            self.assertAlmostEqual(got, want)
+
+    def test_layers_five_to_eight_are_the_slider_s_alone_and_near(self):
+        for t in GRASS_TIERS[4:]:
+            self.assertEqual(t.min_preset, EXTRA_LAYERS_PRESET)
+            self.assertLessEqual(t.cull_end_cm, GRASS_TIERS[3].cull_end_cm)
+        ends = [t.cull_end_cm for t in GRASS_TIERS]
+        self.assertEqual(ends, sorted(ends, reverse=True))
+        # Every preset (Low, Medium, High, Custom) is below it.
+        self.assertEqual(EXTRA_LAYERS_PRESET, len(PRESET_LABELS))
+
+    def test_eight_layers_double_four(self):
+        d = tier_densities(DEFAULT_DENSITY_PER_SQM)
+        self.assertAlmostEqual(sum(d), 2 * sum(d[:4]))
+
 
     def test_the_default_specs_are_not_touched(self):
         L.grass_specs_for("Lvl_Forest_200m")

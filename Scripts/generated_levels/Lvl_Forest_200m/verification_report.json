@@ -84,7 +84,7 @@
     {
       "name": "Grass Count / Density",
       "passed": true,
-      "message": "81,697 clumps on 40,000 m\u00b2 = 2.04/m\u00b2 (requested 2.20/m\u00b2)",
+      "message": "163,247 clumps on 40,000 m\u00b2 = 4.08/m\u00b2 (requested 4.40/m\u00b2)",
       "details": []
     },
     {
@@ -96,7 +96,7 @@
     {
       "name": "Grass Snapped To Terrain",
       "passed": true,
-      "message": "All 502 sampled clumps seated on the mesh",
+      "message": "All 501 sampled clumps seated on the mesh",
       "details": []
     },
     {
@@ -122,13 +122,13 @@
       "passed": true,
       "message": "1 of 1 species represented",
       "details": [
-        "HISM_Grass_Patch: 81,697"
+        "HISM_Grass_Patch: 163,247"
       ]
     },
     {
       "name": "Grass Density Tiers",
       "passed": true,
-      "message": "T0 32,633, T1 16,230, T2 16,447, T3 16,387",
+      "message": "T0 32,633, T1 16,230, T2 16,447, T3 16,387, T4 20,419, T5 20,451, T6 20,249, T7 20,431",
       "details": []
     },
     {

@@ -747,7 +747,7 @@ def run_all_checks(
     """Run the complete verification suite and return a report."""
     # Imported here: undergrowth_checks imports CheckResult from this module.
     from . import undergrowth_checks
-    from .grass_look import grass_specs_for
+    from .grass_look import grass_specs_for, tiers_for
     specs = grass_specs_for(level_name)
     world_size_m = world_size_cm / 100.0
     report = VerificationReport(level_name=level_name, world_size_m=world_size_m)
@@ -779,8 +779,8 @@ def run_all_checks(
         report.checks.append(check_grass_upscale(placed_grass, knee_height_cm, specs))
         report.checks.append(check_grass_coverage(placed_grass, world_size_cm))
         report.checks.append(check_grass_spec_distribution(placed_grass, specs))
-        report.checks.append(undergrowth_checks.check_grass_tiers(placed_grass,
-                                                                  world_size_cm))
+        report.checks.append(undergrowth_checks.check_grass_tiers(
+            placed_grass, world_size_cm, tiers_for(level_name)))
 
     # Generated meshes, and bushes (None when bush generation is disabled)
     report.checks.append(undergrowth_checks.check_undergrowth_meshes())

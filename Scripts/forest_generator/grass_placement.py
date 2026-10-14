@@ -44,7 +44,7 @@ import random
 from dataclasses import dataclass
 
 from .undergrowth_meshes import GRASS_02_09, asset_path
-from .grass_cells import GRASS_TIERS
+from .grass_cells import GRASS_TIERS, tier_densities
 from .terrain import get_exact_mesh_z
 
 
@@ -94,12 +94,15 @@ MAX_UPSCALE_FACTOR = 2.4
 # Specs whose height_ratio is at or above this count as the "knee" layer.
 KNEE_LAYER_MIN_RATIO = 0.85
 
-# Clumps per m² of map with every tier drawn (Ultra); Low draws
+# Clumps per m² of map with every tier drawn (grass layers 8); four layers,
+# the most a shipped preset draws, are half of it, and Low draws
 # GRASS_TIERS[0].share of it. A clump covers about 0.15 m² as authored, so
-# that is roughly a third of the ground under grass at Ultra and an eighth on
-# Low (more where a level plants it wide). It was 1.1 until G2 doubled every
-# layer; a level held at another number is in grass_look.HELD_DENSITY_PER_SQM.
-DEFAULT_DENSITY_PER_SQM = 2.2
+# that is roughly a third of the ground under grass at four layers and an
+# eighth on Low (more where a level plants it wide). It was 1.1 until G2
+# doubled every layer, and 2.2 until F1 added layers 5-8 (grass_cells) on top
+# of the same four; a level held at another number is in
+# grass_look.HELD_DENSITY_PER_SQM.
+DEFAULT_DENSITY_PER_SQM = 4.4
 DEFAULT_PATCHINESS = 0.25       # 0 = perfectly even, ->1 = heavily clustered
 SPAWN_CLEAR_RADIUS_CM = 150.0   # keep the PlayerStart from being submerged
 TREE_CLEAR_RADIUS_CM = 90.0     # small bare ring at each trunk
@@ -246,11 +249,11 @@ def scatter_grass(
         return []
 
     placed: list[PlacedGrass] = []
-    for tier_index, tier in enumerate(tiers):
+    for tier_index, tier_density in enumerate(tier_densities(density_per_sqm, tiers)):
         # Decorrelated from tree placement, and each tier from the others.
         rng = random.Random((seed ^ 0x6A55) + 7919 * tier_index)
         placed.extend(_scatter_layer(
-            rng, tier_index, density_per_sqm * tier.share, world_size_cm,
+            rng, tier_index, tier_density, world_size_cm,
             grid_z, grid_size, knee_height_cm, patchiness, grass_specs,
             placed_trees, spawn_clear_radius_cm, tree_clear_radius_cm,
             coverage_fraction))

@@ -42,7 +42,7 @@ from forest_generator.grass_placement import (
     DEFAULT_PATCHINESS,
     KNEE_HEIGHT_CM,
 )
-from forest_generator.grass_look import density_for, grass_specs_for
+from forest_generator.grass_look import density_for, grass_specs_for, tiers_for
 from forest_generator.bush_placement import (
     scatter_bushes,
     DEFAULT_BUSH_SPECS,
@@ -220,6 +220,7 @@ def main():
             patchiness=args.grass_patchiness,
             grass_specs=grass_specs_for(level_name),
             placed_trees=placed_trees,
+            tiers=tiers_for(level_name),
         )
         grass_counts = Counter(g.spec_name for g in placed_grass)
         for name, cnt in sorted(grass_counts.items()):

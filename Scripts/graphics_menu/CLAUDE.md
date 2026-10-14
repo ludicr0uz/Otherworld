@@ -342,6 +342,11 @@ Moved word for word: `docs/history/menu.md#presets-and-the-graphics-settings-tab
     CSV, held to the CSV by `dev/tests/test_gfx_stats.py`.
   - **High:** every group 3. Custom starts as High with the grass lit, and is the
     player's: a change to a shipped row never rewrites a saved Custom row.
+- **The grass density row goes to 8 (F1), and no preset draws past 4.** It is the count of
+  `grass_cells.GRASS_TIERS`; layers 5-8 are near-only tiers (fading out by 12-22 m at High's
+  distances) that only the slider unhides, so the shipped rows and their cost are as they
+  were. Only the 200 m map plants them: on the 1 km map (four tiers, `grass_look.
+  HELD_TIER_COUNT`) layers 5-8 draw what 4 does.
 - **Medium is no longer the cheap preset: level 2 doubles its frame.** Measured windowed on
   the 16 GB Mac, noon, the perf audit's forest spot, by `probes/probe_medium_reach.py`
   (it nudges the live rows from the old ones to the new and measures each; `--map` for

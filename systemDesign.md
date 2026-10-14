@@ -110,8 +110,11 @@ change. The forest has day and night beds faded by the clock.
 **The world** (`Scripts/world/CLAUDE.md`, `Scripts/forest_generator/CLAUDE.md`). Two
 generated maps, `Lvl_Forest_200m` (the editor's startup map) and `Lvl_Forest_1000m` (what a
 packaged game plays). The grass is a dark, dull olive on a ground tinted to match, on both:
-on the 200 m map in patches 1.2 m across, seven of the pack's clump merged (G3), at 2.2 to
-the square metre (81,697 of them, twice what any grass density setting drew before G2), on the 1 km map in the narrow clump at 1.1 (1.03
+on the 200 m map in patches 1.2 m across, seven of the pack's clump merged (G3), in eight
+density layers the menu's grass density row picks from (1-8; F1): the four a shipped preset
+draws are 2.2 to the square metre (81,697 of them, twice what they drew before G2), and
+layers 5-8, the slider's alone, add as many again near the player (163,247 in all, 4.4/m²,
+each fading out by 12-22 m at High's distances), on the 1 km map in the narrow clump at 1.1 (1.03
 million; doubling it is its own task) (`forest_generator/grass_look.py`). A clock turns the sun and moon; day and night are 4 minutes each for
 now, the night moonlit under the real stars, and a level starts at a random hour. The clock
 has one owner: the server's (single player's own), which every client's sky and wind follow
@@ -327,8 +330,9 @@ triangles near, 269 from 10 m, as the clump's last), and it carries its own Pivo
 textures so each copy's blades bend about their own roots in the pack's wind; it draws
 `MI_Grass_Patch_Dark`, a child of the dark instance. G1 had stretched the clump 1.55–2.10×
 instead, which spread its blades into flat spiky stars. The module also holds a level to a density when the default moves on
-(`HELD_DENSITY_PER_SQM`, `density_for(level)`): the default is 2.2 clumps/m² since G2 and
-the 1 km map stays at 1.1. A level that gains only the colour is not planted again:
+(`HELD_DENSITY_PER_SQM`, `density_for(level)`): the default is 4.4 clumps/m² over eight
+layers since F1 (2.2 over the first four, G2's), and the 1 km map stays at 1.1 over its four
+(`HELD_TIER_COUNT`, `tiers_for(level)`). A level that gains only the colour is not planted again:
 `Scripts/recolour_grass.py` sets the material on its cells in place. The same module holds the ground's colour: the import
 (`forest_import/grass_look.py`) builds the instance and puts a desaturation and a tint
 (`GroundSaturation`, `GroundTint`) in front of `M_Forest_Ground_PBR`'s base colour, so a gap

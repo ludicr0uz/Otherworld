@@ -65,6 +65,19 @@ are listed under `Modules` in `Otherworld.uproject` (`OtherworldEditor` as type 
 - **Toolchain:** **Xcode 16.2** (16C5032a; Apple clang 16.0.0, Mac SDK 15.2), on macOS 26.5.
   UE 5.8.3 accepts Xcode 15.2 to 27.9 (`Engine/Config/Apple/Apple_SDK.json`); do not upgrade
   Xcode for it.
+- **On Windows** (first built 13 Oct 2026; Visual Studio 18, MSVC 14.51, UE 5.8 from the launcher):
+  `"C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" OtherworldEditor Win64 Development -Project="<checkout>\Otherworld.uproject" -WaitMutex`,
+  about 90 s from a changed branch. `uepy.py` is not ported (it looks under `Binaries/Mac`), so
+  there is no `--compile` there, and `package_game.py` builds the game and never the editor
+  (`-nocompileeditor`): **compile the editor by hand after any pull or branch switch that touches
+  `Source/`**, or the cook loads an old module and every Blueprint on a native parent fails
+  ("Failed to load Class /Script/Otherworld...", "Could not find a function named ...").
+  With no Python installed, `python3` can be the engine's own
+  (`Engine\Binaries\ThirdParty\Python3\Win64\python.exe`).
+- **MSVC fails a name that shadows one in an engine header** (C4459 is an error; clang lets it
+  pass): a file-level `Header` in an unnamed namespace broke `OtherworldGripLibrary.cpp` against
+  `ConcurrentLinearAllocator.h`. Give a file-level constant a name the engine will not use
+  (`CsvHeader`).
 - **Output:** `Binaries/Mac/libUnrealEditor-Otherworld*.dylib` (one per module), `UnrealEditor.modules` and
   `OtherworldEditor.target`, all git-ignored.
 

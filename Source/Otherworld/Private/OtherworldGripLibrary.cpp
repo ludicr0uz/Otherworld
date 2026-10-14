@@ -13,7 +13,7 @@ namespace
 {
 	const FName GripTag(TEXT("Grip"));
 	const FName HeldVar(TEXT("Held"));
-	const TCHAR* Header = TEXT("item,x,y,z,pitch,yaw,roll");
+	const TCHAR* CsvHeader = TEXT("item,x,y,z,pitch,yaw,roll");
 	// Two numbers nearer than this are one: a cell stepped by 0.1 three times
 	// is not 0.3 to the last bit.
 	const double Same = 1e-6;
@@ -214,7 +214,7 @@ void UOtherworldGripLibrary::SetGripNudge(FName Row, FVector Location, FRotator 
 bool UOtherworldGripLibrary::SaveGripNudges()
 {
 	const FGripTable& T = Loaded();
-	FString Text = FString(Header) + TEXT("\n");
+	FString Text = FString(CsvHeader) + TEXT("\n");
 	for (const FName& Row : T.Order)
 	{
 		Text += Row.ToString();

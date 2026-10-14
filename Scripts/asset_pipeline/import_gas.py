@@ -148,12 +148,12 @@ def unredirected():
 
 def strays():
     """Files under Content/GAS the manifest does not list."""
-    listed = {_dst(p) for p in packages()}
+    listed = {os.path.normpath(_dst(p)) for p in packages()}
     return sorted(os.path.join(d, f)
                   for d, _, files in os.walk(os.path.join(PROJECT_ROOT, DEST))
                   for f in files
                   if f.endswith((".uasset", ".umap"))
-                  and os.path.join(d, f) not in listed)
+                  and os.path.normpath(os.path.join(d, f)) not in listed)
 
 
 def _same(a, b):

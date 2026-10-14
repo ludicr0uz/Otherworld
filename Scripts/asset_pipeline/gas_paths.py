@@ -85,17 +85,24 @@ PATCHED_NOTIFIES = (
 # choosers take an object of its class and no other.  The traversal component
 # is the weapons build's too (combat/gas_traversal.py: it reads any Character,
 # and its Server event asks the RPC guard).  The sprint-loop databases are the
-# weapons build's too (combat/gas_sprint.py: the relaxed forward loop in each).
+# weapons build's too (combat/gas_sprint.py: the relaxed forward loop and the
+# relaxed walk- and run-to-sprint transitions in each), and so are the
+# sprint-start databases (the relaxed starts straight ahead and refacing).
 _DBS = "/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases"
 SPRINT_LOOP_DBS = (
     _DBS + "/Dense/PSD_Dense_Stand_Sprint_Loops",
     _DBS + "/Sparse/PSD_Sparse_Stand_Sprint_Loops",
     _DBS + "/Extreme_Sparse/PSD_Extreme_Sparse_Stand_Sprint_Loops",
 )
+SPRINT_START_DBS = (
+    _DBS + "/Dense/PSD_Dense_Stand_Sprint_Starts",
+    _DBS + "/Sparse/PSD_Sparse_Stand_Sprint_Starts",
+    _DBS + "/Extreme_Sparse/PSD_Extreme_Sparse_Stand_Sprint_Starts",
+)
 PATCHED = PATCHED_NOTIFIES + (
     "/Game/Blueprints/SandboxCharacter_CMC_ABP",
     "/Game/Blueprints/AC_TraversalLogic",
-) + SPRINT_LOOP_DBS
+) + SPRINT_LOOP_DBS + SPRINT_START_DBS
 
 ABP = GAME_ROOT + "/Blueprints/SandboxCharacter_CMC_ABP"
 UEFN = GAME_ROOT + "/Characters/UEFN_Mannequin"

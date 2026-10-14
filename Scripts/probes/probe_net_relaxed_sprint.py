@@ -7,11 +7,15 @@ sprinter's own copy, another client's copy and the server's
 Client 1 sprints straight ahead, veers to the forward-right diagonal and back,
 posting each phase. Every machine reads the motion matching's pick on its copy
 of client 1's character through each one, counted from SETTLE_S into the
-first phase and PICK_AFTER_S into the others (the start and the turn come first): M_Relaxed_Sprint_Loop_F ahead, a
-neutral sprint clip on the diagonal (the _FL/_FR loops, or the diamond the
-motion matching passes through on the way) and none of the relaxed one, the
-relaxed one again after. The databases are assets every machine has; the pick
-reads the movement's sprint, which another player's copy, running no moves,
+first phase (or once its relaxed start or transition is done) and
+PICK_AFTER_S into the others (the start and the turn come first):
+M_Relaxed_Sprint_Loop_F ahead, a neutral sprint clip on the diagonal (the
+_FL/_FR loops, or the diamond the motion matching passes through on the way)
+and none of the relaxed one, the relaxed one again after. Before then, the
+start: a relaxed start or transition and never a neutral clip the switch
+swapped out (the neutral start dipped the head before the relaxed loop came
+in). The databases are assets every machine has; the pick reads the
+movement's sprint, which another player's copy, running no moves,
 takes from the server (AOtherworldCharacter::bSprinting, IsSprintPosed).
 
 On its own copy client 1 also measures:
@@ -34,7 +38,7 @@ import time
 
 import unreal
 
-from combat.gas_sprint import DIAGONALS, RELAXED_F
+from combat.gas_sprint import DIAGONALS, RELAXED_F, swaps
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.sprint_tuning import SPRINT_FORCED_VAR
 from probes.crawl_watch import always_pose
@@ -54,6 +58,13 @@ PICK_AFTER_S = 1.0      # of a later phase, before the picks are counted
 NEUTRAL = "M_Neutral_Sprint"
 RELAXED = RELAXED_F.rsplit("/", 1)[1]
 DIAGONAL_NAMES = tuple(d.rsplit("/", 1)[1] for d in DIAGONALS)
+# The clips the switch puts in, and the neutral ones they replaced.
+SWAPPED_IN = tuple(w.rsplit("/", 1)[1] for w, _g in swaps())
+SWAPPED_OUT = tuple(g.rsplit("/", 1)[1] for _w, g in swaps())
+# The relaxed starts and transitions: the start, however late it plays. Another
+# player's copy sprints when the server says, from a run, and the relaxed
+# run-to-sprint (3.6 s) can outlast SETTLE_S there.
+STARTS = tuple(c for c in SWAPPED_IN if c != RELAXED)
 SPACE = unreal.RelativeTransformSpace.RTS_COMPONENT
 
 
@@ -68,7 +79,9 @@ def _pick(mesh):
 
 
 def _count(seen, phase, clip, since):
-    if clip and since >= (SETTLE_S if phase == "ahead" else PICK_AFTER_S):
+    if clip and phase == "ahead" and (since < SETTLE_S or clip in STARTS):
+        phase = "start"
+    if clip and since >= (0.0 if phase == "start" else PICK_AFTER_S):
         counts = seen.setdefault(phase, {})
         counts[clip] = counts.get(clip, 0) + 1
 
@@ -84,6 +97,12 @@ def _check_picks(p, whose, seen):
             f"(held longest; the loops are {' or '.join(DIAGONAL_NAMES)}), and never "
             "the relaxed one",
             str(main("veer")).startswith(NEUTRAL) and RELAXED not in veer, str(veer))
+    start = seen.get("start") or {}
+    p.check(f"{p.where}: {whose} starting the sprint from a stand plays the relaxed set's "
+            "start or transition (some frame picks one) and never a neutral clip the "
+            "switch swapped out",
+            any(c in SWAPPED_IN for c in start) and not any(c in SWAPPED_OUT for c in start),
+            str(start))
 
 
 def _posture(mesh):

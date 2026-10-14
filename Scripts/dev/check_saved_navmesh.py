@@ -19,17 +19,34 @@ MAPS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
 MARK = b"RecastNavMesh-Default"
 
 
-def main():
-    bad = []
+LFS_POINTER = b"version https://git-lfs"
+FIX = ("re-save through world/level_save.py (any of build_survival.py, "
+       "build_day_night.py) or re-import the level")
+
+
+def scan():
+    """[(path, state)] for each map on disk: state is "navmesh", "ok", or
+    "pointer" (a Git LFS pointer whose bytes were never pulled: unknown)."""
+    found = []
     for path in sorted(glob.glob(MAPS)):
         with open(path, "rb") as f:
-            found = MARK in f.read()
-        print(f"{'SAVED NAVMESH' if found else 'ok           '}  {os.path.basename(path)}")
-        if found:
+            data = f.read()
+        if data.startswith(LFS_POINTER):
+            found.append((path, "pointer"))
+        else:
+            found.append((path, "navmesh" if MARK in data else "ok"))
+    return found
+
+
+def main():
+    labels = {"navmesh": "SAVED NAVMESH", "ok": "ok", "pointer": "LFS pointer"}
+    bad = []
+    for path, state in scan():
+        print(f"{labels[state]:<14} {os.path.basename(path)}")
+        if state == "navmesh":
             bad.append(path)
     if bad:
-        print("re-save these through world/level_save.py (any of build_survival.py, "
-              "build_day_night.py) or re-import the level")
+        print(FIX)
     return 1 if bad else 0
 
 

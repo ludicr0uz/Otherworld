@@ -34,7 +34,7 @@ from combat.game_state import ensure_game_mode_vars
 from combat.glimmer import build_glimmer_material
 from combat.input_assets import build_input_assets
 from combat.gas_locomotion import build_gas_locomotion, resave_gas_locomotion
-from combat.gas_sprint import swap_sprint_loop
+from combat.gas_sprint import swap_sprint_clips
 from combat.heat import build_hot_material
 from combat.health_component import build_health_component
 from combat.hit_bodies import fit_hit_bodies
@@ -159,8 +159,8 @@ def _body(c):
         # Blueprint that links it in, both before the body that runs them.
         build_weapon_layers()
         build_gas_locomotion()
-        # The relaxed forward loop in the sample's sprint databases.
-        swap_sprint_loop()
+        # The relaxed loop, starts and transitions in the sample's sprint databases.
+        swap_sprint_clips()
     wear_skin(skin)
     if skin.anim_bp != P.ABP_PATH:
         # ABP_Unarmed is not the player's: what an earlier body left in it goes.

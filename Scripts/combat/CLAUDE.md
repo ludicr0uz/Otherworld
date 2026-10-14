@@ -310,9 +310,13 @@ another player's copy and the server's).
   `RELAXED_SPRINT`): `M_Relaxed_Sprint_Loop_F` takes `M_Neutral_Sprint_Loop_F`'s entry in
   the three sprint-loop databases the chooser offers (dense, sparse, extreme sparse; the
   entry's settings kept), through the editor module's `OtherworldPoseSearchLibrary`
-  (Python cannot write a database's entries). The diagonals, starts, stops, pivots and
-  transitions are the neutral set's; the experimental state machine's `PSD_SM_CMC_Loops`
-  is left. The databases are rows of `gas_paths.PATCHED` and git-ignored, so the weapons
+  (Python cannot write a database's entries). The starts straight ahead and refacing
+  (`Stand_Sprint_Starts`, the same three sets) and the walk- and run-to-sprint transitions
+  (in the loop databases) are the relaxed set's too, `gas_sprint.PAIRS`: a neutral start
+  pitched the head down and then blended up into the relaxed loop. The diagonals (loops and
+  starts), stops and pivots are the neutral set's (the relaxed set has no diagonals); the
+  experimental state machine's `PSD_SM_CMC_Loops` and `_Transitions` are left. The
+  databases are rows of `gas_paths.PATCHED` and git-ignored, so the weapons
   build swaps them on every machine. The relaxed loop travels 585 cm/s (the neutral 700),
   so at the sprint's 600 the motion matching plays it at about 1.03 (the neutral at 0.86);
   the probe measures the legs at x1.0 the ground's pace and no posture pop on a veer to the

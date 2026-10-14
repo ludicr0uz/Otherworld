@@ -214,7 +214,7 @@ and it never relies on a variable another section left behind.
 
   gas_turn  the turn in place (combat/gas_turn.py): WantsToAim is filled, and the root's offset is released by a traversal alone
 
-  gas_sprint  Checks for the relaxed forward sprint loop (combat/gas_sprint.py), run by the gas_locomotion section: each of ...
+  gas_sprint  Checks for the relaxed sprint (combat/gas_sprint.py), run by the gas_locomotion section: each of the sample's ...
 """
 
 SECTIONS = (

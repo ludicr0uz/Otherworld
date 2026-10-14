@@ -4316,6 +4316,9 @@ dev/check_node_catalog.py:69: scratch_graphs
 dev/check_node_catalog.py:114: resolves
 dev/check_saved_navmesh.py:17: MAPS
 dev/check_saved_navmesh.py:19: MARK
+dev/check_saved_navmesh.py:22: LFS_POINTER
+dev/check_saved_navmesh.py:23: FIX
+dev/check_saved_navmesh.py:27: scan
 dev/codemods/drop_unused_imports.py:18: UNUSED
 dev/codemods/drop_unused_imports.py:21: unused
 dev/codemods/drop_unused_imports.py:34: at_head

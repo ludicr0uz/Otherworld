@@ -1502,3 +1502,21 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 - [x] If a player dies, rather then giving him the option to retry and start again, the option should be to go back to main menu. And then from the menu if the player wants they will be able to start a new game. 
 
 - [x] Unarmed sprint: swap the forward loop for the sample's relaxed one. Sprinting straight ahead without a gun should play `M_Relaxed_Sprint_Loop_F` (`/Game/GAS/Characters/UEFN_Mannequin/Animations/Sprint`) where it plays `M_Neutral_Sprint_Loop_F` today. Only that one clip changes: the diagonal loops (`M_Neutral_Sprint_Loop_FL`, `_FR`) look good and stay, as do the Neutral starts, stops, pivots and the run/walk-to-sprint transitions. The sprint with a long gun (the `CarrySprint` overlay, `combat/carry_pose.py`) is fine and must look the same after. Lead (read off the assets' strings, not confirmed in the editor): the forward loop sits in `PSD_Dense_Stand_Sprint_Loops` and `PSD_Sparse_Stand_Sprint_Loops` under `MotionMatchingData/Databases`, and maybe the extreme-sparse set; find every sprint loops database the `CHT_PoseSearchDatabases` chooser can offer and swap it in each, by a build script and not by hand, keeping the entry's settings (mirroring, sampling range). Check the relaxed clip's travel speed against the neutral one's and say what it is: the feet must not slide at the sprint speed and the play rate must not visibly scale (`probes/probe_gas_anim_speed.py` measures this). Veering from forward to a diagonal and back must blend without a pop in posture; if the two styles seam visibly, report it with a capture rather than swapping the diagonals too. Must hold on other players' copies in multiplayer.
+
+- [x] Update the melee weaponless attack animation to a punching animation
+
+- [x] Some of the character model peeks through the current jeans and jacket clothing when it's equipped as the character moves around
+
+- [x] Improve foliage to be thicker in an efficient way. Right now there is a still a fair bit of ground seen through the grass. Allow for more foliage to exist such that it largely covers the ground tunable through the menu. Increase the max setting to 8 (I.E current max is 4)
+
+- [x] Improve foliage to be a variety of types of grass throughout the forest. Some areas may have more of one grass type, other areas more of another grass type. Some areas may have mixed grass types. Use 7 differnt grass types.
+
+- [x] Implement another level that is 400x400 called "Horde Survival". The level should be surrounded by a dense forest (same density as center in the 1000x1000). Center should only have scarse trees. In the center there should be a defensible area surrounded by chest high rocks. There should be 3 entrances / opennings into the defensible section.
+
+- [x] In single player main menu there should be an option to do "Horde Mode" - new horde level and "Survival" - the current 1000x1000 level. Not accessible in multiplayer for now.
+
+- [x] On the horde level there is a permanent campfire in the center of the level. (Create a new object for this). This campfire like a regular campfire pulls in zombies on the map. 
+
+- [x] On the horde level implement difficulty levels that gradually increase every 3 minutes. Difficulty levels increase the number of total NPC monsters that exist on the level. Level 1 - 4 monsters, Level 2 - 6 monsters, Level 3- 8x etc. For every 9 zombies spawned there should be one wendiego. I.E no wendiegos until level 4 - where there is one, then level 8 there is 2 etc.
+
+- [ ] On the horde level update the permanent campfire to have an attraction range that is indefinite (I.E applies to the whole level)

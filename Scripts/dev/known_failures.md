@@ -19,3 +19,4 @@ probe:probe_net_see_each_other | client 2 saw client 1's character move | since 
 probe:probe_net_see_each_other | client 2 walked | since 2026-10-10 | the same
 probe:probe_net_survival | the server has both clients' characters | since 2026-10-10 | characters left by earlier probes in the shared launch
 probe:probe_net_survival | the probe raised | since 2026-10-10 | the check above raised on its way out
+verify_graphics_menu.py | no graph asks for a controller or a camera by player index | since 2026-10-13 | PN_GlobalUpdater.EventGraph, a Blueprint of the grass library pack (/Game/PN_GrassLibrary/Blueprints, not ours and not committed), calls one

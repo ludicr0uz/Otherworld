@@ -1,6 +1,6 @@
 """graphics_menu/gfx_stats.py: the engine quality groups as rows, and a row
 from before them read as today's. Every preset is still what one engine
-quality level made it (0, 1, 3, 3 in each group, and that level's shadow
+quality level made it (0, 2, 3, 3 in each group, and that level's shadow
 numbers of BaseScalability.ini), in the table's defaults and in the tracked
 CSV alike, and migrate_row (the rule gfx_save's load follows in the HUD's
 graph) spreads an old row's engine quality over the new rows and moves no
@@ -15,7 +15,7 @@ import _paths  # noqa: F401
 
 from graphics_menu import gfx_stats as GS
 
-LEVELS = (0, 1, 3, 3)
+LEVELS = (0, 2, 3, 3)
 GROUPS = [s for s in GS.GFX_STATS if s.how == GS.GROUP]
 
 

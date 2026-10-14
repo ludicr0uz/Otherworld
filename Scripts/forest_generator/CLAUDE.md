@@ -27,7 +27,7 @@ The generator's code lives in this package. The level-side import code is in
 | `tree_lods.py` | which levels plant the trees' other build, a LOD chain ending in an impostor (`TREE_LOD_LEVELS`: the 1 km map, and the title level, which plants that map's middle trees: `Scripts/title/forest.py`), and where that mesh is |
 | `grass_placement.py` | `DEFAULT_GRASS_SPECS` and a stratified scatter |
 | `bush_placement.py` | `DEFAULT_BUSH_SPECS` and the clustered scatter |
-| `grass_look.py` | the dark, ground-filling grass: the colours of its material instance and of the ground under it (each with its reason), the wide `width_jitter`, and the levels that have it (`DARK_GRASS_LEVELS`, the 200 m map alone; `grass_specs_for(level)`). `forest_import/grass_look.py` builds the instance and patches the ground material from it ("Rendering gotchas", below) |
+| `grass_look.py` | the dark, ground-filling grass: the colours of its material instance and of the ground under it (each with its reason), the wide `width_jitter`, the levels that have the colour (`DARK_GRASS_LEVELS`: the 200 m and 1 km maps) and the ones that have the width (`WIDE_GRASS_LEVELS`: the 200 m map alone; `grass_specs_for(level)`), and the density a level is held at when the default moves (`HELD_DENSITY_PER_SQM`: the 1 km map at 1.1/m²; `density_for(level)`, the generator's default for `--grass-density`). `forest_import/grass_look.py` builds the instance and patches the ground material from it ("Rendering gotchas", below) |
 | `undergrowth_meshes.py` | the two library meshes the grass and the bushes are planted from, and the packages of each that the repository carries ("Rendering gotchas", below) |
 | `npc_placement.py` | NPC numbers (see `Scripts/npc/CLAUDE.md`) |
 | `npc_agro.py` | sense and patrol numbers |
@@ -40,10 +40,14 @@ The generator's code lives in this package. The level-side import code is in
 ## The two maps
 
 - **`Lvl_Forest_200m`** (`--size 200`):
-  - night, 68 trees, ~41k grass clumps, 328 bushes, ten NPCs at 75–79 m;
+  - night, 68 trees, 81,697 grass clumps (2.2/m², G2; 40,521 before), 328 bushes, ten NPCs
+    at 75–79 m;
   - it is the `EditorStartupMap`: the debug map.
 - **`Lvl_Forest_1000m`** (`--size 1000`, tree density 0.5):
-  - 1,700 trees, ~1.0 M grass clumps, 8,239 bushes;
+  - 1,700 trees, 1,025,988 grass clumps, 8,239 bushes;
+  - its grass is held at 1.1/m² (`grass_look.HELD_DENSITY_PER_SQM`), half the default: at
+    2.2 it would be about 2.05 million clumps and a `.umap` of about 360 MB (170 bytes a clump: the grass is
+    nearly all of today's 185). Regenerating it without `--grass-density` keeps 1.1;
   - its trees are the LOD build, not the Nanite one ("Rendering gotchas", below);
   - it is the `GameDefaultMap`: what a packaged or standalone run boots;
   - the `.umap` is 185 MB;
@@ -62,6 +66,12 @@ script.
 import rebuilds the level from scratch, which drops the forage, the garments lying in it and
 the day/night cycle actor. The import also rebuilds the dark grass's material instance and
 re-applies the ground's tint (`forest_import/grass_look.py`), on whichever level it runs.
+
+**The first game runs after an import are slow, and prove nothing about the frame.** The
+game rebuilds what the import invalidated while it plays: three windowed runs after G2's
+import measured 100–200 ms a frame (one stalled) where the fourth measured 32. Run a
+measuring probe twice, and with no editor holding the 1 km level beside it (a warm editor
+that imported a level is 13 GB, most of it in swap on this machine).
 
 ## Navmesh
 
@@ -119,13 +129,23 @@ re-applies the ground's tint (`forest_import/grass_look.py`), on whichever level
   and `SM_Bush_02` (1.95 m tall, 3.5 m across, 1,304 triangles).
   - Neither is Nanite. Each has four mesh LODs and a masked two-sided material, and a cell
     draws the mesh's own materials unless its spec names one (the default specs name none).
-  - **The 200 m map's grass is dark and wide (G1); the 1 km and probe levels' is not.**
-    `grass_look.py` holds it: a level in `DARK_GRASS_LEVELS` plants the same clumps, in the
-    same places, 1.55–2.10× wide in place of 0.85–1.20× (same height; about 3.2× the area,
-    so some 40% of the ground is under grass where a sixth was) and drawn with
-    `/Game/Forest/Materials/MI_Grass_02_09_Dark`, our instance of the pack's
-    `grass_02_09_Mat`. To give another level the look, add its name there, regenerate and
-    re-import it.
+  - **The 200 m map's grass is dark and wide (G1); the 1 km map's is dark and narrow
+    (G2); the probe level's is neither.** `grass_look.py` holds it in two lists. A level in
+    `DARK_GRASS_LEVELS` draws its clumps with `/Game/Forest/Materials/MI_Grass_02_09_Dark`,
+    our instance of the pack's `grass_02_09_Mat`. A level in `WIDE_GRASS_LEVELS` plants the
+    same clumps, in the same places, 1.55–2.10× wide in place of 0.85–1.20× (same height;
+    about 3.2× the area).
+    - **The width needs a re-import; the colour does not.** To widen a level, add its name
+      to `WIDE_GRASS_LEVELS`, regenerate and re-import it. To colour one, add it to
+      `DARK_GRASS_LEVELS`, regenerate its scripts (the clumps do not move: the 1 km map's
+      sidecar came out byte for byte the same) and run `uepy.py Scripts/recolour_grass.py`
+      (`forest_import/grass_recolour.py`): it sets the override the import would have set
+      on each grass cell and saves the level, with nothing planted again and so no forage,
+      garments, sky or sound beds to put back. It did the 1 km map's 400 cells in 3 s.
+    - **The density is 2.2 clumps/m² (G2; 1.1 before),** `grass_placement.
+      DEFAULT_DENSITY_PER_SQM`, with the tier shares unchanged, so every grass density
+      setting draws twice what it did. Only the 200 m map has it: the 1 km map is held at
+      1.1 ("The two maps", above).
     - **What the pack's `MA_Grass` does with the instance's numbers:** base colour is
       `desaturate(variation(albedo × Brightness) × Tint.rgb, 1 − Saturation)`. **`Tint`'s
       alpha is wired to nothing** (the pack ships it 0; only the RGB output is linked).
@@ -148,7 +168,18 @@ re-applies the ground's tint (`forest_import/grass_look.py`), on whichever level
       (`verify_grass_look`, eight checks). `probes/probe_grass_look.py` (windowed; its
       docstring has the command) measures the frame with the grass shown and hidden at
       Medium and High and takes the pictures: 2.8 ms at Medium and 0.7 ms at High, against
-      2.5 and 1.0 for the narrow clumps, which is inside what two runs differ by.
+      2.5 and 1.0 for the narrow clumps, which is inside what two runs differ by. At G2's
+      2.2/m² the same grass is 5.4 ms at Medium and 2.1 at High on the 200 m map (3.0 and
+      1.1 at 1.1/m² the same day); the 1 km map's, recoloured, 5.7 and 0.9 (3.4 and 1.3
+      before, its Medium then drawing 180 m of it, not 300).
+    - **How far it is drawn is the menu's row, and it is a thinning, not an edge.** A cell
+      fades its instances out between the tier's cull start and end, which the tuner
+      scales to the preset's `grass_distance` (`graphics_menu/gfx_tuner_foliage.py`); the
+      cell's own max draw distance (`grass_cells.cell_max_draw_cm`) stands 130 m past it
+      at Medium's 300 m and never cuts first, and the mesh's last LOD has no end.
+      `probes/probe_medium_reach.py` (windowed; `--map` for the 1 km level) holds both
+      numbers and pictures two cells from 255 m with their grass shown and hidden: at
+      265–300 m about a tenth of the clumps are left, a pixel and a half each.
   - **They sway by their pack's wind, not `MPC_Wind`.** The graphics menu's wind strength and
     speed do not reach them; its world-position-offset switch still does.
   - **The packs are git-ignored but these two meshes are committed.** `.gitignore`
@@ -162,8 +193,8 @@ re-applies the ground's tint (`forest_import/grass_look.py`), on whichever level
     the import stops if one is missing, and the verifier re-measures height, LOD count and
     triangles, so a pack update that changes the mesh fails there.
   - **A grass clump is a third of the width of the generated patch it replaced,** so at the
-    same count (about 1/m² with every tier drawn) the ground is tufts with terrain between
-    them, wherever the default specs are planted. Grass is scaled to the target height from the mesh's real bounds at plant time;
+    patches' count (about 1/m² with every tier drawn, the 1 km map's today) the ground is
+    tufts with terrain between them, wherever the narrow clump is planted. Grass is scaled to the target height from the mesh's real bounds at plant time;
     the offline check caps the upscale at 2.4×.
   - **The generated patches and bushes are still in the tree but no level plants them:**
     `foliage_meshes.py`, `forest_import/foliage_assets.py` and `/Game/Forest/Procedural`.

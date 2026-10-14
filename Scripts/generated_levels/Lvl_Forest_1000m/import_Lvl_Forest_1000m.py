@@ -358,13 +358,15 @@ trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
 GRASS_DATA_PATH = r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/generated_levels/Lvl_Forest_1000m/grass_Lvl_Forest_1000m.json"
 EXPECTED_GRASS_COUNT = 1025988
 EXPECTED_BUSH_COUNT = 8239
-GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_02_09": {"mesh": "/Game/PN_GrassLibrary/Meshes/grassMesh/grass_02_09_mesh.grass_02_09_mesh", "mats": []}}""")
+GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_02_09": {"mesh": "/Game/PN_GrassLibrary/Meshes/grassMesh/grass_02_09_mesh.grass_02_09_mesh", "mats": ["/Game/Forest/Materials/MI_Grass_02_09_Dark.MI_Grass_02_09_Dark"]}}""")
 BUSH_CONFIGS = json.loads(r"""{"HISM_Bush_02": {"mesh": "/Game/Light_Foliage/Meshes/SM_Bush_02.SM_Bush_02", "mats": []}}""")
 if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
     unreal.log_warning("[GEN] 5a. Wind, and the grass and bush meshes...")
     from forest_import import undergrowth_assets, wind as wind_import
     wind_import.ensure_wind()
     undergrowth_assets.ensure_undergrowth_assets()
+    from forest_import import grass_look as grass_look_import
+    grass_look_import.ensure_grass_look()
 
 # ── 5b. Plant knee-high grass ────────────────────────────────────────
 # Per-cell, per-tier HISMs, saved unlit and (above Low) hidden in game

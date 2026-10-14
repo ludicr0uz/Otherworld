@@ -356,7 +356,7 @@ trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
 # The meshes come out of two Fab packs and are planted as they are --
 # see forest_import/undergrowth_assets.py.
 GRASS_DATA_PATH = r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/generated_levels/Lvl_Forest_200m/grass_Lvl_Forest_200m.json"
-EXPECTED_GRASS_COUNT = 40521
+EXPECTED_GRASS_COUNT = 81697
 EXPECTED_BUSH_COUNT = 328
 GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_02_09": {"mesh": "/Game/PN_GrassLibrary/Meshes/grassMesh/grass_02_09_mesh.grass_02_09_mesh", "mats": ["/Game/Forest/Materials/MI_Grass_02_09_Dark.MI_Grass_02_09_Dark"]}}""")
 BUSH_CONFIGS = json.loads(r"""{"HISM_Bush_02": {"mesh": "/Game/Light_Foliage/Meshes/SM_Bush_02.SM_Bush_02", "mats": []}}""")

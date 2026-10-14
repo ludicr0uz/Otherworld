@@ -330,6 +330,42 @@ Moved word for word: `docs/history/menu.md#presets-and-the-graphics-settings-tab
   only when it moved (`gfx_tuner._author_groups`). A cvar row wins over its group because
   a console command outranks scalability; **never console-set an `sg.*` variable**, which
   would take the group out of the setter's reach. Never `ApplySettings`.
+- **What the three shipped presets are today** (`graphics_tuning.csv`; the table in the
+  history file is what they began as):
+  - **Low:** every group 0, the shadow maps level 0's.
+  - **Medium (G2):** every group **2** (it was 1), the three shadow rows level 2's
+    (`SHADOW_BY_LEVEL`: 2048, 1024, 4 cascades), resolution 85%, view distance 70%,
+    **grass drawn to 300 m and trees to 400 m** (180 and 180 before), four grass layers,
+    no grass shadows. `gfx_stats._LEVELS` is `(0, 2, 3, 3)`, the fallback for a missing
+    CSV, held to the CSV by `dev/tests/test_gfx_stats.py`.
+  - **High:** every group 3. Custom starts as High with the grass lit, and is the
+    player's: a change to a shipped row never rewrites a saved Custom row.
+- **Medium is no longer the cheap preset: level 2 doubles its frame.** Measured windowed on
+  the 16 GB Mac, noon, the perf audit's forest spot, by `probes/probe_medium_reach.py`
+  (it nudges the live rows from the old ones to the new and measures each; `--map` for
+  the 1 km level):
+
+  | Medium's rows | 200 m map | 1 km map |
+  |---|---|---|
+  | groups 1, 180 m / 180 m (before G2), grass at 1.1/m² | 13.8 ms | 21.9 ms |
+  | the same rows, the 200 m map's grass at 2.2/m² | 16.4 ms | 22.1 ms |
+  | groups 2 and their shadow maps | 31.7 ms | 36.2 ms |
+  | and grass 300 m, trees 400 m (Medium today) | 32.4 ms | 38.1 ms |
+
+  So the level is +14 to +15 ms on either map, the distances under 1 ms on the 200 m map
+  (it is 283 m corner to corner) and +1.9 ms on the 1 km map, the doubled grass +2.6 ms.
+  **Medium is over 33 ms on the 1 km map** (38 ms, 26 fps) and just under it on the 200 m
+  one; High there is 46.8 ms. G2 reports it and does not tune it back.
+- **A draw distance row is metres on the ground, and nothing cuts shorter.** The tuner
+  divides the view distance out (`gfx_tuner_foliage.py`), so at Medium the grass's base
+  layer fades out at 300.0 m and the trees at 400.1 m with the cells' own max draw
+  distance 130 m and 160 m further (432.5 m and 558.8 m after `r.ViewDistanceScale`
+  0.7). `probe_medium_reach.py` checks those numbers, then pictures two cells from 255 m
+  (350 m for trees) shown and hidden with everything else that grows hidden and the fog
+  off: grass at 265–300 m and trees at 360–400 m are drawn on both maps, and nothing of
+  either from past its cell's distance. The fade is a thinning: at 265–300 m a tenth of
+  the clumps are left. A HISM also culls by cluster, so some trees are still drawn 20 m
+  past the row.
 - **A new row moves `STAT_COUNT`, and a save of another length is another build's.** Add
   the old layout to the load (`gfx_save.author_legacy_row`, `gfx_stats.LEGACY_COLUMNS`) or
   every player's Custom row is dropped. Probe: `probe_gfx_groups.py` (`--windowed`).

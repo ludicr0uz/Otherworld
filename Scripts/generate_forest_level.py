@@ -42,7 +42,7 @@ from forest_generator.grass_placement import (
     DEFAULT_PATCHINESS,
     KNEE_HEIGHT_CM,
 )
-from forest_generator.grass_look import grass_specs_for
+from forest_generator.grass_look import density_for, grass_specs_for
 from forest_generator.bush_placement import (
     scatter_bushes,
     DEFAULT_BUSH_SPECS,
@@ -109,9 +109,10 @@ def main():
                         help=f"Multiplier on every tree species' per-hectare count "
                              f"(default: {DEFAULT_TREE_DENSITY}; 1.0 = the full "
                              f"forest the specs describe)")
-    parser.add_argument("--grass-density", type=float, default=DEFAULT_DENSITY_PER_SQM,
+    parser.add_argument("--grass-density", type=float, default=None,
                         help=f"Grass clumps per square metre "
-                             f"(default: {DEFAULT_DENSITY_PER_SQM})")
+                             f"(default: {DEFAULT_DENSITY_PER_SQM}, or what "
+                             f"grass_look.HELD_DENSITY_PER_SQM holds the level at)")
     parser.add_argument("--grass-height", type=float, default=KNEE_HEIGHT_CM,
                         help=f"Knee height in cm the dominant grass layer is "
                              f"scaled to (default: {KNEE_HEIGHT_CM:.0f})")
@@ -143,6 +144,8 @@ def main():
     world_size_m = args.size
     world_size_cm = world_size_m * 100.0
     level_name = args.name or f"Lvl_Forest_{int(world_size_m)}m"
+    if args.grass_density is None:
+        args.grass_density = density_for(level_name)
     lighting = get_preset(args.time_of_day)
 
     output_dir = os.path.join(SCRIPTS_DIR, "generated_levels", level_name)

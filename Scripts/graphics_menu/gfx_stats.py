@@ -101,8 +101,9 @@ def _metres(column):
     return tuple(round(FULL_VIEW_M[column] * pct * PERCENT) for pct in _VIEW_PCT)
 
 
-# The engine quality level each preset ran when one row set every group.
-_LEVELS = (0, 1, 3, 3)
+# The engine quality level each preset's groups default to (Medium was 1
+# until G2).
+_LEVELS = (0, 2, 3, 3)
 
 
 def _group(column, label, setter):

@@ -12,4 +12,6 @@ call, rather than carrying inline. Unlike forest_generator/, these import
   undergrowth_assets  Check the grass and bush meshes are there before a level plants them, and verify them
 
   grass_look  Build the dark grass's material instance, tint the ground under it, and verify both
+
+  grass_recolour  Give a planted level's grass cells the materials its specs name, without planting it again
 """

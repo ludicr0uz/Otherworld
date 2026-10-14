@@ -227,7 +227,9 @@ if EXPECTED_BUSH_COUNT > 0:
 if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
     from forest_import import undergrowth_assets, wind as wind_import
     wind_import.verify_wind(check)
-    undergrowth_assets.verify_undergrowth_assets(check, actors)
+    undergrowth_assets.verify_undergrowth_assets(check, actors, LEVEL_NAME)
+    from forest_import import grass_look as grass_look_import
+    grass_look_import.verify_grass_look(check)
 
 # ── 6. Navigation + NPCs ─────────────────────────────────────────────
 if EXPECTED_NPCS:

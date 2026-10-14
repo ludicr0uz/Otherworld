@@ -56,4 +56,6 @@ Scripts/net/CLAUDE.md has the conventions and the traps.
   throw_watch  What a client shows of one thrown item, frame by frame (task R2)
 
   crawl_watch  What a crawling body does, read off its joints: the measurements probe_stance_clips.py and probe_net_crawl.py ...
+
+  png_pixels  Reading a screenshot's pixels in a probe: the editor's Python has no image library, and a picture is the only ...
 """

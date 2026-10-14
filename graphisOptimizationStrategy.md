@@ -268,3 +268,41 @@ The widening named above is done, on `Lvl_Forest_200m` only (`forest_generator/g
 - **Blades do not read as oversized at 1.8×:** a clump reads as a wider tussock, so the width was not brought down.
 
 Pictures (git-ignored, `assets/generated/undergrowth/`): `g1_<Low|Medium|High>_<noon|night>_<across|down>.png`, and the same twelve from before as `g1_before_…`. Not done: the 1 km map (its grass is the pack's until the pictures are seen; its ground is already the dark one), Retina-equivalent pixels, Low's frame time.
+
+### Medium at level 2, grass to 300 m, twice the grass, the 1 km map's colour (G2, 2026-10-13)
+
+Four changes, measured apart. Medium's ten engine quality groups go from level 1 to 2 with that level's shadow maps (2048 for the sun and moon, 1024 for other lights, 4 cascades). Medium draws the grass to 300 m and the trees to 400 m (180 m and 180 m before). The grass density default goes from 1.1 to 2.2 clumps/m² with the tier shares unchanged, so every grass layer setting draws twice the clumps; only `Lvl_Forest_200m` is regenerated at it (81,697 clumps where 40,521 were, its `.umap` 14.4 MB where 7.4 was). `Lvl_Forest_1000m` keeps its 1,025,988 clumps, their places and their narrow width (`grass_look.HELD_DENSITY_PER_SQM`) and gains the dark material alone, set on its 400 grass cells in place (`Scripts/recolour_grass.py`), with no re-import.
+
+`probes/probe_medium_reach.py` (new; windowed at 1280×720, the perf audit's spot, noon) nudges Medium's live rows from the old ones to the new and measures each state twice, so the shares can be told apart in one run:
+
+| Medium's rows | 200 m map, before | 200 m map, after (2.2/m²) | 1 km map, before | 1 km map, after (recoloured) |
+|---|---|---|---|---|
+| groups 1, grass 180 m, trees 180 m | 13.85, 13.77 ms | 16.43, 16.42 ms | 22.00, 21.82 ms | 22.16, 21.95 ms |
+| groups 2 and their shadow maps | 28.26, 28.22 ms | 32.84, 30.63 ms | 35.52, 35.60 ms | 36.22, 36.10 ms |
+| and grass 300 m, trees 400 m | 28.06, 29.08 ms | 32.36, 32.48 ms | 37.54, 37.55 ms | 38.10, 38.00 ms |
+
+- **Level 2 is the cost: +14.4 ms on the 200 m map and +13.7 ms on the 1 km map,** about doubling Medium's frame. Which of the ten groups carries it was not measured (`probe_gfx_groups.py` can move them one at a time).
+- **The longer draw distances cost +2.0 ms on the 1 km map and nothing measurable on the 200 m map,** which is 283 m corner to corner, so little stands past the old 180 m.
+- **Twice the grass costs +2.6 ms at the old rows and about +3 ms at the new ones** on the 200 m map.
+- **Medium is over 33 ms on the 1 km map: 38.1 ms (26 fps), where it was 21.9 ms (46 fps).** On the 200 m map it is 32.4 ms, just under. It is reported here and not tuned back; the cheapest lever by these numbers is the level, not the distances or the grass.
+
+`probes/probe_grass_look.py`, the grass cells alone hidden and shown, each state twice, before and after on the same day:
+
+| Map | Preset | | Grass shown | Grass hidden | Grass costs |
+|---|---|---|---|---|---|
+| 200 m | Medium | before | 14.13, 13.83 ms | 11.06, 11.01 ms | 3.0 ms |
+| 200 m | Medium | after | 32.71, 31.56 ms | 27.99, 25.41 ms | 5.4 ms |
+| 200 m | High | before | 41.57, 41.56 ms | 40.42, 40.43 ms | 1.1 ms |
+| 200 m | High | after | 42.21, 42.75 ms | 40.33, 40.40 ms | 2.1 ms |
+| 1 km | Medium | before | 22.10, 22.03 ms | 18.70, 18.60 ms | 3.4 ms |
+| 1 km | Medium | after | 38.43, 38.12 ms | 32.50, 32.61 ms | 5.7 ms |
+| 1 km | High | before | 46.79, 47.24 ms | 45.71, 45.77 ms | 1.3 ms |
+| 1 km | High | after | 46.83, 46.86 ms | 45.80, 46.16 ms | 0.9 ms |
+
+- **High did not move on the 1 km map** (its rows and that map's clumps are the same; only the material changed) and gained 1 ms on the 200 m map, the doubled grass.
+- **The 1 km map's grass costs more at Medium after (5.7 ms against 3.4) with the same clumps:** Medium now draws 300 m of it where it drew 180 m, under level 2's shadows.
+- **The distances are real.** At Medium the grass's base layer fades out at 300.0 m and the trees at 400.1 m, and the cells' own max draw distance stands at 432.5 m and 558.8 m, so neither it nor a mesh LOD cuts shorter than the row. Pictured from 255 m (grass) and 350 m (trees) with only two cells shown, then hidden: the grass at 265–300 m differs over 501 pixels of the 1 km map's frame (6 between two frames of one state) and 2,954 on the 200 m map; the trees at 360–400 m over 10,281 and 4,057. From past the cells' own distance nothing differs. The fade is a thinning, so at 265–300 m about a tenth of the clumps are left, each a pixel and a half: it reads as a tone on the ground, not as blades.
+- **The three game runs straight after the re-import measured 100–200 ms a frame and one stalled:** the game was rebuilding what the import had invalidated, with a 13 GB editor in swap beside it. The numbers above are from the runs after.
+- **Doubling the 1 km map too would be about 2.05 million clumps and a `.umap` of about 360 MB** (170 bytes a clump, measured on the 200 m map; today's is 185 MB), and by the 200 m map's numbers some 3 ms more at Medium. Not done here.
+
+Pictures (git-ignored, `assets/generated/undergrowth/`): the twelve of the 200 m map as `g2_<Low|Medium|High>_<noon|night>_<across|down>.png`, the same twelve of the 1 km map as `g2_1km_…` (`g2_1km_Medium_noon_across.png` and `g2_1km_Medium_night_across.png` are the two looking across its ground), and the reach pictures as `g2_reach_<level>_<grass|tree>_<near|far>_<shown|hidden>.png`. Not measured: night frame times, which group of level 2 costs what, a packaged build.

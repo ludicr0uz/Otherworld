@@ -313,10 +313,10 @@ def _check_rows(check):
     """The rows the one engine quality row became (pure table, no graph)."""
     groups = [st for _i, st in GS.stats_by(GS.GROUP)]
     wrong = [st.column for st in groups
-             if (st.lo, st.hi, st.step, st.kind, st.defaults) != (0, 3, 1, int, (0, 1, 3, 3))]
+             if (st.lo, st.hi, st.step, st.kind, st.defaults) != (0, 3, 1, int, (0, 2, 3, 3))]
     check(f"the tab has a row per engine quality group ({len(groups)}: "
           f"{', '.join(st.column for st in groups)}), each 0-3 and each starting at "
-          "the engine quality its preset ran (0, 1, 3, 3); no engine quality row",
+          "the engine quality its preset runs (0, 2, 3, 3); no engine quality row",
           len(groups) == 10 and not wrong and len({st.target for st in groups}) == len(groups)
           and GS.LEGACY_LEVEL_COLUMN not in GS.GFX_COLUMNS, str(wrong))
     want = {"shadow_resolution": ("r.Shadow.MaxCSMResolution", 512, 4096),

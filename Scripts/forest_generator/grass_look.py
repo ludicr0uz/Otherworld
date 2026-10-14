@@ -1,5 +1,6 @@
 """The dark, ground-filling grass: its colours, the ground's under it, how wide
-a clump is planted, and which levels have it. Pure Python (no ``unreal``).
+a clump is planted, how many to the square metre, and which levels have which.
+Pure Python (no ``unreal``).
 
 The library clump (undergrowth_meshes.py) with the pack's material is a light
 green tuft 54 cm across on pale ground: about a sixth of the ground covered,
@@ -13,9 +14,12 @@ and nothing of a spooky forest. Three things change that, at the same count:
 ``forest_import/grass_look.py`` builds the instance and patches the ground
 material from these numbers; nothing is written to a pack asset.
 
-The colour and the width are per level (``DARK_GRASS_LEVELS``): a level not
-named here plants ``DEFAULT_GRASS_SPECS`` as before. The ground material is
-shared by every level, so its colour is not.
+The colour and the width are per level, each by its own list
+(``DARK_GRASS_LEVELS``, ``WIDE_GRASS_LEVELS``): a level in neither plants
+``DEFAULT_GRASS_SPECS`` as before. The ground material is shared by every
+level, so its colour is not. The count is per level too (``density_for``): a
+level held in ``HELD_DENSITY_PER_SQM`` is regenerated at the density it was
+planted at, not at today's default.
 
 What the pack's material does with the numbers (MA_Grass, read in the editor):
 
@@ -32,12 +36,18 @@ bright green.
 
 from dataclasses import replace
 
-from .grass_placement import DEFAULT_GRASS_SPECS
+from .grass_placement import DEFAULT_DENSITY_PER_SQM, DEFAULT_GRASS_SPECS
 from .undergrowth_meshes import GRASS_02_09
 
-# The levels whose grass is the dark, wide one. The 1 km map is not here until
-# its pictures have been seen: it keeps the pack material and the narrow clump.
-DARK_GRASS_LEVELS = ("Lvl_Forest_200m",)
+# The levels whose grass draws the dark instance.
+DARK_GRASS_LEVELS = ("Lvl_Forest_200m", "Lvl_Forest_1000m")
+# The levels whose clumps are planted wide. The 1 km map has the colour only:
+# its million clumps keep their places and their narrow width.
+WIDE_GRASS_LEVELS = ("Lvl_Forest_200m",)
+# Clumps per m2 a level is held at when the default moves on without it. The
+# 1 km map stays at 1.1 (1.0 M clumps, a 185 MB .umap): at the default's 2.2
+# it would be about 2 million.
+HELD_DENSITY_PER_SQM = {"Lvl_Forest_1000m": 1.1}
 
 # ─── The grass's colour ──────────────────────────────────────────────────────
 
@@ -101,16 +111,28 @@ def has_dark_grass(level_name):
     return level_name in DARK_GRASS_LEVELS
 
 
+def has_wide_grass(level_name):
+    return level_name in WIDE_GRASS_LEVELS
+
+
+def density_for(level_name):
+    """Clumps per m2 ``level_name`` is generated at unless told otherwise."""
+    return HELD_DENSITY_PER_SQM.get(level_name, DEFAULT_DENSITY_PER_SQM)
+
+
 def material_object_path():
     """The instance as a spec names it: ``/Game/Dir/Name.Name``."""
     return f"{GRASS_MATERIAL}.{GRASS_MATERIAL.rsplit('/', 1)[1]}"
 
 
 def grass_specs_for(level_name):
-    """The grass specs ``level_name`` plants: the default ones, or on a dark
-    grass level the same specs wider and drawn with the dark instance."""
-    if not has_dark_grass(level_name):
+    """The grass specs ``level_name`` plants: the default ones, drawn with the
+    dark instance on a dark grass level and wider on a wide grass level."""
+    changes = {}
+    if has_dark_grass(level_name):
+        changes["material_paths"] = [material_object_path()]
+    if has_wide_grass(level_name):
+        changes["width_jitter"] = WIDE_WIDTH_JITTER
+    if not changes:
         return list(DEFAULT_GRASS_SPECS)
-    return [replace(spec, material_paths=[material_object_path()],
-                    width_jitter=WIDE_WIDTH_JITTER)
-            for spec in DEFAULT_GRASS_SPECS]
+    return [replace(spec, **changes) for spec in DEFAULT_GRASS_SPECS]

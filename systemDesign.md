@@ -83,7 +83,9 @@ applied there, by `BP_GameTuner` on the GameState, only where the server was sta
 this machine's; M32, `Scripts/graphics_menu/CLAUDE.md`, "The tuning tabs by mode"; the graphics tab's
 rows per preset include one for each engine quality group, Lumen GI, reflections, shadow detail,
 post-processing, effects, textures, shading, foliage, anti-aliasing and character LOD, each 0-3 and
-applied by itself, and the sun's shadow resolution, the lamps' and the cascade count), and Exit Game on the
+applied by itself, and the sun's shadow resolution, the lamps' and the cascade count; Medium runs
+every group at level 2 and draws grass to 300 m and trees to 400 m since G2, which measures 32 ms a
+frame on the 200 m map and 38 ms on the 1 km one, over the 33 ms of 30 fps), and Exit Game on the
 title or Save and Exit in play (a 15 s countdown, cancelled by a hit, a move, the
 trigger or leaving the ground, with the movement left walking so the feet stay fitted
 to the ground; saves stats, inventory and worn garments, not the location; death deletes the
@@ -104,9 +106,10 @@ change. The forest has day and night beds faded by the clock.
 
 **The world** (`Scripts/world/CLAUDE.md`, `Scripts/forest_generator/CLAUDE.md`). Two
 generated maps, `Lvl_Forest_200m` (the editor's startup map) and `Lvl_Forest_1000m` (what a
-packaged game plays). On the 200 m map the grass is a dark, dull olive in wide clumps that
-cover some 40% of a ground tinted to match; the 1 km map's is still the pack's light green
-tufts, on the same dark ground (`forest_generator/grass_look.py`). A clock turns the sun and moon; day and night are 4 minutes each for
+packaged game plays). The grass is a dark, dull olive on a ground tinted to match, on both:
+on the 200 m map in wide clumps at 2.2 to the square metre (81,697 of them, twice what any
+grass density setting drew before G2), on the 1 km map in the narrow clump at 1.1 (1.03
+million; doubling it is its own task) (`forest_generator/grass_look.py`). A clock turns the sun and moon; day and night are 4 minutes each for
 now, the night moonlit under the real stars, and a level starts at a random hour. The clock
 has one owner: the server's (single player's own), which every client's sky and wind follow
 through the GameState (`Scripts/net/CLAUDE.md`, "One world clock"). At night
@@ -307,16 +310,20 @@ mesh's own material at 0.7–1.0× to reach knee height; the offline `Grass Upsc
 still fails the build past **2.4×**. Per-instance jitter is height ×0.85–1.15, width
 ×0.85–1.20, and a ±4° lean so the field does not look stamped.
 
-**The dark, wide grass (`forest_generator/grass_look.py`).** On the levels it names, today
-`Lvl_Forest_200m` alone, `grass_specs_for(level)` hands the scatter the same spec with two
-fields changed: width ×1.55–2.10 at the same height (the same clumps in the same places,
-about 3.2× the area each, some 40% of the ground covered where a sixth was) and a material,
+**The dark, wide grass (`forest_generator/grass_look.py`).** Two lists of levels, each
+changing one field of the spec `grass_specs_for(level)` hands the scatter. On a level in
+`DARK_GRASS_LEVELS` (the 200 m and 1 km maps) the material:
 `/Game/Forest/Materials/MI_Grass_02_09_Dark`, an instance of the pack's `grass_02_09_Mat`
-set to a dark, dull olive. The same module holds the ground's colour: the import
+set to a dark, dull olive. On a level in `WIDE_GRASS_LEVELS` (the 200 m map alone) the
+width: ×1.55–2.10 at the same height (the same clumps in the same places, about 3.2× the
+area each). The module also holds a level to a density when the default moves on
+(`HELD_DENSITY_PER_SQM`, `density_for(level)`): the default is 2.2 clumps/m² since G2 and
+the 1 km map stays at 1.1. A level that gains only the colour is not planted again:
+`Scripts/recolour_grass.py` sets the material on its cells in place. The same module holds the ground's colour: the import
 (`forest_import/grass_look.py`) builds the instance and puts a desaturation and a tint
 (`GroundSaturation`, `GroundTint`) in front of `M_Forest_Ground_PBR`'s base colour, so a gap
 between clumps does not read as bare ground. That material is shared, so every level's
-ground is the dark one; the 1 km and probe levels' grass is still the pack's light green.
+ground is the dark one; the probe level has no grass.
 
 200 m at the defaults ⇒ **40,521 clumps**, about 1.0/m² with every density tier drawn. A clump
 covers about 0.15 m², so the ground reads as tufts with terrain between them, not a field
@@ -625,8 +632,9 @@ weapon's name, and every per-weapon number is a row of `gun_tuning.csv`.
 - **Blueprint authoring is available from Python.** `BlueprintGraphEditor` +
   `BlueprintEditorLibrary` cover node creation, pin lookup, connection, variables, compile.
   Prefer it over hand-editing assets — and never over editing `.uasset` as text.
-- **Foliage instance budgets.** ~44 k HISM instances at the default density is fine, but the
-  count scales with map *area* — a 400 m map is 4× the clumps. Reach for `--grass-density`
+- **Foliage instance budgets.** ~82 k HISM instances on the 200 m map at the default density
+  (2.2/m²) is fine, but the count scales with map *area* — a 400 m map is 4× the clumps,
+  and the 1 km map would be 2 million (it is held at 1.1/m²). Reach for `--grass-density`
   before reaching for a new scatter algorithm.
 - **Verify after importing.** The offline suite cannot see collision, materials or actors;
   the in-editor script is the real gate.

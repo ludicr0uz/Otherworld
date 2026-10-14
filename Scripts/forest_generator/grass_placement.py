@@ -75,8 +75,8 @@ class GrassSpec:
 # One clump out of the grass library (forest_generator/undergrowth_meshes.py):
 # 60 cm tall and about 54 cm across as authored, so planting scales it by
 # 0.7-1.0 to reach knee height. No material is named: a cell draws the mesh's
-# own. A level named in grass_look.py plants these wider and with a dark
-# instance of that material (grass_look.grass_specs_for).
+# own. A level named in grass_look.py plants these with a dark instance of
+# that material, or wider, or both (grass_look.grass_specs_for).
 #
 # The clump is a third of the width of the generated patch it replaced
 # (1.1 m), so at the same count the ground is far more open: tufts with
@@ -95,9 +95,11 @@ MAX_UPSCALE_FACTOR = 2.4
 KNEE_LAYER_MIN_RATIO = 0.85
 
 # Clumps per m² of map with every tier drawn (Ultra); Low draws
-# GRASS_TIERS[0].share of it. A clump covers about 0.15 m², so that is roughly
-# a sixth of the ground under grass at Ultra and a fifteenth on Low.
-DEFAULT_DENSITY_PER_SQM = 1.1
+# GRASS_TIERS[0].share of it. A clump covers about 0.15 m² as authored, so
+# that is roughly a third of the ground under grass at Ultra and an eighth on
+# Low (more where a level plants it wide). It was 1.1 until G2 doubled every
+# layer; a level held at another number is in grass_look.HELD_DENSITY_PER_SQM.
+DEFAULT_DENSITY_PER_SQM = 2.2
 DEFAULT_PATCHINESS = 0.25       # 0 = perfectly even, ->1 = heavily clustered
 SPAWN_CLEAR_RADIUS_CM = 150.0   # keep the PlayerStart from being submerged
 TREE_CLEAR_RADIUS_CM = 90.0     # small bare ring at each trunk

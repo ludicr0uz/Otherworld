@@ -1,6 +1,7 @@
-"""The dark, wide grass (forest_generator/grass_look.py): which levels plant
-it, that it is the default clump with only its material and width changed, and
-that its material instance is content git carries."""
+"""The dark, wide grass (forest_generator/grass_look.py): which levels have
+the colour, which the width and which a density of their own, that it is the
+default clump with only its material and width changed, and that its material
+instance is content git carries."""
 
 import dataclasses
 import os
@@ -10,20 +11,36 @@ import unittest
 import _paths
 
 from forest_generator import grass_look as L
-from forest_generator.grass_placement import DEFAULT_GRASS_SPECS
+from forest_generator.grass_placement import DEFAULT_DENSITY_PER_SQM, DEFAULT_GRASS_SPECS
 from forest_generator.undergrowth_meshes import GRASS_02_09, content_file
 
 ROOT = os.path.dirname(_paths.SCRIPTS)
 
 
 class Levels(unittest.TestCase):
-    def test_only_the_200_m_level_has_it(self):
-        self.assertEqual(L.DARK_GRASS_LEVELS, ("Lvl_Forest_200m",))
+    def test_the_forest_levels_have_the_colour_and_the_200_m_one_the_width(self):
+        self.assertEqual(L.DARK_GRASS_LEVELS, ("Lvl_Forest_200m", "Lvl_Forest_1000m"))
+        self.assertEqual(L.WIDE_GRASS_LEVELS, ("Lvl_Forest_200m",))
 
     def test_any_other_level_plants_the_default_specs(self):
         # None is what a verify script written before the level argument passes.
-        for level in ("Lvl_Forest_1000m", "Lvl_Probe_50m", "Lvl_Title", None):
+        for level in ("Lvl_Probe_50m", "Lvl_Title", None):
             self.assertEqual(L.grass_specs_for(level), DEFAULT_GRASS_SPECS, level)
+
+    def test_the_1_km_level_has_the_colour_alone(self):
+        specs = L.grass_specs_for("Lvl_Forest_1000m")
+        self.assertEqual(len(specs), len(DEFAULT_GRASS_SPECS))
+        for dark, plain in zip(specs, DEFAULT_GRASS_SPECS):
+            self.assertEqual(dark.material_paths, [L.material_object_path()])
+            self.assertEqual(dataclasses.replace(dark, material_paths=plain.material_paths),
+                             plain)
+
+    def test_the_density_doubled_everywhere_but_on_the_1_km_level(self):
+        self.assertEqual(DEFAULT_DENSITY_PER_SQM, 2.2)
+        self.assertEqual(L.HELD_DENSITY_PER_SQM, {"Lvl_Forest_1000m": 1.1})
+        self.assertEqual(L.density_for("Lvl_Forest_1000m"), 1.1)
+        for level in ("Lvl_Forest_200m", "Lvl_Probe_50m", None):
+            self.assertEqual(L.density_for(level), DEFAULT_DENSITY_PER_SQM, level)
 
     def test_the_default_specs_are_not_touched(self):
         L.grass_specs_for("Lvl_Forest_200m")

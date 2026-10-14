@@ -3,7 +3,7 @@
   author_title       GameStarted false: the menu stands alone, open, over a
                      hidden HUD and a paused world
   author_death_menu  PlayerDead: WBP_DeathMenu instead of the HUD, the score,
-                     and, in standalone, [R] restarting the level; as a client
+                     and, in standalone, [R] back to the title's main menu; as a client
                      of a server the hint says a respawn is coming and no key
                      or click does anything
   author_alive       neither: the HUD's Body shown, the death menu hidden
@@ -49,7 +49,8 @@ from graphics_menu.umg_consts import (
 from uebp.nodes.actor import FN_GET_OWNING_PC, FN_WAS_PRESSED
 from uebp.nodes.math import FN_EQ_II, FN_OR
 from uebp.nodes.system import (
-    FN_CONCAT, FN_INT_TO_STR, FN_IS_STANDALONE, FN_LEVEL_NAME, FN_OPEN_LEVEL)
+    FN_CONCAT, FN_INT_TO_STR, FN_IS_STANDALONE, FN_OPEN_LEVEL)
+from title.paths import TITLE_LEVEL
 from net.pause import author_unpause
 from net.state_consts import PLAYER_KILL_COUNT_VAR, PLAYER_STATE_CLASS_PATH
 from graphics_menu import hud_vars as MV
@@ -83,10 +84,12 @@ def author_death_menu(ed, in_execs, state_out):
     WBP_DeathMenu instead of the HUD, not over it -- a reticle and an
     inventory over a death screen read as a game still being played.
 
-    Restarting is SetGamePaused(false) *then* OpenLevel: a level opened while
-    the world is paused comes up paused, with nothing left able to unpause it.
+    Leaving is SetGamePaused(false) *then* OpenLevel of the title level: a
+    level opened while the world is paused comes up paused, with nothing left
+    able to unpause it. The title opens on the main menu, and New Game there
+    starts again; there is no retry from the death screen itself.
 
-    Restarting is standalone's: there death ends that game (the mode table's
+    Leaving is standalone's: there death ends that game (the mode table's
     death row, serversupportsysdesign.md 4.8). As a client of a server the
     same screen is up for the seconds until the server gives the player a
     new body (combat/player_respawn.py): the hint line says so, the restart
@@ -158,21 +161,19 @@ def author_death_menu(ed, in_execs, state_out):
     _set(served, CURSOR_ACCEPT_VAR, False)
     _connect(then(again), _pin(served, "execute"))
     unpaused = author_unpause(ed, [then(served)], made)
-    # The current map by name, so the menu restarts whatever level is loaded.
-    # bRemovePrefixString strips PIE's UEDPIE_0_.
-    where = keep(_node(ed, FN_LEVEL_NAME))
-    _set(where, "bRemovePrefixString", True)
-    _connect(unpaused, _pin(where, "execute"))
-    reopen = keep(_node(ed, FN_OPEN_LEVEL))
-    _connect(out(where), _pin(reopen, "LevelName"))
-    _connect(then(where), _pin(reopen, "execute"))
+    # Back to the title level, as save and exit goes (save_exit.py): its HUD
+    # opens on the main menu, whose New Game starts again. The profile is
+    # already deleted (save_exit._author_forget_on_death), so the figure on
+    # the stage and the next game start bare.
+    home = keep(_node(ed, FN_OPEN_LEVEL))
+    _set(home, "LevelName", TITLE_LEVEL)
+    _connect(unpaused, _pin(home, "execute"))
 
     ed.add_comment_to_nodes(
         f"The death menu, instead of the HUD while the GameMode's PlayerDead is "
         f"set and the game is paused. [{RESTART_KEY}] or a click on the hint "
-        f"line unpauses and reopens the "
-        f"current level, which resets the kill count with it -- the counter "
-        f"lives on the GameMode, and OpenLevel builds a new one. In standalone only: "
+        f"line unpauses and opens the title level ({TITLE_LEVEL}), onto the main "
+        f"menu, whose New Game starts a fresh game. In standalone only: "
         f"as a client of a server the hint says a respawn is coming, and nothing "
         f"restarts.",
         made)

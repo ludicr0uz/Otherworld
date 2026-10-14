@@ -1,5 +1,5 @@
 """verify_graphics_menu.py's checks for the death menu by mode
-(menu_screens.author_death_menu): in standalone the restart, as a client of a
+(menu_screens.author_death_menu): in standalone back to the title's main menu, as a client of a
 server a hint that a respawn is coming and nothing to press. The graph only;
 `probes/probe_net_death.py` is the behaviour, in both modes.
 """
@@ -10,6 +10,7 @@ from graphics_menu import umg_consts as C
 from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR
 from graphics_menu.pause_checks import _gates, _pins, _sources, _title, _value
 from graphics_menu.umg_checks import text_literal
+from title.paths import TITLE_LEVEL
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -51,9 +52,12 @@ def check_death_menu(check, nodes):
     alone, shared = _reach(BEL.find_then_pin(gates[0])), _reach(BEL.find_else_pin(gates[0]))
     polled = [n for n in alone for s in _sources(n, "Condition") for a in _sources(s, "A")
               if a in _polls(nodes)]
-    check(f"standalone keeps the restart: [{C.RESTART_KEY}] or a click, then OpenLevel",
-          len(_restarts(alone)) == 1 and len(polled) == 1,
-          f"{len(_restarts(alone))} OpenLevel, {len(polled)} poll(s)")
+    homes = [n for n in _restarts(alone) if _value(n, "LevelName") == TITLE_LEVEL
+             and not _sources(n, "LevelName")]
+    check(f"standalone goes back to the main menu: [{C.RESTART_KEY}] or a click, then "
+          f"OpenLevel of the title level ({TITLE_LEVEL}), not the level in play",
+          len(_restarts(alone)) == 1 and len(homes) == 1 and len(polled) == 1,
+          f"{len(_restarts(alone))} OpenLevel, {len(homes)} to the title, {len(polled)} poll(s)")
     lowered = [n for n in shared if _title(n) == f"Set {CURSOR_ACCEPT_VAR}"
                and _value(n, CURSOR_ACCEPT_VAR) == "false"]
     check("as a client of a server nothing restarts: no OpenLevel and no key poll on "

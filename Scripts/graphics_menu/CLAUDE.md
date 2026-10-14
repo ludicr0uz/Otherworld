@@ -82,7 +82,7 @@ link under it, names its part there.
   comes up in play. Nothing is paused on the title: the stage has nothing to pause, and
   the character idles live (a paused world would freeze it in whatever pose its first
   frames reached). The HUD neither pauses nor ticks while paused any more; the one
-  `SetGamePaused` left in its graph is the death menu's unpause before the restart.
+  `SetGamePaused` left in its graph is the death menu's unpause before it opens the title level.
 - **The figure is dressed from the profile** (`title_figure.py`, Tick's title arm, once:
   `TitleDressed`): when the pawn's parts cast and the weapon component has issued the
   loadout, `DoesSaveGameExist` on the profile's slot, `LoadGameFromSlot`, and each saved
@@ -125,7 +125,7 @@ link under it, names its part there.
   `net.pause.author_pause` (`combat/death.py`): a Branch on IsStandalone in front of its
   `SetGamePaused(true)`. As a client of a server there is no title at all (below). The
   HUD ticks either way, `menu_still.py` holds the walk and `author_hold_fire` the fire
-  press while the menu is open, and the restart's unpause (`author_unpause`) is a plain
+  press while the menu is open, and the death menu's unpause (`author_unpause`) is a plain
   call, a no-op where nothing paused. `probe_net_menu_overlay.py` (`uepy.py --net`) is
   the client's half, with `--windowed` for the fire press, which DrawHUD holds.
 - **Probes:** `probe_main_menu.py` holds a title up by hand on its level under `-nomenu`,
@@ -288,7 +288,9 @@ Moved word for word: `docs/history/menu.md#the-mouse-cursor`.
   shows the one the frame is on and writes the live values (`SetText`, `SetPercent`,
   `SetVisibility`).
 - **Which screen:** `GameStarted` false → the menu alone, held open (`Body` hidden);
-  `PlayerDead` → `WBP_DeathMenu`; otherwise `WBP_HUD`'s `Body`. In either of the first and
+  `PlayerDead` → `WBP_DeathMenu` (in standalone `[R]` or a click opens the title level,
+  `TITLE_LEVEL`, onto the main menu, as save and exit does: no retry, New Game starts again);
+  otherwise `WBP_HUD`'s `Body`. In either of the first and
   last, `WBP_PauseMenu` while `MenuOpen` (its own rows, or the settings page, by
   `MenuPage`, or the open tuning tab in their place), with `WBP_MainMenu` up beside it.
   `WBP_HUD` itself is never hidden, so its `Fps` text (outside

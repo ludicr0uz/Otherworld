@@ -120,8 +120,9 @@ each kind has a lifetime and a cap so a long-running world does not fill up; sin
 keeps what is left until it is taken (`Scripts/net/CLAUDE.md`, "Things left in the world").
 
 **Death** (`Scripts/combat/docs/health.md`, `Scripts/net/CLAUDE.md`). Nothing a dead body
-could do runs. In single player death ends the game: the world pauses on the death menu and
-the profile is deleted. As a client of a server the player's gear goes onto the body, which
+could do runs. In single player death ends the game: the world pauses on the death menu, the
+profile is deleted, and the menu's one choice goes back to the title's main menu, where New
+Game starts again. As a client of a server the player's gear goes onto the body, which
 anyone can loot, and the server respawns them 10 s later at a random PlayerStart. Players
 can hurt players; a player kill is counted apart from monster kills.
 

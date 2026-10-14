@@ -57,13 +57,13 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
 - **Everything collapses into a ragdoll** (`_author_death_collapse`):
   `DisableMovement` → capsule `NoCollision` → mesh profile `Ragdoll` → `SetAllBodiesSimulatePhysics`.
-  - Use `DisableMovement`, not `DisableInput`: the HUD polls restart off the controller.
+  - Use `DisableMovement`, not `DisableInput`: the HUD polls the death menu's key off the controller.
   - Turn off the capsule, not the mesh, because it is the capsule that blocks and is traced.
   - Set the profile **before** simulating.
   - `SetSimulatePhysics` would simulate only the root body.
 - **A player's death is two deaths, by mode** (`Scripts/net/CLAUDE.md`, "Death"; the mode
   table's death row). Both fork at a Branch on IsStandalone, and standalone's arm is what
-  it always was: the pause after `DEATH_PAUSE_SECONDS`, the death menu's restart.
+  it always was: the pause after `DEATH_PAUSE_SECONDS`, the death menu back to the title.
   - **On a server the gear is shed** (`weapon_component/shed.py`): the dead gate's first
     act, on the frame the owner is first found dead (`OwnerDead` read before the gate
     sets it). The server records `Inventory` and `Worn` on the body's `Loot` arrays; every
@@ -103,9 +103,10 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 - **The player's death:**
   - collapse → `Delay 2.2` → `GameMode.PlayerDead` → `[PLAYER-DEAD] killed with N` → pause.
   - The delay is also the ragdoll's settle time.
-  - The HUD draws YOU DIED, the kill count and `[R] try again`. That unpauses **before**
-    `OpenLevel`; a level opened paused stays paused.
-  - Restart is polled from `DrawHUD`, which runs while paused.
+  - The HUD draws YOU DIED, the kill count and `[R] or click   main menu`. That unpauses **before**
+    `OpenLevel` of the title level (`title/paths.TITLE_LEVEL`); a level opened paused stays
+    paused. There is no retry: New Game on the title's menu starts again.
+  - Its key is polled from `DrawHUD`, which runs while paused.
   - `FullBodySlot` is spliced into `ABP_Unarmed` and asserted, though nothing plays into it yet.
 - **The dead do nothing** (`weapon_component/dead.py`): the weapon component's Tick starts at a
   gate on its owner's health component, `Dead OR Health <= 0`, and a dead owner gets none of

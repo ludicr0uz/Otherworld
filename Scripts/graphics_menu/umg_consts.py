@@ -295,7 +295,8 @@ DEATH_PLAYER_SCORE_PREFIX = "Player Kills:  "
 RESTART_KEY = "R"
 DEATH_TITLE = "YOU DIED"
 DEATH_SCORE_PREFIX = "Monster Kills:  "
-DEATH_HINT = f"[{RESTART_KEY}] or click   try again"
+# Back to the title's main menu, where New Game starts again.
+DEATH_HINT = f"[{RESTART_KEY}] or click   main menu"
 # As a client of a server: nothing to press, the server gives a new body.
 DEATH_HINT_SERVER = "you will respawn in a moment"
 DEATH_PANEL_SIZE = (560.0, 300.0)

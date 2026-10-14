@@ -177,9 +177,8 @@ def author_take_mouse(ed, in_execs):
     """BeginPlay of a HUD that opens in play (the forest's): Game-only, once.
     Returns the exec tail.
 
-    The input mode is the viewport's, and outlives the level: New Game and
-    the death menu's restart are an OpenLevel from a screen that showed the
-    cursor, so the viewport comes in Game-and-UI. The HUD that opens there is
+    The input mode is the viewport's, and outlives the level: New Game is
+    an OpenLevel from a screen that showed the cursor (the title's), so the viewport comes in Game-and-UI. The HUD that opens there is
     a new one, CursorShown false like its wish, and author_cursor_mode sees
     no change to apply: the view stayed dead until a menu was opened and
     shut."""
@@ -189,7 +188,7 @@ def author_take_mouse(ed, in_execs):
         _connect(e, _pin(taken, "execute"))
     ed.add_comment_to_nodes(
         "In play at once: the mouse to the camera. The viewport keeps the "
-        "input mode of the level before (the title's, the death screen's: "
+        "input mode of the level before (the title's: "
         "Game-and-UI), and this HUD's CursorShown starts false, so DrawHUD "
         "would see nothing to switch.", made)
     return then(taken)

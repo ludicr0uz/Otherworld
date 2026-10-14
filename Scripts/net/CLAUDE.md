@@ -515,13 +515,13 @@ no builder names `FN_SET_PAUSED` itself:
 - `author_pause` (the title's at BeginPlay, death's) is `SetGamePaused(true)` off the true
   arm of a Branch on IsStandalone; elsewhere the flow goes on unpaused.
   `net/pause_checks.check_standalone_pause` is the verifiers' check of it.
-- `author_unpause` (the menu's first row, the death menu's restart) has no Branch: where
+- `author_unpause` (the menu's first row, the death menu's way back to the title) has no Branch: where
   nothing paused it does nothing, and in standalone nothing may stand between it and its row.
 - M5 pause: docs/history/multiplayer.md#m5
 
 **Death** (M16, done). One death path, forked where the table says: the health component's
 (`combat/death.py`) runs on every machine as before, and standalone's ends where it always
-did (the pause, the death menu's restart, the profile deleted). Outside standalone:
+did (the pause, the death menu back to the title's main menu, the profile deleted). Outside standalone:
 
 - M16 death: docs/history/multiplayer.md#m16
 

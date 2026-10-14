@@ -348,7 +348,8 @@ Wanderer (selector)
     `FindNearestActor`, pure: read once into `DrawnTo`). The fire does not tell the zombies
     when it is lit: the controllers are separate Blueprints, so it would need a cast per
     creature. So a zombie that comes within 200 m of a fire already burning (a respawn) is
-    drawn too. This build runs after `build_survival.py`; without `BP_Campfire`,
+    drawn too. A child class counts: the Horde Survival level's `BP_PermanentCampfire`
+    (never burns out) draws them the same way. This build runs after `build_survival.py`; without `BP_Campfire`,
     `drawn.draws()` leaves the step out with a log line and `verify_drawn.py` fails.
   - **None of it is tuned:** the range and the stand-off are literals, and the speed is the
     patrol's own share.

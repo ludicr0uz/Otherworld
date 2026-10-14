@@ -75,6 +75,12 @@ The generator's code lives in this package. The level-side import code is in
     30 and 80 cm) is 4.5–5.9 m. At 80 cm two pointed scans leave an 11 cm V, tolerated
     up to 40 cm (`fort.RAY_HEIGHTS_CM`); at 30 cm no crack is;
   - nothing grows inside 21 m (the fort and 8 m round it); the PlayerStart is the middle;
+  - a permanent campfire in the fort, 2.5 m from the PlayerStart (`fort.CAMPFIRE_OFFSET_CM`,
+    inside its 4 m of warmth): `BP_PermanentCampfire`, a `BP_Campfire` that never burns out
+    (`survival/permanent_campfire.py`), so it draws every zombie on the map (all spawn within
+    100 m of it, inside the 200 m draw) as a lit fire does. `fort.place_fort` places it with
+    the rocks (`place_campfire`, which removes an earlier one first) and `verify_fort` checks
+    it; `probes/probe_horde_campfire.py` watches the zombies walk to it;
   - nothing opens it yet (the menu's mode choice is a later task), and it is not in
     `MapsToCook`.
 

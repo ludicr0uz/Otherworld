@@ -11,6 +11,7 @@ STARVING_GE_PATH = f"{SURVIVAL_DIR}/GE_Starving"
 DEHYDRATED_GE_PATH = f"{SURVIVAL_DIR}/GE_Dehydrated"
 BLEEDING_GE_PATH = f"{SURVIVAL_DIR}/GE_Bleeding"
 CAMPFIRE_BP_PATH = f"{SURVIVAL_DIR}/BP_Campfire"
+PERMANENT_CAMPFIRE_BP_PATH = f"{SURVIVAL_DIR}/BP_PermanentCampfire"
 
 MAT_MUSHROOM_CAP = f"{SURVIVAL_DIR}/M_MushroomCap"
 MAT_MUSHROOM_STEM = f"{SURVIVAL_DIR}/M_MushroomStem"
@@ -22,6 +23,7 @@ MUSHROOM_CLASS_PATH = f"{MUSHROOM_BP_PATH}.BP_Mushroom_C"
 CANTEEN_CLASS_PATH = f"{CANTEEN_BP_PATH}.BP_WaterCanteen_C"
 BLEEDING_GE_CLASS_PATH = f"{BLEEDING_GE_PATH}.GE_Bleeding_C"
 CAMPFIRE_CLASS_PATH = f"{CAMPFIRE_BP_PATH}.BP_Campfire_C"
+PERMANENT_CAMPFIRE_CLASS_PATH = f"{PERMANENT_CAMPFIRE_BP_PATH}.BP_PermanentCampfire_C"
 
 # The player's and the wanderer's component names. Both characters get the
 # ability system; only the player gets hunger and thirst.

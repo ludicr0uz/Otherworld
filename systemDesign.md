@@ -113,7 +113,8 @@ change. The forest has day and night beds faded by the clock.
 generated maps, `Lvl_Forest_200m` (the editor's startup map) and `Lvl_Forest_1000m` (what a
 packaged game plays), and a third, `Lvl_Horde_Survival` (400 m): a dense forest ring round a
 sparse clearing, in whose middle a 13 m fort of chest-high moss rocks has three openings
-(`forest_generator/horde_layout.py`, `forest_import/fort.py`; nothing opens it yet). The grass is a dark, dull olive on a ground tinted to match, on both:
+and holds a campfire that never burns out, drawing the zombies to it
+(`forest_generator/horde_layout.py`, `forest_import/fort.py`, `survival/permanent_campfire.py`). The grass is a dark, dull olive on a ground tinted to match, on both:
 on the 200 m map in patches 1.2 m across, seven of the pack's clump merged (G3), in eight
 density layers the menu's grass density row picks from (1-8; F1): the four a shipped preset
 draws are 2.2 to the square metre (81,697 of them, twice what they drew before G2), and

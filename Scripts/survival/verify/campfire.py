@@ -1,7 +1,9 @@
 """BP_Campfire (survival/campfire.py): the model on the ground, the glow, the
 burn time, and the Tick that warms a player near it; and the weapon
 component's CampfireClass, which build_survival.py points at it. The strike
-that spawns it is verify_weapons' (combat/verify/light.py)."""
+that spawns it is verify_weapons' (combat/verify/light.py). And
+BP_PermanentCampfire (survival/permanent_campfire.py), the child that never
+burns out: the horde level's (its placement is that level's verifier's)."""
 
 import unreal
 
@@ -21,7 +23,7 @@ from survival.campfire import (
     CAMPFIRE_MESH, CAMPFIRE_SCALE, MAX_TEMPERATURE_VAR, TEMPERATURE_VAR, WARM_RADIUS_VAR,
     WARM_RATE_VAR,
 )
-from survival.paths import CAMPFIRE_BP_PATH
+from survival.paths import CAMPFIRE_BP_PATH, PERMANENT_CAMPFIRE_BP_PATH
 from survival.tuning import (
     CAMPFIRE_BURN_S, CAMPFIRE_WARM_PER_S, CAMPFIRE_WARM_RADIUS_CM,
 )
@@ -205,3 +207,31 @@ def run():
     check(f"BP_WeaponComponent.{CAMPFIRE_CLASS_VAR} points at BP_Campfire_C, so a "
           "strike of the matches lights one",
           got is not None and got.get_name() == "BP_Campfire_C", str(got))
+    check_permanent(bp)
+
+
+def check_permanent(parent):
+    bp = load(PERMANENT_CAMPFIRE_BP_PATH)
+    check("BP_PermanentCampfire exists, a child of BP_Campfire: whatever knows a "
+          "campfire (the zombies' Drawn step, the ward, a stick) knows it",
+          bp is not None and bp.get_blueprint_parent_class() == BEL.generated_class(parent),
+          str(bp.get_blueprint_parent_class() if bp else None))
+    if bp is None:
+        return
+    nodes = list(graph(bp).list_all_nodes())
+    lives = by_pins(nodes, "InLifespan")
+    begins = [n for n in nodes if "beginplay" in _squash(n)]
+    check("...its own BeginPlay sets no life span (0): it never burns out",
+          len(begins) == 1 and len(lives) == 1 and num_pin(lives[0], "InLifespan") in (None, 0.0)
+          and _feeders(lives[0], "execute") == begins,
+          str([num_pin(n, "InLifespan") for n in lives]))
+    check("...and calls nothing of the parent's: no burn time, never noted as a "
+          "leftover (a server's cap would put out the oldest fire)",
+          not left_nodes(nodes) and not any("parent" in _squash(n) for n in nodes)
+          and not any("tick" in _squash(n) for n in nodes),
+          str([_title(n) for n in nodes]))
+    d = cdo(bp)
+    check("...and warms as the parent does (its Tick, its radius and rate)",
+          abs(d.get_editor_property(WARM_RADIUS_VAR) - CAMPFIRE_WARM_RADIUS_CM) < 1e-6
+          and abs(d.get_editor_property(WARM_RATE_VAR) - CAMPFIRE_WARM_PER_S) < 1e-6
+          and net.replicates(bp), f"{d.get_editor_property(WARM_RATE_VAR)}")

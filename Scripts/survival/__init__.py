@@ -47,6 +47,8 @@ BUILDERS
   campfire          BP_Campfire: what the matches light; its Tick warms a player
                     within its radius. Also writes it onto the weapon
                     component's CampfireClass
+  permanent_campfire  BP_PermanentCampfire: a BP_Campfire that never burns out,
+                    the Horde Survival level's centre (forest_import/fort.py)
   install           the ability system + survival component onto the characters
                     (replicated, on the player)
   forage_level      putting the forage into a level, in the editor

@@ -21,6 +21,8 @@ WHAT THIS BUILDS
   BP_SurvivalComponent         Hunger/Thirst/Temperature, decay, debuffs
   GA_ConsumeItem               GameplayAbility, triggered by Event.Item.Consume
   BP_Campfire                  what the matches light: warms a player near it
+  BP_PermanentCampfire         a BP_Campfire that never burns out (the horde
+                               level's centre, forest_import/fort.py)
 and installs an AbilitySystemComponent on the player and the wanderer, plus
 BP_SurvivalComponent on the player. It also fills the corpse loot tables
 (loot/install.py) onto BP_HealthComponent, since they name these items, and
@@ -40,6 +42,7 @@ from combat.log import _log                                       # noqa: E402
 from uebp.graph import BEL, _apply_defaults                       # noqa: E402
 from loot.install import fill_loot_tables                          # noqa: E402
 from survival.campfire import build_campfire, install_campfire     # noqa: E402
+from survival.permanent_campfire import build_permanent_campfire  # noqa: E402
 from survival.consumables import build_consumables                 # noqa: E402
 from survival.consume_ability import build_consume_ability         # noqa: E402
 from survival.effects import build_debuff_effects, build_timed_effects  # noqa: E402
@@ -67,6 +70,8 @@ def main():
     # After the component too: the fire casts to it. Then onto the weapon
     # component, also before the install recompiles the characters.
     install_campfire(build_campfire())
+    # The Horde Survival level's fire: a child of the one just built.
+    build_permanent_campfire()
     install_survival(survival_bp)
     _log(f"done -- {', '.join(items)}, hunger, thirst, temperature, "
          f"{len(effects)} debuffs and the bleed, GA_ConsumeItem and the campfire")

@@ -176,6 +176,13 @@ intended rule for a respawn; for a logout it is the save's job.
 - **It crackles:** `Crackle`, an AudioComponent playing `/Game/Audio/A_Campfire`, a looping
   placed wave (how far and how loud are the wave's: `Scripts/Sound/CLAUDE.md`). On a
   component so that it ends with the fire. The weapons build imports the wave: run it first.
+- **The permanent fire** (`permanent_campfire.py`): `BP_PermanentCampfire`, a child of
+  `BP_Campfire` whose own BeginPlay sets a life span of 0 and calls nothing of the
+  parent's: no burn time, and not noted as a leftover (the server's cap would put out the
+  oldest fire, which this always is). Everything else is inherited, so the zombies, the
+  ward and a stick take it for a campfire. It stands in the Horde Survival fort
+  (`forest_import/fort.py`); `verify/campfire.check_permanent`,
+  `probes/probe_horde_campfire.py`.
 - `probes/probe_campfire.py` cuts wood, strikes, and measures the warmth in and out of the
   radius. It raises the fire's rate for the run and zeroes the night's cold.
 

@@ -483,7 +483,7 @@ FAB = (
                   "Scripts/asset_pipeline/import_lyra.py"),
         note="Epic's Lyra mannequin and its clips, of which the game plays "
              "the rows of Scripts/asset_pipeline/lyra_paths.CLIPS (the "
-             "punch), retargeted onto the player's skeleton into "
+             "guns' poses and reloads), retargeted onto the player's skeleton into "
              "Sourced/Lyra/UEFN_Player by import_lyra.py; not committed "
              "(.gitignore). Lyra's /Game/Characters/Heroes is "
              "/Game/Sourced/Lyra/Characters/Heroes here, found through "

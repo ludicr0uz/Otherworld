@@ -114,7 +114,7 @@ RATE_SCALE_RANGE = (0.5, 2.0)
 
 
 # ─── The player's melee set ─────────────────────────────────────────────────
-# The knife's and the axe's swing and ready pose (combat/melee_clips.py bakes
+# The knife's and the axe's swing and ready pose, and the punch (combat/melee_clips.py bakes
 # the game's clips from them).  Not PACKS: nothing of these is retargeted onto
 # a creature, and only the clips named in PLAYER_CLIPS are imported (the axe
 # pack has 47).  A pack is a zip, as above, or a folder of loose FBX files by
@@ -124,6 +124,8 @@ RATE_SCALE_RANGE = (0.5, 2.0)
 PLAYER_PACKS = (("Pro Melee Axe Pack", "MeleeAxe"),
                 ("Knife", "Knife"),
                 ("Scary Zombie Pack", "Scary"),
+                # The punch: its "zombie punching", one straight right.
+                ("Not So Scary Zombie Pack", "NotSoScary"),
                 # Where Scripts/dev/swap_clip.py copies an FBX handed to it
                 # from outside the cache; absent until it has.
                 ("Player", "Player"))

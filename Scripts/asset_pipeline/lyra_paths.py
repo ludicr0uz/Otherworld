@@ -53,11 +53,6 @@ RTG_UEFN_FROM_LYRA = f"{RIG_DIR}/RTG_UEFN_from_Lyra"
 UEFN_DIR = f"{GAME_ROOT}/{PLAYER_FAMILY}"
 UEFN_PREFIX = f"A_{PLAYER_FAMILY}_"
 
-# The empty-handed punch.  Lyra has no clip by that name: its melee is one
-# clip per weapon, and the pistol's is the one a bare fist reads as (a
-# straight right, the other hand off the gun).
-PUNCH = f"{ACTIONS}/MM_Pistol_Melee"
-
 # A gun's ready pose (C3): what it is held in for an aim, down the sights, a
 # shot, a reload and the guard.  Lyra's own ADS idles, one per kind of gun: a
 # breathing loop with the gun at the shoulder and the eye behind its sights.
@@ -80,7 +75,7 @@ RELOAD_PISTOL = f"{ACTIONS}/MM_Pistol_Reload"
 RELOAD_SHOTGUN = f"{ACTIONS}/MM_Shotgun_Reload"
 
 # Every Lyra clip the game plays.  A later one is a row here and a re-run.
-CLIPS = (PUNCH, AIM_RIFLE, AIM_PISTOL, RELOAD_RIFLE, RELOAD_PISTOL,
+CLIPS = (AIM_RIFLE, AIM_PISTOL, RELOAD_RIFLE, RELOAD_PISTOL,
          RELOAD_SHOTGUN)
 
 

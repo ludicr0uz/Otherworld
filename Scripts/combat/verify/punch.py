@@ -9,7 +9,7 @@ hit's stamps set both melee attacks' nodes aside.
 
 import unreal
 
-from asset_pipeline import lyra_paths as LYRA
+from asset_pipeline import mixamo_paths as MIXAMO
 from combat.anim_blueprint import AIM_SLOT
 from combat.skin import player_skin
 from combat.tuning import COMBAT
@@ -87,11 +87,12 @@ def check_punch_clip(skin, clip):
     """The blow is timed, not notified: its time has to be one the clip's
     fist is out at."""
     if skin.gas:
-        check("on the motion-matching skin the punch is Lyra's melee, retargeted "
-              "(asset_pipeline/import_lyra.py)",
-              skin.punch == LYRA.uefn_clip(LYRA.PUNCH)
-              and load(LYRA.PUNCH) is not None
-              and abs(clip.get_play_length() - load(LYRA.PUNCH).get_play_length()) < 0.05,
+        source = MIXAMO.source_clip(*MIXAMO.PLAYER_CLIPS["punch"])
+        check("on the motion-matching skin the punch is Mixamo's punch role, retargeted "
+              "(asset_pipeline/player_clips.csv, mixamo_player.py)",
+              skin.punch == MIXAMO.player_clip("punch")
+              and load(source) is not None
+              and abs(clip.get_play_length() - load(source).get_play_length()) < 0.05,
               skin.punch)
     check("...in place: a clip with root motion played into the slot would root the player",
           not clip.get_editor_property("enable_root_motion"))

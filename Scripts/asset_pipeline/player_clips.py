@@ -33,8 +33,14 @@ ROLES = {
     "axe_ready": ("the axe held ready, looping", ("axe",)),
     "axe_swing": ("the axe's swing", ()),
     "prone_crawl": ("the crawl while prone", ("body", "anim_patches")),
+    # Played as it is retargeted (its fist is closed already), from
+    # combat/tuning COMBAT.punch_clip_start_s: the weapon component's
+    # PunchAnim is the clip.
+    "punch": ("the empty-handed punch", ("weapon_component",)),
 }
 SWINGS = ("knife_swing", "axe_swing")
+# The roles combat/melee_clips.py does not bake: the game plays their copy.
+UNBAKED = ("prone_crawl", "punch")
 
 
 def parse(text):

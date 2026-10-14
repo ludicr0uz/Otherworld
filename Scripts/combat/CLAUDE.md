@@ -379,8 +379,8 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
 - **A clip belongs to one skeleton**, so the layers' clips are copies on
   `SK_UEFN_Mannequin` (`asset_pipeline/retarget_to_uefn.py`: the two ready poses and
   the six flinches off the mannequin, the crouch, crawl, kneel, throw and pick-up off
-  Quaternius's own rig; `asset_pipeline/import_lyra.py`: the punch, Lyra's
-  `MM_Pistol_Melee`, since C1; `SKIN_GAS` names them), and the poses the build keys (the hold
+  Quaternius's own rig; `asset_pipeline/mixamo_player.py`: the punch, Mixamo's
+  zombie punching; `SKIN_GAS` names them), and the poses the build keys (the hold
   poses, the shotgun's, the throw's) are keyed on that skeleton from them and
   from the sample's idle.
 - **No clip played into a slot may have root motion** (`hold_pose.in_place`,
@@ -438,15 +438,21 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
   guns raised, the AKM, the pistol and the shotgun lowered and down the sights, the pistol
   taken out mid-way through the AKM's; the left hand's leaving is measured in the right
   hand's frame, since the shotgun's starts out on the pump and comes in).
-- **The punch is Lyra's pistol melee** (C1; `asset_pipeline/lyra_paths.PUNCH`, a straight
-  right: Lyra has no unarmed attack). Nothing about the strike changed: the blow is still
-  timed, `COMBAT.punch_impact_s` (0.3 s) after the swing, not notified, with the same
-  sweep and damage. The clip's fist is out 0.45-0.5 s in, so the swing plays it from
-  `COMBAT.punch_clip_start_s` (0.15 s; `Strike.clip_start_s`, the slot play's
-  `InTimeToStartMontageAt`), and `verify/punch.py` measures the fist's reach at the
-  blow's time off the clip (at least 80% of the swing's travel). Under the mannequin's
-  clip the blow landed 0.1 s before the fist was out. A checkout without Lyra punches
-  with the mannequin's clip (`skin._gas_skin`).
+- **The punch is Mixamo's zombie punching** (the `punch` row of
+  `asset_pipeline/player_clips.csv`, the Not So Scary Zombie Pack's; 14 Oct 2026, before
+  it Lyra's pistol melee, which read as a pistol whip). One straight right, 1.03 s: on
+  the player's skeleton the fist is drawn back 0.3 s in (-7 cm) and out 0.65-0.7 s in
+  (53 cm), the left hand pulling back as it lands. Played as retargeted (Mixamo's fist is
+  closed: `melee_clips.py` bakes nothing of it). Nothing about the strike changed: the
+  blow is still timed, `COMBAT.punch_impact_s` (0.3 s) after the swing, not notified,
+  with the same sweep and damage; the swing plays the clip from
+  `COMBAT.punch_clip_start_s` (0.35 s, the left hand out and the right drawn back;
+  `Strike.clip_start_s`, the slot play's `InTimeToStartMontageAt`), and
+  `verify/punch.py` measures the fist's reach at the blow's time off the clip (at least
+  80% of the swing's travel; from 0.3 s it is 72%). `swap_clip.py punch <fbx>` tries
+  another download and rebuilds the weapon component, but re-read the start against
+  that check. A checkout without the copy punches with the mannequin's clip
+  (`skin._gas_skin`).
 - **The body is 10 cm shorter than the mannequin** and the ready poses are retargeted
   chain to chain, so the fist of a ready pose is 11-14 cm nearer and 14-19 cm lower in the
   capsule's frame (`carry_tuning.CARRY_GRIP`, re-measured) and the sights' view with it.
@@ -530,7 +536,7 @@ until C3.
 - **The poses lean in to the sights**: the fist is 11 to 13 cm further forward than in
   the mannequin's poses, so `carry_tuning.CARRY_GRIP` was re-measured ((28, 10, 40)).
 - **A checkout without Lyra** holds the guns in the mannequin's `MF_*_Idle_ADS`,
-  retargeted (`skin.GAS_AIM_WITHOUT_LYRA`, as the punch falls back); the shotgun
+  retargeted (`skin.GAS_AIM_WITHOUT_LYRA`); the shotgun
   verifier then fails its "is Lyra's" line.
 - **`probe_headshot` was unreliable before this** and is not the poses': its wanderer
   swung at the player, who was dead before the last round one run in two, and at 150 cm
@@ -576,14 +582,14 @@ into the game's own asset (`A_HoldKnife`, `A_KnifeSlash`, `A_HoldAxe`, `A_AxeSwi
   ```
 
   The roles are the rows of `asset_pipeline/player_clips.csv` (`role,pack,clip,hit_s`):
-  `knife_ready`, `knife_swing`, `axe_ready`, `axe_swing`, `prone_crawl`; another name is
+  `knife_ready`, `knife_swing`, `axe_ready`, `axe_swing`, `prone_crawl`, `punch`; another name is
   refused with that list. The FBX is a Mixamo download ("With Skin", as every clip here):
   one in a pack's folder under `assets/cache/mixamo` is used where it is, one from anywhere
   else is copied to `assets/cache/mixamo/Player`. The editor's half
   (`asset_pipeline/player_clip_swap.py`) imports and retargets that clip alone, rewrites the
   row, and rebuilds only what is baked from it (`player_clips.ROLES`): a swing's own asset;
   a ready pose's asset and its item's build step (the grip is solved in it); for the crawl
-  the `body` and `anim_patches` steps. The diff of a swap is the row, the baked asset and
+  the `body` and `anim_patches` steps; for the punch the `weapon_component` step. The diff of a swap is the row, the baked asset and
   the two new clips.
   - **It prints the strike it read** for a swing (`player_clips.strike_s`: the first frame
     after the hand's fastest forward frame that it reaches at under a quarter of that

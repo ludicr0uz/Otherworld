@@ -319,11 +319,9 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_lyra.py
   `A_UEFN_Player_<clip>`: read off Lyra's `SKM_Manny` through a rig of the mannequin's
   chain table (`Rig/IK_Lyra_Mannequin_Source`; Lyra's skeleton names its bones as ours
   does), the plain retargeter, in place, root motion off. A new clip is a row and a re-run.
-- **The punch** (C1) is `MM_Pistol_Melee`. Lyra has no unarmed attack: its melee is one clip
-  per weapon, and the pistol's is the one that reads as a fist (a straight right; the
-  rifle's and the shotgun's are two-handed butt strokes). Its fist is out 0.45–0.5 s in,
-  1.53 s long; the game plays it from 0.15 s (`COMBAT.punch_clip_start_s`) so the blow's
-  time stays 0.3 s (`Scripts/combat/CLAUDE.md`).
+- **The punch** was `MM_Pistol_Melee` (C1) until 14 Oct 2026; it is Mixamo's zombie
+  punching now (`player_clips.csv`, `Scripts/combat/CLAUDE.md`), and `import_lyra.py` no
+  longer retargets the pistol melee.
 - **The guns' ready poses** (C3) are `Locomotion/Rifle/MM_Rifle_Idle_ADS` (the rifle, the
   sniper and the shotgun) and `Locomotion/Pistol/MM_Pistol_Idle_ADS` (the pistol and the
   SMG): `lyra_paths.AIM_RIFLE`, `AIM_PISTOL`. The pistol's lays the trigger finger straight

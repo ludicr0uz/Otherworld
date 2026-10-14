@@ -65,7 +65,7 @@ class TheTable(unittest.TestCase):
     def test_the_melee_bake_names_roles_of_the_table(self):
         text = _source("combat", "melee_clips.py")
         named = set(re.findall(r'MeleeClip\([A-Z_]+, "(\w+)"', text))
-        self.assertEqual(named, set(C.ROLES) - {"prone_crawl"})
+        self.assertEqual(named, set(C.ROLES) - set(C.UNBAKED))
         for swing in C.SWINGS:
             self.assertIn(f'PLAYER_HIT_S["{swing}"]', text,
                           f"{swing}: its strike is the table's, not a literal")

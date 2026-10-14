@@ -118,7 +118,8 @@ class PlayerSkin:
     pose_bones: dict
     # The empty-handed punch (weapon_component/punch.py), on this rig, played
     # into the upper-body slot: the mannequin's MM_Attack_01, or on SKIN_GAS
-    # Lyra's melee (asset_pipeline/lyra_paths.PUNCH).
+    # Mixamo's zombie punching (the punch role of asset_pipeline/
+    # player_clips.csv).
     punch: str
     # The head bone: hidden from the player's own view while the camera is on
     # a gun's sights, where the eye point is inside or beside the head
@@ -324,8 +325,8 @@ SKIN_METAHUMAN = dataclasses.replace(
 # mannequin's are (asset_pipeline/gas_player_mesh.py copies the sockets). A
 # clip belongs to one skeleton, so its clips are the mannequin's and
 # Quaternius's retargeted onto this one (asset_pipeline/retarget_to_uefn.py),
-# its punch and its two ready poses Lyra's, retargeted the same way
-# (asset_pipeline/import_lyra.py),
+# its two ready poses Lyra's, retargeted the same way
+# (asset_pipeline/import_lyra.py), its punch Mixamo's (mixamo_player.py),
 # and its idle the sample's own.
 GAS_ANIMS = f"/Game/Sourced/Characters/Anims/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
 GAS_UAL_ANIMS = f"/Game/Sourced/Quaternius/UAL/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
@@ -336,9 +337,9 @@ CARRY_FIELDS = ("carry_idle", "carry_jog", "carry_sprint", "carry_crouch_idle",
 # The crawl of a checkout that has no Free Animation Library (_gas_skin):
 # Mixamo's zombie crawl, the prone_crawl role of player_clips.csv.
 GAS_CRAWL_WITHOUT_FAL = MIXAMO.player_clip("prone_crawl")
-# The punch and the two ready poses of a checkout that has no Lyra
-# (_gas_skin): the mannequin's.
-GAS_PUNCH_WITHOUT_LYRA = f"{GAS_ANIMS}MM_Attack_01"
+# The two ready poses of a checkout that has no Lyra, and the punch of one
+# that has not retargeted Mixamo's (_gas_skin): the mannequin's.
+GAS_PUNCH_WITHOUT_MIXAMO = f"{GAS_ANIMS}MM_Attack_01"
 GAS_AIM_WITHOUT_LYRA = dict(aim_rifle=f"{GAS_ANIMS}MF_Rifle_Idle_ADS",
                             aim_pistol=f"{GAS_ANIMS}MF_Pistol_Idle_ADS")
 SKIN_GAS = dataclasses.replace(
@@ -351,7 +352,7 @@ SKIN_GAS = dataclasses.replace(
     # pose has the finger closed, on the trigger.
     fist_index=LYRA.uefn_clip(LYRA.AIM_RIFLE),
     idle=GAS.IDLE,
-    punch=LYRA.uefn_clip(LYRA.PUNCH),
+    punch=MIXAMO.player_clip("punch"),
     reload_rifle=LYRA.uefn_clip(LYRA.RELOAD_RIFLE),
     reload_pistol=LYRA.uefn_clip(LYRA.RELOAD_PISTOL),
     reload_shotgun=LYRA.uefn_clip(LYRA.RELOAD_SHOTGUN),
@@ -416,18 +417,18 @@ def _gas_skin(eas):
                      (GAS.MESH, "build_gas_bridge.py"), (GAS.ABP_RETARGET, "build_gas_bridge.py"),
                      (GAS_AIM_WITHOUT_LYRA["aim_rifle"], "retarget_to_uefn.py"),
                      (GAS_AIM_WITHOUT_LYRA["aim_pistol"], "retarget_to_uefn.py"),
-                     (GAS_PUNCH_WITHOUT_LYRA, "retarget_to_uefn.py")):
+                     (GAS_PUNCH_WITHOUT_MIXAMO, "retarget_to_uefn.py")):
         if not eas.does_asset_exist(need):
             _log(f"note: GAS_LOCOMOTION is on and {need} is not here — wearing the "
                  f"mannequin. Run asset_pipeline/{by}.")
             return None
     skin = SKIN_GAS
     if not eas.does_asset_exist(skin.punch):
-        # Lyra is a Fab pack the user adds by hand: a checkout without it
-        # keeps the motion matching and punches as it did before.
-        _log(f"note: {skin.punch} is not here — the punch is the mannequin's. Add Lyra "
-             f"({LYRA.CONTENT_DIR}) and run asset_pipeline/import_lyra.py.")
-        skin = dataclasses.replace(skin, punch=GAS_PUNCH_WITHOUT_LYRA)
+        # The copy is committed: a checkout without it has not run the
+        # Mixamo import, and keeps the motion matching all the same.
+        _log(f"note: {skin.punch} is not here — the punch is the mannequin's. Run "
+             "asset_pipeline/import_mixamo_player.py.")
+        skin = dataclasses.replace(skin, punch=GAS_PUNCH_WITHOUT_MIXAMO)
     if not all(eas.does_asset_exist(p) for p in (skin.aim_rifle, skin.aim_pistol)):
         _log(f"note: {skin.aim_rifle} or the pistol's is not here — the guns are held "
              "in the mannequin's ready poses. Add Lyra and run asset_pipeline/"

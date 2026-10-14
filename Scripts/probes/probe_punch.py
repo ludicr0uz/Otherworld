@@ -14,7 +14,7 @@ SYSTEMS = ('melee',)
 
 import unreal
 
-from asset_pipeline import lyra_paths as LYRA
+from asset_pipeline import mixamo_paths as MIXAMO
 from combat.anim_blueprint import AIM_SLOT
 from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
@@ -64,9 +64,9 @@ def probe(p):
     skin = skin_of_mesh(player.get_editor_property("mesh").get_skeletal_mesh_asset().get_path_name())
     if skin is not None and skin.gas:
         got = p.get(wc, PUNCH_ANIM_VAR)
-        p.check("...Lyra's melee, retargeted onto the worn skeleton",
+        p.check("...Mixamo's punch, retargeted onto the worn skeleton",
                 got is not None and got.get_path_name().split(".")[0]
-                == LYRA.uefn_clip(LYRA.PUNCH), str(got))
+                == MIXAMO.player_clip("punch"), str(got))
     p.check("the wanderer punched is a zombie", "Zombie" in npc.get_class().get_name(),
             npc.get_class().get_name())
 

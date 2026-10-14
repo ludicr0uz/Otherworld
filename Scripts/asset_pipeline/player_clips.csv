@@ -4,3 +4,4 @@ knife_swing,Knife,Stabbing,0.97
 axe_ready,MeleeAxe,StandingIdle,
 axe_swing,MeleeAxe,StandingMeleeAttackDownward,0.85
 prone_crawl,Scary,ZombieCrawl,
+punch,NotSoScary,ZombiePunching,

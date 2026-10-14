@@ -8,7 +8,7 @@
     python3 Scripts/dev/swap_clip.py --prune                         # delete the clips no role names
 
 A role is a row of Scripts/asset_pipeline/player_clips.csv (the knife's and
-the axe's ready pose and swing, the prone crawl).  The command registers the
+the axe's ready pose and swing, the prone crawl, the punch).  The command registers the
 FBX (one outside the cache is copied to assets/cache/mixamo/Player), and the
 editor then imports and retargets that clip alone, reads a swing's strike off
 its hand, rewrites the row and rebuilds only what is baked from it

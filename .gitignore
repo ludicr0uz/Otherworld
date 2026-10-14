@@ -80,13 +80,46 @@ Content/Python/__pycache__/
 # fab_library.json records each one and fab_scan.py / fab_raw_scan.py put it
 # back. To ship one item, copy or move it into a committed folder (or add a
 # `!` line for its folder here) so it goes through Git LFS with the game.
-/Content/Fab/
-/Content/AnimStarterPack/
+/Content/Fab/**
+!/Content/Fab/**/
+/Content/AnimStarterPack/**
+!/Content/AnimStarterPack/**/
 /Content/FP_AKS74U_Animation/
-/Content/FreeAnimationLibrary/
+/Content/FreeAnimationLibrary/**
+!/Content/FreeAnimationLibrary/**/
 /Content/FreeLadderAnimationSet/
 /Content/Megaplant_Library/
 /Content/Survival_Character/
+
+# What the game plays out of those packs: the pistol and the shotgun
+# (Weapons/BP_Pistol, BP_Shotgun) and the rifle-hip and prone clips
+# (Sourced/MetaHuman/ABP_WeaponLayers). A build cooks these, so they are
+# committed; `**` and not the folder, as for the two packs below.
+!/Content/AnimStarterPack/UEFN_Player/A_UEFN_Player_Crouch_Idle_Rifle_Hip.uasset
+!/Content/AnimStarterPack/UEFN_Player/A_UEFN_Player_Crouch_Walk_Fwd_Rifle_Hip.uasset
+!/Content/AnimStarterPack/UEFN_Player/A_UEFN_Player_Idle_Rifle_Hip.uasset
+!/Content/AnimStarterPack/UEFN_Player/A_UEFN_Player_Jog_Fwd_Rifle.uasset
+!/Content/AnimStarterPack/UEFN_Player/A_UEFN_Player_Sprint_Fwd_Rifle.uasset
+!/Content/Fab/1911_Pistol_High_Poly/M_1911.uasset
+!/Content/Fab/1911_Pistol_High_Poly/SM_1911_02.uasset
+!/Content/Fab/1911_Pistol_High_Poly/T_1911_AO.uasset
+!/Content/Fab/1911_Pistol_High_Poly/T_1911_C.uasset
+!/Content/Fab/1911_Pistol_High_Poly/T_1911_M.uasset
+!/Content/Fab/1911_Pistol_High_Poly/T_1911_N.uasset
+!/Content/Fab/1911_Pistol_High_Poly/T_1911_R2.uasset
+!/Content/Fab/Shotgun_Pump_Action_Wooden_Stock_Hish_Poly/M_Shotgun_02.uasset
+!/Content/Fab/Shotgun_Pump_Action_Wooden_Stock_Hish_Poly/SM_Shotgun_02.uasset
+!/Content/Fab/Shotgun_Pump_Action_Wooden_Stock_Hish_Poly/T_Shotgun_02_AO.uasset
+!/Content/Fab/Shotgun_Pump_Action_Wooden_Stock_Hish_Poly/T_Shotgun_02_C.uasset
+!/Content/Fab/Shotgun_Pump_Action_Wooden_Stock_Hish_Poly/T_Shotgun_02_M.uasset
+!/Content/Fab/Shotgun_Pump_Action_Wooden_Stock_Hish_Poly/T_Shotgun_02_N.uasset
+!/Content/Fab/Shotgun_Pump_Action_Wooden_Stock_Hish_Poly/T_Shotgun_02_R.uasset
+!/Content/FreeAnimationLibrary/UEFN_Player/A_UEFN_Player_anim_Prone_Fwd_Left_Loop.uasset
+!/Content/FreeAnimationLibrary/UEFN_Player/A_UEFN_Player_anim_Prone_Fwd_Loop_R.uasset
+!/Content/FreeAnimationLibrary/UEFN_Player/A_UEFN_Player_anim_Prone_Fwd_Right_Loop.uasset
+!/Content/FreeAnimationLibrary/UEFN_Player/A_UEFN_Player_anim_Prone_Idle.uasset
+!/Content/FreeAnimationLibrary/UEFN_Player/A_UEFN_Player_anim_Prone_Left_loop.uasset
+!/Content/FreeAnimationLibrary/UEFN_Player/A_UEFN_Player_anim_Prone_Right_Loop.uasset
 
 # Two library packs the levels plant one mesh each from: the grass and the
 # bushes (Scripts/forest_generator/undergrowth_meshes.py, whose

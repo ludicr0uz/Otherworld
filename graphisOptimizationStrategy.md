@@ -306,3 +306,33 @@ Four changes, measured apart. Medium's ten engine quality groups go from level 1
 - **Doubling the 1 km map too would be about 2.05 million clumps and a `.umap` of about 360 MB** (170 bytes a clump, measured on the 200 m map; today's is 185 MB), and by the 200 m map's numbers some 3 ms more at Medium. Not done here.
 
 Pictures (git-ignored, `assets/generated/undergrowth/`): the twelve of the 200 m map as `g2_<Low|Medium|High>_<noon|night>_<across|down>.png`, the same twelve of the 1 km map as `g2_1km_…` (`g2_1km_Medium_noon_across.png` and `g2_1km_Medium_night_across.png` are the two looking across its ground), and the reach pictures as `g2_reach_<level>_<grass|tree>_<near|far>_<shown|hidden>.png`. Not measured: night frame times, which group of level 2 costs what, a packaged build.
+
+### The grass patch on the 200 m map (G3, 2026-10-13)
+
+The wide clump is replaced on `Lvl_Forest_200m` by a patch of seven unstretched clumps (`forest_generator/grass_patch.py`, `Scripts/build_grass_patch.py`), planted in the same 81,697 places at the same height, 0.85–1.20× wide again. No mesh of the pack is a wide, knee-high patch of the same grass: of its 110 meshes (83 `grass_*`, 27 `lowGrass_*`) the widest, `lowGrass_06_02`, is 1.1 m across but 93 cm tall and another grass with its own material and 8k atlas, and nothing in the clump's family is over 58 cm. So the patch is built under `/Game/Forest/Undergrowth`, out of the clump's own LODs, with no pack asset written and no second atlas:
+
+| Patch LOD | From (nominal) | Copies | Triangles |
+|---|---|---|---|
+| 0 | 0 m | 7 of the clump's LOD2 | 3,766 |
+| 1 | 3 m | 7 of its LOD3 | 1,883 |
+| 2 | 6 m | 3 of its LOD3, 1.6× wide | 807 |
+| 3 | 10 m | 1 of its LOD3, 2.4× wide | 269 |
+
+The last LOD is the clump's last, since nearly every instance on screen is drawn at it; the near ones are where a few hundred instances stand. The wind still moves it: the pack's material bends each blade about the pivot its Pivot Painter textures hold, so the patch has its own pair, one band of texels per copy, moved as the copy is.
+
+`probes/probe_grass_look.py`, windowed at 1280×720, the perf audit's spot at noon, each state twice, the same evening:
+
+| Preset | | Grass shown | Grass hidden | Grass costs |
+|---|---|---|---|---|
+| Medium | wide clump | 34.17, 34.13 ms | 27.81, 27.83 ms | 6.3 ms |
+| Medium | patch | 34.91, 34.99 ms | 27.84, 27.96 ms | 7.05 ms |
+| Medium | patch, again | 34.92, 34.93 ms | 27.84, 28.01 ms | 7.0 ms |
+| High | wide clump | 44.26, 44.39 ms | 42.47, 42.47 ms | 1.9 ms |
+| High | patch | 45.28, 45.15 ms | 42.82, 42.80 ms | 2.4 ms |
+| High | patch, again | 45.30, 45.27 ms | 42.85, 42.87 ms | 2.4 ms |
+
+- **The patch costs 0.7 ms more at Medium and 0.5 ms at High, and grass at Medium is now at the 7 ms line (7.0–7.05 ms).** Reported, not tuned. The lever is the patch's near LODs (`grass_patch.LODS`: their distances, or LOD0 from the clump's LOD3), not the count.
+- **Looking down at Medium the ground now reads as filled:** the patches overlap into a field of blades, where the wide clumps were star-shaped tufts on bare earth, at noon and at night.
+- **The patch is lower than the clump (49 cm against 60):** the pack's LOD2 has dropped its tallest blades. Planting scales it to knee height as before (×1.17 at most).
+
+Pictures (git-ignored, `assets/generated/undergrowth/`): `g3_<Low|Medium|High>_<noon|night>_<across|down>.png`, beside the `g2_` ones. The pack's measured table is in the G3 report; `Saved/tmp/grass_pack_table.txt` was its scratch copy.

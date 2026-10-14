@@ -210,6 +210,17 @@ GENERATED = (
         note="BP_ForestWanderer and its AI controller.",
     ),
     AssetSource(
+        dest="Content/Forest/Undergrowth",
+        kind="generated",
+        builders=("Scripts/build_grass_patch.py",),
+        note="SM_Grass_Patch, the grass the 200 m map plants: seven of the "
+             "grass pack's clump merged, with its own pivot textures "
+             "(T_Grass_Patch_PIV/_VEC, written to assets/generated/undergrowth "
+             "and imported) and MI_Grass_Patch_Dark (forest_generator/"
+             "grass_patch.py). Needs the pack's clump and Content/Forest/"
+             "Materials/MI_Grass_02_09_Dark.",
+    ),
+    AssetSource(
         dest="Content/Forest",
         kind="generated",
         builders=("Scripts/generate_forest_level.py",),

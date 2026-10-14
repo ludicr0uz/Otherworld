@@ -358,7 +358,7 @@ trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
 GRASS_DATA_PATH = r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/generated_levels/Lvl_Forest_200m/grass_Lvl_Forest_200m.json"
 EXPECTED_GRASS_COUNT = 81697
 EXPECTED_BUSH_COUNT = 328
-GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_02_09": {"mesh": "/Game/PN_GrassLibrary/Meshes/grassMesh/grass_02_09_mesh.grass_02_09_mesh", "mats": ["/Game/Forest/Materials/MI_Grass_02_09_Dark.MI_Grass_02_09_Dark"]}}""")
+GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_Patch": {"mesh": "/Game/Forest/Undergrowth/SM_Grass_Patch.SM_Grass_Patch", "mats": ["/Game/Forest/Undergrowth/MI_Grass_Patch_Dark.MI_Grass_Patch_Dark"]}}""")
 BUSH_CONFIGS = json.loads(r"""{"HISM_Bush_02": {"mesh": "/Game/Light_Foliage/Meshes/SM_Bush_02.SM_Bush_02", "mats": []}}""")
 if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
     unreal.log_warning("[GEN] 5a. Wind, and the grass and bush meshes...")

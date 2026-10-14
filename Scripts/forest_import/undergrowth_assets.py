@@ -3,7 +3,10 @@ verify them.
 
 Called by the generated import_<Level>.py (step 5a) and verify_<Level>.py. The
 meshes come out of two Fab packs and are planted as the pack made them
-(forest_generator/undergrowth_meshes.py): nothing here writes to one. A cell
+(forest_generator/undergrowth_meshes.py): nothing here writes to one. The
+grass patch is ours, made of the pack's clump by Scripts/build_grass_patch.py
+and committed: a level that plants it verifies it too (forest_import/
+grass_patch.py). A cell
 draws the mesh's own materials unless its spec names others: the dark grass
 of forest_generator/grass_look.py, on the levels that have it.
 
@@ -16,8 +19,9 @@ a clone draws it with the default grey material.
 import unreal
 
 from forest_generator.bush_placement import DEFAULT_BUSH_SPECS
-from forest_generator.grass_look import grass_specs_for
+from forest_generator.grass_look import grass_specs_for, has_patch_grass
 from forest_generator.undergrowth_meshes import UNDERGROWTH_MESHES
+from forest_import.grass_patch import verify_grass_patch
 
 _CELL_PREFIXES = ("HISM_Grass", "HISM_Bush")
 
@@ -34,7 +38,8 @@ def ensure_undergrowth_assets():
             raise RuntimeError(
                 f"{mesh.mesh} is missing. It is committed with the game; in a "
                 f"clone without it, add the Fab pack \"{mesh.pack}\" "
-                f"(Scripts/asset_pipeline/fab_library.json)")
+                f"(Scripts/asset_pipeline/fab_library.json) and, for "
+                f"/Game/Forest, run Scripts/build_grass_patch.py")
         _log(f"   {mesh.name}: {mesh.mesh}")
 
 
@@ -115,3 +120,5 @@ def verify_undergrowth_assets(check, actors, level=None):
     check("Undergrowth Cells Draw The Library Meshes", not other, str(other[:3]))
     check("Undergrowth Cells Draw The Materials Their Specs Name", not wrong,
           str(wrong[:3]))
+    if has_patch_grass(level):
+        verify_grass_patch(check)

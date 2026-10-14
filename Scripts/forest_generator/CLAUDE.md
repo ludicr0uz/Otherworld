@@ -27,8 +27,10 @@ The generator's code lives in this package. The level-side import code is in
 | `tree_lods.py` | which levels plant the trees' other build, a LOD chain ending in an impostor (`TREE_LOD_LEVELS`: the 1 km map, and the title level, which plants that map's middle trees: `Scripts/title/forest.py`), and where that mesh is |
 | `grass_placement.py` | `DEFAULT_GRASS_SPECS` and a stratified scatter |
 | `bush_placement.py` | `DEFAULT_BUSH_SPECS` and the clustered scatter |
-| `grass_look.py` | the dark, ground-filling grass: the colours of its material instance and of the ground under it (each with its reason), the wide `width_jitter`, the levels that have the colour (`DARK_GRASS_LEVELS`: the 200 m and 1 km maps) and the ones that have the width (`WIDE_GRASS_LEVELS`: the 200 m map alone; `grass_specs_for(level)`), and the density a level is held at when the default moves (`HELD_DENSITY_PER_SQM`: the 1 km map at 1.1/m²; `density_for(level)`, the generator's default for `--grass-density`). `forest_import/grass_look.py` builds the instance and patches the ground material from it ("Rendering gotchas", below) |
-| `undergrowth_meshes.py` | the two library meshes the grass and the bushes are planted from, and the packages of each that the repository carries ("Rendering gotchas", below) |
+| `grass_look.py` | the dark, ground-filling grass: the colours of its material instance and of the ground under it (each with its reason), the levels that have the colour (`DARK_GRASS_LEVELS`: the 200 m and 1 km maps) and the ones that plant the patch (`PATCH_GRASS_LEVELS`: the 200 m map alone; `grass_specs_for(level)`), and the density a level is held at when the default moves (`HELD_DENSITY_PER_SQM`: the 1 km map at 1.1/m²; `density_for(level)`, the generator's default for `--grass-density`). `forest_import/grass_look.py` builds the instance and patches the ground material from it ("Rendering gotchas", below) |
+| `undergrowth_meshes.py` | the two library meshes the grass and the bushes are planted from, the grass patch made of one (`GRASS_PATCH`), and the packages of each that the repository carries ("Rendering gotchas", below) |
+| `grass_patch.py` | the grass patch's numbers (G3): the seven copies of the clump, their LOD chain and its distances, and the Pivot Painter 2 texels moved with each copy, each with its reason. `forest_import/grass_patch.py` builds it (`Scripts/build_grass_patch.py`) and verifies it |
+| `pivot_images.py` | the two image files the patch's pivot textures are imported from (a half-float EXR, an 8-bit PNG), in plain Python |
 | `npc_placement.py` | NPC numbers (see `Scripts/npc/CLAUDE.md`) |
 | `npc_agro.py` | sense and patrol numbers |
 | `npc_strafe.py` | the step a wanderer takes between two swings |
@@ -129,14 +131,37 @@ that imported a level is 13 GB, most of it in swap on this machine).
   and `SM_Bush_02` (1.95 m tall, 3.5 m across, 1,304 triangles).
   - Neither is Nanite. Each has four mesh LODs and a masked two-sided material, and a cell
     draws the mesh's own materials unless its spec names one (the default specs name none).
-  - **The 200 m map's grass is dark and wide (G1); the 1 km map's is dark and narrow
-    (G2); the probe level's is neither.** `grass_look.py` holds it in two lists. A level in
-    `DARK_GRASS_LEVELS` draws its clumps with `/Game/Forest/Materials/MI_Grass_02_09_Dark`,
-    our instance of the pack's `grass_02_09_Mat`. A level in `WIDE_GRASS_LEVELS` plants the
-    same clumps, in the same places, 1.55–2.10× wide in place of 0.85–1.20× (same height;
-    about 3.2× the area).
-    - **The width needs a re-import; the colour does not.** To widen a level, add its name
-      to `WIDE_GRASS_LEVELS`, regenerate and re-import it. To colour one, add it to
+  - **The 200 m map's grass is the dark patch (G3); the 1 km map's is the dark clump
+    (G2); the probe level's is the pack's clump.** `grass_look.py` holds it in two lists. A
+    level in `DARK_GRASS_LEVELS` draws its clumps with
+    `/Game/Forest/Materials/MI_Grass_02_09_Dark`, our instance of the pack's
+    `grass_02_09_Mat`. A level in `PATCH_GRASS_LEVELS` plants the patch,
+    `/Game/Forest/Undergrowth/SM_Grass_Patch` (`HISM_Grass_Patch`), in place of the clump,
+    at the same count, places, height and 0.85–1.20× width, drawn with
+    `MI_Grass_Patch_Dark` (a child of the dark instance).
+    - **The patch** (`grass_patch.py`, built by `uepy.py Scripts/build_grass_patch.py`,
+      committed): seven copies of the clump, unstretched, one in the middle and six round
+      it 40 cm out with uneven turns, 1.1 × 1.2 m and 49 cm tall. Its LODs are the clump's
+      own lower LODs (render data only: the pack's LOD1–3 are engine reductions): 7× LOD2
+      (3,766 triangles), from 3 m 7× LOD3 (1,883), from 6 m 3× LOD3 1.6× wide (807), from
+      10 m 1× LOD3 2.4× wide (269, the clump's last). Nearly every instance on screen is
+      at its last LOD, so that one costs what a clump did; the switch distances are
+      nominal (a HISM leaves a LOD at 1.78 × radius / screen size, `screen_sizes`).
+      It is lower than the clump (60 cm) because the pack's LOD2 has lost the tallest
+      blades; planting scales it to knee height as it did the clump.
+    - **The patch has its own pivot textures, or it would bend about the wrong points.**
+      The pack's wind is Pivot Painter 2: UV set 1 picks the blade's texel of
+      `grass_02_09_PIV` (pivot in the mesh's space, parent index as the half float whose
+      bits are index + 1024) and `_VEC` (axis × 0.5 + 0.5, length / 2048). The patch's
+      `T_Grass_Patch_PIV`/`_VEC` hold one band of the clump's texels per placement, moved
+      as that copy is, and each copy's UV set 1 points into its band. The images are
+      written by `pivot_images.py` (no numpy in the editor) to
+      `assets/generated/undergrowth` and imported with the pack's textures' settings.
+      `verify_grass_patch` holds each blade's root as far from its pivot as the same
+      blade of the clump (a reduced blade can sit 13 cm above its pivot, so a fixed
+      tolerance fails); fed the clump's own pivots it fails 648 blades.
+    - **The patch needs a re-import; the colour does not.** To give a level the patch, add
+      its name to `PATCH_GRASS_LEVELS`, regenerate and re-import it. To colour one, add it to
       `DARK_GRASS_LEVELS`, regenerate its scripts (the clumps do not move: the 1 km map's
       sidecar came out byte for byte the same) and run `uepy.py Scripts/recolour_grass.py`
       (`forest_import/grass_recolour.py`): it sets the override the import would have set
@@ -171,7 +196,9 @@ that imported a level is 13 GB, most of it in swap on this machine).
       2.5 and 1.0 for the narrow clumps, which is inside what two runs differ by. At G2's
       2.2/m² the same grass is 5.4 ms at Medium and 2.1 at High on the 200 m map (3.0 and
       1.1 at 1.1/m² the same day); the 1 km map's, recoloured, 5.7 and 0.9 (3.4 and 1.3
-      before, its Medium then drawing 180 m of it, not 300).
+      before, its Medium then drawing 180 m of it, not 300). The patch (G3) is 7.0 ms at
+      Medium and 2.4 at High (6.3 and 1.9 the same day for the wide clump), twice over:
+      at the 7 ms line, reported and not tuned.
     - **How far it is drawn is the menu's row, and it is a thinning, not an edge.** A cell
       fades its instances out between the tier's cull start and end, which the tuner
       scales to the preset's `grass_distance` (`graphics_menu/gfx_tuner_foliage.py`); the

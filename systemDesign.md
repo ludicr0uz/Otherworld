@@ -107,8 +107,8 @@ change. The forest has day and night beds faded by the clock.
 **The world** (`Scripts/world/CLAUDE.md`, `Scripts/forest_generator/CLAUDE.md`). Two
 generated maps, `Lvl_Forest_200m` (the editor's startup map) and `Lvl_Forest_1000m` (what a
 packaged game plays). The grass is a dark, dull olive on a ground tinted to match, on both:
-on the 200 m map in wide clumps at 2.2 to the square metre (81,697 of them, twice what any
-grass density setting drew before G2), on the 1 km map in the narrow clump at 1.1 (1.03
+on the 200 m map in patches 1.2 m across, seven of the pack's clump merged (G3), at 2.2 to
+the square metre (81,697 of them, twice what any grass density setting drew before G2), on the 1 km map in the narrow clump at 1.1 (1.03
 million; doubling it is its own task) (`forest_generator/grass_look.py`). A clock turns the sun and moon; day and night are 4 minutes each for
 now, the night moonlit under the real stars, and a level starts at a random hour. The clock
 has one owner: the server's (single player's own), which every client's sky and wind follow
@@ -310,13 +310,19 @@ mesh's own material at 0.7–1.0× to reach knee height; the offline `Grass Upsc
 still fails the build past **2.4×**. Per-instance jitter is height ×0.85–1.15, width
 ×0.85–1.20, and a ±4° lean so the field does not look stamped.
 
-**The dark, wide grass (`forest_generator/grass_look.py`).** Two lists of levels, each
-changing one field of the spec `grass_specs_for(level)` hands the scatter. On a level in
+**The dark grass and the patch (`forest_generator/grass_look.py`).** Two lists of levels,
+each changing the spec `grass_specs_for(level)` hands the scatter. On a level in
 `DARK_GRASS_LEVELS` (the 200 m and 1 km maps) the material:
 `/Game/Forest/Materials/MI_Grass_02_09_Dark`, an instance of the pack's `grass_02_09_Mat`
-set to a dark, dull olive. On a level in `WIDE_GRASS_LEVELS` (the 200 m map alone) the
-width: ×1.55–2.10 at the same height (the same clumps in the same places, about 3.2× the
-area each). The module also holds a level to a density when the default moves on
+set to a dark, dull olive. On a level in `PATCH_GRASS_LEVELS` (the 200 m map alone) the
+mesh: `/Game/Forest/Undergrowth/SM_Grass_Patch` (G3, `forest_generator/grass_patch.py`,
+built by `Scripts/build_grass_patch.py`), seven copies of the clump turned and offset and
+merged, 1.1 × 1.2 m, planted at the clump's count, places, height and width, so its blades
+are as thick as the clump's. Its LOD chain is made of the clump's own lower LODs (3,766
+triangles near, 269 from 10 m, as the clump's last), and it carries its own Pivot Painter
+textures so each copy's blades bend about their own roots in the pack's wind; it draws
+`MI_Grass_Patch_Dark`, a child of the dark instance. G1 had stretched the clump 1.55–2.10×
+instead, which spread its blades into flat spiky stars. The module also holds a level to a density when the default moves on
 (`HELD_DENSITY_PER_SQM`, `density_for(level)`): the default is 2.2 clumps/m² since G2 and
 the 1 km map stays at 1.1. A level that gains only the colour is not planted again:
 `Scripts/recolour_grass.py` sets the material on its cells in place. The same module holds the ground's colour: the import
@@ -327,7 +333,8 @@ ground is the dark one; the probe level has no grass.
 
 200 m at the defaults ⇒ **40,521 clumps**, about 1.0/m² with every density tier drawn. A clump
 covers about 0.15 m², so the ground reads as tufts with terrain between them, not a field
-(about 0.5 m² with the wide specs, which is what the 200 m map plants).
+(a patch about 1.1 m², which is what the 200 m map plants, so its patches overlap into a
+field).
 
 **Bushes** (`bush_placement.py`) are a third layer: loose clusters of one to four on a coarse
 jittered grid with most cells left empty, so the floor alternates between open grass and

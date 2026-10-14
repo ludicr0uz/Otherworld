@@ -4,7 +4,7 @@ planting it again.
     python3 Scripts/dev/uepy.py Scripts/recolour_grass.py
 
 A level that only gains the dark grass's colour (forest_generator/grass_look.py,
-``DARK_GRASS_LEVELS`` without ``WIDE_GRASS_LEVELS``) keeps every clump where it
+``DARK_GRASS_LEVELS`` without ``PATCH_GRASS_LEVELS``) keeps every clump where it
 is, so a re-import would plant a million instances again, and put the forage,
 the clothing, the sky and the sound beds back after it, to change one material
 per cell. This sets the override the import would have set (forest_import/

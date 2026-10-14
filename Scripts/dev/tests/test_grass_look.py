@@ -1,7 +1,7 @@
-"""The dark, wide grass (forest_generator/grass_look.py): which levels have
-the colour, which the width and which a density of their own, that it is the
-default clump with only its material and width changed, and that its material
-instance is content git carries."""
+"""The dark grass and the patch (forest_generator/grass_look.py): which levels
+have the colour, which the patch and which a density of their own, that the
+patch is planted as the clump was but for its mesh, name, material and
+height, and that the material instances are content git carries."""
 
 import dataclasses
 import os
@@ -12,15 +12,15 @@ import _paths
 
 from forest_generator import grass_look as L
 from forest_generator.grass_placement import DEFAULT_DENSITY_PER_SQM, DEFAULT_GRASS_SPECS
-from forest_generator.undergrowth_meshes import GRASS_02_09, content_file
+from forest_generator.undergrowth_meshes import GRASS_02_09, GRASS_PATCH, asset_path, content_file
 
 ROOT = os.path.dirname(_paths.SCRIPTS)
 
 
 class Levels(unittest.TestCase):
-    def test_the_forest_levels_have_the_colour_and_the_200_m_one_the_width(self):
+    def test_the_forest_levels_have_the_colour_and_the_200_m_one_the_patch(self):
         self.assertEqual(L.DARK_GRASS_LEVELS, ("Lvl_Forest_200m", "Lvl_Forest_1000m"))
-        self.assertEqual(L.WIDE_GRASS_LEVELS, ("Lvl_Forest_200m",))
+        self.assertEqual(L.PATCH_GRASS_LEVELS, ("Lvl_Forest_200m",))
 
     def test_any_other_level_plants_the_default_specs(self):
         # None is what a verify script written before the level argument passes.
@@ -48,28 +48,32 @@ class Levels(unittest.TestCase):
         self.assertEqual([s.width_jitter for s in DEFAULT_GRASS_SPECS], [(0.85, 1.20)])
 
 
-class DarkSpecs(unittest.TestCase):
+class PatchSpecs(unittest.TestCase):
     def setUp(self):
         self.specs = L.grass_specs_for("Lvl_Forest_200m")
 
-    def test_each_draws_the_dark_instance(self):
+    def test_each_draws_the_patch_s_dark_instance(self):
         for spec in self.specs:
-            self.assertEqual(spec.material_paths, [L.material_object_path()])
+            self.assertEqual(spec.material_paths, [L.patch_material_object_path()])
+        self.assertEqual(L.patch_material_object_path(),
+                         "/Game/Forest/Undergrowth/MI_Grass_Patch_Dark.MI_Grass_Patch_Dark")
         self.assertEqual(L.material_object_path(),
                          "/Game/Forest/Materials/MI_Grass_02_09_Dark.MI_Grass_02_09_Dark")
 
-    def test_only_the_material_and_the_width_differ(self):
+    def test_only_the_mesh_its_name_material_and_height_differ(self):
         self.assertEqual(len(self.specs), len(DEFAULT_GRASS_SPECS))
-        for dark, plain in zip(self.specs, DEFAULT_GRASS_SPECS):
-            same = dataclasses.replace(dark, material_paths=plain.material_paths,
-                                       width_jitter=plain.width_jitter)
+        for patch, plain in zip(self.specs, DEFAULT_GRASS_SPECS):
+            self.assertEqual(patch.mesh_path, asset_path(GRASS_PATCH))
+            self.assertEqual(patch.nominal_mesh_height_cm, GRASS_PATCH.height_cm)
+            self.assertTrue(patch.name.startswith("HISM_Grass"), patch.name)
+            same = dataclasses.replace(patch, name=plain.name, mesh_path=plain.mesh_path,
+                                       material_paths=plain.material_paths,
+                                       nominal_mesh_height_cm=plain.nominal_mesh_height_cm)
             self.assertEqual(same, plain)
 
-    def test_a_clump_is_about_1_8_times_wider(self):
-        for dark, plain in zip(self.specs, DEFAULT_GRASS_SPECS):
-            ratio = sum(dark.width_jitter) / sum(plain.width_jitter)
-            self.assertAlmostEqual(ratio, 1.8, delta=0.1)
-            self.assertLess(dark.width_jitter[0], dark.width_jitter[1])
+    def test_the_blades_are_not_stretched(self):
+        for spec in self.specs:
+            self.assertEqual(spec.width_jitter, (0.85, 1.20))
 
 
 class Colours(unittest.TestCase):
@@ -99,13 +103,16 @@ class Committed(unittest.TestCase):
         self.assertIn(L.GRASS_MATERIAL_PARENT, GRASS_02_09.packages)
         self.assertEqual(set(L.GRASS_MATERIAL_PACKAGES),
                          {L.GRASS_MATERIAL, *GRASS_02_09.packages})
+        self.assertIn(L.GRASS_MATERIAL, GRASS_PATCH.packages)
+        self.assertIn(L.PATCH_MATERIAL, GRASS_PATCH.packages)
 
-    def test_git_does_not_ignore_the_instance(self):
-        path = content_file(L.GRASS_MATERIAL)
-        done = subprocess.run(["git", "check-ignore", path], cwd=ROOT,
-                              capture_output=True, text=True)
-        self.assertEqual(done.stdout.strip(), "")
-        self.assertTrue(os.path.isfile(os.path.join(ROOT, path)), path)
+    def test_git_does_not_ignore_the_instances(self):
+        for package in (L.GRASS_MATERIAL, L.PATCH_MATERIAL):
+            path = content_file(package)
+            done = subprocess.run(["git", "check-ignore", path], cwd=ROOT,
+                                  capture_output=True, text=True)
+            self.assertEqual(done.stdout.strip(), "")
+            self.assertTrue(os.path.isfile(os.path.join(ROOT, path)), path)
 
 
 if __name__ == "__main__":

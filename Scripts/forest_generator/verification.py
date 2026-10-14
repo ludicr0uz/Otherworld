@@ -364,7 +364,8 @@ def check_grass_snapped_to_terrain(placed_grass, world_size_cm: float,
     return CheckResult("Grass Snapped To Terrain", ok, msg, bad)
 
 
-def check_grass_knee_height(placed_grass, knee_height_cm: float) -> CheckResult:
+def check_grass_knee_height(placed_grass, knee_height_cm: float,
+                            grass_specs=None) -> CheckResult:
     """
     The dominant layer must actually measure knee high, and nothing may end up
     tall enough to read as a bush.
@@ -378,7 +379,7 @@ def check_grass_knee_height(placed_grass, knee_height_cm: float) -> CheckResult:
     knee_heights = []
     offenders = []
     for g in placed_grass:
-        spec = grass_spec_by_name(g.spec_name)
+        spec = grass_spec_by_name(g.spec_name, grass_specs)
         ratio = spec.height_ratio if spec else 1.0
         if g.target_height_cm > hard_max:
             offenders.append(f"{g.spec_name}: {g.target_height_cm:.1f} cm > {hard_max:.1f} cm")
@@ -398,7 +399,8 @@ def check_grass_knee_height(placed_grass, knee_height_cm: float) -> CheckResult:
     return CheckResult("Grass Knee Height", ok, msg, offenders)
 
 
-def check_grass_upscale(placed_grass, knee_height_cm: float) -> CheckResult:
+def check_grass_upscale(placed_grass, knee_height_cm: float,
+                        grass_specs=None) -> CheckResult:
     """
     Guard the visual quality of the scans: a clump stretched far past its
     authored size reads as oversized blades, so keep every species inside
@@ -415,7 +417,7 @@ def check_grass_upscale(placed_grass, knee_height_cm: float) -> CheckResult:
         if g.spec_name in seen:
             continue
         seen.add(g.spec_name)
-        spec = grass_spec_by_name(g.spec_name)
+        spec = grass_spec_by_name(g.spec_name, grass_specs)
         if not spec or spec.nominal_mesh_height_cm <= 0:
             continue
         # Worst case is the tallest jitter on the shortest mesh.
@@ -460,15 +462,16 @@ def check_grass_coverage(placed_grass, world_size_cm: float,
     return CheckResult("Grass Coverage", ok, msg, empty)
 
 
-def check_grass_spec_distribution(placed_grass) -> CheckResult:
-    """Every configured species must be represented — no dead HISM actors."""
+def check_grass_spec_distribution(placed_grass, grass_specs=None) -> CheckResult:
+    """Every configured species must be represented — no dead HISM actors.
+    ``grass_specs`` are the level's (grass_look.grass_specs_for)."""
     if not placed_grass:
         return CheckResult("Grass Species Spread", True, "No grass to check")
 
     from collections import Counter
     counts = Counter(g.spec_name for g in placed_grass)
     details = [f"{n}: {c:,}" for n, c in sorted(counts.items())]
-    configured = {s.name for s in DEFAULT_GRASS_SPECS}
+    configured = {s.name for s in (grass_specs or DEFAULT_GRASS_SPECS)}
     ok = set(counts) == configured
     msg = f"{len(counts)} of {len(configured)} species represented"
     return CheckResult("Grass Species Spread", ok, msg, details)
@@ -744,6 +747,8 @@ def run_all_checks(
     """Run the complete verification suite and return a report."""
     # Imported here: undergrowth_checks imports CheckResult from this module.
     from . import undergrowth_checks
+    from .grass_look import grass_specs_for
+    specs = grass_specs_for(level_name)
     world_size_m = world_size_cm / 100.0
     report = VerificationReport(level_name=level_name, world_size_m=world_size_m)
 
@@ -770,10 +775,10 @@ def run_all_checks(
         report.checks.append(check_grass_within_bounds(placed_grass, world_size_cm))
         report.checks.append(check_grass_snapped_to_terrain(placed_grass, world_size_cm,
                                                            grid_z, grid_size))
-        report.checks.append(check_grass_knee_height(placed_grass, knee_height_cm))
-        report.checks.append(check_grass_upscale(placed_grass, knee_height_cm))
+        report.checks.append(check_grass_knee_height(placed_grass, knee_height_cm, specs))
+        report.checks.append(check_grass_upscale(placed_grass, knee_height_cm, specs))
         report.checks.append(check_grass_coverage(placed_grass, world_size_cm))
-        report.checks.append(check_grass_spec_distribution(placed_grass))
+        report.checks.append(check_grass_spec_distribution(placed_grass, specs))
         report.checks.append(undergrowth_checks.check_grass_tiers(placed_grass,
                                                                   world_size_cm))
 

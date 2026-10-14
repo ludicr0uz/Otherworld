@@ -37,7 +37,9 @@ class AspImport(unittest.TestCase):
     def test_the_pack_and_its_copies_are_not_committed(self):
         with open(os.path.join(ROOT, ".gitignore")) as handle:
             ignored = {line.strip() for line in handle}
-        self.assertIn("/" + asp_paths.CONTENT_DIR + "/", ignored)
+        # The folder, or (since the clips the game plays are committed) all under it.
+        root = "/" + asp_paths.CONTENT_DIR + "/"
+        self.assertTrue({root, root + "**"} & ignored, root)
         for made in (asp_paths.UEFN_DIR, asp_paths.RIG_DIR):
             self.assertTrue(made.startswith(asp_paths.GAME_ROOT + "/"), made)
 

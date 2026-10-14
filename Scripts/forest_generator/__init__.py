@@ -28,5 +28,8 @@
 
   low_leaves  Which trees have leaves low enough to walk into, so that passing one is heard as passing a bush is ...
 
-  grass_look  The dark, ground-filling grass: its colours, the ground's under it, how wide a clump is planted, and which ...
+  grass_look  The dark, ground-filling grass: its colours, the ground's under it, which mesh is planted, and which ...
+
+  grass_patch   The grass patch: copies of the library clump, turned and offset, merged into one mesh 1.1-1.2 m across
+  pivot_images  The two image files the grass patch's pivot textures are imported from (forest_generator/grass_patch.py)
 """

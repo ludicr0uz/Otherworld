@@ -108,7 +108,7 @@
     {
       "name": "Grass Upscale Factor",
       "passed": true,
-      "message": "worst upscale 0.96x (HISM_Grass_02_09), limit 2.40x",
+      "message": "worst upscale 1.17x (HISM_Grass_Patch), limit 2.40x",
       "details": []
     },
     {
@@ -122,7 +122,7 @@
       "passed": true,
       "message": "1 of 1 species represented",
       "details": [
-        "HISM_Grass_02_09: 81,697"
+        "HISM_Grass_Patch: 81,697"
       ]
     },
     {
@@ -134,9 +134,10 @@
     {
       "name": "Undergrowth Meshes",
       "passed": true,
-      "message": "1 grass, 1 bush, the right size",
+      "message": "2 grass, 1 bush, the right size",
       "details": [
         "Grass_02_09: 2152 tris in LOD0 of 4, 60 cm tall, 54 cm wide",
+        "Grass_Patch: 3766 tris in LOD0 of 4, 49 cm tall, 120 cm wide",
         "Bush_02: 1304 tris in LOD0 of 4, 195 cm tall, 349 cm wide"
       ]
     },

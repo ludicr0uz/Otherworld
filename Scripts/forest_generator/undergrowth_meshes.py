@@ -1,10 +1,12 @@
 """The meshes the grass and the bushes are planted from. Pure Python (no ``unreal``).
 
-Both come out of Fab packs the user added, and are planted where the pack put
+Two come out of Fab packs the user added, and are planted where the pack put
 them, with the pack's own materials (the grass on a level grass_look.py names
-draws an instance of its own, a child of the pack's):
+draws an instance of its own, a child of the pack's); the third is ours, made
+of the first:
 
     grass    grass_02_09_mesh   "temperate Vegetation: optimized Grass Library"
+    grass    SM_Grass_Patch     seven of that clump merged (GRASS_PATCH, below)
     bushes   SM_Bush_02         "Light Foliage"
 
 Neither is Nanite. Each has four mesh LODs and a masked, two-sided foliage
@@ -89,7 +91,29 @@ BUSH_02 = LibraryMesh(
         f"{_BUSH}/Textures/T_Bush_Branch_Mask",
     ))
 
-GRASS_MESHES = (GRASS_02_09,)
+# Ours, not a pack's: seven copies of the clump merged into one patch 1.2 m
+# across, built by Scripts/build_grass_patch.py (forest_generator/
+# grass_patch.py has its numbers and reasons). The 200 m map plants it
+# (grass_look.PATCH_GRASS_LEVELS). It draws the dark grass with pivot textures
+# of its own, so it needs those, the dark instance and what the clump's
+# material needs; not the clump. Its LOD0 is seven of the clump's LOD2, which
+# has lost the tallest blades: so it is lower than the clump.
+_PATCH = "/Game/Forest/Undergrowth"
+
+GRASS_PATCH = LibraryMesh(
+    name="Grass_Patch",
+    pack=GRASS_02_09.pack,
+    mesh=f"{_PATCH}/SM_Grass_Patch",
+    height_cm=49.2, width_cm=120.4, lods=4, lod0_triangles=3766,
+    packages=(
+        "/Game/Forest/Materials/MI_Grass_02_09_Dark",
+        f"{_PATCH}/MI_Grass_Patch_Dark",
+        f"{_PATCH}/SM_Grass_Patch",
+        f"{_PATCH}/T_Grass_Patch_PIV",
+        f"{_PATCH}/T_Grass_Patch_VEC",
+    ) + tuple(p for p in GRASS_02_09.packages if p != GRASS_02_09.mesh))
+
+GRASS_MESHES = (GRASS_02_09, GRASS_PATCH)
 BUSH_MESHES = (BUSH_02,)
 UNDERGROWTH_MESHES = GRASS_MESHES + BUSH_MESHES
 
@@ -109,6 +133,15 @@ def shipped_packages():
     return sorted({p for m in UNDERGROWTH_MESHES for p in m.packages})
 
 
+# The packs' folders: git ignores them but for what gitignore_lines() names.
+PACK_ROOTS = (_GRASS, _BUSH)
+
+
+def in_a_pack(package):
+    return package.startswith(tuple(f"{root}/" for root in PACK_ROOTS))
+
+
 def gitignore_lines():
-    """The lines .gitignore needs to let the shipped packages through."""
-    return [f"!/{content_file(p)}" for p in shipped_packages()]
+    """The lines .gitignore needs to let the shipped packs' packages through
+    (ours, under /Game/Forest, are not ignored)."""
+    return [f"!/{content_file(p)}" for p in shipped_packages() if in_a_pack(p)]

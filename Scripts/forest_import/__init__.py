@@ -14,4 +14,6 @@ call, rather than carrying inline. Unlike forest_generator/, these import
   grass_look  Build the dark grass's material instance, tint the ground under it, and verify both
 
   grass_recolour  Give a planted level's grass cells the materials its specs name, without planting it again
+
+  grass_patch  Build the grass patch under /Game/Forest/Undergrowth, and verify it
 """

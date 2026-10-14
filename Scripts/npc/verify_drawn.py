@@ -4,7 +4,8 @@ trees. Run through Scripts/verify_npc_blueprints.py.
 
 What it proves: only a creature of NPC_DRAWN_BY_FIRE has the step; the step
 looks for campfires, keeps the nearest in DrawnTo (one read of the pure
-query), and is Drawn only by a live fire within range; Drawn, it is ordered
+query), and is Drawn only by a live fire within range or, failing one, by a
+permanent campfire at any distance (looked for the same way); Drawn, it is ordered
 to the fire at its patrol walk, or stood beside it, and the step succeeds;
 otherwise the step fails with Drawn false. In the tree the step shares a
 selector with the Stroll, ahead of it and behind the senses. That a zombie
@@ -27,7 +28,7 @@ from npc.verify import (
 )
 from npc.verify_tree import _gates_on_aggro, _load, _walk
 from npc.verify_ward import _after, _ends, _titles, _zero
-from survival.paths import CAMPFIRE_CLASS_PATH
+from survival.paths import CAMPFIRE_CLASS_PATH, PERMANENT_CAMPFIRE_CLASS_PATH
 
 
 def check_settings():
@@ -41,34 +42,67 @@ def check_settings():
           f"{NPC_DRAWN_RANGE_CM} cm, {NPC_DRAWN_ARRIVE_CM} cm")
 
 
-def check_target(tag, own):
-    """The fire: the nearest campfire, kept. Returns the Branch on it, or None."""
-    looks = _titled(own, "GetAllActorsOfClass")
-    check(f"{tag}: it looks for campfires",
-          len(looks) == 1 and _lit(looks[0], "ActorClass") == CAMPFIRE_CLASS_PATH,
-          f"{[_lit(n, 'ActorClass') for n in looks]}")
-    keeps = _titled(own, f"Set {DRAWN_TO_VAR}")
-    nearest = [f for k in keeps for f in _feeders(k, DRAWN_TO_VAR)]
-    check(f"{tag}: ...and keeps the nearest to its pawn in {DRAWN_TO_VAR}: one "
-          f"read of the pure query, straight after the search",
-          len(keeps) == 1 and len(looks) == 1
-          and _titles(nearest) == {"FindNearestActor"}
-          and _feeders(nearest[0], "ActorsToCheck") == looks
-          and {"Get Actor Location", "Get Controlled Pawn"}
-          <= _titles(_sources(nearest[0], "Origin"))
-          and _drivers(keeps[0]) == looks
-          and len(_titled(own, "FindNearestActor")) == 1,
-          f"{sorted(_titles(nearest))}")
-    if len(keeps) != 1:
-        return None
-    live = _after(BEL.find_then_pin(keeps[0]))
+def _search(own, class_path):
+    """The GetAllActorsOfClass(class_path) nodes, and the DrawnTo writes each drives."""
+    looks = [n for n in _titled(own, "GetAllActorsOfClass") if _lit(n, "ActorClass") == class_path]
+    keeps = [k for k in _titled(own, f"Set {DRAWN_TO_VAR}") if _drivers(k) == looks]
+    return looks, keeps
+
+
+def _kept_nearest(keep, looks):
+    nearest = _feeders(keep, DRAWN_TO_VAR)
+    return (_titles(nearest) == {"FindNearestActor"}
+            and _feeders(nearest[0], "ActorsToCheck") == looks
+            and {"Get Actor Location", "Get Controlled Pawn"}
+            <= _titles(_sources(nearest[0], "Origin")))
+
+
+def _valid_branch(keep):
+    """The Branch straight after a DrawnTo write, on its being valid; or None."""
+    live = _after(BEL.find_then_pin(keep))
     ok = (len(live) == 1 and _title(live[0]) == "Branch"
           and _titles(_feeders(live[0], "Condition")) == {"IsValid"}
           and _titles(_sources(live[0], "Condition"))
           == {"IsValid", f"Get {DRAWN_TO_VAR}"})
-    check(f"{tag}: no fire burning: nothing else is read of it (the next "
-          f"Branch tests only that {DRAWN_TO_VAR} is valid)", ok)
     return live[0] if ok else None
+
+
+def check_target(tag, own):
+    """The fire: the nearest campfire, kept. Returns the Branch on it, or None."""
+    looks = _titled(own, "GetAllActorsOfClass")
+    check(f"{tag}: it looks for campfires, and for permanent ones",
+          sorted(_lit(n, "ActorClass") for n in looks)
+          == sorted([CAMPFIRE_CLASS_PATH, PERMANENT_CAMPFIRE_CLASS_PATH]),
+          f"{[_lit(n, 'ActorClass') for n in looks]}")
+    looks, keeps = _search(own, CAMPFIRE_CLASS_PATH)
+    check(f"{tag}: ...and keeps the nearest campfire to its pawn in {DRAWN_TO_VAR}: "
+          f"one read of the pure query, straight after the search",
+          len(keeps) == 1 and len(looks) == 1 and _kept_nearest(keeps[0], looks)
+          and len(_titled(own, "FindNearestActor")) == 2
+          and len(_titled(own, f"Set {DRAWN_TO_VAR}")) == 2,
+          f"{len(looks)} searches, {len(keeps)} writes")
+    if len(keeps) != 1:
+        return None
+    live = _valid_branch(keeps[0])
+    check(f"{tag}: no fire burning: nothing else is read of it (the next "
+          f"Branch tests only that {DRAWN_TO_VAR} is valid)", live is not None)
+    return live
+
+
+def check_endless(tag, reach, off, on):
+    """No campfire in range: the nearest permanent one, from any distance."""
+    after = _after(BEL.find_else_pin(reach))
+    looks = [n for n in after if _lit(n, "ActorClass") == PERMANENT_CAMPFIRE_CLASS_PATH]
+    keeps = _after(BEL.find_then_pin(looks[0])) if len(looks) == 1 else []
+    ok = (len(after) == 1 and len(looks) == 1 and len(keeps) == 1
+          and _title(keeps[0]) == f"Set {DRAWN_TO_VAR}" and _kept_nearest(keeps[0], looks))
+    check(f"{tag}: none in range: it keeps the nearest permanent campfire in "
+          f"{DRAWN_TO_VAR} instead, at any distance", ok, f"{sorted(_titles(after))}")
+    live = _valid_branch(keeps[0]) if ok else None
+    check(f"{tag}: ...one there: {DRAWN_VAR} = true, as for a fire in range "
+          f"(no distance read); none: {DRAWN_VAR} = false",
+          live is not None and _after(BEL.find_then_pin(live)) == [on]
+          and _after(BEL.find_else_pin(live)) == [off])
 
 
 def check_drawn_state(tag, own, live):
@@ -90,10 +124,10 @@ def check_drawn_state(tag, own, live):
     writes = _titled(own, f"Set {DRAWN_VAR}")
     off = [w for w in writes if _zero(w, DRAWN_VAR)]
     on = [w for w in writes if _lit(w, DRAWN_VAR) == "true"]
-    refused = _after(BEL.find_else_pin(live)) + _after(BEL.find_else_pin(reach[0]))
-    check(f"{tag}: no fire, or none that near: {DRAWN_VAR} = false and the "
-          f"step fails, so the tree goes on to the stroll",
-          len(off) == 1 and refused == off + off
+    refused = _after(BEL.find_else_pin(live))
+    check(f"{tag}: no fire, or none that near and no permanent one: {DRAWN_VAR} "
+          f"= false and the step fails, so the tree goes on to the stroll",
+          len(off) == 1 and refused == off
           and _ends(BEL.find_then_pin(off[0])) == {False}
           and not any(_title(n) in ("SimpleMoveToLocation", "StopMovement")
                       for n in _after(BEL.find_then_pin(off[0]))),
@@ -103,6 +137,8 @@ def check_drawn_state(tag, own, live):
           len(on) == 1 and _after(BEL.find_then_pin(reach[0])) == on
           and _ends(BEL.find_then_pin(on[0])) == {True},
           f"{len(on)} writes")
+    if len(on) == 1 and len(off) == 1:
+        check_endless(tag, reach[0], off[0], on[0])
     return on[0] if len(on) == 1 else None
 
 

@@ -191,7 +191,7 @@ def _author_drawn_step(ed, steps, key):
     ed.add_comment_to_nodes(
         f"BT_Drawn, tried after the senses and before BT_Stroll: with a "
         f"campfire burning within {NPC_DRAWN_RANGE_CM / 100:.0f} m (the "
-        f"nearest, DrawnTo) it is Drawn: it walks to the fire at its patrol "
+        f"nearest, DrawnTo), or a permanent campfire anywhere in the level, it is Drawn: it walks to the fire at its patrol "
         f"walk and stands {NPC_DRAWN_ARRIVE_CM:.0f} cm off. With none the "
         f"step fails and it strolls.", made)
 

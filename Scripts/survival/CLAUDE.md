@@ -180,7 +180,8 @@ intended rule for a respawn; for a logout it is the save's job.
   `BP_Campfire` whose own BeginPlay sets a life span of 0 and calls nothing of the
   parent's: no burn time, and not noted as a leftover (the server's cap would put out the
   oldest fire, which this always is). Everything else is inherited, so the zombies, the
-  ward and a stick take it for a campfire. It stands in the Horde Survival fort
+  ward and a stick take it for a campfire; the zombies' Drawn step also looks for it by
+  its own class, and it draws them from any distance (`npc/drawn.py`). It stands in the Horde Survival fort
   (`forest_import/fort.py`); `verify/campfire.check_permanent`,
   `probes/probe_horde_campfire.py`.
 - `probes/probe_campfire.py` cuts wood, strikes, and measures the warmth in and out of the

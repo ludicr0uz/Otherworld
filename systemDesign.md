@@ -113,7 +113,7 @@ change. The forest has day and night beds faded by the clock.
 generated maps, `Lvl_Forest_200m` (the editor's startup map) and `Lvl_Forest_1000m` (what a
 packaged game plays), and a third, `Lvl_Horde_Survival` (400 m): a dense forest ring round a
 sparse clearing, in whose middle a 13 m fort of chest-high moss rocks has three openings
-and holds a campfire that never burns out, drawing the zombies to it
+and holds a campfire that never burns out, drawing the zombies to it from anywhere in the level
 (`forest_generator/horde_layout.py`, `forest_import/fort.py`, `survival/permanent_campfire.py`).
 Its monsters are held by a difficulty that rises a level every three minutes of play: 4 at
 level 1 and 2 more a level, one in every four levels' worth a wendigo (9 zombies and a

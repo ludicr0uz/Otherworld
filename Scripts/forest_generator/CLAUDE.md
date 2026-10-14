@@ -78,8 +78,9 @@ The generator's code lives in this package. The level-side import code is in
   - nothing grows inside 21 m (the fort and 8 m round it); the PlayerStart is the middle;
   - a permanent campfire in the fort, 2.5 m from the PlayerStart (`fort.CAMPFIRE_OFFSET_CM`,
     inside its 4 m of warmth): `BP_PermanentCampfire`, a `BP_Campfire` that never burns out
-    (`survival/permanent_campfire.py`), so it draws every zombie on the map (all spawn within
-    100 m of it, inside the 200 m draw) as a lit fire does. `fort.place_fort` places it with
+    (`survival/permanent_campfire.py`), and it draws every zombie on the map from any
+    distance (a lit fire draws from 200 m; `npc/drawn.py` looks for a permanent one when
+    none is in range). `fort.place_fort` places it with
     the rocks (`place_campfire`, which removes an earlier one first) and `verify_fort` checks
     it; `probes/probe_horde_campfire.py` watches the zombies walk to it;
   - the horde's director, `AOtherworldHordeDirector`, 5 m over the fort's centre

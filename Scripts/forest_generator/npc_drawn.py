@@ -12,7 +12,10 @@ so only by a wanderer that is not aggro:
            there are several): the zombie walks to it at its patrol walk and
            stands NPC_DRAWN_ARRIVE_CM off. Its senses still run first on
            every pass, so one that meets the player on the way hunts them.
-  let go   the fire burns out, or there is none that near: the step fails
+  endless  none that near, but a permanent campfire (BP_PermanentCampfire, the
+           Horde Survival fort's) in the level: it draws from any distance.
+  let go   the fire burns out, or there is none that near and no permanent
+           one: the step fails
            and it patrols again, about where it spawned.
 """
 

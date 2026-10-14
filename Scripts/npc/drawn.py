@@ -7,8 +7,12 @@ a wanderer that has not noticed the player.
       -> the campfires burning in the level (GetAllActorsOfClass)
       -> DrawnTo = the nearest of them to the pawn
       -> [DrawnTo is valid?]                     no: Drawn = false, fail
-      -> [within NPC_DRAWN_RANGE_CM, flat?]      no: Drawn = false, fail
+      -> [within NPC_DRAWN_RANGE_CM, flat?]      no: the permanent fire...
       -> Drawn = true
+           ...the permanent campfires (GetAllActorsOfClass(BP_PermanentCampfire))
+           -> DrawnTo = the nearest of them
+           -> [DrawnTo is valid?]                no: Drawn = false, fail
+           -> Drawn = true                       (from anywhere in the level)
       -> [further than NPC_DRAWN_ARRIVE_CM?]
            yes: SimpleMoveToLocation(the fire) -> the patrol walk -> succeed
            no:  StopMovement -> succeed          (it stands by the fire)
@@ -19,6 +23,10 @@ The fire is looked for on every pass rather than told to the zombies when it
 is lit: the controllers are separate Blueprints, so a campfire would need a
 cast per creature, and a fire that burns out (its actor is destroyed) lets
 go of them the same way, with nothing to clear.
+
+A permanent campfire (the Horde Survival level's, survival/permanent_campfire.py)
+draws from the whole level: a zombie with no fire in range looks for one of
+those, at any distance. A lit campfire in range still wins, being nearer.
 
 FindNearestActor is pure, so its actor is read once, into DrawnTo, and the
 Branches read the variable. The range Branch is nested behind the validity
@@ -39,7 +47,10 @@ from npc.graph import _Graph, _log
 from uebp.graph import _assets, _connect, _pin, else_, out, then
 from npc.patrol import _author_walk_speed
 from npc.paths import DRAWN_TO_VAR, DRAWN_VAR
-from survival.paths import CAMPFIRE_BP_PATH, CAMPFIRE_CLASS_PATH
+from survival.paths import (
+    CAMPFIRE_BP_PATH, CAMPFIRE_CLASS_PATH, PERMANENT_CAMPFIRE_BP_PATH,
+    PERMANENT_CAMPFIRE_CLASS_PATH,
+)
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_CONTROLLER, FN_GET_PAWN, FN_STOP_MOVEMENT
 from uebp.nodes.ai import FN_SIMPLE_MOVE
 from uebp.nodes.math import FN_DISTANCE_2D, FN_GREATER_FF, FN_LE_FF
@@ -52,9 +63,11 @@ def draws(key):
     never built has zombies that take no notice, and a log line saying why."""
     if key not in NPC_DRAWN_BY_FIRE:
         return False
-    if _assets().does_asset_exist(CAMPFIRE_BP_PATH):
+    missing = [path for path in (CAMPFIRE_BP_PATH, PERMANENT_CAMPFIRE_BP_PATH)
+               if not _assets().does_asset_exist(path)]
+    if not missing:
         return True
-    _log(f"note: {CAMPFIRE_BP_PATH} does not exist -- run build_survival.py "
+    _log(f"note: {missing} does not exist -- run build_survival.py "
          f"first. {key} is not drawn to a fire.")
     return False
 
@@ -62,6 +75,20 @@ def draws(key):
 def declare_drawn_vars(ed):
     """False and none by default: nothing draws it yet."""
     declare(ed, NV.DRAWN)
+
+
+def _author_endless(g, here, exec_in):
+    """No campfire in range: the nearest permanent one, at any distance, into
+    DrawnTo. Returns the Branch on it being there."""
+    fires = g.call(FN_ALL_ACTORS, ActorClass=PERMANENT_CAMPFIRE_CLASS_PATH)
+    _connect(exec_in, _pin(fires, "execute"))
+    nearest = g.call(FN_NEAREST_ACTOR)
+    _connect(here, _pin(nearest, "Origin"))
+    _connect(out(fires, "OutActors"), _pin(nearest, "ActorsToCheck"))
+    kept = g.put(DRAWN_TO_VAR, then(fires), pin=out(nearest))
+    lit = g.call(FN_IS_VALID)
+    _connect(g.get(DRAWN_TO_VAR), _pin(lit, "Object"))
+    return g.branch(out(lit), kept)
 
 
 def _author_drawn(ed, exec_in, result, stock):
@@ -94,10 +121,13 @@ def _author_drawn(ed, exec_in, result, stock):
     near = g.op(FN_LE_FF, out(gap), NPC_DRAWN_RANGE_CM)
     reached = g.branch(near, then(burning))
 
-    let_go = g.put(DRAWN_VAR, [else_(burning), else_(reached)], literal="false")
+    endless = _author_endless(g, out(here), else_(reached))
+
+    let_go = g.put(DRAWN_VAR, [else_(burning), else_(endless)], literal="false")
     _connect(let_go, result(False))
 
-    drawn = g.put(DRAWN_VAR, then(reached), literal="true")
+    # The walk reads DrawnTo again, so it goes to whichever fire was kept.
+    drawn = g.put(DRAWN_VAR, [then(reached), then(endless)], literal="true")
     far = g.op(FN_GREATER_FF, out(gap), NPC_DRAWN_ARRIVE_CM)
     walking = g.branch(far, drawn)
 

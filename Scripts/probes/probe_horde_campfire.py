@@ -7,6 +7,8 @@ forest_import/fort.py).
     player's start, and it is a BP_Campfire (what the zombies look for);
   - it has no life span: it never burns out;
   - every zombie on patrol is Drawn, to that fire, and one closes on it;
+  - it draws from the whole level: moved FAR_CM off a zombie (past the
+    NPC_DRAWN_RANGE_CM a lit campfire draws from), it still draws it;
   - the player beside it is warmed.
 
 The fire's rate is raised for the warmth check and the night's cold zeroed,
@@ -19,7 +21,7 @@ LEVEL = "/Game/Maps/Lvl_Horde_Survival"  # the fire is this level's alone
 
 import unreal
 
-from forest_generator.npc_drawn import NPC_DRAWN_ARRIVE_CM
+from forest_generator.npc_drawn import NPC_DRAWN_ARRIVE_CM, NPC_DRAWN_RANGE_CM
 from forest_generator.npc_placement import NAV_REACHABLE_EXTENT_CM
 from forest_import.fort import CAMPFIRE_OFFSET_CM
 from npc.paths import DRAWN_TO_VAR, DRAWN_VAR
@@ -39,6 +41,7 @@ WRITABLE = list(_FIRE_WRITABLE) + [(PERMANENT_CAMPFIRE_BP_PATH, WARM_RATE_VAR)]
 BEAT_S = 1.2              # two of the tree's 0.5 s passes, and a little
 WALK_S = 3.0
 CLOSED_CM = 150.0         # it closes on the fire by at least this in WALK_S
+FAR_CM = NPC_DRAWN_RANGE_CM * 1.5   # well past a lit campfire's reach
 
 
 def probe(p):
@@ -90,6 +93,26 @@ def probe(p):
         after = _gap(npc, fire)
         p.check(f"...and closes on it (by {CLOSED_CM:.0f} cm or more in {WALK_S:g} s)",
                 before - after >= CLOSED_CM, f"{before:.0f} -> {after:.0f} cm")
+
+        # Out of any campfire's reach: the fire moved away from that zombie,
+        # flat (the level holds no spot that far from one), then put back.
+        ctrl = npc.get_controller()
+        here, there = npc.get_actor_location(), fire.get_actor_location()
+        dx, dy = there.x - here.x, there.y - here.y
+        way = (dx * dx + dy * dy) ** 0.5 or 1.0
+        fire.set_actor_location(unreal.Vector(here.x + dx / way * FAR_CM,
+                                              here.y + dy / way * FAR_CM, there.z),
+                                False, True)
+        far = _gap(npc, fire)
+        yield BEAT_S
+        p.check(f"...and draws from the whole level: {FAR_CM / 100:.0f} m off (a "
+                f"lit campfire draws from {NPC_DRAWN_RANGE_CM / 100:.0f} m) it is "
+                f"still Drawn, to it",
+                far > NPC_DRAWN_RANGE_CM and bool(p.get(ctrl, DRAWN_VAR))
+                and p.get(ctrl, DRAWN_TO_VAR) == fire and _on_patrol(p, ctrl),
+                f"{far / 100:.0f} m off: Drawn {p.get(ctrl, DRAWN_VAR)}, "
+                f"on patrol {_on_patrol(p, ctrl)}")
+        fire.set_actor_location(there, False, True)
 
     cycle = p.actor_of(DAY_NIGHT_CLASS_PATH)
     if cycle is not None:

@@ -352,6 +352,7 @@ void UOtherworldCharacterMovement::UpdateCharacterStateBeforeMovement(float Delt
 		{
 			Body->bProne = bWantsProne && IsCrouching();
 			Body->bSliding = bSliding;
+			Body->bSprinting = bSprinting;
 		}
 	}
 }

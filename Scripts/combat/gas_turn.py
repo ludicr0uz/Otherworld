@@ -85,6 +85,16 @@ def root_modes_ask_traversing(bp):
     for name in ROOT_MODE_GRAPHS:
         ed = BGE.get_graph_editor_by_name(bp, name)
         found = release_flags(ed) if ed else []
+        if not found and ed:
+            # A patched function whose Get OwTraversing went with a failed
+            # build: its Branch is the one with nothing on the Condition.
+            bare = [n for n in ed.list_all_nodes()
+                    if n.get_class().get_name() == "K2Node_IfThenElse"
+                    and not PIN.list_connected_pins(_pin(n, "Condition"))]
+            if len(bare) == 1:
+                flag = ed.add_get_member_variable_node(TRAVERSING)
+                _connect(out(flag, TRAVERSING), _pin(bare[0], "Condition"))
+                continue
         if len(found) != 1:
             raise RuntimeError(f"{name}: expected one Branch on the slot question, "
                                f"found {len(found)}")

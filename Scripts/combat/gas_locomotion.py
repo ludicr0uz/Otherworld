@@ -83,7 +83,7 @@ from uebp.nodes.locomotion import (
     NODE_MAKE_INPUT_STATE,
 )
 from uebp.nodes.math import FN_AND, FN_EQ_II, FN_GREATER_FF, FN_LESS_FF, FN_NOT, FN_SUB_FF
-from uebp.nodes.move import FN_GET_STANCE, FN_IS_SPRINTING
+from uebp.nodes.move import FN_GET_STANCE, FN_IS_SPRINT_POSED
 from uebp.nodes.palette import NODE_BLEND_BY_BOOL, NODE_BREAK_HIT, NODE_CAST_CHARACTER
 from uebp.nodes.system import FN_IS_DEDICATED_SERVER, FN_TIME_SECONDS
 from uebp.pose_share import fed, share, unshare
@@ -172,7 +172,8 @@ def _author_properties(bp, ed):
         B=out(g.call(FN_NOT, A=out(g.call(FN_IS_FALLING, self=move)))))
 
     # The gait, the rotation mode and the movement mode: numbers, then enums.
-    sprinting = g.call(FN_IS_SPRINTING, Character=char)
+    # The sprint as the server says on another player's copy, which runs no moves.
+    sprinting = g.call(FN_IS_SPRINT_POSED, Character=char)
     walking = g.call(FN_LESS_FF, A=out(g.call(FN_MAX_SPEED, self=move)),
                      B=str(WALK_BELOW_CMS))
     gait = _pick(g, out(sprinting), values["Gait"]["SPRINT"],
@@ -184,7 +185,7 @@ def _author_properties(bp, ed):
                  values["MovementMode"]["IN_AIR"], values["MovementMode"]["ON_GROUND"])
 
     wants = g.keep(_palette(ed, NODE_MAKE_INPUT_STATE))
-    _connect(out(g.call(FN_IS_SPRINTING, Character=char)), _field(wants, "WantsToSprint"))
+    _connect(out(g.call(FN_IS_SPRINT_POSED, Character=char)), _field(wants, "WantsToSprint"))
     _connect(out(g.call(FN_LESS_FF, A=out(g.call(FN_MAX_SPEED, self=move)),
                         B=str(WALK_BELOW_CMS))), _field(wants, "WantsToWalk"))
     _connect(out(g.call(FN_NOT, A=g.iget(move, EP.ORIENT_ROTATION_TO_MOVEMENT, CMC))),

@@ -69,7 +69,9 @@ evidence than a reference: it may be a fallback for another body.
 Dashed, "mm pool": the clip is in a pose-search database the player's anim
 Blueprint can reach (Dense, Sparse, Extreme Sparse, the state-machine data).
 The motion matching may pick it; whether it does depends on the chooser. The
-Relaxed databases are not reachable, so none of the Relaxed clips are used.
+Relaxed databases are not reachable; the one Relaxed clip used is
+`M_Relaxed_Sprint_Loop_F`, which the weapons build puts in the neutral sprint-loop
+databases in place of the neutral forward loop (`combat/gas_sprint.py`).
 Run `export_usage.py` again after the graph changes.
 
 ## Wrong category

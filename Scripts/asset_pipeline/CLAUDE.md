@@ -255,8 +255,9 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/check_gas_load.py   # in a fr
   in: `dev/tests/test_gas_import.py`). **Name a GAS asset by its `/Game/GAS` path.** A
   package saved in this project is written with the new paths. The asset registry applies
   the redirects too: a copied package's dependencies read back as `/Game/GAS` names.
-- **Four packages are changed after the copy** (`gas_paths.PATCHED`; the copy keeps a
-  patched file). `SandboxCharacter_CMC_ABP` is the weapons build's to patch
+- **Seven packages are changed after the copy** (`gas_paths.PATCHED`; the copy keeps a
+  patched file). The three sprint-loop databases (`gas_paths.SPRINT_LOOP_DBS`) are the
+  weapons build's: `combat/gas_sprint.py` gives each the relaxed forward loop. `SandboxCharacter_CMC_ABP` is the weapons build's to patch
   (`combat/gas_locomotion.py`: what it reads of its character, its montage slot, the
   server branch), where it lies, because the sample's choosers take an object of its
   class and of no other. `AC_TraversalLogic` is the weapons build's too (G5,

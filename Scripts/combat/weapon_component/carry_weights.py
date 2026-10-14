@@ -5,7 +5,8 @@ pose_weights.py eases them, on every machine's copy).
     CarryPose   -> Lowered AND (HandPose == CarryFor OR HandPose in CarryAlso)
                    AND NOT Stance == PRONE
                    AND NOT Searching AND NOT sliding AND NOT in a traversal
-    CarrySprint -> the movement's IsSprinting
+    CarrySprint -> the movement's IsSprintPosed (IsSprinting, and on another
+                   player's copy, which runs no moves, the server's replicated word)
 
 Lowered (carry.py) is already "no ready pose": a gun nothing holds up, or a
 sprint. HandPose (look.py) is the pose the hand's item is held in, and CarryFor
@@ -34,7 +35,7 @@ from uebp.graph import _pin, out
 from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNER
 from uebp.nodes.array import FN_ARR_CONTAINS
 from uebp.nodes.math import FN_AND, FN_EQ_II, FN_EQ_OO, FN_NOT, FN_OR
-from uebp.nodes.move import FN_IS_SPRINTING
+from uebp.nodes.move import FN_IS_SPRINT_POSED
 
 
 def carry_targets(ed, sliding=None):
@@ -63,4 +64,4 @@ def carry_targets(ed, sliding=None):
         _pin(comp, "ComponentClass").set_pin_value(TRAVERSAL_CLASS)
         on = both(on, never(g.iget(out(comp), DOING_VAR, TRAVERSAL_CLASS)))
     return {CARRY_POSE: on,
-            CARRY_SPRINT: out(g.call(FN_IS_SPRINTING, Character=owner))}
+            CARRY_SPRINT: out(g.call(FN_IS_SPRINT_POSED, Character=owner))}

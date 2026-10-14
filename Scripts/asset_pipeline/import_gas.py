@@ -24,9 +24,10 @@ into Config/DefaultEngine.ini as [CoreRedirects], is what points those at
 /Game/GAS (this script checks they are there).  A package saved in this
 project afterwards is written with the new paths and no longer needs them.
 
-Two packages are changed here after the copy (gas_paths.PATCHED: the notifies
-only the Mover character answers, patch_gas_notifies.py), and the copy leaves
-one of those alone once it is here.
+Packages are changed after the copy (gas_paths.PATCHED: the notifies only the
+Mover character answers, patch_gas_notifies.py; the anim Blueprint, the
+traversal component and the sprint-loop databases, by the weapons build), and
+the copy leaves each of those alone once it is here.
 
 Nothing under Content/GAS is committed (.gitignore): asset_sources.py names
 this script as the way to get it back.  A file already identical in size and

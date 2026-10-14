@@ -7,6 +7,6 @@ public class OtherworldEditor : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine" });
-		PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "BlueprintGraph" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "BlueprintGraph", "PoseSearch" });
 	}
 }

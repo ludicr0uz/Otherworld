@@ -24,6 +24,8 @@ are found as drops (Fab models; the pistol is a 1911, the shotgun a pump-action 
 Game Animation Sample's motion matching on a hidden UEFN mannequin, nothing hand-animated;
 standing, the legs step round after the view with the sample's turn-in-place clips while
 the body faces it at once, armed or not, on every machine (`combat/gas_turn.py`);
+the empty-handed sprint straight ahead is the sample's relaxed loop, its diagonals,
+starts, stops and turns the neutral set's (`combat/gas_sprint.py`), on every copy;
 the sprint, prone, aim-walk, slide and stamina are the C++ movement component's, predicted
 on the owning client and decided by the server (`Source/CLAUDE.md`). The player jogs at
 4 m/s and sprints at 6 (forwards only), carries a gun lowered until something raises it (a rifle, a sniper or a shotgun in both hands at the hip, the Animation Starter Pack's rifle carry over the motion matching's legs, standing to sprinting and crouched; a pistol in the jog's own arm), aims over the shoulder or down a gun's sights (both hands fitted to that gun's model by the build: the right on its grip, the left on its handguard, pump or the gripping fist, as far as the arm reaches, `combat/gun_hold.py`; a long gun's fingers bent onto its model in a ready clip of its own, the AK, the Val, the shotgun, the 1911 and the SMG (a pistol's left hand closed over the right fist), `combat/finger_pose.py`), holds

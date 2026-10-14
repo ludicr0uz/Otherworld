@@ -103,6 +103,16 @@ bool UOtherworldMovementLibrary::IsSprinting(const AActor* Character)
 	return Movement && Movement->bSprinting;
 }
 
+bool UOtherworldMovementLibrary::IsSprintPosed(const AActor* Character)
+{
+	if (Character && Character->GetLocalRole() == ROLE_SimulatedProxy)
+	{
+		const AOtherworldCharacter* Body = Cast<AOtherworldCharacter>(Character);
+		return Body && Body->bSprinting;
+	}
+	return IsSprinting(Character);
+}
+
 bool UOtherworldMovementLibrary::IsSprintSpent(const AActor* Character)
 {
 	const UOtherworldCharacterMovement* Movement = MovementOf(Character);

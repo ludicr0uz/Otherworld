@@ -84,11 +84,18 @@ PATCHED_NOTIFIES = (
 # the server branch); it is patched where it lies because the sample's
 # choosers take an object of its class and no other.  The traversal component
 # is the weapons build's too (combat/gas_traversal.py: it reads any Character,
-# and its Server event asks the RPC guard).
+# and its Server event asks the RPC guard).  The sprint-loop databases are the
+# weapons build's too (combat/gas_sprint.py: the relaxed forward loop in each).
+_DBS = "/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases"
+SPRINT_LOOP_DBS = (
+    _DBS + "/Dense/PSD_Dense_Stand_Sprint_Loops",
+    _DBS + "/Sparse/PSD_Sparse_Stand_Sprint_Loops",
+    _DBS + "/Extreme_Sparse/PSD_Extreme_Sparse_Stand_Sprint_Loops",
+)
 PATCHED = PATCHED_NOTIFIES + (
     "/Game/Blueprints/SandboxCharacter_CMC_ABP",
     "/Game/Blueprints/AC_TraversalLogic",
-)
+) + SPRINT_LOOP_DBS
 
 ABP = GAME_ROOT + "/Blueprints/SandboxCharacter_CMC_ABP"
 UEFN = GAME_ROOT + "/Characters/UEFN_Mannequin"

@@ -305,6 +305,22 @@ another player's copy and the server's).
   probe that reads feet in a headless game makes the mesh pose every frame
   (`crawl_watch.always_pose`): an unrendered mesh keeps its last bones, which turn with the
   capsule and read as sliding.
+- **The empty-handed sprint straight ahead is the sample's relaxed loop**
+  (`gas_sprint.py`, `verify/gas_sprint.py`, `probes/probe_net_relaxed_sprint.py`; switch
+  `RELAXED_SPRINT`): `M_Relaxed_Sprint_Loop_F` takes `M_Neutral_Sprint_Loop_F`'s entry in
+  the three sprint-loop databases the chooser offers (dense, sparse, extreme sparse; the
+  entry's settings kept), through the editor module's `OtherworldPoseSearchLibrary`
+  (Python cannot write a database's entries). The diagonals, starts, stops, pivots and
+  transitions are the neutral set's; the experimental state machine's `PSD_SM_CMC_Loops`
+  is left. The databases are rows of `gas_paths.PATCHED` and git-ignored, so the weapons
+  build swaps them on every machine. The relaxed loop travels 585 cm/s (the neutral 700),
+  so at the sprint's 600 the motion matching plays it at about 1.03 (the neutral at 0.86);
+  the probe measures the legs at x1.0 the ground's pace and no posture pop on a veer to the
+  diagonal and back (it passes through the neutral diamond clips there).
+  **Another player's copy runs no moves**, so the movement's `IsSprinting` is false on it:
+  until this its gait was a run and its long gun's `CarrySprint` never came in. The gait,
+  `WantsToSprint` and `CarrySprint` read `IsSprintPosed`, which is the server's
+  replicated `bSprinting` on a simulated copy (`Source/CLAUDE.md`).
 - **The crawl goes the way the player moves** (P2; `crawl_consts.py`, `crawl_direction.py`,
   `stance_clips._moving`, `verify/crawl_direction.py`): the layers' event graph keeps the
   pawn's velocity along its own forward and right, eased, and five weights read off it; the

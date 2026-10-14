@@ -206,8 +206,9 @@ def check_carry_weights():
           f"B {num_pin(told[0], 'B') if told else None}, then {[_title(n) for n in nots]}")
     sprint = {_title(n) for n in
               _behind(BEL.find_input_pin(writes[CARRY_SPRINT][0], CARRY_SPRINT))}
-    check(f"...{CARRY_SPRINT} targets the movement's own IsSprinting, which every "
-          "machine's copy has", "IsSprinting" in sprint, str(sorted(sprint)))
+    check(f"...{CARRY_SPRINT} targets the movement's IsSprintPosed, which every "
+          "machine's copy has (another player's by replication)",
+          "IsSprintPosed" in sprint, str(sorted(sprint)))
 
 
 def check_carried_guns():

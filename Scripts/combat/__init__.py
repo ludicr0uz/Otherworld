@@ -325,4 +325,6 @@ wrong module.
                     which clips the carry takes (carry_clips)
 
   gas_turn  Standing, the legs step round after the view: the sample's turn-in-place switched on (WantsToAim), the root's offset released by a traversal alone
+
+  gas_sprint  The unarmed sprint straight ahead is the sample's relaxed loop: its three sprint-loop databases have ...
 """

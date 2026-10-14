@@ -26,6 +26,7 @@ from combat.weapon_layers import layers_class_path
 from combat.weapon_layers_consts import BEFORE_LINK_CLASS, LAYERS_ABP, LAYERS_TAG, MAIN_MONTAGES
 from combat.verify.common import _mesh_asset, check, component_template, components
 from combat.verify.fixtures import char
+from combat.verify.gas_sprint import check_sprint_loops
 from combat.verify.gas_turn import check_turn
 from combat.verify.server_anim import (
     _class, _flag_written_once, _sources, _title, check_no_fanout,
@@ -58,14 +59,15 @@ def check_properties(bp, ed):
           + ("Stance is set: the crouch is the sample's, G5)" if crouch_on()
              else "Stance among them: the crouch is the layers' clips)"),
           len(makes) == 1 and fed == sorted(fields_set()), str(fed))
-    sprint = [n for n in nodes if _title(n).replace(" ", "") == "IsSprinting"]
+    sprint = [n for n in nodes if _title(n).replace(" ", "") == "IsSprintPosed"]
     paces = [n for n in nodes if _title(n).replace(" ", "") == "GetMaxSpeed"]
     limits = {float(PIN.get_pin_value(BEL.find_input_pin(c, "B")) or 0.0)
               for p in paces for c in (PIN.get_owning_node(q)
                                        for q in linked(
                                            BEL.find_output_pin(p, "ReturnValue")))}
     check("...the gait is read off the game's own movement: Sprint while the C++ "
-          f"movement sprints, Walk under {WALK_BELOW_CMS:g} cm/s of pace",
+          "movement sprints (IsSprintPosed: on another player's copy the server's "
+          f"replicated word), Walk under {WALK_BELOW_CMS:g} cm/s of pace",
           len(sprint) >= 1 and limits == {WALK_BELOW_CMS}, f"{len(sprint)} / {limits}")
     values = enum_values(bp)
     check("...and the sample's enums still have the members the numbers were read for",
@@ -244,3 +246,4 @@ def run():
     check_anim_graph(bp, anim)
     check_feet(bp, anim, properties)
     check_body()
+    check_sprint_loops()

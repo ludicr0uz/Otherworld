@@ -53,6 +53,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Movement")
 	static bool IsSprinting(const AActor* Character);
 
+	/**
+	 * Sprinting, as any machine's copy poses it: on another player's copy what the server
+	 * replicated (IsSprinting is false there, as that copy runs no moves), elsewhere IsSprinting.
+	 * For the anim graph's gait; the gameplay asks IsSprinting.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Movement")
+	static bool IsSprintPosed(const AActor* Character);
+
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Movement")
 	static bool IsSprintSpent(const AActor* Character);
 

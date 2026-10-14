@@ -704,13 +704,14 @@ asset_pipeline/gas_paths.py:30: ROOT_FOLDERS
 asset_pipeline/gas_paths.py:41: EXCLUDED
 asset_pipeline/gas_paths.py:64: REDIRECTED
 asset_pipeline/gas_paths.py:76: PATCHED_NOTIFIES
-asset_pipeline/gas_paths.py:88: PATCHED
-asset_pipeline/gas_paths.py:93: ABP
-asset_pipeline/gas_paths.py:94: UEFN
-asset_pipeline/gas_paths.py:95: DATABASES
-asset_pipeline/gas_paths.py:98: gas
-asset_pipeline/gas_paths.py:104: redirected
-asset_pipeline/gas_paths.py:110: redirect_lines
+asset_pipeline/gas_paths.py:90: SPRINT_LOOP_DBS
+asset_pipeline/gas_paths.py:95: PATCHED
+asset_pipeline/gas_paths.py:100: ABP
+asset_pipeline/gas_paths.py:101: UEFN
+asset_pipeline/gas_paths.py:102: DATABASES
+asset_pipeline/gas_paths.py:105: gas
+asset_pipeline/gas_paths.py:111: redirected
+asset_pipeline/gas_paths.py:117: redirect_lines
 asset_pipeline/gas_player_mesh.py:26: NEW_SOCKET_NAME
 asset_pipeline/gas_player_mesh.py:29: _sockets
 asset_pipeline/gas_player_mesh.py:34: build_player_mesh
@@ -761,29 +762,29 @@ asset_pipeline/import_fal.py:56: IN_PLACE_CM
 asset_pipeline/import_fal.py:59: _log
 asset_pipeline/import_fal.py:63: _batch
 asset_pipeline/import_fal.py:80: _travel
-asset_pipeline/import_gas.py:45: HERE
-asset_pipeline/import_gas.py:46: PROJECT_ROOT
-asset_pipeline/import_gas.py:52: MANIFEST
-asset_pipeline/import_gas.py:53: CUT
-asset_pipeline/import_gas.py:54: ENGINE_INI
-asset_pipeline/import_gas.py:57: SAMPLE_ROOT
-asset_pipeline/import_gas.py:60: SAMPLE_UPROJECT
-asset_pipeline/import_gas.py:71: EXCLUDED
-asset_pipeline/import_gas.py:72: opts
-asset_pipeline/import_gas.py:76: cut
-asset_pipeline/import_gas.py:109: packages
-asset_pipeline/import_gas.py:114: _file_of
-asset_pipeline/import_gas.py:124: _src
-asset_pipeline/import_gas.py:128: _dst
-asset_pipeline/import_gas.py:132: missing
-asset_pipeline/import_gas.py:137: missing_redirects
-asset_pipeline/import_gas.py:144: unredirected
-asset_pipeline/import_gas.py:149: strays
-asset_pipeline/import_gas.py:159: _same
-asset_pipeline/import_gas.py:167: size
-asset_pipeline/import_gas.py:173: copy
-asset_pipeline/import_gas.py:205: _refuse_bad_redirects
-asset_pipeline/import_gas.py:217: write_manifest
+asset_pipeline/import_gas.py:46: HERE
+asset_pipeline/import_gas.py:47: PROJECT_ROOT
+asset_pipeline/import_gas.py:53: MANIFEST
+asset_pipeline/import_gas.py:54: CUT
+asset_pipeline/import_gas.py:55: ENGINE_INI
+asset_pipeline/import_gas.py:58: SAMPLE_ROOT
+asset_pipeline/import_gas.py:61: SAMPLE_UPROJECT
+asset_pipeline/import_gas.py:72: EXCLUDED
+asset_pipeline/import_gas.py:73: opts
+asset_pipeline/import_gas.py:77: cut
+asset_pipeline/import_gas.py:110: packages
+asset_pipeline/import_gas.py:115: _file_of
+asset_pipeline/import_gas.py:125: _src
+asset_pipeline/import_gas.py:129: _dst
+asset_pipeline/import_gas.py:133: missing
+asset_pipeline/import_gas.py:138: missing_redirects
+asset_pipeline/import_gas.py:145: unredirected
+asset_pipeline/import_gas.py:150: strays
+asset_pipeline/import_gas.py:160: _same
+asset_pipeline/import_gas.py:168: size
+asset_pipeline/import_gas.py:174: copy
+asset_pipeline/import_gas.py:206: _refuse_bad_redirects
+asset_pipeline/import_gas.py:218: write_manifest
 asset_pipeline/import_lyra.py:48: _log
 asset_pipeline/import_lyra.py:52: _batch
 asset_pipeline/import_metahuman.py:31: HERE
@@ -1633,44 +1634,44 @@ combat/breath_tuning.py:31: BREATH_SCALE_VAR
 combat/breath_tuning.py:32: BREATH_FORCED_VAR
 combat/breath_tuning.py:35: breath_target
 combat/breath_tuning.py:40: breath_step
-combat/build_steps.py:71: ENV_ONLY
-combat/build_steps.py:78: class Ctx
-combat/build_steps.py:118: class Step
-combat/build_steps.py:125: _materials
-combat/build_steps.py:129: _hot_material
-combat/build_steps.py:134: _sound_assets
-combat/build_steps.py:140: _anim_blueprint
-combat/build_steps.py:146: _settings_savegame
-combat/build_steps.py:152: _body
-combat/build_steps.py:170: _anim_patches
-combat/build_steps.py:190: _input_assets
-combat/build_steps.py:195: _glimmer_material
-combat/build_steps.py:200: _weapon_item
-combat/build_steps.py:204: _weapons
-combat/build_steps.py:209: _finger_poses
-combat/build_steps.py:214: _hold_poses
-combat/build_steps.py:219: _melee_clips
-combat/build_steps.py:224: _throw_ready
-combat/build_steps.py:229: _knife
-combat/build_steps.py:233: _axe
-combat/build_steps.py:237: _wood
-combat/build_steps.py:241: _matches
-combat/build_steps.py:245: _stick
-combat/build_steps.py:249: _blood
-combat/build_steps.py:253: _bullet_impact
-combat/build_steps.py:257: _state
-combat/build_steps.py:268: _health
-combat/build_steps.py:272: _footsteps
-combat/build_steps.py:276: _throw_arc
-combat/build_steps.py:280: _weapon_component
-combat/build_steps.py:287: _ammo_pickup
-combat/build_steps.py:292: _health_defaults
-combat/build_steps.py:307: _bodies
-combat/build_steps.py:312: _install
-combat/build_steps.py:318: _done
-combat/build_steps.py:326: STEPS
-combat/build_steps.py:363: BY_NAME
-combat/build_steps.py:368: selection
+combat/build_steps.py:72: ENV_ONLY
+combat/build_steps.py:79: class Ctx
+combat/build_steps.py:119: class Step
+combat/build_steps.py:126: _materials
+combat/build_steps.py:130: _hot_material
+combat/build_steps.py:135: _sound_assets
+combat/build_steps.py:141: _anim_blueprint
+combat/build_steps.py:147: _settings_savegame
+combat/build_steps.py:153: _body
+combat/build_steps.py:173: _anim_patches
+combat/build_steps.py:193: _input_assets
+combat/build_steps.py:198: _glimmer_material
+combat/build_steps.py:203: _weapon_item
+combat/build_steps.py:207: _weapons
+combat/build_steps.py:212: _finger_poses
+combat/build_steps.py:217: _hold_poses
+combat/build_steps.py:222: _melee_clips
+combat/build_steps.py:227: _throw_ready
+combat/build_steps.py:232: _knife
+combat/build_steps.py:236: _axe
+combat/build_steps.py:240: _wood
+combat/build_steps.py:244: _matches
+combat/build_steps.py:248: _stick
+combat/build_steps.py:252: _blood
+combat/build_steps.py:256: _bullet_impact
+combat/build_steps.py:260: _state
+combat/build_steps.py:271: _health
+combat/build_steps.py:275: _footsteps
+combat/build_steps.py:279: _throw_arc
+combat/build_steps.py:283: _weapon_component
+combat/build_steps.py:290: _ammo_pickup
+combat/build_steps.py:295: _health_defaults
+combat/build_steps.py:310: _bodies
+combat/build_steps.py:315: _install
+combat/build_steps.py:321: _done
+combat/build_steps.py:329: STEPS
+combat/build_steps.py:366: BY_NAME
+combat/build_steps.py:371: selection
 combat/bullet_impact.py:16: IMPACT_SEED
 combat/bullet_impact.py:17: IMPACT_CHIPS
 combat/bullet_impact.py:18: IMPACT_DUST
@@ -1947,24 +1948,24 @@ combat/gas_locomotion.py:115: enum_values
 combat/gas_locomotion.py:126: _as_enum
 combat/gas_locomotion.py:134: _pick
 combat/gas_locomotion.py:139: _author_properties
-combat/gas_locomotion.py:241: fields_set
-combat/gas_locomotion.py:247: else_pin
-combat/gas_locomotion.py:254: _slot
-combat/gas_locomotion.py:262: slot_in_line
-combat/gas_locomotion.py:268: _remove_slot
-combat/gas_locomotion.py:283: layer_links
-combat/gas_locomotion.py:288: link_tag
-combat/gas_locomotion.py:292: link_class
-combat/gas_locomotion.py:298: _remove_link
-combat/gas_locomotion.py:306: _author_link
-combat/gas_locomotion.py:337: server_branches
-combat/gas_locomotion.py:350: _remove_server_branch
-combat/gas_locomotion.py:367: eye_segment
-combat/gas_locomotion.py:389: _author_server_branch
-combat/gas_locomotion.py:426: silent_foley_bank
-combat/gas_locomotion.py:443: graphs
-combat/gas_locomotion.py:452: build_gas_locomotion
-combat/gas_locomotion.py:493: resave_gas_locomotion
+combat/gas_locomotion.py:242: fields_set
+combat/gas_locomotion.py:248: else_pin
+combat/gas_locomotion.py:255: _slot
+combat/gas_locomotion.py:263: slot_in_line
+combat/gas_locomotion.py:269: _remove_slot
+combat/gas_locomotion.py:284: layer_links
+combat/gas_locomotion.py:289: link_tag
+combat/gas_locomotion.py:293: link_class
+combat/gas_locomotion.py:299: _remove_link
+combat/gas_locomotion.py:307: _author_link
+combat/gas_locomotion.py:338: server_branches
+combat/gas_locomotion.py:351: _remove_server_branch
+combat/gas_locomotion.py:368: eye_segment
+combat/gas_locomotion.py:390: _author_server_branch
+combat/gas_locomotion.py:427: silent_foley_bank
+combat/gas_locomotion.py:444: graphs
+combat/gas_locomotion.py:453: build_gas_locomotion
+combat/gas_locomotion.py:494: resave_gas_locomotion
 combat/gas_locomotion_consts.py:28: GAS_LOCOMOTION
 combat/gas_locomotion_consts.py:32: ABP_LOCOMOTION
 combat/gas_locomotion_consts.py:33: MESH
@@ -2025,6 +2026,17 @@ combat/gas_moves_tuning.py:69: TRACE_FAR_CM
 combat/gas_moves_tuning.py:70: TRACE_FAR_AT_CMS
 combat/gas_moves_tuning.py:71: TRACE_RADIUS_CM
 combat/gas_moves_tuning.py:72: TRACE_HALF_HEIGHT_CM
+combat/gas_sprint.py:42: RELAXED_SPRINT
+combat/gas_sprint.py:44: SPRINT
+combat/gas_sprint.py:45: NEUTRAL_F
+combat/gas_sprint.py:46: RELAXED_F
+combat/gas_sprint.py:48: DIAGONALS
+combat/gas_sprint.py:50: SPRINT_LOOP_DBS
+combat/gas_sprint.py:54: FORWARD_ENTRY
+combat/gas_sprint.py:57: forward_loop
+combat/gas_sprint.py:62: _must_load
+combat/gas_sprint.py:69: entries
+combat/gas_sprint.py:80: swap_sprint_loop
 combat/gas_traversal.py:70: CHARACTER
 combat/gas_traversal.py:71: TRAVERSAL_CLASS
 combat/gas_traversal.py:74: LEDGE_REACH_CM
@@ -2869,7 +2881,7 @@ combat/use_tuning.py:9: USE_BIND
 combat/use_tuning.py:11: USING_VAR
 combat/use_tuning.py:12: USE_PRESSED_VAR
 combat/use_tuning.py:13: USE_WAS_VAR
-combat/verify/__init__.py:218: SECTIONS
+combat/verify/__init__.py:220: SECTIONS
 combat/verify/accuracy.py:20: _title
 combat/verify/accuracy.py:24: _sources
 combat/verify/accuracy.py:31: _sets
@@ -2978,7 +2990,7 @@ combat/verify/carry_pose.py:70: carry_mix
 combat/verify/carry_pose.py:79: check_carry_graph
 combat/verify/carry_pose.py:141: check_carry_clips
 combat/verify/carry_pose.py:163: check_carry_weights
-combat/verify/carry_pose.py:213: check_carried_guns
+combat/verify/carry_pose.py:214: check_carried_guns
 combat/verify/chop.py:41: WOOD_LENGTH_CM
 combat/verify/chop.py:43: WOOD_SINK_CM
 combat/verify/chop.py:46: _squash
@@ -3116,18 +3128,18 @@ combat/verify/fx.py:110: check_pairs
 combat/verify/fx.py:162: _feeders_then
 combat/verify/fx.py:166: check_counter
 combat/verify/fx.py:172: check_headshot_travels
-combat/verify/gas_locomotion.py:36: FEET
-combat/verify/gas_locomotion.py:37: SEARCH
-combat/verify/gas_locomotion.py:40: _linked
-combat/verify/gas_locomotion.py:44: check_properties
-combat/verify/gas_locomotion.py:81: _has
-combat/verify/gas_locomotion.py:89: check_anim_graph
-combat/verify/gas_locomotion.py:125: check_link
-combat/verify/gas_locomotion.py:148: _upstream
-combat/verify/gas_locomotion.py:158: arm_of
-combat/verify/gas_locomotion.py:172: feet_start_at_server_pose
-combat/verify/gas_locomotion.py:189: check_body
-combat/verify/gas_locomotion.py:208: check_feet
+combat/verify/gas_locomotion.py:37: FEET
+combat/verify/gas_locomotion.py:38: SEARCH
+combat/verify/gas_locomotion.py:41: _linked
+combat/verify/gas_locomotion.py:45: check_properties
+combat/verify/gas_locomotion.py:83: _has
+combat/verify/gas_locomotion.py:91: check_anim_graph
+combat/verify/gas_locomotion.py:127: check_link
+combat/verify/gas_locomotion.py:150: _upstream
+combat/verify/gas_locomotion.py:160: arm_of
+combat/verify/gas_locomotion.py:174: feet_start_at_server_pose
+combat/verify/gas_locomotion.py:191: check_body
+combat/verify/gas_locomotion.py:210: check_feet
 combat/verify/gas_moves.py:39: _class
 combat/verify/gas_moves.py:43: _title
 combat/verify/gas_moves.py:47: _flat
@@ -3139,6 +3151,8 @@ combat/verify/gas_moves.py:138: _has_var
 combat/verify/gas_moves.py:146: check_traversal_component
 combat/verify/gas_moves.py:202: check_traversal_slot
 combat/verify/gas_moves.py:240: check_traversal_player
+combat/verify/gas_sprint.py:12: COUNTS
+combat/verify/gas_sprint.py:15: check_sprint_loops
 combat/verify/gas_turn.py:12: _title
 combat/verify/gas_turn.py:16: _feeding
 combat/verify/gas_turn.py:20: _under
@@ -3718,7 +3732,7 @@ combat/weapon_component/build.py:77: build_weapon_component
 combat/weapon_component/carry.py:54: TRAVERSAL_CLASS
 combat/weapon_component/carry.py:57: _author_shot_origin
 combat/weapon_component/carry.py:81: _author_carry
-combat/weapon_component/carry_weights.py:40: carry_targets
+combat/weapon_component/carry_weights.py:41: carry_targets
 combat/weapon_component/cauterize.py:46: CAUTERIZE_TAGS
 combat/weapon_component/cauterize.py:49: _author_cauterize
 combat/weapon_component/cauterize.py:78: author_cauterize_event
@@ -8770,6 +8784,24 @@ probes/probe_net_record_cost.py:34: WINDOW_S
 probes/probe_net_record_cost.py:35: MOVES
 probes/probe_net_record_cost.py:39: _wall
 probes/probe_net_record_cost.py:44: _out_bytes
+probes/probe_net_relaxed_sprint.py:46: WAIT
+probes/probe_net_relaxed_sprint.py:49: PHASES
+probes/probe_net_relaxed_sprint.py:50: SETTLE_S
+probes/probe_net_relaxed_sprint.py:51: AFTER_VEER_S
+probes/probe_net_relaxed_sprint.py:52: POP_RATIO
+probes/probe_net_relaxed_sprint.py:53: PICK_AFTER_S
+probes/probe_net_relaxed_sprint.py:54: NEUTRAL
+probes/probe_net_relaxed_sprint.py:55: RELAXED
+probes/probe_net_relaxed_sprint.py:56: DIAGONAL_NAMES
+probes/probe_net_relaxed_sprint.py:57: SPACE
+probes/probe_net_relaxed_sprint.py:60: _await
+probes/probe_net_relaxed_sprint.py:65: _pick
+probes/probe_net_relaxed_sprint.py:70: _count
+probes/probe_net_relaxed_sprint.py:76: _check_picks
+probes/probe_net_relaxed_sprint.py:89: _posture
+probes/probe_net_relaxed_sprint.py:146: _check_cadence
+probes/probe_net_relaxed_sprint.py:165: _check_posture
+probes/probe_net_relaxed_sprint.py:189: _watch_other
 probes/probe_net_see_each_other.py:27: WAIT
 probes/probe_net_see_each_other.py:28: WALK_CM
 probes/probe_net_see_each_other.py:29: WALK_MIN_CM
@@ -10286,11 +10318,12 @@ uebp/nodes/move.py:17: FN_GET_STANCE
 uebp/nodes/move.py:18: FN_GET_STAMINA
 uebp/nodes/move.py:19: FN_IS_SPRINTING
 uebp/nodes/move.py:20: FN_IS_SPRINT_SPENT
-uebp/nodes/move.py:22: FN_IS_SLIDING
-uebp/nodes/move.py:23: FN_IS_SPRINT_AHEAD
-uebp/nodes/move.py:26: FN_SET_STAMINA
-uebp/nodes/move.py:27: FN_SPEND_STAMINA
-uebp/nodes/move.py:28: FN_SET_PACE
+uebp/nodes/move.py:22: FN_IS_SPRINT_POSED
+uebp/nodes/move.py:24: FN_IS_SLIDING
+uebp/nodes/move.py:25: FN_IS_SPRINT_AHEAD
+uebp/nodes/move.py:28: FN_SET_STAMINA
+uebp/nodes/move.py:29: FN_SPEND_STAMINA
+uebp/nodes/move.py:30: FN_SET_PACE
 uebp/nodes/noise.py:7: NOISE_LIBRARY
 uebp/nodes/noise.py:12: FN_MAKE_NOISE
 uebp/nodes/noise.py:15: FN_HEAR_NOISE
@@ -10765,8 +10798,8 @@ world/world_tuning.py:47: read_table
 world/world_tuning.py:58: format_value
 world/world_tuning.py:63: write_table
 Source/Otherworld/Public/OtherworldCharacter.h:31: UCLASS class OTHERWORLD_API AOtherworldCharacter : public ACharacter
-Source/Otherworld/Public/OtherworldCharacter.h:59: UFUNCTION void SetFireKey(FKey Key);
-Source/Otherworld/Public/OtherworldCharacter.h:67: UFUNCTION void OnRep_Prone();
+Source/Otherworld/Public/OtherworldCharacter.h:63: UFUNCTION void SetFireKey(FKey Key);
+Source/Otherworld/Public/OtherworldCharacter.h:71: UFUNCTION void OnRep_Prone();
 Source/Otherworld/Public/OtherworldCharacterMovement.h:98: UCLASS class OTHERWORLD_API UOtherworldCharacterMovement : public UCharacterM
 Source/Otherworld/Public/OtherworldGripLibrary.h:24: UCLASS class OTHERWORLD_API UOtherworldGripLibrary : public UBlueprintFunctio
 Source/Otherworld/Public/OtherworldGripLibrary.h:34: UFUNCTION static FName GripRowOf(const AActor* Item);
@@ -10838,12 +10871,13 @@ Source/Otherworld/Public/OtherworldMovementLibrary.h:38: UFUNCTION static void R
 Source/Otherworld/Public/OtherworldMovementLibrary.h:47: UFUNCTION static int32 GetStance(const AActor* Character);
 Source/Otherworld/Public/OtherworldMovementLibrary.h:50: UFUNCTION static float GetStamina(const AActor* Character);
 Source/Otherworld/Public/OtherworldMovementLibrary.h:53: UFUNCTION static bool IsSprinting(const AActor* Character);
-Source/Otherworld/Public/OtherworldMovementLibrary.h:56: UFUNCTION static bool IsSprintSpent(const AActor* Character);
-Source/Otherworld/Public/OtherworldMovementLibrary.h:60: UFUNCTION static bool IsSliding(const AActor* Character);
-Source/Otherworld/Public/OtherworldMovementLibrary.h:63: UFUNCTION static bool IsSprintAhead(const AActor* Character);
-Source/Otherworld/Public/OtherworldMovementLibrary.h:68: UFUNCTION static void SetStamina(AActor* Character, float NewStamina);
-Source/Otherworld/Public/OtherworldMovementLibrary.h:72: UFUNCTION static void SpendStamina(AActor* Character, float Amount);
-Source/Otherworld/Public/OtherworldMovementLibrary.h:76: UFUNCTION static void SetPace(AActor* Character, float JogSpeed, float SprintSpe
+Source/Otherworld/Public/OtherworldMovementLibrary.h:61: UFUNCTION static bool IsSprintPosed(const AActor* Character);
+Source/Otherworld/Public/OtherworldMovementLibrary.h:64: UFUNCTION static bool IsSprintSpent(const AActor* Character);
+Source/Otherworld/Public/OtherworldMovementLibrary.h:68: UFUNCTION static bool IsSliding(const AActor* Character);
+Source/Otherworld/Public/OtherworldMovementLibrary.h:71: UFUNCTION static bool IsSprintAhead(const AActor* Character);
+Source/Otherworld/Public/OtherworldMovementLibrary.h:76: UFUNCTION static void SetStamina(AActor* Character, float NewStamina);
+Source/Otherworld/Public/OtherworldMovementLibrary.h:80: UFUNCTION static void SpendStamina(AActor* Character, float Amount);
+Source/Otherworld/Public/OtherworldMovementLibrary.h:84: UFUNCTION static void SetPace(AActor* Character, float JogSpeed, float SprintSpe
 Source/Otherworld/Public/OtherworldNetLibrary.h:19: UCLASS class OTHERWORLD_API UOtherworldNetLibrary : public UBlueprintFunction
 Source/Otherworld/Public/OtherworldNetLibrary.h:29: UFUNCTION static bool IsLevelActor(const AActor* Actor);
 Source/Otherworld/Public/OtherworldNetLibrary.h:41: UFUNCTION static bool SendServerEvent(UObject* Target, FName Event, const TArray
@@ -10903,3 +10937,6 @@ Source/OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h:55: UFUNCTION sta
 Source/OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h:62: UFUNCTION static bool SetVariableReplication(UBlueprint* Blueprint, FName Variab
 Source/OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h:66: UFUNCTION static bool GetVariableReplication(const UBlueprint* Blueprint, FName 
 Source/OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h:70: UFUNCTION static bool GetCompiledPropertyReplication(const UClass* Class, FName 
+Source/OtherworldEditor/Public/OtherworldPoseSearchLibrary.h:14: UCLASS class OTHERWORLDEDITOR_API UOtherworldPoseSearchLibrary : public UBlue
+Source/OtherworldEditor/Public/OtherworldPoseSearchLibrary.h:25: UFUNCTION static int32 ReplaceDatabaseAnimation(UPoseSearchDatabase* Database, U
+Source/OtherworldEditor/Public/OtherworldPoseSearchLibrary.h:32: UFUNCTION static bool GetDatabaseEntry(const UPoseSearchDatabase* Database, int3

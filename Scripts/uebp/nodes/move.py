@@ -18,6 +18,8 @@ FN_GET_STANCE = MOVE_LIBRARY + ".GetStance"
 FN_GET_STAMINA = MOVE_LIBRARY + ".GetStamina"
 FN_IS_SPRINTING = MOVE_LIBRARY + ".IsSprinting"
 FN_IS_SPRINT_SPENT = MOVE_LIBRARY + ".IsSprintSpent"
+# Sprinting as any machine's copy poses it (a simulated copy: the server's word).
+FN_IS_SPRINT_POSED = MOVE_LIBRARY + ".IsSprintPosed"
 # In a slide, on any machine (a simulated copy included).
 FN_IS_SLIDING = MOVE_LIBRARY + ".IsSliding"
 FN_IS_SPRINT_AHEAD = MOVE_LIBRARY + ".IsSprintAhead"

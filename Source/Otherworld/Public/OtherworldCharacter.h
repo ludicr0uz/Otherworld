@@ -44,6 +44,10 @@ public:
 	UPROPERTY(Transient, Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
 	bool bSliding = false;
 
+	/** Sprinting. The server writes it with each move; only simulated copies receive it, for the gait they pose. */
+	UPROPERTY(Transient, Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Otherworld|State")
+	bool bSprinting = false;
+
 	/** The game's own mapping context, added for the local player (input_assets.py writes it). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Otherworld|Input")
 	TObjectPtr<UInputMappingContext> InputContext;

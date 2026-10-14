@@ -30,8 +30,8 @@ class Levels(unittest.TestCase):
             self.assertEqual(L.grass_specs_for(level), DEFAULT_GRASS_SPECS, level)
 
     def test_the_1_km_level_has_the_colour_alone(self):
-        specs = L.grass_specs_for("Lvl_Forest_1000m")
-        self.assertEqual(len(specs), len(DEFAULT_GRASS_SPECS))
+        # Its meadow; the six other types are VariedGrass's.
+        specs = L.grass_specs_for("Lvl_Forest_1000m")[:len(DEFAULT_GRASS_SPECS)]
         for dark, plain in zip(specs, DEFAULT_GRASS_SPECS):
             self.assertEqual(dark.material_paths, [L.material_object_path()])
             self.assertEqual(dataclasses.replace(dark, material_paths=plain.material_paths),
@@ -92,7 +92,8 @@ class Tiers(unittest.TestCase):
 
 class PatchSpecs(unittest.TestCase):
     def setUp(self):
-        self.specs = L.grass_specs_for("Lvl_Forest_200m")
+        # The meadow; the six other types are VariedGrass's.
+        self.specs = L.grass_specs_for("Lvl_Forest_200m")[:len(DEFAULT_GRASS_SPECS)]
 
     def test_each_draws_the_patch_s_dark_instance(self):
         for spec in self.specs:
@@ -103,7 +104,6 @@ class PatchSpecs(unittest.TestCase):
                          "/Game/Forest/Materials/MI_Grass_02_09_Dark.MI_Grass_02_09_Dark")
 
     def test_only_the_mesh_its_name_material_and_height_differ(self):
-        self.assertEqual(len(self.specs), len(DEFAULT_GRASS_SPECS))
         for patch, plain in zip(self.specs, DEFAULT_GRASS_SPECS):
             self.assertEqual(patch.mesh_path, asset_path(GRASS_PATCH))
             self.assertEqual(patch.nominal_mesh_height_cm, GRASS_PATCH.height_cm)
@@ -116,6 +116,55 @@ class PatchSpecs(unittest.TestCase):
     def test_the_blades_are_not_stretched(self):
         for spec in self.specs:
             self.assertEqual(spec.width_jitter, (0.85, 1.20))
+
+
+class VariedGrass(unittest.TestCase):
+    """F2: seven grass types on the two forest levels, the meadow first."""
+
+    def test_the_forest_levels_plant_seven_types(self):
+        self.assertEqual(L.VARIED_GRASS_LEVELS, ("Lvl_Forest_200m", "Lvl_Forest_1000m"))
+        for level in L.VARIED_GRASS_LEVELS:
+            specs = L.grass_specs_for(level)
+            self.assertEqual(len(specs), 7, level)
+            self.assertEqual(len({s.name for s in specs}), 7, level)
+            # The prefix the import's cleanup sweeps on.
+            self.assertTrue(all(s.name.startswith("HISM_Grass") for s in specs), level)
+            self.assertEqual(len({s.mesh_path for s in specs}), 7, level)
+            self.assertEqual(len({tuple(s.material_paths) for s in specs}), 7, level)
+        for level in ("Lvl_Probe_50m", "Lvl_Title", None):
+            self.assertFalse(L.has_varied_grass(level))
+
+    def test_each_type_draws_its_own_dark_instance(self):
+        for t in L.LOW_GRASS_TYPES:
+            self.assertTrue(t.material.startswith("/Game/Forest/Materials/MI_LowGrass_"))
+            self.assertTrue(t.material.endswith("_Dark"))
+            self.assertIn(t.material_parent, t.mesh.packages)
+            self.assertNotEqual(t.material_parent, L.GRASS_MATERIAL_PARENT)
+        self.assertEqual(L.LOW_GRASS_MATERIALS, tuple(t.material for t in L.LOW_GRASS_TYPES))
+
+    def test_only_the_patch_level_plants_a_spot_more_than_once(self):
+        for spec in L.grass_specs_for("Lvl_Forest_1000m"):
+            self.assertEqual(spec.density_scale, 1.0, spec.name)
+        specs = L.grass_specs_for("Lvl_Forest_200m")
+        self.assertEqual(specs[0].density_scale, 1.0)
+        for spec in specs[1:]:
+            self.assertTrue(1.0 <= spec.density_scale <= 2.0, spec.name)
+
+    def test_most_types_stand_in_the_knee_layer(self):
+        # verification.check_grass_knee_height holds a ratio of 0.85 and up to
+        # the knee band; one short lawn is allowed under it.
+        ratios = [t.height_ratio for t in L.LOW_GRASS_TYPES]
+        self.assertEqual(sum(r < 0.85 for r in ratios), 1)
+        self.assertTrue(all(0.5 <= r <= 1.3 for r in ratios), ratios)
+
+    def test_the_tints_are_dark_olive_like_the_meadow_s(self):
+        for t in L.LOW_GRASS_TYPES:
+            r, g, b = t.tint
+            self.assertTrue(b < g <= r <= 1.0, (t.name, t.tint))
+
+    def test_the_widths_are_not_stretched_flat(self):
+        for t in L.LOW_GRASS_TYPES:
+            self.assertLessEqual(t.width_jitter[1], 1.4, t.name)
 
 
 class Colours(unittest.TestCase):
@@ -149,7 +198,7 @@ class Committed(unittest.TestCase):
         self.assertIn(L.PATCH_MATERIAL, GRASS_PATCH.packages)
 
     def test_git_does_not_ignore_the_instances(self):
-        for package in (L.GRASS_MATERIAL, L.PATCH_MATERIAL):
+        for package in (L.GRASS_MATERIAL, L.PATCH_MATERIAL) + L.LOW_GRASS_MATERIALS:
             path = content_file(package)
             done = subprocess.run(["git", "check-ignore", path], cwd=ROOT,
                                   capture_output=True, text=True)

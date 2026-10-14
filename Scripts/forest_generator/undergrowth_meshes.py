@@ -7,6 +7,8 @@ of the first:
 
     grass    grass_02_09_mesh   "temperate Vegetation: optimized Grass Library"
     grass    SM_Grass_Patch     seven of that clump merged (GRASS_PATCH, below)
+    grass    lowGrass_*_SM      six more of the same pack, the other grass
+                                types (LOW_GRASS_MESHES, F2)
     bushes   SM_Bush_02         "Light Foliage"
 
 Neither is Nanite. Each has four mesh LODs and a masked, two-sided foliage
@@ -113,7 +115,40 @@ GRASS_PATCH = LibraryMesh(
         f"{_PATCH}/T_Grass_Patch_VEC",
     ) + tuple(p for p in GRASS_02_09.packages if p != GRASS_02_09.mesh))
 
-GRASS_MESHES = (GRASS_02_09, GRASS_PATCH)
+# The six other grass types (grass_look.GRASS_TYPES), F2: the pack's
+# "lowGrass" clumps, wide and cheap (456-1,416 triangles against the patch's
+# 3,766). Each needs only itself, its material instance and its pivot
+# textures: the master material, its functions and the atlas are the clump's.
+_GRASS_SHARED = tuple(p for p in GRASS_02_09.packages
+                      if "/grass_02_09" not in p)
+_LOW_VEC = f"{_GRASS}/Textures/grassTextures/PivPainterTextures/lowGrass_VEC"
+
+
+def _low_grass(tag, height_cm, width_cm, lod0_triangles):
+    name = f"lowGrass_{tag}"
+    return LibraryMesh(
+        name=f"LowGrass_{tag}",
+        pack=GRASS_02_09.pack,
+        mesh=f"{_GRASS}/Meshes/grassMesh/{name}_SM",
+        height_cm=height_cm, width_cm=width_cm, lods=4,
+        lod0_triangles=lod0_triangles,
+        packages=_GRASS_SHARED + (
+            f"{_GRASS}/Materials/grassMaterials/grassMaterials/{name}_Mat",
+            f"{_GRASS}/Meshes/grassMesh/{name}_SM",
+            f"{_GRASS}/Textures/grassTextures/PivPainterTextures/{name}_PIV",
+            _LOW_VEC))
+
+
+LOW_GRASS_01_02 = _low_grass("01_02", 22.4, 61.6, 537)
+LOW_GRASS_02_02 = _low_grass("02_02", 42.0, 82.5, 728)
+LOW_GRASS_03_03 = _low_grass("03_03", 66.3, 85.7, 904)
+LOW_GRASS_04_06 = _low_grass("04_06", 92.2, 89.5, 756)
+LOW_GRASS_06_02 = _low_grass("06_02", 92.7, 111.9, 1416)
+LOW_GRASS_07_03 = _low_grass("07_03", 84.3, 103.1, 456)
+LOW_GRASS_MESHES = (LOW_GRASS_01_02, LOW_GRASS_02_02, LOW_GRASS_03_03,
+                    LOW_GRASS_04_06, LOW_GRASS_06_02, LOW_GRASS_07_03)
+
+GRASS_MESHES = (GRASS_02_09, GRASS_PATCH) + LOW_GRASS_MESHES
 BUSH_MESHES = (BUSH_02,)
 UNDERGROWTH_MESHES = GRASS_MESHES + BUSH_MESHES
 

@@ -356,9 +356,9 @@ trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
 # The meshes come out of two Fab packs and are planted as they are --
 # see forest_import/undergrowth_assets.py.
 GRASS_DATA_PATH = r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/generated_levels/Lvl_Forest_200m/grass_Lvl_Forest_200m.json"
-EXPECTED_GRASS_COUNT = 163247
+EXPECTED_GRASS_COUNT = 289450
 EXPECTED_BUSH_COUNT = 328
-GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_Patch": {"mesh": "/Game/Forest/Undergrowth/SM_Grass_Patch.SM_Grass_Patch", "mats": ["/Game/Forest/Undergrowth/MI_Grass_Patch_Dark.MI_Grass_Patch_Dark"]}}""")
+GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_Patch": {"mesh": "/Game/Forest/Undergrowth/SM_Grass_Patch.SM_Grass_Patch", "mats": ["/Game/Forest/Undergrowth/MI_Grass_Patch_Dark.MI_Grass_Patch_Dark"]}, "HISM_Grass_Low_01_02": {"mesh": "/Game/PN_GrassLibrary/Meshes/grassMesh/lowGrass_01_02_SM.lowGrass_01_02_SM", "mats": ["/Game/Forest/Materials/MI_LowGrass_01_02_Dark.MI_LowGrass_01_02_Dark"]}, "HISM_Grass_Low_02_02": {"mesh": "/Game/PN_GrassLibrary/Meshes/grassMesh/lowGrass_02_02_SM.lowGrass_02_02_SM", "mats": ["/Game/Forest/Materials/MI_LowGrass_02_02_Dark.MI_LowGrass_02_02_Dark"]}, "HISM_Grass_Low_03_03": {"mesh": "/Game/PN_GrassLibrary/Meshes/grassMesh/lowGrass_03_03_SM.lowGrass_03_03_SM", "mats": ["/Game/Forest/Materials/MI_LowGrass_03_03_Dark.MI_LowGrass_03_03_Dark"]}, "HISM_Grass_Low_04_06": {"mesh": "/Game/PN_GrassLibrary/Meshes/grassMesh/lowGrass_04_06_SM.lowGrass_04_06_SM", "mats": ["/Game/Forest/Materials/MI_LowGrass_04_06_Dark.MI_LowGrass_04_06_Dark"]}, "HISM_Grass_Low_06_02": {"mesh": "/Game/PN_GrassLibrary/Meshes/grassMesh/lowGrass_06_02_SM.lowGrass_06_02_SM", "mats": ["/Game/Forest/Materials/MI_LowGrass_06_02_Dark.MI_LowGrass_06_02_Dark"]}, "HISM_Grass_Low_07_03": {"mesh": "/Game/PN_GrassLibrary/Meshes/grassMesh/lowGrass_07_03_SM.lowGrass_07_03_SM", "mats": ["/Game/Forest/Materials/MI_LowGrass_07_03_Dark.MI_LowGrass_07_03_Dark"]}}""")
 BUSH_CONFIGS = json.loads(r"""{"HISM_Bush_02": {"mesh": "/Game/Light_Foliage/Meshes/SM_Bush_02.SM_Bush_02", "mats": []}}""")
 if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
     unreal.log_warning("[GEN] 5a. Wind, and the grass and bush meshes...")

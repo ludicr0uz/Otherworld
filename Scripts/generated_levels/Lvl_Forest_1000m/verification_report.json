@@ -84,7 +84,7 @@
     {
       "name": "Grass Count / Density",
       "passed": true,
-      "message": "1,025,988 clumps on 1,000,000 m\u00b2 = 1.03/m\u00b2 (requested 1.10/m\u00b2)",
+      "message": "1,025,988 clumps, 1,025,988 spots on 1,000,000 m\u00b2 = 1.03/m\u00b2 (requested 1.10/m\u00b2)",
       "details": []
     },
     {
@@ -102,13 +102,13 @@
     {
       "name": "Grass Knee Height",
       "passed": true,
-      "message": "knee layer = 100% of clumps, avg 50.0 cm (target 50 cm)",
+      "message": "knee layer = 84% of clumps, avg 51.3 cm (target 50 cm)",
       "details": []
     },
     {
       "name": "Grass Upscale Factor",
       "passed": true,
-      "message": "worst upscale 0.96x (HISM_Grass_02_09), limit 2.40x",
+      "message": "worst upscale 1.41x (HISM_Grass_Low_01_02), limit 2.40x",
       "details": []
     },
     {
@@ -120,9 +120,15 @@
     {
       "name": "Grass Species Spread",
       "passed": true,
-      "message": "1 of 1 species represented",
+      "message": "7 of 7 species represented",
       "details": [
-        "HISM_Grass_02_09: 1,025,988"
+        "HISM_Grass_02_09: 157,480",
+        "HISM_Grass_Low_01_02: 159,588",
+        "HISM_Grass_Low_02_02: 135,311",
+        "HISM_Grass_Low_03_03: 135,224",
+        "HISM_Grass_Low_04_06: 141,777",
+        "HISM_Grass_Low_06_02: 148,987",
+        "HISM_Grass_Low_07_03: 147,621"
       ]
     },
     {
@@ -134,9 +140,16 @@
     {
       "name": "Undergrowth Meshes",
       "passed": true,
-      "message": "1 grass, 1 bush, the right size",
+      "message": "8 grass, 1 bush, the right size",
       "details": [
         "Grass_02_09: 2152 tris in LOD0 of 4, 60 cm tall, 54 cm wide",
+        "Grass_Patch: 3766 tris in LOD0 of 4, 49 cm tall, 120 cm wide",
+        "LowGrass_01_02: 537 tris in LOD0 of 4, 22 cm tall, 62 cm wide",
+        "LowGrass_02_02: 728 tris in LOD0 of 4, 42 cm tall, 82 cm wide",
+        "LowGrass_03_03: 904 tris in LOD0 of 4, 66 cm tall, 86 cm wide",
+        "LowGrass_04_06: 756 tris in LOD0 of 4, 92 cm tall, 90 cm wide",
+        "LowGrass_06_02: 1416 tris in LOD0 of 4, 93 cm tall, 112 cm wide",
+        "LowGrass_07_03: 456 tris in LOD0 of 4, 84 cm tall, 103 cm wide",
         "Bush_02: 1304 tris in LOD0 of 4, 195 cm tall, 349 cm wide"
       ]
     },

@@ -45,6 +45,7 @@ from dataclasses import dataclass
 
 from .undergrowth_meshes import GRASS_02_09, asset_path
 from .grass_cells import GRASS_TIERS, tier_densities
+from .grass_regions import RegionMix
 from .terrain import get_exact_mesh_z
 
 
@@ -70,6 +71,10 @@ class GrassSpec:
     # offline to flag excessive upscaling — the import script re-reads the
     # real bounds at plant time.
     nominal_mesh_height_cm: float = 0.0
+    # Clumps planted per spot this spec wins (F2): a narrow type among wide
+    # ones is planted more often, so the ground stays as covered. The level's
+    # density counts spots, so a clump counts 1/density_scale of one.
+    density_scale: float = 1.0
 
 
 # One clump out of the grass library (forest_generator/undergrowth_meshes.py):
@@ -248,6 +253,10 @@ def scatter_grass(
     if density_per_sqm <= 0 or not grass_specs:
         return []
 
+    # One mix for every tier, so a stretch of one grass is that grass on
+    # every layer the menu draws.
+    regions = (RegionMix(seed, [s.weight for s in grass_specs])
+               if len(grass_specs) > 1 else None)
     placed: list[PlacedGrass] = []
     for tier_index, tier_density in enumerate(tier_densities(density_per_sqm, tiers)):
         # Decorrelated from tree placement, and each tier from the others.
@@ -256,14 +265,14 @@ def scatter_grass(
             rng, tier_index, tier_density, world_size_cm,
             grid_z, grid_size, knee_height_cm, patchiness, grass_specs,
             placed_trees, spawn_clear_radius_cm, tree_clear_radius_cm,
-            coverage_fraction))
+            coverage_fraction, regions))
     return placed
 
 
 def _scatter_layer(rng, tier, density_per_sqm, world_size_cm, grid_z, grid_size,
                    knee_height_cm, patchiness, grass_specs, placed_trees,
                    spawn_clear_radius_cm, tree_clear_radius_cm,
-                   coverage_fraction) -> list[PlacedGrass]:
+                   coverage_fraction, regions=None) -> list[PlacedGrass]:
     """One tier's even layer of patches; see scatter_grass."""
     half = world_size_cm / 2.0 * coverage_fraction
     cell_cm = math.sqrt(1.0 / density_per_sqm) * 100.0  # density is per m²
@@ -298,40 +307,67 @@ def _scatter_layer(rng, tier, density_per_sqm, world_size_cm, grid_z, grid_size,
                 if tree_grid and _near_tree(tree_grid, tree_cell, gx, gy, tree_clear_radius_cm):
                     continue
 
-                spec = rng.choices(grass_specs, weights=weights, k=1)[0]
+                if regions is not None:
+                    spec = rng.choices(grass_specs, weights=regions.weights(gx, gy),
+                                       k=1)[0]
+                else:
+                    spec = rng.choices(grass_specs, weights=weights, k=1)[0]
 
-                gz = get_exact_mesh_z(gx, gy, grid_z, grid_size, world_size_cm)
-
-                # Stand it along the ground, then lean it a little. The lean is
-                # added to the aligned pose rather than replacing it, so the
-                # field keeps its variety and keeps its feet.
-                yaw = rng.uniform(0.0, 360.0)
-                pitch, roll, _n = terrain_pose(gx, gy, yaw, grid_z, grid_size,
-                                               world_size_cm)
-                pitch += rng.uniform(-spec.max_tilt_deg, spec.max_tilt_deg)
-                roll += rng.uniform(-spec.max_tilt_deg, spec.max_tilt_deg)
-
-                h_scale = rng.uniform(*spec.height_jitter)
-                w_scale = rng.uniform(*spec.width_jitter)
-                target_h = knee_height_cm * spec.height_ratio * h_scale
-                sink = spec.sink_cm * h_scale
-
-                placed.append(PlacedGrass(
-                    spec_name=spec.name,
-                    x=gx, y=gy,
-                    terrain_z=gz,
-                    placed_z=gz - sink,
-                    yaw_deg=yaw,
-                    pitch_deg=pitch,
-                    roll_deg=roll,
-                    height_scale=h_scale,
-                    width_scale=w_scale,
-                    target_height_cm=target_h,
-                    sink_cm=sink,
-                    tier=tier,
-                ))
+                # The spot's own clump, then any more its spec plants.
+                # (No draw for a whole number: a level of one spec keeps its
+                # stream, and so its places.)
+                extra = int(spec.density_scale) - 1
+                fraction = spec.density_scale - int(spec.density_scale)
+                if fraction > 0 and rng.random() < fraction:
+                    extra += 1
+                spots = [(gx, gy)]
+                for _ in range(extra):
+                    ex = origin + (ix + rng.random()) * cell_cm
+                    ey = origin + (iy + rng.random()) * cell_cm
+                    if ex * ex + ey * ey < spawn_r2 or (tree_grid and _near_tree(
+                            tree_grid, tree_cell, ex, ey, tree_clear_radius_cm)):
+                        continue
+                    spots.append((ex, ey))
+                for gx, gy in spots:
+                    placed.append(_place(rng, spec, tier, gx, gy, grid_z, grid_size,
+                                         world_size_cm, knee_height_cm))
 
     return placed
+
+
+def _place(rng, spec, tier, gx, gy, grid_z, grid_size, world_size_cm,
+           knee_height_cm) -> PlacedGrass:
+    """One clump of ``spec`` at (gx, gy), stood on the ground."""
+    gz = get_exact_mesh_z(gx, gy, grid_z, grid_size, world_size_cm)
+
+    # Stand it along the ground, then lean it a little. The lean is
+    # added to the aligned pose rather than replacing it, so the
+    # field keeps its variety and keeps its feet.
+    yaw = rng.uniform(0.0, 360.0)
+    pitch, roll, _n = terrain_pose(gx, gy, yaw, grid_z, grid_size,
+                                   world_size_cm)
+    pitch += rng.uniform(-spec.max_tilt_deg, spec.max_tilt_deg)
+    roll += rng.uniform(-spec.max_tilt_deg, spec.max_tilt_deg)
+
+    h_scale = rng.uniform(*spec.height_jitter)
+    w_scale = rng.uniform(*spec.width_jitter)
+    target_h = knee_height_cm * spec.height_ratio * h_scale
+    sink = spec.sink_cm * h_scale
+
+    return PlacedGrass(
+        spec_name=spec.name,
+        x=gx, y=gy,
+        terrain_z=gz,
+        placed_z=gz - sink,
+        yaw_deg=yaw,
+        pitch_deg=pitch,
+        roll_deg=roll,
+        height_scale=h_scale,
+        width_scale=w_scale,
+        target_height_cm=target_h,
+        sink_cm=sink,
+        tier=tier,
+    )
 
 
 def grass_spec_by_name(name: str, grass_specs: list[GrassSpec] | None = None) -> GrassSpec | None:

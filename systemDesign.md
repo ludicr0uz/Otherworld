@@ -115,7 +115,10 @@ density layers the menu's grass density row picks from (1-8; F1): the four a shi
 draws are 2.2 to the square metre (81,697 of them, twice what they drew before G2), and
 layers 5-8, the slider's alone, add as many again near the player (163,247 in all, 4.4/m²,
 each fading out by 12-22 m at High's distances), on the 1 km map in the narrow clump at 1.1 (1.03
-million; doubling it is its own task) (`forest_generator/grass_look.py`). A clock turns the sun and moon; day and night are 4 minutes each for
+million; doubling it is its own task) (`forest_generator/grass_look.py`). On both maps
+that meadow is one of seven grass types (F2): six of the pack's low grasses, shin high to
+just over the knee, each a tint of its own, grow by region (`forest_generator/grass_regions.py`),
+so a walk crosses stretches of one type and seams where several mix. A clock turns the sun and moon; day and night are 4 minutes each for
 now, the night moonlit under the real stars, and a level starts at a random hour. The clock
 has one owner: the server's (single player's own), which every client's sky and wind follow
 through the GameState (`Scripts/net/CLAUDE.md`, "One world clock"). At night
@@ -310,12 +313,15 @@ measure in world space) plus independent height and width multipliers; the gener
 script divides that target by the mesh's *actual* `get_bounds().box_extent.z * 2` at plant
 time. "Knee high" therefore stays true if an asset is ever re-exported at a different size.
 
-**One species.** `DEFAULT_GRASS_SPECS` is a single clump, `grass_02_09_mesh` from the grass
+**One species by default, seven on the forest maps.** `DEFAULT_GRASS_SPECS` is a single clump, `grass_02_09_mesh` from the grass
 library pack (`forest_generator/undergrowth_meshes.py`): 60 cm tall and 54 cm across as
 authored, four mesh LODs, a masked material and the pack's own wind. It is planted with the
 mesh's own material at 0.7–1.0× to reach knee height; the offline `Grass Upscale Factor` check
 still fails the build past **2.4×**. Per-instance jitter is height ×0.85–1.15, width
 ×0.85–1.20, and a ±4° lean so the field does not look stamped.
+On a level in `grass_look.VARIED_GRASS_LEVELS` six low grasses of the same pack join it
+(F2), and each spot's type is drawn by `grass_regions.RegionMix`: a value-noise field per
+type, the highest owning the ground and close ones mixing (`Scripts/forest_generator/CLAUDE.md`).
 
 **The dark grass and the patch (`forest_generator/grass_look.py`).** Two lists of levels,
 each changing the spec `grass_specs_for(level)` hands the scatter. On a level in

@@ -25,10 +25,11 @@ The generator's code lives in this package. The level-side import code is in
 | `tree_placement.py` | `DEFAULT_TREE_SPECS` and the scatter (`MIN_TREE_SPACING_CM` 150, checked through a spatial hash) |
 | `tree_meshes.py` | the meshes the trees are planted from: a recipe per species (`TREE_MESH_RECIPES`) that cuts a scan down. `forest_import/tree_assets.py` builds them under `/Game/Forest/Trees`; the level import calls it |
 | `tree_lods.py` | which levels plant the trees' other build, a LOD chain ending in an impostor (`TREE_LOD_LEVELS`: the 1 km map, and the title level, which plants that map's middle trees: `Scripts/title/forest.py`), and where that mesh is |
-| `grass_placement.py` | `DEFAULT_GRASS_SPECS` and a stratified scatter |
+| `grass_placement.py` | `DEFAULT_GRASS_SPECS` and a stratified scatter; with several specs it picks each spot's by `grass_regions`, and plants a spot `density_scale` times |
+| `grass_regions.py` | where each grass type grows (F2): one value-noise field per type, the type whose field is highest owns the ground, close fields mix (`RegionMix`, pure Python) |
 | `bush_placement.py` | `DEFAULT_BUSH_SPECS` and the clustered scatter |
-| `grass_look.py` | the dark, ground-filling grass: the colours of its material instance and of the ground under it (each with its reason), the levels that have the colour (`DARK_GRASS_LEVELS`: the 200 m and 1 km maps) and the ones that plant the patch (`PATCH_GRASS_LEVELS`: the 200 m map alone; `grass_specs_for(level)`), and the density a level is held at when the default moves (`HELD_DENSITY_PER_SQM`: the 1 km map at 1.1/m²; `density_for(level)`, the generator's default for `--grass-density`). `forest_import/grass_look.py` builds the instance and patches the ground material from it ("Rendering gotchas", below) |
-| `undergrowth_meshes.py` | the two library meshes the grass and the bushes are planted from, the grass patch made of one (`GRASS_PATCH`), and the packages of each that the repository carries ("Rendering gotchas", below) |
+| `grass_look.py` | the dark, ground-filling grass: the colours of its material instance and of the ground under it (each with its reason), the levels that have the colour (`DARK_GRASS_LEVELS`: the 200 m and 1 km maps) and the ones that plant the patch (`PATCH_GRASS_LEVELS`: the 200 m map alone; `grass_specs_for(level)`), the density a level is held at when the default moves (`HELD_DENSITY_PER_SQM`: the 1 km map at 1.1/m²; `density_for(level)`, the generator's default for `--grass-density`), and the seven grass types of a varied level (`VARIED_GRASS_LEVELS`, `LOW_GRASS_TYPES`: F2). `forest_import/grass_look.py` builds the instances and patches the ground material from it ("Rendering gotchas", below) |
+| `undergrowth_meshes.py` | the library meshes the grass and the bushes are planted from (the clump, the bush and the six low grasses of F2), the grass patch made of one (`GRASS_PATCH`), and the packages of each that the repository carries ("Rendering gotchas", below) |
 | `grass_patch.py` | the grass patch's numbers (G3): the seven copies of the clump, their LOD chain and its distances, and the Pivot Painter 2 texels moved with each copy, each with its reason. `forest_import/grass_patch.py` builds it (`Scripts/build_grass_patch.py`) and verifies it |
 | `pivot_images.py` | the two image files the patch's pivot textures are imported from (a half-float EXR, an 8-bit PNG), in plain Python |
 | `npc_placement.py` | NPC numbers (see `Scripts/npc/CLAUDE.md`) |
@@ -42,18 +43,19 @@ The generator's code lives in this package. The level-side import code is in
 ## The two maps
 
 - **`Lvl_Forest_200m`** (`--size 200`):
-  - night, 68 trees, 163,247 grass clumps (4.4/m² over eight layers, F1; the first four
-    are G2's 81,697 at 2.2, unchanged; 40,521 before G2), 328 bushes, ten NPCs
-    at 75–79 m;
+  - night, 68 trees, 289,450 grass clumps of seven types on 162,534 spots (4.4/m² requested
+    over eight layers, F1; F2's six low grasses plant up to two clumps a spot, the patch one;
+    the first four layers were G2's 81,697 at 2.2), 328 bushes, ten NPCs at 75–79 m;
   - it is the `EditorStartupMap`: the debug map.
 - **`Lvl_Forest_1000m`** (`--size 1000`, tree density 0.5):
-  - 1,700 trees, 1,025,988 grass clumps, 8,239 bushes;
+  - 1,700 trees, 1,025,988 grass clumps of seven types (one a spot), 8,239 bushes; its
+    grass is 2,800 cell actors (seven types × four tiers × 100 cells; 400 with one type);
   - its grass is held at 1.1/m² (`grass_look.HELD_DENSITY_PER_SQM`), half the default: at
     2.2 it would be about 2.05 million clumps and a `.umap` of about 360 MB (170 bytes a clump: the grass is
     nearly all of today's 185). Regenerating it without `--grass-density` keeps 1.1;
   - its trees are the LOD build, not the Nanite one ("Rendering gotchas", below);
   - it is the `GameDefaultMap`: what a packaged or standalone run boots;
-  - the `.umap` is 185 MB;
+  - the `.umap` is 181 MB;
   - the import takes about a minute. `uepy.py` reports that the editor stopped responding, but
     the job keeps going; read the editor log.
 
@@ -67,7 +69,7 @@ script.
 
 **After an import, re-run `place_forage.py`, `build_clothing.py` and `build_day_night.py`.** The
 import rebuilds the level from scratch, which drops the forage, the garments lying in it and
-the day/night cycle actor. The import also rebuilds the dark grass's material instance and
+the day/night cycle actor. The import also rebuilds the dark grass's material instances and
 re-applies the ground's tint (`forest_import/grass_look.py`), on whichever level it runs.
 
 **The first game runs after an import are slow, and prove nothing about the frame.** The
@@ -127,6 +129,23 @@ that imported a level is 13 GB, most of it in swap on this machine).
     `<spec>__±ix_±iy`, tagged `OW_Grass`;
   - no collision, saved unlit;
   - they cull at 60–90 m × `r.ViewDistanceScale`.
+- **Seven grass types on the two forest maps, by region (F2).** On a level in
+  `grass_look.VARIED_GRASS_LEVELS` the scatter plants the level's meadow (the patch on the
+  200 m map, the clump on the 1 km) and six of the pack's low grasses
+  (`undergrowth_meshes.LOW_GRASS_MESHES`, `lowGrass_01_02` … `07_03`: 22–93 cm tall, 456–1,416
+  triangles), each spec `HISM_Grass_Low_<tag>` (the `HISM_Grass` prefix is what the import's
+  sweeps match) drawn with its own dark instance, `/Game/Forest/Materials/MI_LowGrass_<tag>_Dark`
+  (a child of the pack's `lowGrass_<tag>_Mat`, `GRASS_SCALARS` and a tint of its own).
+  - **Where:** `grass_regions.RegionMix` gives each type a value-noise field (40 m regions,
+    a 15 m octave so the edges wander) and weights a spot's draw by exp(20 × field − top):
+    over the 1 km map one type holds over 70% of the ground on about half of it, none holds
+    half on about a sixth (the mixed seams), and each leads on 13–16%. The same mix for all
+    tiers, so a region's near layers are its far ones' type.
+  - **Coverage:** the six are narrower than the 1.2 m patch at their heights, so on the patch
+    level each spot of one is planted `patch_density` times (1.5–2, each its own place in the
+    spot's cell; `GrassSpec.density_scale`), and the offline density check counts spots. On
+    the 1 km map they are wider than the clump: one a spot.
+  - The probe level keeps the one clump (`grass_specs_for` gives it `DEFAULT_GRASS_SPECS`).
 - **Grass and bushes are one library mesh each, planted where its Fab pack put it**
   (`undergrowth_meshes.py`): `grass_02_09_mesh` (60 cm tall, 54 cm across, 2,152 triangles)
   and `SM_Bush_02` (1.95 m tall, 3.5 m across, 1,304 triangles).
@@ -198,7 +217,7 @@ that imported a level is 13 GB, most of it in swap on this machine).
       the trees, not by the noon ground alone.
     - The level verifier holds the instance to its parent, its numbers and its
       dependencies, the cells to the material their spec names, and the ground to its tint
-      (`verify_grass_look`, eight checks). `probes/probe_grass_look.py` (windowed; its
+      (`verify_grass_look`, thirteen checks: five for the six low grasses' instances). `probes/probe_grass_look.py` (windowed; its
       docstring has the command) measures the frame with the grass shown and hidden at
       Medium and High and takes the pictures: 2.8 ms at Medium and 0.7 ms at High, against
       2.5 and 1.0 for the narrow clumps, which is inside what two runs differ by. At G2's
@@ -218,8 +237,8 @@ that imported a level is 13 GB, most of it in swap on this machine).
   - **They sway by their pack's wind, not `MPC_Wind`.** The graphics menu's wind strength and
     speed do not reach them; its world-position-offset switch still does.
   - **The packs are git-ignored but these two meshes are committed.** `.gitignore`
-    re-includes exactly the packages each needs (22 files, 116 MB, of which the grass pack's
-    8k atlas is 109 MB). To plant another library mesh, add its record and its packages to
+    re-includes exactly the packages each needs (41 files, 118 MB, of which the grass pack's
+    8k atlas is 109 MB; F2's six low grasses added 19 of them, 1.4 MB, sharing the atlas). To plant another library mesh, add its record and its packages to
     `undergrowth_meshes.py` and its `gitignore_lines()` to `.gitignore`;
     `dev/tests/test_undergrowth_meshes.py` holds the two together, and the level verifier
     fails if a mesh references a package outside its list.

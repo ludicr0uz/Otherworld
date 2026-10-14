@@ -306,18 +306,22 @@ def check_no_trees_in_spawn_zone(placed_trees, world_size_cm: float) -> CheckRes
 # ─── Grass checks ───────────────────────────────────────────────────────────
 
 def check_grass_count(placed_grass, world_size_cm: float,
-                      density_per_sqm: float) -> CheckResult:
-    """Verify the realised density matches the requested density."""
+                      density_per_sqm: float, grass_specs=None) -> CheckResult:
+    """Verify the realised density matches the requested density. The density
+    counts spots: a spec planting ``density_scale`` clumps a spot counts each
+    as 1/density_scale of one (grass_placement.GrassSpec)."""
     area_sqm = (world_size_cm / 100.0) ** 2
     count = len(placed_grass)
-    density = count / area_sqm if area_sqm > 0 else 0.0
+    scale = {s.name: s.density_scale for s in (grass_specs or DEFAULT_GRASS_SPECS)}
+    spots = sum(1.0 / scale.get(g.spec_name, 1.0) for g in placed_grass)
+    density = spots / area_sqm if area_sqm > 0 else 0.0
 
     # Trees, the spawn ring and the coverage inset all remove a little area,
     # so allow the realised density to sit inside 70–105 % of the request.
     lo, hi = density_per_sqm * 0.70, density_per_sqm * 1.05
     ok = count > 0 and lo <= density <= hi
-    msg = (f"{count:,} clumps on {area_sqm:,.0f} m² = {density:.2f}/m² "
-           f"(requested {density_per_sqm:.2f}/m²)")
+    msg = (f"{count:,} clumps, {spots:,.0f} spots on {area_sqm:,.0f} m² = "
+           f"{density:.2f}/m² (requested {density_per_sqm:.2f}/m²)")
     return CheckResult("Grass Count / Density", ok, msg)
 
 
@@ -771,7 +775,7 @@ def run_all_checks(
     # Grass checks (skipped entirely when grass generation is disabled)
     if placed_grass:
         report.checks.append(check_grass_count(placed_grass, world_size_cm,
-                                               grass_density_per_sqm))
+                                               grass_density_per_sqm, specs))
         report.checks.append(check_grass_within_bounds(placed_grass, world_size_cm))
         report.checks.append(check_grass_snapped_to_terrain(placed_grass, world_size_cm,
                                                            grid_z, grid_size))

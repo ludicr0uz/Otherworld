@@ -32,4 +32,6 @@
 
   grass_patch   The grass patch: copies of the library clump, turned and offset, merged into one mesh 1.1-1.2 m across
   pivot_images  The two image files the grass patch's pivot textures are imported from (forest_generator/grass_patch.py)
+
+  grass_regions  Where each grass type grows: one smooth noise field per type, and the mix of types at a point read off them
 """

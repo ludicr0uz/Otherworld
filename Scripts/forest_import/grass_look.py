@@ -1,10 +1,11 @@
-"""Build the dark grass's material instance, tint the ground under it, and
-verify both.
+"""Build the dark grass's material instances (the meadow's and the six other
+types', L.LOW_GRASS_TYPES), tint the ground under them, and verify all of
+it.
 
 Called by the generated import_<Level>.py (step 5a) and verify_<Level>.py. The
 numbers and the reasons are forest_generator/grass_look.py's.
 
-The instance is ours, under /Game/Forest/Materials, a child of the grass
+The instances are ours, under /Game/Forest/Materials, each a child of its grass
 pack's own instance: the pack asset is read and never written. The ground
 material is ours too but no script authors it (it was made by hand and is
 only assigned by the import), so it is patched in place: its base colour goes
@@ -43,28 +44,36 @@ def _same_color(color, rgb):
 
 # ─── The grass's instance ────────────────────────────────────────────────────
 
-def _ensure_grass_material():
+def _ensure_instance(path, parent_path, tint):
+    """One dark instance: ``path``, a child of ``parent_path``, with
+    GRASS_SCALARS and ``tint``."""
     eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
-    parent = _must_load(L.GRASS_MATERIAL_PARENT)
-    if eas.does_asset_exist(L.GRASS_MATERIAL):
-        instance = _must_load(L.GRASS_MATERIAL)
+    parent = _must_load(parent_path)
+    if eas.does_asset_exist(path):
+        instance = _must_load(path)
     else:
-        folder, name = L.GRASS_MATERIAL.rsplit("/", 1)
+        folder, name = path.rsplit("/", 1)
         instance = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
             name, folder, unreal.MaterialInstanceConstant,
             unreal.MaterialInstanceConstantFactoryNew())
         if not instance:
-            raise RuntimeError(f"could not create {L.GRASS_MATERIAL}")
+            raise RuntimeError(f"could not create {path}")
     MEL.set_material_instance_parent(instance, parent)
     known = {str(n) for n in MEL.get_scalar_parameter_names(parent)}
     for name, value in L.GRASS_SCALARS.items():
         if name not in known:
-            raise RuntimeError(f"{L.GRASS_MATERIAL_PARENT} has no parameter {name!r}")
+            raise RuntimeError(f"{parent_path} has no parameter {name!r}")
         MEL.set_material_instance_scalar_parameter_value(instance, name, value)
-    MEL.set_material_instance_vector_parameter_value(instance, "Tint", _color(L.GRASS_TINT))
+    MEL.set_material_instance_vector_parameter_value(instance, "Tint", _color(tint))
     MEL.update_material_instance(instance)
     eas.save_loaded_asset(instance, False)
-    _log(f"   {L.GRASS_MATERIAL}: tint {L.GRASS_TINT}, {L.GRASS_SCALARS}")
+    _log(f"   {path}: tint {tint}, {L.GRASS_SCALARS}")
+
+
+def _ensure_grass_material():
+    _ensure_instance(L.GRASS_MATERIAL, L.GRASS_MATERIAL_PARENT, L.GRASS_TINT)
+    for t in L.LOW_GRASS_TYPES:
+        _ensure_instance(t.material, t.material_parent, t.tint)
 
 
 # ─── The ground ──────────────────────────────────────────────────────────────
@@ -160,6 +169,8 @@ def verify_grass_look(check):
         check("Dark Grass Material Needs Nothing The Repository Does Not Carry",
               not stray, str(stray[:3]))
 
+    _verify_low_grass(check, eas)
+
     ground = eas.load_asset(L.GROUND_MATERIAL)
     check("Ground Material Exists", bool(ground), L.GROUND_MATERIAL)
     if ground:
@@ -175,3 +186,40 @@ def verify_grass_look(check):
               _same_color(tint, L.GROUND_TINT)
               and abs(dull - L.GROUND_SATURATION) < _TOLERANCE,
               f"(tint ({tint.r:.3f}, {tint.g:.3f}, {tint.b:.3f}), saturation {dull:.3f})")
+
+
+def _instance_off(instance, tint):
+    """What of GRASS_SCALARS and ``tint`` ``instance`` does not hold."""
+    off = [f"{name}: {got:.3f}, expected {want}" for name, want, got in (
+        (n, w, MEL.get_material_instance_scalar_parameter_value(instance, n))
+        for n, w in L.GRASS_SCALARS.items()) if abs(got - want) > _TOLERANCE]
+    got = MEL.get_material_instance_vector_parameter_value(instance, "Tint")
+    if not _same_color(got, tint):
+        off.append(f"Tint: ({got.r:.3f}, {got.g:.3f}, {got.b:.3f})")
+    return off
+
+
+def _verify_low_grass(check, eas):
+    """The six other types' dark instances (L.LOW_GRASS_TYPES), one check
+    each for all six."""
+    missing, orphans, off, flat, stray = [], [], [], [], []
+    for t in L.LOW_GRASS_TYPES:
+        instance = eas.load_asset(t.material)
+        if not instance:
+            missing.append(t.material)
+            continue
+        parent = instance.get_editor_property("parent")
+        if not parent or parent.get_path_name().split(".")[0] != t.material_parent:
+            orphans.append(t.name)
+        off += [f"{t.name} {o}" for o in _instance_off(instance, t.tint)]
+        base = instance.get_base_material()
+        if not (base and base.get_editor_property("used_with_instanced_static_meshes")):
+            flat.append(t.name)
+        allowed = {t.material} | set(t.mesh.packages)
+        stray += sorted(dependencies(t.material) - allowed)
+    check("Low Grass Dark Materials Exist", not missing, str(missing))
+    check("Low Grass Dark Materials Are Children Of The Pack's", not orphans, str(orphans))
+    check("Low Grass Dark Materials Have Their Colours", not off, str(off[:3]))
+    check("Low Grass Dark Materials Draw On Instances", not flat, str(flat))
+    check("Low Grass Dark Materials Need Nothing The Repository Does Not Carry",
+          not stray, str(stray[:3]))

@@ -152,6 +152,25 @@ Content/Python/__pycache__/
 !/Content/PN_GrassLibrary/Textures/grassTextures/MasterTextures/springGrass_Opacity_8k.uasset
 !/Content/PN_GrassLibrary/Textures/grassTextures/PivPainterTextures/grass_02_09_PIV.uasset
 !/Content/PN_GrassLibrary/Textures/grassTextures/PivPainterTextures/grass_02_09_VEC.uasset
+!/Content/PN_GrassLibrary/Materials/grassMaterials/grassMaterials/lowGrass_01_02_Mat.uasset
+!/Content/PN_GrassLibrary/Materials/grassMaterials/grassMaterials/lowGrass_02_02_Mat.uasset
+!/Content/PN_GrassLibrary/Materials/grassMaterials/grassMaterials/lowGrass_03_03_Mat.uasset
+!/Content/PN_GrassLibrary/Materials/grassMaterials/grassMaterials/lowGrass_04_06_Mat.uasset
+!/Content/PN_GrassLibrary/Materials/grassMaterials/grassMaterials/lowGrass_06_02_Mat.uasset
+!/Content/PN_GrassLibrary/Materials/grassMaterials/grassMaterials/lowGrass_07_03_Mat.uasset
+!/Content/PN_GrassLibrary/Meshes/grassMesh/lowGrass_01_02_SM.uasset
+!/Content/PN_GrassLibrary/Meshes/grassMesh/lowGrass_02_02_SM.uasset
+!/Content/PN_GrassLibrary/Meshes/grassMesh/lowGrass_03_03_SM.uasset
+!/Content/PN_GrassLibrary/Meshes/grassMesh/lowGrass_04_06_SM.uasset
+!/Content/PN_GrassLibrary/Meshes/grassMesh/lowGrass_06_02_SM.uasset
+!/Content/PN_GrassLibrary/Meshes/grassMesh/lowGrass_07_03_SM.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/PivPainterTextures/lowGrass_01_02_PIV.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/PivPainterTextures/lowGrass_02_02_PIV.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/PivPainterTextures/lowGrass_03_03_PIV.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/PivPainterTextures/lowGrass_04_06_PIV.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/PivPainterTextures/lowGrass_06_02_PIV.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/PivPainterTextures/lowGrass_07_03_PIV.uasset
+!/Content/PN_GrassLibrary/Textures/grassTextures/PivPainterTextures/lowGrass_VEC.uasset
 
 # Generator sidecars: megabytes apiece, and fully determined by the seed.
 Scripts/generated_levels/*/grass_*.json

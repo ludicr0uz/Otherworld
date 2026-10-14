@@ -26,6 +26,7 @@ from combat.weapon_layers import layers_class_path
 from combat.weapon_layers_consts import BEFORE_LINK_CLASS, LAYERS_ABP, LAYERS_TAG, MAIN_MONTAGES
 from combat.verify.common import _mesh_asset, check, component_template, components
 from combat.verify.fixtures import char
+from combat.verify.gas_turn import check_turn
 from combat.verify.server_anim import (
     _class, _flag_written_once, _sources, _title, check_no_fanout,
 )
@@ -239,6 +240,7 @@ def run():
         return
     anim, _events, properties = graphs(bp)
     check_properties(bp, properties)
+    check_turn(bp, properties)
     check_anim_graph(bp, anim)
     check_feet(bp, anim, properties)
     check_body()

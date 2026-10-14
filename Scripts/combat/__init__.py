@@ -323,4 +323,6 @@ wrong module.
                     onto that gun's model, which its item is held in (AimPose); a
                     pistol's left fingers on the right fist as fitted (fist), and
                     which clips the carry takes (carry_clips)
+
+  gas_turn  Standing, the legs step round after the view: the sample's turn-in-place switched on (WantsToAim), the root's offset released by a traversal alone
 """

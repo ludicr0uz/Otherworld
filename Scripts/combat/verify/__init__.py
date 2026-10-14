@@ -211,6 +211,8 @@ and it never relies on a variable another section left behind.
   crawl_direction  verify.crawl_direction -- the crawl goes the way the player moves (P2): the weapon layers' event graph keeps ...
 
   carry_pose  verify.carry_pose -- a long gun's carry (combat/carry_pose.py): the weapon layers' AnimGraph blends the ...
+
+  gas_turn  the turn in place (combat/gas_turn.py): WantsToAim is filled, and the root's offset is released by a traversal alone
 """
 
 SECTIONS = (

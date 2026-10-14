@@ -286,6 +286,25 @@ another player's copy and the server's).
   while `GetStance == 2`, else 1). They plant two standing feet: on a prone body they folded
   the legs under it and lifted its hips. A clip that poses the legs in the layers needs its
   IK foot bones on its feet (`asset_pipeline/ik_follow.py`), or Leg IK moves them.
+- **Standing, the legs step round after the view** (`gas_turn.py`,
+  `verify/gas_turn.py`): the sample's own turn-in-place. The capsule takes the view's yaw at
+  once and Offset Root Bone leaves the legs behind; the sample's chooser offers its
+  turn-in-place databases only while `ShouldTurnInPlace` (a bool column of its "Stand Idles"
+  and "Crouch Idle" tables, bound to the function: no graph calls it), which wants the root
+  50 degrees off and `InputState.WantsToAim`. The properties function fills that flag: the
+  pawn stands (under 10 cm/s over the ground) and is not prone, whatever it holds, read off
+  the movement so every machine agrees. Moving it stays false, so the sample's strafe
+  thresholds (its other reader) are as they were. **A slot named `DefaultSlot` is not the
+  sample's alone:** its `Get_OffsetRootRotationMode` and `Get_OffsetRootTranslationMode`
+  released the root while that slot was busy, and the layers' ready pose plays in a slot of
+  that name on the same instance, so a raised gun's legs spun with the capsule. Both ask
+  `OwTraversing` now. (`Enable_AO` and `JustTraversed` ask the slot too and were left: the
+  sample's aim offset is off under a raised gun, where the layers aim.)
+  `probes/probe_turn_in_place.py` (empty hands, carrying, down the sights: 180 and 360
+  degrees) and `probe_net_turn_in_place.py` (another client's copy and the server's). A
+  probe that reads feet in a headless game makes the mesh pose every frame
+  (`crawl_watch.always_pose`): an unrendered mesh keeps its last bones, which turn with the
+  capsule and read as sliding.
 - **The crawl goes the way the player moves** (P2; `crawl_consts.py`, `crawl_direction.py`,
   `stance_clips._moving`, `verify/crawl_direction.py`): the layers' event graph keeps the
   pawn's velocity along its own forward and right, eased, and five weights read off it; the

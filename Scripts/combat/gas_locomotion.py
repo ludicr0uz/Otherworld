@@ -58,6 +58,7 @@ from combat.gas_moves import crouch_on, traversal_on
 from combat.gas_traversal_slot import (
     author_traversal_slot, author_traversing_flag, remove_traversal_slot,
 )
+from combat.gas_turn import FIELD as TURN_FIELD, root_modes_ask_traversing, turns_in_place
 from combat.log import _log
 from combat.weapon_layers import layers_class_path
 from combat.weapon_layers_consts import (
@@ -188,6 +189,7 @@ def _author_properties(bp, ed):
                         B=str(WALK_BELOW_CMS))), _field(wants, "WantsToWalk"))
     _connect(out(g.call(FN_NOT, A=g.iget(move, EP.ORIENT_ROTATION_TO_MOVEMENT, CMC))),
              _field(wants, "WantsToStrafe"))
+    _connect(turns_in_place(g, char), _field(wants, TURN_FIELD))
 
     floor = g.keep(_palette(ed, NODE_BREAK_FLOOR))
     _connect(g.iget(move, EP.CURRENT_FLOOR, CMC), _pin(floor, "FindFloorResult"))
@@ -443,8 +445,7 @@ def graphs(bp):
     eds = [BGE.get_graph_editor_by_name(bp, n)
            for n in ("AnimGraph", "EventGraph", PROPERTIES_GRAPH)]
     if not all(eds):
-        raise RuntimeError(f"{bp.get_name()} lacks one of AnimGraph, EventGraph, "
-                           f"{PROPERTIES_GRAPH}")
+        raise RuntimeError(f"{bp.get_name()} lacks AnimGraph, EventGraph or {PROPERTIES_GRAPH}")
     return eds
 
 
@@ -456,8 +457,7 @@ def build_gas_locomotion():
         raise RuntimeError(f"{ABP_LOCOMOTION} is not here: run asset_pipeline/import_gas.py")
     bp = eas.load_asset(ABP_LOCOMOTION)
     anim, events, properties = graphs(bp)
-    # The plain links back first: the fragments below find their places by
-    # following them.
+    # The plain links back first: the fragments below find by following them.
     unshare(anim)
     _remove_server_branch(anim, events)
     _remove_link(anim)
@@ -467,6 +467,7 @@ def build_gas_locomotion():
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{ABP_LOCOMOTION} failed to compile before the patch")
     _author_properties(bp, properties)
+    root_modes_ask_traversing(bp)
     _remove_slot(anim)
     if traversal_on():
         author_traversal_slot(anim, _slot(anim))

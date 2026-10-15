@@ -13,7 +13,8 @@ prediction.
                             its cooldown over (within FIRE_GRACE_S); then the
                             round, the cooldown and the record's mark
     ShotFired(AimPoint)     the base's event for a shot it let through, and
-                            this graph's: the sound told, firing.py's shot
+                            this graph's: mid-flinch the ready pose snapped
+                            back (shot_snap.py), the sound told, firing.py's shot
                             from the server's own muzzle to the client's
                             AimPoint, and its noise
     Server_Reload           the base's too (task W2): the guard's Allow,
@@ -28,7 +29,7 @@ prediction.
     _author_shot_ask        the trigger's gate passed, where the keys are:
                             without authority the shot's sound (Fx_Shot), a
                             round off Loaded, the cooldown and AsksSent;
-                            Server_Fire
+                            mid-flinch the ready pose snapped back; Server_Fire
     _author_reload_ask      R: without authority ReloadNow and AsksSent;
                             Server_Reload
 
@@ -64,6 +65,7 @@ from combat.weapon_component.impact import author_pellet_flew
 from combat.weapon_component.record import authority, rep_dirty
 from combat.weapon_component.reload_clip import author_reload_clip
 from combat.weapon_component.shot_noise import _author_shot_noise
+from combat.weapon_component.shot_snap import author_shot_snap
 from combat.weapon_component.slot_nodes import op, valid
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_GET_OWNER
 from uebp.nodes.math import FN_ADD_FF, FN_ADD_II, FN_LE_FF, FN_OR, FN_SUB_II
@@ -118,8 +120,11 @@ def _author_shot_fired(ed):
         f"and its cooldown over (within {FIRE_GRACE_S:g} s: packets do not arrive evenly), "
         "then spent the round and stamped the cooldown. The shot is traced from this "
         "machine's muzzle to the client's AimPoint.", g.made)
+    # Mid-flinch, the ready pose snapped back before the muzzle is read
+    # (shot_snap.py): the round leaves from the shooting position.
+    snapped = author_shot_snap(ed, [then(event)])
     # The round's bloom, for the next round's draw (this one's is in AimSpread).
-    bloomed = author_bloom_shot(ed, held, [then(event)])
+    bloomed = author_bloom_shot(ed, held, [snapped])
     # Heard by everyone who did not predict it, before the pellets fly.
     told = fx.tell(g, SHOT, bloomed)
     # The server's own muzzle: where the gun is here, not where a client says.
@@ -184,10 +189,12 @@ def _author_shot_ask(ed, held, muzzle, exec_in):
     flow = _count(g, AsksSent, [flow])
     # The round's bloom, predicted (the server adds its own in ShotFired).
     flow = author_bloom_shot(ed, held, [flow])
+    # Mid-flinch, the body is snapped into the ready pose first (shot_snap.py):
+    # here for the eye, and in ShotFired on the server for the pellets.
+    snapped = author_shot_snap(ed, (owns, *flow))
     ask = g.keep(_node(ed, FN_SERVER_FIRE))
     _connect(g.get(WV.AimPoint), _pin(ask, AIM_PARAM))
-    for e in (owns, *flow):
-        _connect(e, _pin(ask, "execute"))
+    _connect(snapped, _pin(ask, "execute"))
     ed.add_comment_to_nodes(
         f"The shot is asked of the server ({SERVER_FIRE}, shot.py), with where the "
         "reticle rests. A client of a server plays its sound at once, spends the "

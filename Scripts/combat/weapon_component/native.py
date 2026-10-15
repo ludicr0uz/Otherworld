@@ -17,6 +17,8 @@ the builders' own constants and held to them by combat/verify/shot.py.
 import unreal
 
 from combat import health_vars as HV
+from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
+from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS
 from combat import item_vars as IV
 from combat.light_tuning import LIGHTS_VAR
 from combat.log import _log
@@ -47,9 +49,14 @@ NAMES = {
     "limb_bones_var": str(HV.LimbBones),
     "head_multiplier_var": str(HV.HeadMultiplier),
     "limb_multiplier_var": str(HV.LimbMultiplier),
+    # SnapToShotPose's: the flinch's slot and the ready pose's.
+    "flinch_slot": HIT_SLOT,
+    "pose_slot": AIM_SLOT,
 }
 # ...and its numbers.
-NUMBERS = {"fire_grace_seconds": FIRE_GRACE_S}
+NUMBERS = {"fire_grace_seconds": FIRE_GRACE_S,
+           # ...and the ready pose it plays, as the equip plays it.
+           "pose_blend_out_seconds": AIM_BLEND, "pose_loops": AIM_LOOPS}
 # Classes the base is told: {property: class path}. None since W3 (the
 # health component is asked for by its native class).
 CLASSES = {}

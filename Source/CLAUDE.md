@@ -212,6 +212,13 @@ comment has the picture of the first two, the shot's server half (W1) and the re
   pistol's endless reserve (`InfiniteReserve`) is read there and nowhere in the graph.
   `ReloadNow` marks the record itself, which does nothing on a client. `Reloads` counts
   the ones that moved rounds on this machine.
+- **A shot fired mid-flinch snaps the body to its ready pose** (`SnapToShotPose(Mesh, Pose)`,
+  2026-10-14): if `FlinchSlot` (`HitSlot`) is playing or blending out, it stops the flinch with
+  no blend, plays `Pose` into `PoseSlot` with no blend in, then `TickAnimation(0)` and
+  `RefreshBoneTransforms()` with no tick function. That evaluates on the game thread, and its
+  finalize moves what hangs on a socket, so the muzzle read next is the ready pose's. The graph
+  calls it before the ask and in `ShotFired` (`Scripts/combat/weapon_component/shot_snap.py`).
+  `FlinchSnaps` counts the snaps on this machine.
 - **A custom event named as a function a new slice adds** is removed by
   `native.retire_events` (the names are `shot_vars.NATIVE_FUNCTIONS`) before the build:
   add the slice's functions to that tuple.

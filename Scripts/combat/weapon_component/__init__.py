@@ -255,6 +255,8 @@ _author_* fragment per concern, each in its own module:
               stay fitted to the ground); first in the upkeep, on every copy
   recoil      view turn, kick, recovery
   shot_noise  the shot's noise for the wanderers (ShotVolume + a cone)
+  shot_snap   a shot mid-flinch: the flinch stopped and the ready pose
+              snapped in before the muzzle is read (SnapToShotPose)
   sprint      the sprint key handed to the movement component (C++, which
               sprints, latches and spends the stamina), and its answers
               copied into Sprinting, SprintSpent, SprintAhead and Stamina

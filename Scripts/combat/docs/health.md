@@ -186,6 +186,12 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     takes the body's `HeadMultiplier` times as much, as a pellet does). A new damage
     source needs nothing more than that. `probes/probe_throw_stick.py` sees the thrown knife's
     flinch play, a thrown gun (no damage) play none, and a killing throw ragdoll instead.
+- **A shot ends a flinch** (`weapon_component/shot_snap.py`, the native `SnapToShotPose`):
+  the flinch had stopped the ready pose and thrown the gun with the arms, so a round fired
+  mid-flinch left from about crouch height. Now the shooter's copy (before the ask) and the
+  server (in `ShotFired`, before its muzzle is read) stop the flinch, snap the ready pose
+  back in with no blend, and re-pose the mesh on the spot. The round then leaves from where
+  it would if no hit had landed.
 - **A body looking down its sights does not flinch** (`Steady`, asked first by
   `_author_steady_gate`; that arm only writes `PrevHealth`). The damage is untouched.
   - Only the player's is ever true: `weapon_component/steady.py` writes

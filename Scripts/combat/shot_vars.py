@@ -43,7 +43,10 @@ RELOAD_NOW = "ReloadNow"
 RELOADED = "Reloaded"
 SERVER_EVENTS = (SERVER_FIRE, SERVER_RELOAD)
 # The base's functions, which the graph has no event named as.
-NATIVE_FUNCTIONS = (SERVER_FIRE, SERVER_RELOAD, RELOAD_NOW)
+# A shot fired mid-flinch: the flinch stopped and the ready pose snapped in
+# before the muzzle is read (weapon_component/shot_snap.py).
+SNAP_SHOT_POSE = "SnapToShotPose"
+NATIVE_FUNCTIONS = (SERVER_FIRE, SERVER_RELOAD, RELOAD_NOW, SNAP_SHOT_POSE)
 
 # Loaded, Reserve and NextFireTime are not rows here or on the component: a
 # magazine and a deadline are a gun's own, so they are BP_WeaponItem's

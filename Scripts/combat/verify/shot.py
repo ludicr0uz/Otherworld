@@ -14,7 +14,8 @@ from combat.record_vars import VIEW_ROW, ViewDirty
 from combat.paths import HEALTH_BP_PATH, ITEM_BP_PATH
 from combat.shot_vars import (
     AIM_PARAM, FIRE_GRACE_S, NATIVE_FUNCTIONS, PELLET_FLEW, RELOAD_NOW, RELOADED,
-    SERVER_EVENTS, SERVER_FIRE, SERVER_RELOAD, SHOT_FIRED, AsksSent, AsksServed, ReloadForced)
+    SERVER_EVENTS, SERVER_FIRE, SERVER_RELOAD, SHOT_FIRED, SNAP_SHOT_POSE, AsksSent, AsksServed,
+    ReloadForced)
 from combat import fx_vars as FX
 from combat.verify.common import BEL, PIN, cdo, check, graph, in_pins, num_pin, pellet_calls
 from combat.verify.fixtures import wc, wc_cdo, wg
@@ -245,9 +246,34 @@ def check_view_waits():
           and all((num_pin(s, "B") or 0) == -1 for s in picks), f"{len(rows)} row(s), {reads}")
 
 
+def check_shot_snap():
+    # A shot mid-flinch left from where the flinch had thrown the gun, about
+    # crouch height (weapon_component/shot_snap.py): the ready pose is
+    # snapped back before the muzzle is read, by the client and the server.
+    check(f"{SNAP_SHOT_POSE} is the native base's plain function, and the graph has no "
+          "event named as it", net.compiled_rpc(wc, SNAP_SHOT_POSE) == (net.LOCAL, False)
+          and _event(SNAP_SHOT_POSE) is None, str(net.compiled_rpc(wc, SNAP_SHOT_POSE)))
+    snaps = [n for n in wg if {"Mesh", "Pose"} <= in_pins(n)
+             and "Snap" in _title(n).replace(" ", "")]
+    reads = [{_title(f) for f in _feeders(n, "Mesh") + _feeders(n, "Pose")} for n in snaps]
+    check(f"...called twice, each on OwnerMesh with HandPose: once before the ask, once "
+          f"under {SHOT_FIRED}", len(snaps) == 2
+          and all(r == {"Get OwnerMesh", "Get HandPose"} for r in reads), f"{len(snaps)}, {reads}")
+    fired = _event(SHOT_FIRED)
+    flown = pellet_calls(wg)
+    asks = _calls_of(SERVER_FIRE)
+    server = [n for n in snaps if fired in _upstream(n)]
+    client = [n for n in snaps if asks and n in _upstream(asks[0])]
+    check(f"...the server's ahead of the pellets (the muzzle FirePellets is handed is the "
+          f"ready pose's), the client's ahead of {SERVER_FIRE}", len(server) == 1
+          and len(flown) == 1 and server[0] in _upstream(flown[0]) and len(client) == 1,
+          f"server {len(server)}, client {len(client)}")
+
+
 def run():
     check_native()
     check_events()
     check_server_fires()
+    check_shot_snap()
     check_client_predicts()
     check_view_waits()

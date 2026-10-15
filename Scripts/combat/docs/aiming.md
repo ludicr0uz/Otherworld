@@ -417,6 +417,9 @@ in game `probes/probe_carry.py`.
     inside its target does not stop on it.
   - The first frames after the click the gun is on its way up and the real muzzle is used
     again: an automatic's second round starts from a muzzle part-raised.
+- **Mid-flinch the shot snaps the gun up first** (`shot_snap.py`, `docs/health.md`): the
+  flinch is not `Lowered`, so it is not the stand-in above. The ready pose is snapped back and
+  the real muzzle read.
 - Jogging, the barrel swings with the arm: about 90° below the horizon to 20° above it,
   median 56° below (probe).
 

@@ -26,6 +26,10 @@ FN_SERVER_RELOAD = WEAPON_BASE_CLASS + ".Server_Reload"
 # self: the reload on this machine's copy of the held gun (the take worked
 # out once, the magazine, the reserve, the deadline, the record's mark).
 FN_RELOAD_NOW = WEAPON_BASE_CLASS + ".ReloadNow"
+# self, Mesh, Pose -> bool: a flinch playing on Mesh stopped, Pose snapped
+# into the aim slot with no blend and the mesh posed again on the spot, so the
+# muzzle read next is the ready pose's (combat/weapon_component/shot_snap.py).
+FN_SNAP_SHOT_POSE = WEAPON_BASE_CLASS + ".SnapToShotPose"
 # A reload that moved rounds.
 NODE_EVENT_RELOADED = "AddEvent|Otherworld|Shot|EventReloaded"
 # The local player's fire action went down (I1; not told while paused).

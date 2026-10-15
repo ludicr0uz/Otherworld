@@ -1520,3 +1520,44 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 - [x] On the horde level implement difficulty levels that gradually increase every 3 minutes. Difficulty levels increase the number of total NPC monsters that exist on the level. Level 1 - 4 monsters, Level 2 - 6 monsters, Level 3- 8x etc. For every 9 zombies spawned there should be one wendiego. I.E no wendiegos until level 4 - where there is one, then level 8 there is 2 etc.
 
 - [x] On the horde level update the permanent campfire to have an attraction range that is indefinite (I.E applies to the whole level)
+
+- [x] Instead of debug on / off in the main menu, create a debug settings tab (in the same format that we have other settings subsections in the menu). In this tab monster vision and agro lines and shot trajectory are 2 separate settings. (Currently debug on / off enables both) Reduce the thickens of the monster agro vision lines (right now they are way too thick). Add a cheat to get full stats when used. 
+
+- [x] Make the GUN SETTINGS tab's save (Enter) work in a packaged build: today it runs through Python, which only the editor has, so tuned values are stuck in the game's .sav file. Have it write a CSV the project can take back as the new gun defaults (gun_tuning.csv), keeping the editor's save as it is. Prove it in a real packaged build by tuning a value, saving, and showing it land in gun_tuning.csv.
+      effort: medium
+
+- [x] When firing without ADS, every shot should gradually increase the spread range for automatic weapons (and come back relatively quickly when firing stopped). I.E the more you fire continuously the more random the shots become as the hands start shaking. Stopping briefly should bring this spread range down in a smooth motion.
+
+- [x] When switching from hipfire or over the shoudler aim to ADS, the target aim location jumps which is incorrect. It should stay consistent with where the player was aiming prior. State machine flow shoudl be 1. Brief gradual zoom in 2. Switch to FPS view. 3. Bring gun into frame from the side over a few frames. 4. Gun from the side aligns with reticle target.
+
+- [x] Add refresh command to dev-team that can be called mid run, to re-read tasks.md and update the queue based on its content. (I.E if tasks were removed then remove them from queue, and if tasks were added, add them to queeue). Essentially re-read incomplete tasks and set the queue to that. Complete current task regardless and do not update it even if it changed. I.E if mid run, do not read the first incomplete task into the refreshed queue. 
+
+- [x] For shotgun, add pellet spread width as a configurable parameter in the guns tuning menu for shotgun
+
+- [x] Implement flipbook sprites for blood splatter in the points of contact. Smaller for limb contact. Largest for head contact. Medium for chest contact.
+
+- [ ] (QOL - small) polish - QOL. If a weapon gets picked up but there is no weapon in hand, it should go to hand. (melee or ranged)
+
+- [ ] (polish) Crawl animation legs are too wide, fix them to be natural
+
+- [ ] (implement) zombie combat - use scratch animation for attack
+
+- [ ] Punch animation for attack, alternate between A_UAL1_Punch_Cross and cross at random on each hit. 
+
+- [ ] Use A_UAL2_TreeChopping_Loop if the character is hitting a tree with the swing.
+
+- [ ] The blood splatter pop up animation has a few frames where it appears and a few frames where it disappears. Remove those, just keeep the maximal shape frame, and slightly reduce the time that it stays up. (otherwise hanging blood drops stay in the air after the monster dies)
+
+- [ ] Measure how the drawn hands hold the guns. The grip is fitted on the hidden UEFN mannequin and the gun is attached to it, but the MetaHuman is what's drawn, retargeted rotation-only, and every grip check (verify/gun_hold, verify/finger_pose, probe_gun_hands) measures the mannequin. Make the grip probe measure the drawn Body's hands and fingers against each gun's real mesh, for every gun standing, walking, crouched, sprinting and down the sights at pitch up/level/down, with close-up screenshots per gun and state. Report: wrist offset drawn vs mannequin, and per finger, penetration and gap.
+      effort: medium
+
+- [ ] Pin the drawn MetaHuman's wrists to the mannequin's with hand IK goals in the retarget, so the gun sits in the drawn hand. Keep the mannequin the gameplay truth (gun socket, hits, server); nothing may change for the server, which draws no MetaHuman. Prove it with the drawn-hand grip probe: wrist offset near zero in every gun state, and no regression in the body's look elsewhere.
+      effort: medium
+
+- [ ] Make the fingers hold every gun, using the drawn-hand grip probe's results with the wrists pinned. Fit each gun's finger pose on the MetaHuman's own hand against the gun's real mesh (not the outline boxes), and hold it over the fingers in every gun state, carry included; the trigger finger at the trigger. Goal: no visible penetration, finger pads on the surface, in the probe and the screenshots. Retire or fix the old mannequin fit (finger_fit.close() and swing() fall back to the clip's pose even inside the gun; riding() skips the first finger bone). Add runtime fingertip IK only if the wrist-pinned results still drift.
+      effort: high
+
+- [ ] Stop the cook's ~300 `LogBlueprint: Warning: Node '...EdGraphNode_Comment_N' missing NodeGuid` lines at the source. Cause: in UE 5.8, `UBlueprintGraphEditor::AddCommentNode` (`Engine/Source/Editor/BlueprintEditorLibrary/Private/BlueprintEditorLibrary/BlueprintGraphEditor.cpp:1292`) never calls `CreateNewGuid()`; the engine's normal add-node path does (line 1032). Every `ed.add_comment_to_nodes(...)` in `Scripts/` therefore saves a comment with no GUID. Python can't set `NodeGuid`, and the build scripts save in about 119 places (`save_loaded_asset`), so fix it once in C++: in `Source/OtherworldEditor`, register an `FCoreUObjectDelegates::OnObjectPreSave` handler at module startup (unregister on shutdown). Before a `UBlueprint` saves, it walks `FBlueprintEditorUtils::GetAllGraphs` and calls `CreateNewGuid()` on any node whose `NodeGuid` is invalid, so every save path is covered, scripted or by hand. Add a GUID check to `dev/graph_fingerprint.py` too if it would otherwise flag the new GUIDs as changes. After the editor rebuild, resave the Blueprints that already have the problem so the fix sticks (`-run=ResavePackages -PackageFolder=/Game -OnlySaveDirtyPackages`, or re-run their build scripts). Assets seen in the cook log: `BP_WeaponComponent`, `BP_ForestWandererAI_Zombie`, `ABP_WeaponLayers`, `SandboxCharacter_CMC_ABP`, `AC_TraversalLogic`, the Zombie01/Wendigo01 unarmed ABPs, `BP_Axe`/`BP_Knife`/`BP_Stick`/`BP_WeaponItem`, `BP_AmmoPickup`, `BP_BloodSplash`, `BP_BulletImpact`, `BP_BloodSprite`, `BP_FootstepComponent`, `BP_DayNightCycle`, `BP_GraphicsTuner`, `BP_OtherworldGameInstance`. Never resave or modify files under the engine or pack folders. Proof: re-run one build script that adds comments (e.g. `combat/weapon_component`'s), then cook Mac and show zero `missing NodeGuid` lines in the log (grep count before vs after); unit tests and `ruff check --config Scripts/ruff.toml` clean on any changed Python file.
+      effort: low
+
+- [ ] Add a debug option to enable a trace log for shots that are fired, origin, end, source manequin position, target manequin position and contact point(s). Whatever information would be necessary to help troubleshoot shot issues.

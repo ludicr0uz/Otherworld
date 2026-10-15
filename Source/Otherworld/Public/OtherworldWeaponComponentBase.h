@@ -50,7 +50,9 @@
 #include "OtherworldWeaponComponentBase.generated.h"
 
 class AController;
+class UAnimSequenceBase;
 class UOtherworldHealthComponent;
+class USkeletalMeshComponent;
 
 UCLASS(Abstract, Blueprintable, ClassGroup = (Otherworld))
 class OTHERWORLD_API UOtherworldWeaponComponentBase : public UActorComponent
@@ -98,6 +100,40 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Otherworld|Shot")
 	void PelletFlew(FVector Start, FVector Stop, bool bStopped, FVector Point, FVector Normal, bool bHurt,
 		bool bScenery, FName Bone, bool bHead, float Damage, float Worth);
+
+	/**
+	 * A shot fired mid-flinch leaves from the shooting position, not from
+	 * wherever the flinch has thrown the arms. If FlinchSlot is playing on
+	 * Mesh, the flinch is stopped at once, Pose is played into PoseSlot with
+	 * no blend in (the equip's own loop count and blend out), and the mesh is
+	 * posed again on the spot (TickAnimation(0) and a synchronous
+	 * RefreshBoneTransforms), which moves the gun on its grip socket too.
+	 * The muzzle read after it is the ready pose's. Called just before the
+	 * muzzle is read: on the machine with the keys before the ask, and in
+	 * ShotFired before the server traces. False, and nothing done, when no
+	 * flinch is playing.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Otherworld|Shot")
+	bool SnapToShotPose(USkeletalMeshComponent* Mesh, UAnimSequenceBase* Pose);
+
+	// SnapToShotPose's slots and the ready pose's play (Scripts/combat:
+	// anim_blueprint.HIT_SLOT and AIM_SLOT, weapon_component/common.py's
+	// AIM_BLEND and AIM_LOOPS), written by native.py.
+	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot")
+	FName FlinchSlot = TEXT("HitSlot");
+
+	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot")
+	FName PoseSlot = TEXT("DefaultSlot");
+
+	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot")
+	float PoseBlendOutSeconds = 0.25f;
+
+	UPROPERTY(EditAnywhere, Category = "Otherworld|Shot")
+	int32 PoseLoops = 9999;
+
+	/** For the probes: shots on this machine that snapped out of a flinch. */
+	UPROPERTY(BlueprintReadOnly, Category = "Otherworld|Shot")
+	int32 FlinchSnaps = 0;
 
 	/**
 	 * The owning client's R. Asks the guard, counts the ask served whatever

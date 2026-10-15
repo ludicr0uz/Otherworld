@@ -1,5 +1,8 @@
 #include "OtherworldWeaponComponentBase.h"
 
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimSequenceBase.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
@@ -160,6 +163,37 @@ void UOtherworldWeaponComponentBase::Server_Fire_Implementation(FVector AimPoint
 	UOtherworldInventoryLibrary::MarkInventoryDirty(this);
 	++ShotsFired;
 	ShotFired(AimPoint);
+}
+
+bool UOtherworldWeaponComponentBase::SnapToShotPose(USkeletalMeshComponent* Mesh, UAnimSequenceBase* Pose)
+{
+	UAnimInstance* Anim = Mesh ? Mesh->GetAnimInstance() : nullptr;
+	if (!Anim)
+	{
+		return false;
+	}
+	// IsSlotActive is false for a montage blending out, and a flinch blending
+	// out still has the arms off the gun's line: its weight says so too.
+	const bool bFlinching = Anim->IsSlotActive(FlinchSlot)
+		|| Anim->Blueprint_GetSlotMontageLocalWeight(FlinchSlot) > 0.f;
+	if (!bFlinching)
+	{
+		return false;
+	}
+	Anim->StopSlotAnimation(0.f, FlinchSlot);
+	// The flinch stopped the ready pose (one montage group); it comes back
+	// whole, with no blend. One already playing is left as it is.
+	if (Pose && !Anim->IsPlayingSlotAnimation(Pose, PoseSlot))
+	{
+		Anim->PlaySlotAnimationAsDynamicMontage(Pose, PoseSlot, 0.f, PoseBlendOutSeconds, 1.f, PoseLoops);
+	}
+	// Posed now, not at the end of the frame: no tick function means the
+	// evaluation is on this thread, and its finalize moves what hangs on a
+	// socket (the gun), so the muzzle read next is the ready pose's.
+	Mesh->TickAnimation(0.f, false);
+	Mesh->RefreshBoneTransforms();
+	++FlinchSnaps;
+	return true;
 }
 
 void UOtherworldWeaponComponentBase::Server_Reload_Implementation()

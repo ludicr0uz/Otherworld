@@ -8,7 +8,8 @@ dev-team itself is the thin CLI (argument parsing and the per-task loop):
               and resuming it
   pause       the typed ``pause``: listening for it, the WIP branch, the session
               backup, the record ``dev-team resume`` reads; and the typed
-              ``stop``, which ends the run once the task in hand is done
+              ``stop``, which ends the run once the task in hand is done; and
+              ``refresh``, which reads the task file again at once
   session     one headless ``claude -p`` session: the rules as its system prompt, the
               task prompt, command, env, the compaction window, live output
   triage      one Haiku call before the run marks the small, obvious tasks low effort

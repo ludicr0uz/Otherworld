@@ -137,6 +137,13 @@ run as usual and it is ticked if it passed, and the tasks still waiting are
 listed as not run. Like a pause, a stop skips the final probes. ``pause``
 typed after ``stop`` still pauses at once.
 
+**Refresh.** Type ``refresh`` and Enter to read the task file again at once
+rather than after the task in hand: the queue becomes the file's unticked
+items as they are now, added ones sized by triage, deleted or ticked ones
+gone. The task in hand runs to the end as it began; its own item is left out
+of the new queue even if it was edited meanwhile (reworded, the first unticked
+item stands for it, and is what gets ticked).
+
 **Fab assets need you.** Sessions cannot sign in to Fab, so an asset a task
 needs is asked of you at this terminal: a task's ``fab:`` hints before its
 session starts, and a session whose report opens with FAB-REQUIRED after it
@@ -190,7 +197,7 @@ from devteam import (                                               # noqa: E402
 )
 from devteam.accounting import git_head                             # noqa: E402
 from devteam.session import DEFAULT_MODEL                           # noqa: E402
-from devteam.tasks import Task, parse_tasks, requeue, tick          # noqa: E402
+from devteam.tasks import Task, parse_tasks, refresh, requeue, tick # noqa: E402
 from devteam.trace import Tee, clock                                # noqa: E402
 from devteam.triage import triage                                   # noqa: E402
 from devteam.work import (                                          # noqa: E402
@@ -285,8 +292,10 @@ def describe(n, task):
     return f"  {n}. {task.title}" + (f"  [{hints}]" if hints else "")
 
 
-def reread(task_file, pending, attempted, args, n):
-    """The queue after a task: the task file as it is now (tasks.requeue).
+def reread(task_file, pending, attempted, args, n, current=None):
+    """The queue after a task: the task file as it is now (tasks.requeue);
+    or, given the task in hand as ``current``, during it (a typed
+    ``refresh``: tasks.refresh, which leaves that task's own item out).
 
     Returns (queue, triage cost). A file that cannot be read leaves the queue
     as it was."""
@@ -297,16 +306,18 @@ def reread(task_file, pending, attempted, args, n):
         print(f"dev-team: could not read {task_file} again ({exc}) "
               "-- keeping the queue as it was")
         return pending, 0.0
-    queue, added, dropped = requeue(pending, attempted, fresh)
+    queue, added, dropped = (refresh(pending, attempted, current, fresh) if current
+                             else requeue(pending, attempted, fresh))
     for task in dropped:
         print(f"dev-team: no longer in {os.path.basename(task_file)}, "
               f"so not run: {task.title}")
-    if not added:
-        return queue, 0.0
-    print(f"dev-team: {len(added)} new task(s) in {os.path.basename(task_file)}")
-    cost = size(added, args)
+    if added:
+        print(f"dev-team: {len(added)} new task(s) in {os.path.basename(task_file)}")
+    cost = size(added, args) if added else 0.0
+    if current:
+        print(f"dev-team: refreshed -- {len(queue)} task(s) after this one")
     for i, task in enumerate(queue, n + 1):
-        if task in added:
+        if task in added or current:
             print(describe(i, task))
     return queue, cost
 
@@ -401,9 +412,21 @@ def run(args, task_file, todo, triage_cost, run_dir, progress, meter, pauser):
     finale = final.Finale(args, run_dir, progress) if args.final_set else None
     halted = False      # paused, interrupted or stopped: no final sweep
     attempted = []      # run already and still unticked: not to be queued again
+    refresh_costs = []
+
+    def refreshed():
+        # A typed 'refresh', from the listener while todo[0] is in hand: the
+        # loop does not touch todo until run_one, which joins it, returns.
+        print(f"\ndev-team: reading {os.path.basename(task_file)} again")
+        todo[1:], cost = reread(task_file, todo[1:], attempted, args, n, current=todo[0])
+        refresh_costs.append(cost)
+    if task_file:
+        pauser.on_refresh = refreshed
     if pauser.enabled:
         print(f"dev-team: type '{pause.WORD}' and Enter to pause the task in hand, "
-              f"'{pause.STOP_WORD}' to stop the run after it")
+              f"'{pause.STOP_WORD}' to stop the run after it"
+              + (f", '{pause.REFRESH_WORD}' to read the task file again now"
+                 if task_file else ""))
     while todo:
         # The total moves when the task file is edited mid-run (reread, below).
         task, n, total = todo[0], len(outcomes) + 1, len(outcomes) + len(todo)
@@ -461,6 +484,7 @@ def run(args, task_file, todo, triage_cost, run_dir, progress, meter, pauser):
             todo, cost = reread(task_file, todo, attempted, args, n)
             total_cost += cost
 
+    total_cost += sum(refresh_costs)
     if server.stop(SERVE_DIR):
         print("\ndev-team: stopped the last session's warm editor")
     probes_ok = True

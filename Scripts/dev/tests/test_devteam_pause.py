@@ -68,6 +68,27 @@ class PauserTest(unittest.TestCase):
         self.assertIn("stopping after this task", self.said[0])
         self.assertIn("'stop'", self.said[1])
 
+    def test_the_refresh_word_calls_the_refresh_and_interrupts_nothing(self):
+        calls, refreshed = [], []
+        self.pauser.on_refresh = lambda: refreshed.append(1)
+        with self.pauser.watching(lambda: calls.append(1)):
+            self.type("Refresh\n")
+            self.assertTrue(self.wait(lambda: refreshed))
+        self.assertEqual((calls, self.pauser.requested, self.pauser.stop_requested),
+                         ([], False, False))
+
+    def test_a_refresh_with_nothing_to_refresh_or_failing_is_said(self):
+        with self.pauser.watching():
+            self.type("refresh\n")
+            self.assertTrue(self.wait(lambda: self.said))
+            self.pauser.on_refresh = lambda: 1 / 0
+            self.type("refresh\n")
+            self.assertTrue(self.wait(lambda: len(self.said) == 2))
+            self.type("pause\n")                   # the listener outlives it
+            self.assertTrue(self.wait(lambda: self.pauser.requested))
+        self.assertIn("nothing to refresh", self.said[0])
+        self.assertIn("refresh failed", self.said[1])
+
     def test_pause_after_stop_still_pauses_at_once(self):
         calls = []
         with self.pauser.watching(lambda: calls.append(1)):

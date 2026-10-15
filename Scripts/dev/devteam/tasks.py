@@ -18,6 +18,8 @@ a Fab asset the task needs, asked of the user before its session starts:
 The file is the queue for the whole run, not only at its start: dev-team reads
 it again after each task (``requeue``), so an item added while a session was
 working is run in the same run, and a waiting one ticked or deleted is not.
+Typing ``refresh`` at the run's terminal reads it at once instead
+(``refresh``): the queue shown is the file's now, the task in hand aside.
 """
 
 import re
@@ -34,6 +36,7 @@ class Task(object):
         self.effort, self.model = effort, model
         self.triage = None          # why devteam/triage.py lowered the effort
         self.fab = list(fab or [])
+        self.file_text = None       # its item's text, when reworded in hand (refresh)
 
     @property
     def title(self):
@@ -100,6 +103,35 @@ def requeue(pending, attempted, fresh):
     return queue, added, waiting
 
 
+def refresh(pending, attempted, current, fresh):
+    """The queue when ``refresh`` is typed while ``current`` is in hand.
+
+    As ``requeue``, but the in-hand task's own item is set aside first: it is
+    finished as it began, whatever the file now says of it. Its item is the
+    one with its text; if there is none (it was reworded), the file's first
+    unticked item not already tried stands for it, and its text is kept on
+    ``current.file_text`` so the task can still be ticked. Returns
+    (queue, added, dropped).
+    """
+    rest = list(fresh)
+    own = next((t for t in rest if t.text == current.text), None)
+    if own is None:
+        tried = [t.text for t in attempted]
+        for t in rest:
+            if t.done:
+                continue
+            if t.text in tried:
+                tried.remove(t.text)
+                continue
+            own = t
+            break
+        if own is not None:
+            current.file_text = own.text
+    if own is not None:
+        rest.remove(own)
+    return requeue(pending, attempted, rest)
+
+
 def tick(path, task):
     """Mark one task done in its file, touching nothing else. False if the
     task is no longer there to tick."""
@@ -111,10 +143,14 @@ def tick(path, task):
         return False
     # The file may have been edited during the run: find the item again by its
     # first line rather than trusting the line number it had at parse time.
-    first = task.text.splitlines()[0]
-    hits = [i for i, l in enumerate(lines)
-            if (m := ITEM.match(l)) and m.group(2).strip() == first
-            and (m.group(1) or " ") == " "]
+    hits = []
+    for text in filter(None, (task.text, task.file_text)):
+        first = text.splitlines()[0]
+        hits = [i for i, l in enumerate(lines)
+                if (m := ITEM.match(l)) and m.group(2).strip() == first
+                and (m.group(1) or " ") == " "]
+        if hits:
+            break
     if not hits:
         print(f"    (could not find this task in {path} to tick it)")
         return False

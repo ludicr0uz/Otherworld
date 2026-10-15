@@ -32,6 +32,8 @@ package's `CLAUDE.md`; it adds to this file only a rule that applies in every pa
        instead. The one exception is a Fab asset (see "Fab assets" below).
        It reads the task file again after each task, so an item added to `tasks.md` during a
        run is run in that run, and a waiting one ticked or deleted there is not.
+       Typing `refresh` at its terminal reads the file again at once; the task in hand is
+       left as it began.
      - Probes are opt-in for a run (`--probes [SET]` sweeps one after the last task;
        `--gate-probes SET` beside the verifiers after every task; `Scripts/probes/sets.py`):
        measured 8-10 Oct 2026, they cost 21 hours of launches for three defects found, while

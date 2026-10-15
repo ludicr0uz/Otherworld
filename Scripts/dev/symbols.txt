@@ -4526,31 +4526,32 @@ dev/devteam/limits.py:112: clock
 dev/devteam/limits.py:116: wait
 dev/devteam/nightly.py:25: DEFAULT_SET
 dev/devteam/nightly.py:28: report
-dev/devteam/pause.py:50: WORD
-dev/devteam/pause.py:51: STOP_WORD
-dev/devteam/pause.py:52: MARK
-dev/devteam/pause.py:53: MANIFEST
-dev/devteam/pause.py:54: INTERRUPT_WAITS
-dev/devteam/pause.py:57: class Paused
-dev/devteam/pause.py:68: class Pauser
-dev/devteam/pause.py:125: interrupt
-dev/devteam/pause.py:142: claude_projects
-dev/devteam/pause.py:148: transcript
-dev/devteam/pause.py:156: backup_session
-dev/devteam/pause.py:171: restore_session
-dev/devteam/pause.py:191: slug
-dev/devteam/pause.py:196: current_branch
-dev/devteam/pause.py:200: is_wip
-dev/devteam/pause.py:206: _dirty
-dev/devteam/pause.py:212: park
-dev/devteam/pause.py:244: unpark
-dev/devteam/pause.py:264: tip
-dev/devteam/pause.py:268: land
-dev/devteam/pause.py:292: pause_dir
-dev/devteam/pause.py:296: save
-dev/devteam/pause.py:306: find
-dev/devteam/pause.py:321: listing
-dev/devteam/pause.py:335: forget
+dev/devteam/pause.py:55: WORD
+dev/devteam/pause.py:56: STOP_WORD
+dev/devteam/pause.py:57: REFRESH_WORD
+dev/devteam/pause.py:58: MARK
+dev/devteam/pause.py:59: MANIFEST
+dev/devteam/pause.py:60: INTERRUPT_WAITS
+dev/devteam/pause.py:63: class Paused
+dev/devteam/pause.py:74: class Pauser
+dev/devteam/pause.py:146: interrupt
+dev/devteam/pause.py:163: claude_projects
+dev/devteam/pause.py:169: transcript
+dev/devteam/pause.py:177: backup_session
+dev/devteam/pause.py:192: restore_session
+dev/devteam/pause.py:212: slug
+dev/devteam/pause.py:217: current_branch
+dev/devteam/pause.py:221: is_wip
+dev/devteam/pause.py:227: _dirty
+dev/devteam/pause.py:233: park
+dev/devteam/pause.py:265: unpark
+dev/devteam/pause.py:285: tip
+dev/devteam/pause.py:289: land
+dev/devteam/pause.py:313: pause_dir
+dev/devteam/pause.py:317: save
+dev/devteam/pause.py:327: find
+dev/devteam/pause.py:342: listing
+dev/devteam/pause.py:356: forget
 dev/devteam/probe_gate.py:20: PREFIX
 dev/devteam/probe_gate.py:21: PER_PROBE_SECONDS
 dev/devteam/probe_gate.py:25: MAX_RERUNS
@@ -4629,13 +4630,14 @@ dev/devteam/tasklog.py:191: append
 dev/devteam/tasklog.py:216: lines
 dev/devteam/tasklog.py:228: headline
 dev/devteam/tasklog.py:233: printout
-dev/devteam/tasks.py:25: ITEM
-dev/devteam/tasks.py:26: HINT
-dev/devteam/tasks.py:27: FAB_HINT
-dev/devteam/tasks.py:30: class Task
-dev/devteam/tasks.py:44: parse_tasks
-dev/devteam/tasks.py:68: requeue
-dev/devteam/tasks.py:103: tick
+dev/devteam/tasks.py:27: ITEM
+dev/devteam/tasks.py:28: HINT
+dev/devteam/tasks.py:29: FAB_HINT
+dev/devteam/tasks.py:32: class Task
+dev/devteam/tasks.py:47: parse_tasks
+dev/devteam/tasks.py:71: requeue
+dev/devteam/tasks.py:106: refresh
+dev/devteam/tasks.py:135: tick
 dev/devteam/timing.py:30: MODEL
 dev/devteam/timing.py:31: OWN
 dev/devteam/timing.py:32: SESSION

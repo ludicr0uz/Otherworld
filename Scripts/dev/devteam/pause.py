@@ -32,6 +32,11 @@ Typing ``stop`` instead lets the task in hand finish (session, gate and
 write-up as usual) and ends the run after it, with the rest of the queue not
 run: no session is interrupted and nothing is parked. ``pause`` typed after
 ``stop`` still pauses at once.
+
+Typing ``refresh`` reads the task file again there and then and sets the
+queue to its unticked items (devteam/tasks.py ``refresh``): added ones join
+it, deleted or ticked ones leave it. The task in hand is not touched, and its
+own item is not queued again, even if it was edited. It interrupts nothing.
 """
 
 import contextlib
@@ -49,6 +54,7 @@ from devteam.accounting import git
 
 WORD = "pause"
 STOP_WORD = "stop"                  # the run ends once the task in hand is done
+REFRESH_WORD = "refresh"            # read the task file again now
 MARK = "Dev-Team-Pause"             # the WIP commit's trailer: the pause's name
 MANIFEST = "pause.json"
 INTERRUPT_WAITS = ((signal.SIGINT, 20.0), (signal.SIGTERM, 10.0), (signal.SIGKILL, 5.0))
@@ -72,13 +78,16 @@ class Pauser(object):
     long as the block runs; the pause word sets ``requested`` and calls
     on_pause once, from the listening thread. The stop word sets
     ``stop_requested`` and interrupts nothing: the run's loop reads it once
-    the task in hand is done. Outside a block nothing is read, so a prompt
-    dev-team itself puts to the user gets its answer."""
+    the task in hand is done. The refresh word calls ``on_refresh``, set by
+    the run's loop, from the listening thread (``watching`` joins it, so a
+    refresh is over before the block ends). Outside a block nothing is read,
+    so a prompt dev-team itself puts to the user gets its answer."""
 
     def __init__(self, stream, enabled=True, say=print):
         self.stream, self.enabled, self.say = stream, enabled, say
         self.requested = False
         self.stop_requested = False
+        self.on_refresh = None
 
     def _listen(self, done, on_pause):
         while not done.is_set() and not self.requested:
@@ -103,9 +112,21 @@ class Pauser(object):
                     self.stop_requested = True
                     self.say("\ndev-team: stopping after this task -- the rest of the "
                              f"queue will not run (type '{WORD}' to stop it now)")
+            elif word == REFRESH_WORD:
+                self._refresh()
             elif word:
                 self.say(f"    (type '{WORD}' and Enter to pause this task, "
-                         f"'{STOP_WORD}' to stop after it)")
+                         f"'{STOP_WORD}' to stop after it, "
+                         f"'{REFRESH_WORD}' to read the task file again)")
+
+    def _refresh(self):
+        if not self.on_refresh:
+            self.say("\ndev-team: nothing to refresh -- the queue is not from a task file")
+            return
+        try:
+            self.on_refresh()
+        except Exception as exc:            # the listener must outlive a bad refresh
+            self.say(f"\ndev-team: refresh failed ({exc}) -- the queue is as it was")
 
     @contextlib.contextmanager
     def watching(self, on_pause=None):

@@ -20,7 +20,7 @@ from devteam.session import (
     build_system, session_env,
 )
 from devteam import triage
-from devteam.tasks import Task, parse_tasks, requeue, tick
+from devteam.tasks import Task, parse_tasks, refresh, requeue, tick
 
 
 class TasksTest(unittest.TestCase):
@@ -107,6 +107,45 @@ class RequeueTest(unittest.TestCase):
         (b,) = parse_tasks("- [ ] b\n")
         queue, _added, _dropped = requeue([b], [], parse_tasks("# queue\n\n- [ ] new\n- [ ] b\n"))
         self.assertEqual([t.line for t in queue], [2, 3])
+
+
+class RefreshTest(unittest.TestCase):
+    """The queue when 'refresh' is typed while a task is in hand."""
+
+    def test_the_task_in_hand_is_not_queued_again(self):
+        current, b = parse_tasks("- [ ] a\n- [ ] b\n")
+        queue, added, dropped = refresh(
+            [b], [], current, parse_tasks("- [ ] a\n- [ ] new\n- [ ] b\n"))
+        self.assertEqual([t.text for t in queue], ["new", "b"])
+        self.assertEqual([t.text for t in added], ["new"])
+        self.assertEqual((dropped, current.file_text), ([], None))
+
+    def test_the_queue_is_the_file_s_unticked_items_now(self):
+        current, b, c = parse_tasks("- [ ] a\n- [ ] b\n- [ ] c\n")
+        queue, added, dropped = refresh(
+            [b, c], [], current, parse_tasks("- [ ] a\n- [x] b\n- [ ] d\n"))
+        self.assertEqual([t.text for t in queue], ["d"])
+        self.assertEqual([t.text for t in dropped], ["b", "c"])
+
+    def test_a_reworded_task_in_hand_is_the_first_unticked_item(self):
+        failed, current, b = parse_tasks("- [ ] f\n- [ ] a\n- [ ] b\n")
+        queue, added, _dropped = refresh(
+            [b], [failed], current,
+            parse_tasks("- [x] done\n- [ ] f\n- [ ] a, reworded\n- [ ] b\n"))
+        self.assertEqual([t.text for t in queue], ["b"])
+        self.assertEqual(added, [])
+        self.assertEqual(current.file_text, "a, reworded")
+
+    def test_a_reworded_task_is_ticked_by_its_new_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "tasks.md")
+            with open(path, "w") as fh:
+                fh.write("- [ ] a, reworded\n- [ ] b\n")
+            (current,) = parse_tasks("- [ ] a\n")
+            current.file_text = "a, reworded"
+            self.assertTrue(tick(path, current))
+            with open(path) as fh:
+                self.assertEqual(fh.read(), "- [x] a, reworded\n- [ ] b\n")
 
 
 def load_cli():
@@ -218,6 +257,21 @@ class LoopTest(unittest.TestCase):
         self.assertIn("not run  b", out)
         with open(self.path) as fh:                         # a finished task is still ticked
             self.assertEqual(fh.read(), "- [x] a\n- [ ] b\n- [ ] c\n")
+
+    def test_a_refresh_typed_during_a_task_sets_the_queue_at_once(self):
+        self.write("- [ ] a\n- [ ] b\n")
+
+        def edit_and_refresh():
+            self.write("- [ ] a, reworded\n- [ ] c\n- [ ] d\n")
+            self.pauser.on_refresh()            # what a typed 'refresh' calls
+        code, out = self.run_cli({"a": edit_and_refresh})
+        self.assertEqual(self.ran, [(1, 2, "a"), (2, 3, "c"), (3, 3, "d")])
+        self.assertEqual(code, 0)
+        self.assertIn("refreshed -- 2 task(s) after this one", out)
+        self.assertIn("so not run: b", out)
+        self.assertNotIn("a, reworded", [text for _n, _t, text in self.ran])
+        with open(self.path) as fh:
+            self.assertEqual(fh.read(), "- [x] a, reworded\n- [x] c\n- [x] d\n")
 
     def test_a_task_file_that_goes_away_keeps_the_queue(self):
         self.write("- [ ] a\n- [ ] b\n")

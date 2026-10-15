@@ -149,8 +149,8 @@ _author_* fragment per concern, each in its own module:
   pickup      interact's item kind: the Dropped items it offers, and the ask
               for the one kept, Server_Take(Item), whose body is the take into
               the bag, detached from what it was left in (a body a thrown
-              blade struck); a Lodged blade taken with empty hands goes to the
-              hand
+              blade struck); a weapon (melee or ranged) or a Lodged blade
+              taken with empty hands goes to the hand
   heat        interact's campfire kind: the fires it offers while the held
               item Heats (the knife, the axe), and what makes that item Hot
               for HEAT_S (the item's own Tick cools it: combat/heat.py)

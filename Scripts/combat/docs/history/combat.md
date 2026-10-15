@@ -47,12 +47,15 @@ A heading here is the heading the text stood under there.
     something in hand nothing is picked up, a weapon with a free slot included (`HasRoom`
     is not per item). The held item stays held
     (`probes/probe_pickup_weapon_slot.py`).
-  - **One pick-up goes to the hand: a blade taken back out of what it was thrown into.**
-    The strike flags the item `Lodged` as it sets it into a tree or a body
-    (`throw_strike.py`); the take (`pickup._author_to_hand`) lowers it and, with empty
-    hands (`Held` not valid), writes `Slot = HAND` over the UNPLACED, `HandFrom` the
-    item's `WeaponKind`, so 4 puts it away. With something in hand it is placed like
-    any weapon. A blade that glanced off and fell is not `Lodged`. After a drop, a throw or eating the
+  - **A weapon picked up with empty hands goes to the hand** (15 Oct 2026; before, only
+    a blade taken back out of what it was thrown into did). The take
+    (`pickup._author_to_hand`) writes `Slot = HAND` over the UNPLACED when `Held` is not
+    valid and the item is a weapon (`WeaponKind` not `NOT_A_WEAPON`, melee or ranged) or
+    `Lodged` (the strike flags a blade so as it sets it into a tree or a body,
+    `throw_strike.py`), `HandFrom` the item's `WeaponKind`, so its slot's key puts it
+    away; `Lodged` is lowered either way. With something in hand a weapon is placed as
+    above; anything else goes to the bag with empty hands too
+    (`probes/probe_pickup_weapon_slot.py`). After a drop, a throw or eating the
     last one the hands stay empty: nothing comes up unasked.
   - **A screen never writes a request itself:** the HUD calls the component's `Ask…`
     events (`combat/ask_consts.py`, `weapon_component/asks.py`), which raise them. The loot

@@ -1,4 +1,4 @@
-"""A weapon picked up goes to its weapon slot before the bag.
+"""A weapon picked up goes to its weapon slot before the bag, or to empty hands.
 
 The player sets an issued item down (DropRequest: what a drag out of the
 inventory writes), the probe lays it on the ground ahead, under the reticle,
@@ -9,10 +9,12 @@ the slot sync then puts it:
     the knife, the melee slot free        -> the melee slot
     the knife, the axe in the melee slot  -> the bag
     the matches (no weapon)               -> the bag
-    the shotgun, out of the hand          -> the primary slot, hands empty
+    the shotgun, out of the hand          -> the hand (it was empty)
+    the matches, hands empty              -> the bag (no weapon)
+    the knife, hands empty, axe in melee  -> the hand
 
 (A blade taken back out of what it was thrown into goes to empty hands
-instead: probe_throw_strike.py and probe_throw_stick.py.)
+too: probe_throw_strike.py and probe_throw_stick.py.)
 
 Any profile on disk is set aside first, so the game starts on the issued
 loadout, and put back at the end.
@@ -32,6 +34,7 @@ from combat.slot_tuning import (
     NO_REQUEST, PISTOL_SLOT, PRIMARY, SLOT_ITEMS_VAR, SLOT_VAR,
 )
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
+from probes.probe_hip_bloom import _clear_creatures
 from probes.probe_pickup import DOWN_CM, RING_CM, SETTLE, _file, _in_reach, _look, _press
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, v) for v in
@@ -79,6 +82,9 @@ def _run(p):
     yield 0.3
     player = p.pawn()
     wc = p.component(player, WEAPON_COMP_CLASS_PATH)
+    # The level's creatures reach the player and kill them, which stops the
+    # weapon component, before the probe is through.
+    p.note(f"took away {_clear_creatures(p)} creature(s)")
     yield lambda: p.get(wc, "Held") is not None
     shotgun, pistol, knife, axe, matches = list(p.get(wc, "Inventory"))[:5]
     p.check("the issued items are where the probe expects them: the shotgun in hand, "
@@ -124,7 +130,26 @@ def _run(p):
 
     slot = yield from _round_trip(p, player, wc, shotgun, yaw)
     yield SETTLE
-    p.check("the shotgun set down out of the hand and picked up goes to the primary "
-            "slot: not the bag, and not the empty hands",
-            slot == PRIMARY and p.get(wc, "Held") is None
-            and p.get(wc, SLOT_ITEMS_VAR)[HAND] is None, f"slot {slot}")
+    p.check("the shotgun set down out of the hand and picked up goes back to the "
+            "empty hands, not to the primary slot",
+            slot == HAND and p.get(wc, "Held") == shotgun
+            and p.get(wc, SLOT_ITEMS_VAR)[PRIMARY] is None, f"slot {slot}")
+
+    # Hands empty again: the shotgun set down and put out of reach, 20 m
+    # behind on the ground.
+    yield from _ask(p, wc, DROP_REQUEST_VAR, HAND)
+    a = math.radians(yaw)
+    shotgun.set_actor_location(
+        here - unreal.Vector(2000.0 * math.cos(a), 2000.0 * math.sin(a), DOWN_CM),
+        False, True)
+    yield SETTLE
+    bare = p.get(wc, "Held") is None
+    slot = yield from _round_trip(p, player, wc, matches, yaw)
+    p.check("with empty hands, the matches (no weapon) still go to the bag",
+            bare and slot is not None and BAG_FIRST <= slot <= BAG_LAST
+            and p.get(wc, "Held") is None, f"slot {slot}, hands empty first {bare}")
+
+    slot = yield from _round_trip(p, player, wc, knife, yaw)
+    yield SETTLE
+    p.check("with empty hands, the knife (melee) picked up goes to the hand",
+            slot == HAND and p.get(wc, "Held") == knife, f"slot {slot}")

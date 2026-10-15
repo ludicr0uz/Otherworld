@@ -1,8 +1,8 @@
 """verify.pickup -- the pick-up (weapon_component/pickup.py), interact's item
 kind: the target interact kept, cast to an item, is asked for once, after the
 search, while there is room; the take is Server_Take's (task M20), which
-asks again on the machine that owns the inventory; and a blade that was
-Lodged goes back into empty hands.
+asks again on the machine that owns the inventory; and a weapon, or a
+blade that was Lodged, goes into empty hands.
 
 How the target is chosen is verify/interact.py's. That a pick-up joins the
 inventory without switching to it is verify/weapon_inputs.py's.
@@ -22,7 +22,8 @@ from combat.anim_blueprint import AIM_SLOT
 from combat.fx_vars import PICKUP_CLIP, fx_event
 from combat.pickup_tuning import PICKUP_CLIP_START_S
 from combat.skin import player_skin
-from combat.slot_tuning import HAND, HAND_FROM_VAR, HAS_ROOM_VAR, SLOT_VAR, WEAPON_KIND_VAR
+from combat.slot_tuning import (
+    HAND, HAND_FROM_VAR, HAS_ROOM_VAR, NOT_A_WEAPON, SLOT_VAR, WEAPON_KIND_VAR)
 from combat.strike_vars import ITEM_PARAM, SERVER_TAKE, TAKE_REACH_CM
 from combat.verify.common import (
     BEL, before_marks, by_pins, check, graph, in_pins, num_pin, past_marks, pin_value)
@@ -191,8 +192,9 @@ def check_pickup_takes_once():
           str([pin for _n, pin in entries]))
 
 
-def check_lodged_to_hand():
-    """A blade taken back out of a tree or a body goes to empty hands."""
+def check_weapon_to_hand():
+    """A weapon (melee or ranged), or a blade taken back out of a tree or a
+    body, goes to empty hands."""
     hands = [n for n in wg if _title(n) == f"Set {SLOT_VAR}"
              and pin_value(n, SLOT_VAR) in (str(HAND), "")
              and not _sources(n, SLOT_VAR) and _taken_item(n, "self")]
@@ -200,38 +202,47 @@ def check_lodged_to_hand():
           len(hands) == 1, f"{len(hands)} Set {SLOT_VAR} = HAND on the target")
     if len(hands) != 1:
         return
-    bare = _exec_from(hands[0])
-    held = [h for n, _pin in bare for c in _sources(n, "Condition")
-            for v in _sources(c, "A") for h in _sources(v, "Object")]
-    check(f"...only with empty hands ({WV.Held} is not valid)",
-          len(bare) == 1 and bare[0][1] == "then"
-          and [_title(h) for h in held] == [f"Get {WV.Held}"],
-          str([_title(h) for h in held]))
-    if len(bare) != 1:
-        return
-    lowers = _exec_from(bare[0][0])
-    check(f"...the item no longer {IV.Lodged}",
-          len(lowers) == 1 and _title(lowers[0][0]) == f"Set {IV.Lodged}"
-          and pin_value(lowers[0][0], IV.Lodged) in ("false", "")
-          and _taken_item(lowers[0][0], "self"),
-          ", ".join(_title(n) for n, _pin in lowers))
-    if len(lowers) != 1:
-        return
-    gates = _exec_from(lowers[0][0])
-    asked = [c for n, _pin in gates for c in _sources(n, "Condition")]
-    check(f"...and only an item that was {IV.Lodged} (a thrown blade left in a "
-          "tree or a body), after the take set it UNPLACED",
-          len(gates) == 1 and gates[0][1] == "then" and len(asked) == 1
-          and _title(asked[0]) == f"Get {IV.Lodged}"
-          and [_title(n) for n in before_marks([n for n, _pin in _exec_from(gates[0][0])])]
+    gate = _exec_from(hands[0])
+    conds = [c for n, _pin in gate for c in _sources(n, "Condition")]
+    check("...behind one Branch, after the take set it UNPLACED",
+          len(gate) == 1 and gate[0][1] == "then" and len(conds) == 1
+          and [_title(n) for n in before_marks([n for n, _pin in _exec_from(gate[0][0])])]
           == [f"Set {SLOT_VAR}"],
-          f"{len(gates)} gate(s)")
+          f"{len(gate)} gate(s)")
+    if len(gate) != 1 or len(conds) != 1:
+        return
+    bare = [h for v in _sources(conds[0], "A") for h in _sources(v, "A")
+            for o in _sources(h, "Object")]
+    held = [_title(o) for v in _sources(conds[0], "A") for h in _sources(v, "A")
+            for o in _sources(h, "Object")]
+    check(f"...only with empty hands ({WV.Held} is not valid)",
+          len(bare) == 1 and held == [f"Get {WV.Held}"], str(held))
+    either = _sources(conds[0], "B")
+    kinds = [k for e in either for ne in _sources(e, "A") for k in _sources(ne, "A")]
+    nots = [pin_value(ne, "B") for e in either for ne in _sources(e, "A")]
+    lodged = [_title(l) for e in either for l in _sources(e, "B")]
+    check(f"...and only a weapon (its {WEAPON_KIND_VAR} not NOT_A_WEAPON, melee or "
+          f"ranged) or an item that was {IV.Lodged} (a thrown blade left in a tree "
+          "or a body)",
+          [_title(k) for k in kinds] == [f"Get {WEAPON_KIND_VAR}"]
+          and nots == [str(NOT_A_WEAPON)] and lodged == [f"Get {IV.Lodged}"]
+          and all(_taken_item(k, "self") for k in kinds),
+          f"{[_title(k) for k in kinds]} != {nots}, or {lodged}")
     froms = past_marks(_then(hands[0]))
-    check(f"...{HAND_FROM_VAR} its {WEAPON_KIND_VAR}: the melee slot's key puts it away",
+    check(f"...{HAND_FROM_VAR} its {WEAPON_KIND_VAR}: its slot's key puts it away",
           len(froms) == 1 and _title(froms[0]) == f"Set {HAND_FROM_VAR}"
           and [_title(f) for f in _sources(froms[0], HAND_FROM_VAR)]
           == [f"Get {WEAPON_KIND_VAR}"],
           ", ".join(_title(n) for n in froms))
+    if len(froms) != 1:
+        return
+    lowers = past_marks(_then(froms[0]))
+    into = sorted(pin for _n, pin in _exec_from(lowers[0])) if len(lowers) == 1 else []
+    check(f"...the item no longer {IV.Lodged}, in the hand or not",
+          len(lowers) == 1 and _title(lowers[0]) == f"Set {IV.Lodged}"
+          and pin_value(lowers[0], IV.Lodged) in ("false", "")
+          and _taken_item(lowers[0], "self") and into == ["else", "then"],
+          f"{[_title(n) for n in lowers]} from {into}")
 
 
 def _reads_clip(node):
@@ -297,5 +308,5 @@ def check_pickup_clip():
 
 def run():
     check_pickup_takes_once()
-    check_lodged_to_hand()
+    check_weapon_to_hand()
     check_pickup_clip()

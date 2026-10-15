@@ -94,7 +94,7 @@ AdsRaiseSeconds = Var("AdsRaiseSeconds", FLOAT, COMBAT.ads_raise_s)
 ShotVolume = Var("ShotVolume", FLOAT)
 # A thrown blade left in a tree or a body (throw_strike.py sets it as it sets
 # the item in). The pick-up reads it: taken back with empty hands, it goes to
-# the hand, not to a slot (pickup.py), and stops being Lodged.
+# the hand, as any weapon does (pickup.py), and stops being Lodged.
 Lodged = Var("Lodged", BOOL, rep=REPLICATED)
 # Loose in the world, in the air or lying: set by the server as the item
 # leaves a hand for it and lowered by the take (item_world.py). Replicated: a

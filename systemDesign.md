@@ -52,8 +52,8 @@ I opens the panel: keys or mouse bring an item to hand, a right click uses it (a
 worn, a gun goes to a weapon slot; on the hand's slot, or with the use key, what is in hand
 is eaten, drunk or struck), drag moves items between slots, and a drop outside the
 panel sets the item down. The character's portrait beside it is the player in the jacket,
-pants and boots they wear. A pick-up goes to a free weapon slot of its kind, else the bag,
-else empty hands.
+pants and boots they wear. A weapon (melee or ranged) picked up with empty hands goes to the
+hand; any other pick-up goes to a free weapon slot of its kind, else the bag, else empty hands.
 
 **The wanderers** (`Scripts/npc/CLAUDE.md`). Ten zombies and wendigos on Behavior Trees:
 patrol until they notice a player, then chase and melee, sidestepping between swings. Each

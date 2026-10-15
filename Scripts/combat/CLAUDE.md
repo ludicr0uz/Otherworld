@@ -146,6 +146,9 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   empties `Held` first, so a hand slot with nothing in it is empty hands). Weapons are spawned once at
   BeginPlay and then hidden or shown, never destroyed, so a dropped weapon is the same actor.
 - **The slots**: `docs/history/combat.md#the-slots`
+- **A weapon picked up with empty hands goes to the hand** (melee or ranged;
+  `pickup._author_to_hand`, `verify/pickup.check_weapon_to_hand`,
+  `probes/probe_pickup_weapon_slot.py`); anything else still goes to the bag.
 - **E is Interact, and picking up is one kind of it**: `docs/history/combat.md#e-is-interact-and-picking-up`
 - **An item on the ground glimmers**: `docs/history/combat.md#an-item-on-the-ground-glimmers`
 - **Ammunition lives on the weapon** (`MagazineSize`/`Loaded`/`Reserve` on `BP_WeaponItem`).

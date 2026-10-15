@@ -19,9 +19,9 @@ body it struck (throw_strike.py). The take detaches what it takes, so an item
 that goes into the bag unseen does not ride on with the body.
 
 Where a taken item goes is the slot sync's (UNPLACED: a weapon to a free
-weapon slot of its kind, anything else to the bag), but for one case: a blade
-taken back out of what it was thrown into (the item is Lodged), with empty
-hands, goes to the hand (_author_to_hand).
+weapon slot of its kind, anything else to the bag), but for one case: with
+empty hands, a weapon (melee or ranged), or a blade taken back out of what
+it was thrown into (the item is Lodged), goes to the hand (_author_to_hand).
 
 The reach down for it is the skin's pick-up clip (pickup_clip.py), played
 by the owner off the ask, and on the other players' copies at the server's
@@ -38,7 +38,8 @@ a hidden one would stand in a late joiner's level as the level has it
 from net.guard import author_guard
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from combat.paths import ITEM_CLASS_PATH
-from combat.slot_tuning import HAND, HAND_FROM_VAR, HAS_ROOM_VAR, SLOT_VAR, UNPLACED, WEAPON_KIND_VAR
+from combat.slot_tuning import (
+    HAND, HAND_FROM_VAR, HAS_ROOM_VAR, NOT_A_WEAPON, SLOT_VAR, UNPLACED, WEAPON_KIND_VAR)
 from combat.weapon_component.common import _prop
 from combat.item_world import author_out_of_world
 from combat.fx_vars import PICKUP_CLIP
@@ -51,7 +52,7 @@ from uebp.nodes.actor import FN_ACTOR_LOC, FN_DESTROY, FN_DETACH, FN_GET_OWNER, 
 from uebp.nodes.array import FN_ARR_ADD
 from uebp.g import _G
 from uebp.nodes.level import FN_IS_LEVEL_ACTOR
-from uebp.nodes.math import FN_AND, FN_DISTANCE, FN_LE_FF, FN_NOT
+from uebp.nodes.math import FN_AND, FN_DISTANCE, FN_LE_FF, FN_NEQ_II, FN_NOT, FN_OR
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_ITEM, NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID, FN_OBJECT_CLASS
 from uebp.nodes.system import FN_ALL_ACTORS
@@ -195,8 +196,9 @@ def author_take_event(ed):
         "class where the item was the level's, which is destroyed): detached from "
         "whatever it was left in, into Inventory UNPLACED (the slot sync puts a "
         "weapon in a free weapon slot of its kind, anything else in the bag, or "
-        "in empty hands when the bag is full). A blade taken back out of what it "
-        "was thrown into (Lodged) with empty hands goes to the hand instead. "
+        "in empty hands when the bag is full). A weapon, or a blade taken back out "
+        "of what it was thrown into (Lodged), with empty hands goes to the hand "
+        "instead. "
         "Everyone else is told of the take: their copies play the reach down.",
         g.made + hand_nodes)
 
@@ -219,20 +221,22 @@ def _author_fresh_item(ed, g, best, exec_in):
 
 
 def _author_to_hand(ed, item, exec_in):
-    """A Lodged item (a blade thrown into a tree or a body) taken with empty
+    """A weapon (any WeaponKind but NOT_A_WEAPON, melee or ranged), or a
+    Lodged item (a blade thrown into a tree or a body), taken with empty
     hands goes to the hand: Slot = HAND, over the UNPLACED the take wrote.
-    HandFrom is its WeaponKind, so the melee slot's key puts it away as if
-    it had come from there. Lodged is lowered either way.
+    HandFrom is its WeaponKind, so its slot's key puts it away as if it had
+    come from there. Lodged is lowered either way, after the Branch has
+    read it.
 
     Held is last frame's equip: a clash with something that reached the
     hand this frame is the slot sync's (the later claim goes UNPLACED).
     Returns (tails, nodes).
     """
     g = _G(ed, ITEM_CLASS_PATH)
-    stuck, loose = g.branch(g.iget(item, IV.Lodged), [exec_in])
-    flow = g.iput(item, IV.Lodged, "false", [stuck])
     bare = out(g.call(FN_NOT, A=out(g.call(FN_IS_VALID, Object=g.get(WV.Held)))))
-    empty, busy = g.branch(bare, [flow])
+    armed = op(g, FN_NEQ_II, g.iget(item, WEAPON_KIND_VAR), str(NOT_A_WEAPON))
+    wanted = op(g, FN_OR, armed, g.iget(item, IV.Lodged))
+    empty, busy = g.branch(op(g, FN_AND, bare, wanted), [exec_in])
     flow = g.iput(item, SLOT_VAR, str(HAND), [empty])
     flow = g.put(HAND_FROM_VAR, g.iget(item, WEAPON_KIND_VAR), [flow])
-    return (loose, busy, flow), g.made
+    return (g.iput(item, IV.Lodged, "false", [flow, busy]),), g.made

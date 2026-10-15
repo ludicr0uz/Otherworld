@@ -539,8 +539,10 @@ until C3.
   it after a gun's model, grip or ready pose changes, then the weapons build (its
   `drawn_grip` step lays the clip over the fingers), then the probe. **The clip plays
   retargeted**: the bake corrects its keys until the pose as played is the fit's
-  (`drawn_grip_bake.settle`). The numbers and what is not done: `docs/aiming.md`, "The
-  drawn fingers".
+  (`drawn_grip_bake.settle`). **The pistol's right thumb is laid, not swung**
+  (`drawn_thumb.py`, `drawn_grip_consts.THUMB_REST`/`THUMB_CEILING_CM`): swung onto the
+  gun it stood up behind the slide, over the rear sight down the sights. The numbers and
+  what is not done: `docs/aiming.md`, "The drawn fingers".
 - **Every gun's left hand is seated on its own model** (`gun_hold.py`), the shotgun's
   being one case: the AK's on its handguard clear of the magazine, the Val's on the front
   of its receiver, the pistol's and the SMG's over the right hand's fingers on the grip.

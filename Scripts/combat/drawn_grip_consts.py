@@ -42,6 +42,19 @@ TRIGGER = {
     "BP_Pistol": ((5.6, 0.0, 3.1), (5.6, 0.0, 1.9)),
     "BP_SMG": ((5.0, 0.0, 3.4), (5.3, 0.0, 2.0)),
 }
+# Where the right thumb's tip rests on a gun whose thumb the retarget leaves
+# standing up behind its slide, over the rear sight (combat/drawn_thumb.py):
+# a segment beside the frame's left side (-Y), under the slide (its bottom
+# at z 5.5 and its top at 7.5 on the 1911), laid a finger_fit.SKIN_CM off the
+# mesh as the trigger's is. And how high the thumb's skin may rise there (the
+# gun's +Z, cm): 1.5 cm under the slide's top, so the sights are clear.
+THUMB_REST = {
+    "BP_Pistol": ((0.0, -3.0, 4.2), (3.0, -3.0, 4.2)),
+}
+THUMB_CEILING_CM = 6.0
+# probe_drawn_grip's bounds on it: the tip within THUMB_NEAR_CM of its rest
+# (a skin off it), and no point of the thumb's skin above THUMB_CEILING_CM.
+THUMB_NEAR_CM = 1.0
 # probe_drawn_grip's bound on it: the index's pad within this of a skin off
 # the trigger's face (cm); the shotgun's own, whose trigger is below the hand.
 TRIGGER_NEAR_CM = 1.0

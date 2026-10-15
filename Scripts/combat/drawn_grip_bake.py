@@ -35,9 +35,9 @@ import unreal
 
 from asset_pipeline.metahuman_paths import BODY_MESH
 from combat import drawn_grip as D
-from combat import finger_fit
+from combat import drawn_thumb, finger_fit
 from combat.drawn_grip_consts import (
-    CLIP, CLIP_FPS, FRAMES, GUNS, HANDGUNS, TRIGGER,
+    CLIP, CLIP_FPS, FRAMES, GUNS, HANDGUNS, THUMB_CEILING_CM, THUMB_REST, TRIGGER,
 )
 from combat.drawn_grip_mesh import gun_solid
 from combat.log import _log
@@ -91,6 +91,8 @@ def fit_gun(gun, row, solid):
     pull = tuple(D.apply(into, p) for p in trigger(solid, TRIGGER[gun]))
     moved, bends = D.fit_hand(right, "r", seen_r, trigger=pull)
     right_fit = {**right, **moved}
+    if gun in THUMB_REST:
+        right_fit, bends["thumb"] = _rest_thumb(gun, right_fit, hand_r, solid)
     pad = finger_fit.riding(D.finger_points(right_fit, "r")["index"])[D.PAD]
     near = finger_fit._len(finger_fit._sub(pad, finger_fit.aimed(pull, pad)))
     _log(_said(f"{gun} right", D.offsets(right, "r", seen_r),
@@ -117,6 +119,26 @@ def fit_gun(gun, row, solid):
              + "; deepest by state " + " ".join(f"{d:+.2f}" for d in each))
         out[frame] = {**right_fit, **left_fit}
     return out
+
+
+def _rest_thumb(gun, right, hand_r, solid):
+    """``right`` with its thumb laid on the gun's THUMB_REST (drawn_thumb.lay),
+    clear of the gun and the fitted fingers, and the search's params."""
+    into = D.inverse(hand_r)
+    rest = tuple(D.apply(into, p) for p in trigger(solid, THUMB_REST[gun]))
+    fist = finger_fit.Union([solid, D.capsules(right, "r", hand_r)])
+    height = lambda p: D.apply(hand_r, p)[2]
+    bones = D.chain("thumb", "r")
+    moved, params = drawn_thumb.lay(right, bones, D.Seen(fist, [hand_r]), rest, height,
+                                    THUMB_CEILING_CM)
+    out = {**right, **moved}
+    tip = D.finger_points(out, "r")["thumb"][-1]
+    near = finger_fit._len(finger_fit._sub(tip, finger_fit.aimed(rest, tip)))
+    _log(f"{gun} right thumb laid on its rest: tip {near:.2f} cm off it, top "
+         f"{drawn_thumb.top(right, bones, height):+.2f} -> {drawn_thumb.top(out, bones, height):+.2f}"
+         f" cm (its axis at most {THUMB_CEILING_CM - finger_fit.SKIN_CM:+.2f}); turns "
+         + "/".join(f"{a:+.0f}" for a in params))
+    return out, params
 
 
 def _clip():

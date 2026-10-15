@@ -617,13 +617,25 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     then the fit. The thumb swings onto the gun, and out of it the least either way. The
     right index is drawn to the trigger (a segment per gun, `TRIGGER`), its pad on it.
     A handgun's left fingers are fitted on the gun and the fitted right fingers together.
+    **The pistol's right thumb is laid along the frame** (`drawn_thumb.py`, 15 Oct 2026):
+    swung onto the gun, the retarget's thumb stood up behind the slide, its tip 1.4 cm
+    over the slide's top and in front of the rear sight down the sights. A gun named in
+    `THUMB_REST` has its right thumb turned at its root (two swings and a roll past the
+    turn that points it at the rest, within 45 and 60 degrees) and its outer joints bent,
+    searched on a grid and then in halving steps, so that its tip lies on the rest (a
+    segment on the frame's left side under the slide, z 4.2), nothing of it is pressed
+    into the gun or the fitted fingers, and no point's skin rises over
+    `THUMB_CEILING_CM` (6 cm, 1.5 under the slide's top); the least turn and the least
+    bend win a tie, so it lies straight rather than curled. On the 1911 its top fell from
+    +8.9 cm to +4.4 (the skin's +5.1), its tip 0.66 cm off the rest's line; the SMG's
+    right thumb is beside its receiver, not over its sights, and is still swung.
     One frame holds every hand placement of its state (the carry's four clips), and the
     fingers are kept out of the gun in all of them.
   - **The clip plays retargeted** (Taro's mesh against the skeleton's reference pose:
     root `CLAUDE.md`, "Skeletons and retargeting"), so the bake keys each frame, reads it
     back as played and corrects the keys until the played pose is the fit's (0.13 degrees
     at worst: `drawn_grip_bake.settle`).
-  - **Measured** (`probe_drawn_grip`, 329 checks, 15 Oct 2026): no finger more than 0.3 cm
+  - **Measured** (`probe_drawn_grip`, 345 checks since the pistol's thumb, 15 Oct 2026): no finger more than 0.3 cm
     into a gun raised or down the sights but the left knuckle of the shotgun's little
     finger (0.44) and the SMG's index (0.38), which no turn of the metacarpal clears at
     the pinned wrist (`PRESSED_CM_BY_GUN`); every finger within 1 cm of the surface

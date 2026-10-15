@@ -339,6 +339,8 @@ wrong module.
                     fingers by layered blends, weighted by the weapon component's
   drawn_grip_mesh   a gun's drawn meshes as one solid in its actor's frame (GeometryScript)
   drawn_grip_vars   the drawn grip's variables, the weapon component's and the anim BP's
+  drawn_thumb       the pistol's right thumb laid forward along the frame's left side,
+                    under the slide and its sights (pure; drawn_grip_bake's fit)
 
   gas_turn  Standing, the legs step round after the view: the sample's turn-in-place switched on (WantsToAim), the root's offset released by a traversal alone
 

@@ -36,7 +36,9 @@ layer weighed in (the left only on a long gun or a raised one), no finger
 of a hand on the gun deeper in it than drawn_grip_consts.PRESSED_CM
 (PRESSED_CM_BY_GUN's own, CARRY_PRESSED_CM carried), none further off it
 than OFF_CM (CARRY_OFF_CM carried, and not CARRY_OFF's), and the right
-index's pad at the gun's TRIGGER. A handgun's left fingers are measured to
+index's pad at the gun's TRIGGER; on the pistol (THUMB_REST) the right thumb
+under the sights and forward along the frame's left side (combat/
+drawn_thumb.py). A handgun's left fingers are measured to
 the nearer of the gun and the right fingers, which they lie on.
 
   python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_drawn_grip.py
@@ -53,7 +55,8 @@ from combat import drawn_grip as D
 from combat import finger_fit, gun_hold
 from combat.drawn_grip_consts import (
     CARRY_OFF, CARRY_OFF_CM, CARRY_PRESSED_CM, GRIP_LEFT_VAR, GRIP_RIGHT_VAR, HANDGUNS, OFF_CM,
-    PRESSED_CM, PRESSED_CM_BY_GUN, TRIGGER, TRIGGER_NEAR_CM, TRIGGER_NEAR_CM_BY_GUN,
+    PRESSED_CM, PRESSED_CM_BY_GUN, THUMB_CEILING_CM, THUMB_NEAR_CM, THUMB_REST, TRIGGER,
+    TRIGGER_NEAR_CM, TRIGGER_NEAR_CM_BY_GUN,
 )
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import SEAT_VAR, SIGHTS_FORCED_VAR
@@ -238,6 +241,26 @@ def _grip(p, name, state, raised, body, held, hands, m):
             near <= bound, f"its pad {near:.2f} cm off the trigger's face (at most {bound:.2f})")
 
 
+def _thumb(p, name, state, body, held, hands):
+    """A gun of THUMB_REST (the pistol): the right thumb laid along the
+    frame's left side, under the sights (combat/drawn_thumb.py): its tip on
+    the rest's line (a skin off the mesh, so within THUMB_NEAR_CM and a skin
+    of the line beside it) and no point of its skin above THUMB_CEILING_CM."""
+    bones, tip_cm = hands[("right", "thumb")]
+    pts = _points(body, held.get_actor_transform(), bones, tip_cm)
+    top = max(q[2] for q in pts[1:] + finger_fit.riding(pts)) + R.SKIN_CM
+    p.check(f"{name}, {state}: the right thumb is under the sights",
+            top <= THUMB_CEILING_CM + 0.1, f"its skin's top at z {top:+.2f} cm "
+            f"(at most {THUMB_CEILING_CM}; the slide's top 7.5)")
+    tip = pts[-1]
+    near = finger_fit._len(finger_fit._sub(tip, finger_fit.aimed(THUMB_REST[name], tip)))
+    bound = THUMB_NEAR_CM + 2.0 * R.SKIN_CM
+    p.check(f"{name}, {state}: the right thumb lies forward along the frame's left side",
+            tip[1] < 0.0 and near <= bound,
+            f"its tip at ({tip[0]:+.1f}, {tip[1]:+.1f}, {tip[2]:+.1f}), {near:.2f} cm off "
+            f"the rest's line (at most {bound:.2f})")
+
+
 def _xf(xf):
     t, q = xf.translation, xf.rotation
     return [[t.x, t.y, t.z], [q.x, q.y, q.z, q.w]]
@@ -398,6 +421,8 @@ def probe(p):
                             f"{pen[0][0]} {pen[0][1]} {pen[1]:.2f}" if pen else "none",
                             f"{gap[0][0]} {gap[0][1]} {gap[1]:.2f}" if gap else "none"])
             _grip(p, name, state, raised, body, held, hands, m)
+            if name in THUMB_REST:
+                _thumb(p, name, state, body, held, hands)
             p.check(f"{name}, {state}: the drawn wrists are on the mannequin's",
                     max(wrist[:2]) <= WRIST_PINNED_CM,
                     f"right {wrist[0]:.2f} cm, left {wrist[1]:.2f} cm "

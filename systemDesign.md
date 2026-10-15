@@ -81,7 +81,9 @@ neither in multiplayer), Multiplayer (a
 server address and Join Server), Controls (rebinding, difficulty EASY/MEDIUM/SURVIVOR),
 Debug Settings (monster vision and agro, and the shot trajectory, two switches, and a FULL
 STATS cheat), Dev All Guns (in play only: the title has no such row), the GUN / MONSTER / PLAYER / SOUND / WORLD / GRAPHICS SETTINGS tabs
-(live tuning, each saved to a tracked CSV the matching build reads; as a client of a server
+(live tuning, each saved to a tracked CSV the matching build reads; a packaged build, which has
+no Python, saves the gun table to `gun_tuning.csv` in its own `Saved/Tuning/` through the C++
+`OtherworldTuningLibrary`, and `Scripts/take_gun_tuning.py` copies it back over the tracked one; as a client of a server
 the gun, monster, world and player tables are the server's: a change is sent to it and
 applied there, by `BP_GameTuner` on the GameState, only where the server was started with
 `-AllowDevTuning`, and the rows are read-only and say so otherwise; sound and graphics stay

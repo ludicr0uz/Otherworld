@@ -717,6 +717,13 @@ laid over `COMBAT` and tuned in game by the menu's PLAYER SETTINGS tab (`docs/st
   slash's damage is not there: it is `COMBAT.knife_damage`, a literal in the blow's graph.
   `_weapon_specs()` lays it over its literals, so **the CSV wins**; the literals are the
   fallback for a missing cell. Edit the CSV by hand or through the tab, never only the literal.
+- **A packaged build saves too** (no Python there): Enter's save branches on
+  `OtherworldTuningLibrary.CanRunPython`; where it is false the C++ `SaveTuningCsv` writes the
+  table, in `write_table`'s format byte for byte (`tune_checks` compares the two), to
+  `gun_tuning.csv` in the build's own `Saved/Tuning/` (on the Mac, the sandbox container's
+  `Library/Application Support/Epic/Otherworld/Saved/Tuning/`). `python3 Scripts/take_gun_tuning.py`
+  (`gun_tuning_take.py`; `--dry-run` lists the cells that moved) checks its header and copies it
+  over the tracked CSV; then rebuild as below. The editor's save is unchanged.
 - The tab writes the carried guns live and Enter saves the CSV; the Blueprints change only when
   `build_weapons_and_combat.py` and then `build_graphics_menu.py` run (the HUD's copy of the
   table is baked too: `tune_checks` fails if it is stale).

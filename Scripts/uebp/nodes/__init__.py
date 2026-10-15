@@ -42,6 +42,8 @@ Scripts/dev/check_node_catalog.py.
   grip.py     the game's own grip library (C++, Source/Otherworld): where a
               held item sits under the grip socket, its Grip and its row of
               the nudge table, and the tuning tab's reads and writes of it (H2)
+  tuning.py   the game's own tuning library (C++, Source/Otherworld): a tuning
+              tab's save to a CSV where there is no Python (a packaged build)
   locomotion.py  what the player's motion-matching anim blueprint reads its
               character through: the movement component, and the Game
               Animation Sample's structs and enums

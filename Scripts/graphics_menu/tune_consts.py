@@ -26,7 +26,7 @@ fragments take.
 """
 
 from combat.grip_nudges import GRIP_STATS
-from combat.gun_tuning import TUNE_STATS
+from combat.gun_tuning import TUNE_COLUMNS, TUNE_STATS, WEAPON_COLUMN
 from combat.ask_consts import TUNE_GUNS
 from graphics_menu.tune_tab import TuneTab, save_command
 
@@ -70,7 +70,11 @@ TUNE_ROW_LABELS = ((TUNE_GUN_LABEL,) + tuple(s[2] for s in TUNE_STATS)
                    + tuple(s[1] for s in GRIP_STATS))
 TUNE_HINT_TEXT = ("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "
                   "ENTER  save to gun_tuning.csv")
-TUNE_SAVED_WORDS = "saved to Scripts/combat/gun_tuning.csv"
+# Where it went is the editor's Scripts/combat/ or a packaged build's
+# Saved/Tuning/ (TUNE_CSV_NAME, under TUNE_CSV_HEADER: gun_tuning.write_table's).
+TUNE_SAVED_WORDS = "saved to gun_tuning.csv"
+TUNE_CSV_NAME = "gun_tuning.csv"
+TUNE_CSV_HEADER = ",".join((WEAPON_COLUMN,) + TUNE_COLUMNS)
 TUNE_PANEL_W = 520.0
 TUNE_POS = (60.0, 130.0)            # where the M panel was: an open tab replaces it
 # A tab in the corner (TuneTab.corner): its bottom-right, in from the screen's,
@@ -105,4 +109,4 @@ GUN_TAB = TuneTab(
     saved_text=TUNE_SAVED_TEXT, title_widget="TuneTitle", hint_widget="TuneHint",
     back_widget="TuneBack",
     title_text=TUNE_TITLE_TEXT, row_labels=TUNE_ROW_LABELS, hint_text=TUNE_HINT_TEXT,
-    saved_words=TUNE_SAVED_WORDS)
+    saved_words=TUNE_SAVED_WORDS, native_csv=TUNE_CSV_NAME, native_header=TUNE_CSV_HEADER)

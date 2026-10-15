@@ -76,6 +76,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
   gun_tuning        gun_tuning.csv: the tunable stats (TUNE_STATS: column,
                     variable, label, step, minimum), which are whose
                     (columns_of: a gun's, a melee weapon's), reading and writing it
+  gun_tuning_take   a packaged build's save of that table (its Saved/Tuning/,
+                    written by C++) checked and copied back over it
+                    (Scripts/take_gun_tuning.py)
   melee_tuning      the knife's and the axe's rows of that table: their
                     throw's arc and damage, defaults under the CSV's cells
   gun_rows          the guns' tunable numbers as plain data (GUN_DEFAULTS,

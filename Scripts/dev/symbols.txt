@@ -2225,6 +2225,13 @@ combat/gun_tuning.py:84: _cell
 combat/gun_tuning.py:88: read_table
 combat/gun_tuning.py:103: format_value
 combat/gun_tuning.py:111: write_table
+combat/gun_tuning_take.py:17: FILE
+combat/gun_tuning_take.py:18: HEADER
+combat/gun_tuning_take.py:21: saved_copies
+combat/gun_tuning_take.py:36: newest
+combat/gun_tuning_take.py:42: header_problem
+combat/gun_tuning_take.py:52: changes
+combat/gun_tuning_take.py:65: take
 combat/hand_seat.py:27: SEAT_OFF_CM
 combat/hand_seat.py:34: SEAT_SINK_CM
 combat/hand_seat.py:37: THUMB_CLEAR_CM
@@ -6618,18 +6625,20 @@ graphics_menu/title_figure.py:49: title_defaults
 graphics_menu/title_figure.py:53: _author_dress
 graphics_menu/title_figure.py:78: _author_stow
 graphics_menu/title_figure.py:91: author_title_figure
-graphics_menu/tune_checks.py:26: _title
-graphics_menu/tune_checks.py:30: _pins
-graphics_menu/tune_checks.py:34: _same
-graphics_menu/tune_checks.py:41: _weapons
-graphics_menu/tune_checks.py:47: _check_csv
-graphics_menu/tune_checks.py:77: _check_widgets
-graphics_menu/tune_checks.py:93: _check_graph
-graphics_menu/tune_checks.py:129: _check_apply_goes_on
-graphics_menu/tune_checks.py:149: _from_live
-graphics_menu/tune_checks.py:158: _check_melee
-graphics_menu/tune_checks.py:188: _check_grip
-graphics_menu/tune_checks.py:212: check_tune
+graphics_menu/tune_checks.py:29: _title
+graphics_menu/tune_checks.py:33: _pins
+graphics_menu/tune_checks.py:37: _same
+graphics_menu/tune_checks.py:44: _weapons
+graphics_menu/tune_checks.py:50: _check_csv
+graphics_menu/tune_checks.py:80: _check_native_format
+graphics_menu/tune_checks.py:106: _check_widgets
+graphics_menu/tune_checks.py:122: _check_native_save
+graphics_menu/tune_checks.py:162: _check_graph
+graphics_menu/tune_checks.py:200: _check_apply_goes_on
+graphics_menu/tune_checks.py:220: _from_live
+graphics_menu/tune_checks.py:229: _check_melee
+graphics_menu/tune_checks.py:259: _check_grip
+graphics_menu/tune_checks.py:283: check_tune
 graphics_menu/tune_consts.py:33: TUNE_ACTION
 graphics_menu/tune_consts.py:34: TUNE_ROW_LABEL
 graphics_menu/tune_consts.py:38: TUNE_OPEN_VAR
@@ -6655,16 +6664,18 @@ graphics_menu/tune_consts.py:67: TUNE_TITLE_TEXT
 graphics_menu/tune_consts.py:68: TUNE_GUN_LABEL
 graphics_menu/tune_consts.py:69: TUNE_ROW_LABELS
 graphics_menu/tune_consts.py:71: TUNE_HINT_TEXT
-graphics_menu/tune_consts.py:73: TUNE_SAVED_WORDS
-graphics_menu/tune_consts.py:74: TUNE_PANEL_W
-graphics_menu/tune_consts.py:75: TUNE_POS
-graphics_menu/tune_consts.py:78: TUNE_CORNER_MARGIN
-graphics_menu/tune_consts.py:80: TUNE_CORNER_PADDING
-graphics_menu/tune_consts.py:85: TUNE_ROW_H
-graphics_menu/tune_consts.py:86: TUNE_ROW_LABEL_W
-graphics_menu/tune_consts.py:91: HUD_CLASS_PATH
-graphics_menu/tune_consts.py:94: TUNE_SAVE_COMMAND
-graphics_menu/tune_consts.py:96: GUN_TAB
+graphics_menu/tune_consts.py:75: TUNE_SAVED_WORDS
+graphics_menu/tune_consts.py:76: TUNE_CSV_NAME
+graphics_menu/tune_consts.py:77: TUNE_CSV_HEADER
+graphics_menu/tune_consts.py:78: TUNE_PANEL_W
+graphics_menu/tune_consts.py:79: TUNE_POS
+graphics_menu/tune_consts.py:82: TUNE_CORNER_MARGIN
+graphics_menu/tune_consts.py:84: TUNE_CORNER_PADDING
+graphics_menu/tune_consts.py:89: TUNE_ROW_H
+graphics_menu/tune_consts.py:90: TUNE_ROW_LABEL_W
+graphics_menu/tune_consts.py:95: HUD_CLASS_PATH
+graphics_menu/tune_consts.py:98: TUNE_SAVE_COMMAND
+graphics_menu/tune_consts.py:100: GUN_TAB
 graphics_menu/tune_draw.py:40: SWITCH_HALF
 graphics_menu/tune_draw.py:43: _item
 graphics_menu/tune_draw.py:49: _author_stats
@@ -6716,26 +6727,26 @@ graphics_menu/tune_scroll.py:80: author_scroll_drag
 graphics_menu/tune_tab.py:54: TUNE_SAVE_KEY
 graphics_menu/tune_tab.py:57: READ_ONLY_HINT
 graphics_menu/tune_tab.py:62: class TuneTab
-graphics_menu/tune_tab.py:157: tab_bools
-graphics_menu/tune_tab.py:161: tab_ints
-graphics_menu/tune_tab.py:165: tab_table
-graphics_menu/tune_tab.py:180: save_command
+graphics_menu/tune_tab.py:163: tab_bools
+graphics_menu/tune_tab.py:167: tab_ints
+graphics_menu/tune_tab.py:171: tab_table
+graphics_menu/tune_tab.py:186: save_command
 graphics_menu/tune_tabs.py:16: TABS
 graphics_menu/tune_tabs.py:19: other_open_vars
-graphics_menu/tune_tick.py:88: declare_tab_vars
-graphics_menu/tune_tick.py:93: tab_defaults
-graphics_menu/tune_tick.py:102: declare_tune_vars
-graphics_menu/tune_tick.py:107: tune_table
-graphics_menu/tune_tick.py:126: tune_defaults
-graphics_menu/tune_tick.py:134: _pressed
-graphics_menu/tune_tick.py:138: _cell
-graphics_menu/tune_tick.py:145: _author_keys
-graphics_menu/tune_tick.py:195: _author_nudge
-graphics_menu/tune_tick.py:243: _author_save
-graphics_menu/tune_tick.py:253: _author_apply
-graphics_menu/tune_tick.py:264: author_onto_pawn
-graphics_menu/tune_tick.py:312: author_tab_flow
-graphics_menu/tune_tick.py:320: author_tune_tick
+graphics_menu/tune_tick.py:91: declare_tab_vars
+graphics_menu/tune_tick.py:96: tab_defaults
+graphics_menu/tune_tick.py:105: declare_tune_vars
+graphics_menu/tune_tick.py:110: tune_table
+graphics_menu/tune_tick.py:129: tune_defaults
+graphics_menu/tune_tick.py:137: _pressed
+graphics_menu/tune_tick.py:141: _cell
+graphics_menu/tune_tick.py:148: _author_keys
+graphics_menu/tune_tick.py:198: _author_nudge
+graphics_menu/tune_tick.py:246: _author_save
+graphics_menu/tune_tick.py:268: _author_apply
+graphics_menu/tune_tick.py:279: author_onto_pawn
+graphics_menu/tune_tick.py:327: author_tab_flow
+graphics_menu/tune_tick.py:335: author_tune_tick
 graphics_menu/ui_graph.py:30: _wire
 graphics_menu/ui_graph.py:39: declare_ui_vars
 graphics_menu/ui_graph.py:45: author_create_screens
@@ -10759,6 +10770,9 @@ uebp/nodes/system.py:97: FN_STR_TO_TEXT
 uebp/nodes/system.py:98: FN_TEXT_TO_STR
 uebp/nodes/system.py:99: FN_TO_TEXT
 uebp/nodes/system.py:101: FN_EXEC_PYTHON
+uebp/nodes/tuning.py:6: TUNING_LIBRARY
+uebp/nodes/tuning.py:9: FN_CAN_RUN_PYTHON
+uebp/nodes/tuning.py:12: FN_SAVE_TUNING_CSV
 uebp/nodes/umg.py:3: FN_SET_BRUSH
 uebp/nodes/umg.py:4: FN_SET_TINT
 uebp/nodes/umg.py:6: FN_CHILD_AT
@@ -11212,6 +11226,10 @@ Source/Otherworld/Public/OtherworldShotLibrary.h:68: UFUNCTION static float Last
 Source/Otherworld/Public/OtherworldShotLibrary.h:72: UFUNCTION static void LastShotLine(const UObject* WorldContextObject, FVector& S
 Source/Otherworld/Public/OtherworldShotLibrary.h:76: UFUNCTION static int32 RewoundShots(const UObject* WorldContextObject);
 Source/Otherworld/Public/OtherworldShotLibrary.h:79: UFUNCTION static int32 RewoundHits(const UObject* WorldContextObject);
+Source/Otherworld/Public/OtherworldTuningLibrary.h:18: UCLASS class OTHERWORLD_API UOtherworldTuningLibrary : public UBlueprintFunct
+Source/Otherworld/Public/OtherworldTuningLibrary.h:25: UFUNCTION static bool CanRunPython();
+Source/Otherworld/Public/OtherworldTuningLibrary.h:36: UFUNCTION static bool SaveTuningCsv(const FString& FileName, const FString& Head
+Source/Otherworld/Public/OtherworldTuningLibrary.h:42: UFUNCTION static FString TuningCsvPath(const FString& FileName);
 Source/Otherworld/Public/OtherworldWeaponComponentBase.h:55: UCLASS class OTHERWORLD_API UOtherworldWeaponComponentBase : public UActorCom
 Source/Otherworld/Public/OtherworldWeaponComponentBase.h:67: UFUNCTION void Server_Fire(FVector AimPoint);
 Source/Otherworld/Public/OtherworldWeaponComponentBase.h:75: UFUNCTION void ShotFired(FVector AimPoint);

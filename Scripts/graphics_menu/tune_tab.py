@@ -117,6 +117,12 @@ class TuneTab:
     # A tab of switches (DEBUG SETTINGS): each value is shown as (off, on),
     # on above a half, in place of its number; () = the number.
     words: tuple = ()
+    # Where the Python plugin is not (a packaged build), the save writes the
+    # table to this CSV in the build's Saved/Tuning/ instead, under this
+    # header line (OtherworldTuningLibrary.SaveTuningCsv); "" = the save is
+    # Python's alone, and does nothing there.
+    native_csv: str = ""
+    native_header: str = ""
 
     @property
     def row_count(self):

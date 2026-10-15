@@ -3,13 +3,16 @@ tune_draw, wbp_tune, and gun_tuning.csv reaching the guns). Here rather than
 in the verifier, which is over its size budget.
 """
 
+import os
+import tempfile
+
 import unreal
 
 from combat.axe import AXE_DISPLAY
 from combat.grip_nudges import GRIP_MIN, GRIP_STATS
 from combat.gun_tuning import (
     CSV_PATH, GUN_COLUMNS, MELEE_COLUMNS, MELEE_WEAPONS, TUNE_COLUMNS, TUNE_STATS,
-    columns_of, read_table,
+    columns_of, read_table, write_table,
 )
 from combat.knife import KNIFE_DISPLAY
 from combat.paths import AXE_BP_PATH, KNIFE_BP_PATH
@@ -74,6 +77,32 @@ def _check_csv(check):
           not bad, "; ".join(bad[:6]))
 
 
+def _check_native_format(check, defaults):
+    """A packaged build's save (OtherworldTuningLibrary.SaveTuningCsv) writes
+    the built table as the editor's (gun_tuning.write_table) does, byte for
+    byte, so the file it leaves can stand in for gun_tuning.csv."""
+    names = list(defaults[TC.TUNE_WEAPONS_VAR])
+    values = list(defaults[TC.TUNE_VALUES_VAR])
+    live = list(defaults[TC.TUNE_LIVE_VAR])
+    name = "verify_gun_tuning.csv"   # never the name a build saves under
+    lib = unreal.OtherworldTuningLibrary
+    wrote = lib.save_tuning_csv(name, TC.TUNE_CSV_HEADER, names, values, live, TC.STAT_COUNT)
+    path = lib.tuning_csv_path(name)
+    native = open(path).read() if wrote and os.path.exists(path) else ""
+    n = TC.STAT_COUNT
+    rows = [(w, {c: values[i * n + s] for s, c in enumerate(TUNE_COLUMNS)
+                 if c in columns_of(w)}) for i, w in enumerate(names)]
+    with tempfile.TemporaryDirectory() as tmp:
+        write_table(rows, os.path.join(tmp, "g.csv"))
+        python = open(os.path.join(tmp, "g.csv")).read()
+    if os.path.exists(path):
+        os.remove(path)
+    diff = [(a, b) for a, b in zip(native.splitlines(), python.splitlines()) if a != b]
+    check("a packaged build's save (SaveTuningCsv) writes the built table as "
+          "gun_tuning.write_table does", wrote and native == python,
+          f"wrote {wrote}, {len(native)} vs {len(python)} chars, first diff {diff[:1]}")
+
+
 def _check_widgets(check):
     widgets = {name: w for name, (w, _var) in _tree(UC.WBP_PAUSE_MENU).items()}
     panel, box = widgets.get(TC.TUNE_PANEL), widgets.get(TC.TUNE_ROWS_BOX)
@@ -90,6 +119,46 @@ def _check_widgets(check):
           str(UC.PAUSE_ROW_LABELS))
 
 
+def _check_native_save(check, nodes, runs):
+    """A packaged build has no Python: there the save is SaveTuningCsv's, on
+    the false side of the branch whose true side is the Python save."""
+    def lit(n, pin):
+        return str(BEL.find_input_pin(n, pin).get_pin_value())
+
+    def fed(n, pin):
+        return [q for q in BEL.find_input_pin(n, pin).list_connected_pins()]
+
+    csvs = [n for n in nodes if {"FileName", "Header", "Subjects", "Values", "Live",
+                                 "Stride"} <= _pins(n)]
+    check("in a packaged build the save writes gun_tuning.csv through SaveTuningCsv, "
+          "once, with gun_tuning.csv's header and a row of STAT_COUNT cells per weapon",
+          len(csvs) == 1 and lit(csvs[0], "FileName") == TC.TUNE_CSV_NAME
+          and lit(csvs[0], "Header") == TC.TUNE_CSV_HEADER
+          and lit(csvs[0], "Stride") == str(TC.STAT_COUNT),
+          f"{len(csvs)} nodes" + (f": {lit(csvs[0], 'Header')!r} stride "
+                                  f"{lit(csvs[0], 'Stride')}" if csvs else ""))
+    if len(csvs) != 1 or len(runs) != 1:
+        return
+    sources = {_title(PIN.get_owning_node(q)): q for pin in ("Subjects", "Values", "Live")
+               for q in fed(csvs[0], pin)}
+    check("...of TuneWeapons, TuneValues and TuneLive",
+          set(sources) == {f"Get {v}" for v in (TC.TUNE_WEAPONS_VAR, TC.TUNE_VALUES_VAR,
+                                                TC.TUNE_LIVE_VAR)}, str(sorted(sources)))
+    saved = [q for q in BEL.find_output_pin(csvs[0], "ReturnValue").list_connected_pins()]
+    check("...and its success is what TuneSaved shows",
+          any(_title(PIN.get_owning_node(q)) == f"Set {TC.TUNE_SAVED_VAR}" for q in saved))
+    native = [str(PIN.get_pin_name(q)) for q in fed(csvs[0], "execute")]
+    python = [str(PIN.get_pin_name(q)) for q in fed(runs[0], "execute")]
+    branches = {PIN.get_owning_node(q).get_name() for q in
+                fed(csvs[0], "execute") + fed(runs[0], "execute")}
+    conds = [_title(PIN.get_owning_node(q)) for n in nodes if n.get_name() in branches
+             for q in fed(n, "Condition")]
+    check("...only where CanRunPython is false: the Python save is the same branch's true side",
+          native == ["else"] and python == ["then"] and len(branches) == 1
+          and any("CanRunPython" in c.replace(" ", "") for c in conds),
+          f"native {native}, python {python}, {len(branches)} branches, {conds}")
+
+
 def _check_graph(check, nodes):
     # MONSTER SETTINGS has its own, with its own command (monster_tune_checks).
     calls = [n for n in nodes if "PythonCommand" in _pins(n)]
@@ -101,6 +170,8 @@ def _check_graph(check, nodes):
              .list_connected_pins()]
     check("...and its success is what TuneSaved shows",
           any(_title(PIN.get_owning_node(q)) == f"Set {TC.TUNE_SAVED_VAR}" for q in saved))
+
+    _check_native_save(check, nodes, runs)
 
     writes = [n for n in nodes if {"TargetArray", "Index", "Item", "bSizeToFit"} <= _pins(n)]
     fed = [n for n in writes
@@ -219,6 +290,7 @@ def check_tune(check, bp, nodes):
           f"({len(defaults[TC.TUNE_WEAPONS_VAR])} guns x {TC.STAT_COUNT} stats)",
           not wrong, str(wrong))
     _check_csv(check)
+    _check_native_format(check, defaults)
     _check_widgets(check)
     _check_graph(check, nodes)
     _check_grip(check, nodes)

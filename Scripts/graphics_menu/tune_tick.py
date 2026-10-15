@@ -28,6 +28,8 @@ the table written onto every carried gun.
                                       mask, only a cell that is the subject's
                                       own (TuneLive): the others stay
     TuneSaveRequested -> lower it; TuneSaved = ExecutePythonCommand(the save)
+                   where the Python plugin is (CanRunPython); in a packaged
+                   build = SaveTuningCsv(the table) into its Saved/Tuning/
     TuneTouched -> for each carried item whose DisplayName is in TuneWeapons,
                    every TUNE_STATS variable that is its own := its cell
                    (ints rounded): a gun's, or for the melee weapons listed
@@ -80,6 +82,7 @@ from uebp.nodes.math import (
     FN_SUB_II)
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_WEAPON
 from uebp.nodes.system import FN_EXEC_PYTHON
+from uebp.nodes.tuning import FN_CAN_RUN_PYTHON, FN_SAVE_TUNING_CSV
 from combat import item_vars as IV
 from graphics_menu import hud_vars as MV
 from combat.weapon_component import vars as WV
@@ -241,13 +244,25 @@ def _author_nudge(ed, in_execs, made, tab, subjects):
 
 
 def _author_save(ed, in_execs, made, tab):
-    """Serve the save flag: run the tab's save through the Python plugin."""
+    """Serve the save flag: run the tab's save through the Python plugin; a
+    tab with a native_csv, where that plugin is not (a packaged build),
+    writes its table there through the C++ instead."""
     serve, idle = _branch(ed, _get(ed, tab.save_var, made), in_execs, made)
     flow = _setter(ed, tab.save_var, "false", [serve], made)
+    natives = []
+    if tab.native_csv:
+        flow, native = _branch(ed, out(_call(ed, FN_CAN_RUN_PYTHON, made)), [flow], made)
+        write = _call(ed, FN_SAVE_TUNING_CSV, made, FileName=tab.native_csv,
+                      Header=tab.native_header, Subjects=_get(ed, tab.names_var, made),
+                      Values=_get(ed, tab.values_var, made), Stride=tab.stat_count)
+        if tab.live_var:
+            _connect(_get(ed, tab.live_var, made), _pin(write, "Live"))
+        _connect(native, _pin(write, "execute"))
+        natives = [put(ed, tab.saved_var, out(write), [then(write)], made)]
     run = _call(ed, FN_EXEC_PYTHON, made, PythonCommand=tab.save_command)
     _connect(flow, _pin(run, "execute"))
     done = put(ed, tab.saved_var, out(run), [then(run)], made)
-    return [done, idle]
+    return [done, *natives, idle]
 
 
 def _author_apply(ed, in_execs, made, guns):

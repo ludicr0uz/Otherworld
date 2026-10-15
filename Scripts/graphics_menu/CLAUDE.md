@@ -594,6 +594,15 @@ owned; it runs no Python. `debug_tune_checks.py` verifies it,
 
 ## The GUN SETTINGS tab (`tune_*.py`, `wbp_tune.py`)
 
+Its save works in a packaged build: `TuneTab.native_csv` (the gun tab's alone) makes
+`tune_tick._author_save` branch on `CanRunPython` into the C++ `SaveTuningCsv`
+(`Scripts/combat/CLAUDE.md`, "Tuning"). Proved on a packaged Development build on 14 Oct
+2026, driven by `-ExecCmds="set BP_GraphicsMenuHUD_C_2147482301 TuneRow 1, ... TuneNudge 1,
+... TuneSaveRequested True"` (the title's HUD instance; `set` on an object name writes that
+object alone): the shotgun's damage moved 22 to 23 in the file and nothing else. macOS
+refuses synthetic keys here (no Accessibility grant).
+
+
 Moved word for word: `docs/history/menu.md#the-gun-settings-tab`.
 
 ## The MONSTER SETTINGS tab (`monster_tune_*.py`)

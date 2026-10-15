@@ -14,6 +14,9 @@ UI_ART_DIR = "/Game/UI/Art"
 MAT_METAL = f"{WEAPON_DIR}/M_Gunmetal"
 MAT_WOOD = f"{WEAPON_DIR}/M_GunWood"
 MAT_BLOOD = f"{WEAPON_DIR}/M_Blood"
+# The splatter sprite at a wound (blood_sprite.py): its flipbook and material.
+MAT_BLOOD_SPRITE = f"{WEAPON_DIR}/M_BloodSprite"
+TEX_BLOOD_SPRITE = f"{WEAPON_DIR}/T_BloodSprite"
 MAT_BRASS = f"{WEAPON_DIR}/M_Brass"
 # What a bullet knocks off the scenery (bullet_impact.py): chips and dust.
 MAT_IMPACT_CHIP = f"{WEAPON_DIR}/M_ImpactChip"
@@ -62,6 +65,7 @@ HEALTH_BP_PATH = f"{WEAPON_DIR}/BP_HealthComponent"
 WEAPON_COMP_BP_PATH = f"{WEAPON_DIR}/BP_WeaponComponent"
 FOOTSTEP_BP_PATH = f"{WEAPON_DIR}/BP_FootstepComponent"
 BLOOD_BP_PATH = f"{WEAPON_DIR}/BP_BloodSplash"
+BLOOD_SPRITE_BP_PATH = f"{WEAPON_DIR}/BP_BloodSprite"
 # The burst where a bullet hits anything that does not bleed (bullet_impact.py).
 BULLET_IMPACT_BP_PATH = f"{WEAPON_DIR}/BP_BulletImpact"
 AMMO_BP_PATH = f"{WEAPON_DIR}/BP_AmmoPickup"
@@ -99,6 +103,7 @@ WEAPON_COMP_CLASS_PATH = f"{WEAPON_COMP_BP_PATH}.BP_WeaponComponent_C"
 # (npc/ward.py), and keeps off the side the player faces while it is true.
 FIRE_WARD_VAR = "FireWard"
 BLOOD_CLASS_PATH = f"{BLOOD_BP_PATH}.BP_BloodSplash_C"
+BLOOD_SPRITE_CLASS_PATH = f"{BLOOD_SPRITE_BP_PATH}.BP_BloodSprite_C"
 BULLET_IMPACT_CLASS_PATH = f"{BULLET_IMPACT_BP_PATH}.BP_BulletImpact_C"
 AMMO_CLASS_PATH = f"{AMMO_BP_PATH}.BP_AmmoPickup_C"
 THROW_ARC_CLASS_PATH = f"{THROW_ARC_BP_PATH}.BP_ThrowArc_C"
@@ -107,3 +112,4 @@ SETTINGS_CLASS_PATH = f"{SETTINGS_BP_PATH}.BP_Settings_C"
 CUBE = "/Engine/BasicShapes/Cube"          # 100 cm box
 CYLINDER = "/Engine/BasicShapes/Cylinder"  # 100 cm tall, 50 cm radius, axis +Z
 SPHERE = "/Engine/BasicShapes/Sphere"      # 100 cm diameter
+PLANE = "/Engine/BasicShapes/Plane"        # 100 cm square, facing +Z

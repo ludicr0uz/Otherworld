@@ -239,6 +239,26 @@ cast's failed arm, `weapon_component/surface_impact.py`). Never both.
 - **One transform spawns either burst:** at the impact point, rotated to the surface normal
   (`MakeRotFromX`), scaled by `clamp(Damage/24, 0.65, 1.6)`.
 - **Not Niagara:** Python can't build or retune an emitter stack in 5.8.
+- **The splat (`blood_sprite.py`):** beside the splash, `Fx_PelletHit`'s blood arm spawns
+  `BP_BloodSprite` (`WV.BloodSpriteClass`): a 16-frame flipbook (4x4 atlas of 128 px cells,
+  drawn seeded in plain Python by `blood_sprite_image.py`, imported as `T_BloodSprite`) that
+  blooms out of the wound and breaks up over 0.5 s, on the engine plane.
+  - Sized by the zone, not the round: head 38 cm, chest 26 cm, a limb 16 cm
+    (`blood_sprite_consts.py`). The pellet graph picks it off `PelletFlew` with two
+    `SelectFloat`s (`impact._splat_size`): `bHead`, else `Worth` under 1 (the limb
+    multiplier), else the chest. So a character whose limb multiplier is 1 or more splats
+    chest-size on its limbs. The size rides the shot's batch as `ShotHitSplats` /
+    `Splats` / `Splat` (`shot_hits.py`); the chips note 0.
+  - `M_BloodSprite` (masked, lit, two-sided) picks the frame from
+    `(Time − SpawnTime) / 0.5`, `SpawnTime` a scalar read from the card's custom primitive
+    data slot 0, which `BeginPlay` stamps with `GetTimeSeconds`: one material, no instance,
+    no Tick. Its colour is the atlas's shade times `M_Blood`'s colour ×1.25.
+  - At `BeginPlay` the actor turns to the local camera (random roll); the card sits 35 % of
+    its width toward it so a splat seen side-on is not half inside the body. No camera (a
+    dedicated server never plays it anyway): it keeps the hit normal.
+  - A thrown blade's `Fx_Stab` and melee blows spawn no splat.
+  - Checked by `verify/blood_sprite.py`, `dev/tests/test_blood_sprite.py`, and in game
+    `probes/probe_blood_sprite.py`.
 - **Trap:** a Kismet math node's **A** pin won't hold a literal. Keep constants on B, e.g.
   `(e^(−kt) − 1)/−k`.
 - **Trap:** a wide cone's speed draw. `burst.throw`'s `bias` under 1 leans fast (blood's 0.5),

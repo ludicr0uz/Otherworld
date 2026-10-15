@@ -9,12 +9,14 @@ itself, on every machine with a screen.
 from combat.blood import (
     BLOOD_REFERENCE_DAMAGE, BLOOD_SCALE_MAX, BLOOD_SCALE_MIN,
 )
+from combat.blood_sprite_consts import PLANE_CM, SPLAT_CHEST_CM, SPLAT_HEAD_CM, SPLAT_LIMB_CM
 from combat.game_state import DAMAGE_TEXT_COLOR, DEBUG_SHOTS_VAR, TRACE_DEBUG_SECONDS
 from uebp.graph import _connect, _node, _palette, _pin, _set, out, then
 from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.paths import ITEM_CLASS_PATH
 from combat.tuning import COMBAT
-from combat.fx_vars import BLOOD_PARAM, PELLET_HIT, PELLET_HIT_PARAMS, SCALE_PARAM, fx_event
+from combat.fx_vars import (
+    BLOOD_PARAM, PELLET_HIT, PELLET_HIT_PARAMS, SCALE_PARAM, SPLAT_PARAM, fx_event)
 from combat.weapon_component import fx, shot_hits
 from combat.weapon_component import vars as WV
 from combat.weapon_component.headshot import _author_headshot
@@ -22,7 +24,7 @@ from combat.weapon_component.surface_impact import _author_surface_impact
 from combat.weapon_component.tracer import _author_tracer
 from uebp import net
 from uebp.g import _G
-from uebp.nodes.math import FN_CLAMP, FN_DIV_FF
+from uebp.nodes.math import FN_CLAMP, FN_DIV_FF, FN_LESS_FF, FN_SELECT_FF
 from uebp.nodes.system import FN_CONCAT, FN_DRAW_STRING, FN_FLOAT_TO_STR
 from uebp.nodes.weapon import NODE_EVENT_PELLET_FLEW
 from combat import item_vars as IV
@@ -31,10 +33,13 @@ from combat import item_vars as IV
 def _author_pellet_hit(g, exec_in, event):
     """The body of Fx_PelletHit: at the event's point and normal, sized by
     its Scale, the blood (Blood) or the surface's chips. The one transform
-    serves both bursts."""
+    serves both bursts. Blood brings the splat too (BP_BloodSprite), on a
+    transform of its own: sized by its Splat, the zone's, not the round's."""
     where = fx.point_transform(g, event, out(event, SCALE_PARAM))
     bleeds, chips = g.branch(out(event, BLOOD_PARAM), [exec_in])
-    fx.spawn_blood(g, where, [bleeds])
+    bled = fx.spawn_blood(g, where, [bleeds])
+    fx.spawn_blood_sprite(g, fx.point_transform(g, event, out(event, SPLAT_PARAM)),
+                          [then(bled)])
     for n in _author_surface_impact(g.ed, where, chips):
         g.keep(n)
 
@@ -98,7 +103,8 @@ def author_pellet_flew(ed):
     # cone along its own forward, so the spray comes *out of* the wound), and
     # so do the chips: Fx_PelletHit makes the one transform from these.
     normal = out(flew, "Normal")
-    bled = shot_hits.note(g, [hurt], g.get(HIT_POINT_VAR), normal, out(spray), blood=True)
+    bled = shot_hits.note(g, [hurt], g.get(HIT_POINT_VAR), normal, out(spray), blood=True,
+                          splat=_splat_size(g, flew))
     shot_hits.note(g, [scenery], g.get(HIT_POINT_VAR), normal, out(spray), blood=False)
 
     # A pellet in the head says so to the HUD: the X round the reticle.
@@ -123,6 +129,20 @@ def author_pellet_flew(ed):
         "Debug mode only: the damage this pellet actually did, and the zone "
         "multiplier behind it, drawn where it landed for as long as the tracer.",
         shown)
+
+
+def _splat_size(g, flew):
+    """The splat's scale for this pellet's zone (blood_sprite_consts.splat_scale):
+    the head's if bHead, else a limb's if its Worth is under 1 (the limb
+    multiplier), else the chest's."""
+    limb = g.call(FN_LESS_FF, A=out(flew, "Worth"))
+    _set(limb, "B", 1.0)
+    body = g.call(FN_SELECT_FF, bPickA=out(limb))
+    _set(body, "A", SPLAT_LIMB_CM / PLANE_CM)
+    _set(body, "B", SPLAT_CHEST_CM / PLANE_CM)
+    size = g.call(FN_SELECT_FF, B=out(body), bPickA=out(flew, "bHead"))
+    _set(size, "A", SPLAT_HEAD_CM / PLANE_CM)
+    return out(size)
 
 
 def _author_damage_readout(ed, flew, exec_in):

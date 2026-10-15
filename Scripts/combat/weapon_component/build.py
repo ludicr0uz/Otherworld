@@ -12,7 +12,7 @@ from uebp.graph import (
 from uebp import net
 from uebp.layout import arrange
 from combat.paths import (
-    CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, THROW_ARC_BP_PATH,
+    BLOOD_SPRITE_BP_PATH, CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, THROW_ARC_BP_PATH,
     THROW_READY_ANIM_PATH, WEAPON_COMP_BP_PATH,
 )
 from combat.finger_pose import carry_clips
@@ -199,6 +199,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         WV.StickClass: BEL.generated_class(stick_bp),
         WV.ItemClass: item_class,
         WV.BloodClass: BEL.generated_class(blood_bp),
+        # Built by the same step as the splash (build_steps._blood).
+        WV.BloodSpriteClass: BEL.generated_class(_must_load(BLOOD_SPRITE_BP_PATH)),
         WV.ImpactClass: BEL.generated_class(impact_bp),
         WV.WoodClass: BEL.generated_class(wood_bp),
         WV.CampfireClass: campfire_class,

@@ -136,6 +136,8 @@ RecoilYawDebt = Var("RecoilYawDebt", FLOAT, 0.0)
 RecoilYawKick = Var("RecoilYawKick", FLOAT, 0.0)
 ItemClass = Var("ItemClass", cls(ITEM_CLASS_PATH))
 BloodClass = Var("BloodClass", cls("/Script/Engine.Actor"))
+# The splat beside the splash (BP_BloodSprite, combat/blood_sprite.py).
+BloodSpriteClass = Var("BloodSpriteClass", cls("/Script/Engine.Actor"))
 # The component's own sounds, a few takes each (Sound/sound_weapons.py, sound_items.py).
 SwingSounds = Var("SwingSounds", array(obj("/Script/Engine.SoundBase")))
 ChopSounds = Var("ChopSounds", array(obj("/Script/Engine.SoundBase")))
@@ -418,7 +420,7 @@ CORE = (
     SightAiming, AimZoom, SightBlend, SightHeld, SightSnapped, SightPending, AdsSpeed,
     SightAnchor, SightCut, ViewPoint, MouseSensitivity, ScopeSensitivity, BaseYawScale,
     BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ItemClass,
-    BloodClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds, ThrowSounds, ThrowSharpSounds,
+    BloodClass, BloodSpriteClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds, ThrowSounds, ThrowSharpSounds,
     PunchHitSounds, BladeHitSounds, LodgeSounds, HeadKillSounds, BreathSounds, BreathNextTime,
     HandledItem, TakeItem, LocalPC, LocalInput, LocalReady, ExitPending, ExitAt, ExitStartedAt,
     ExitCalledOffAt, ExitDue,

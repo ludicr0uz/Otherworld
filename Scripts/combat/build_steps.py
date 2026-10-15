@@ -25,6 +25,7 @@ from combat.ammo_pickup import build_ammo_pickup
 from combat.anim_blueprint import patch_anim_blueprint
 from combat.axe import build_axe
 from combat.blood import build_blood_splash
+from combat.blood_sprite import build_blood_sprite
 from combat.body_pose import patch_body_pose
 from combat.bullet_impact import build_bullet_impact
 from combat.carry_pose import patch_carry_pose
@@ -251,6 +252,7 @@ def _stick(c):
 
 def _blood(c):
     c.put("blood_bp", build_blood_splash())
+    build_blood_sprite()
 
 
 def _bullet_impact(c):
@@ -347,7 +349,7 @@ STEPS = (
     Step("wood", _wood, needs=("weapon_item",), made=(P.WOOD_BP_PATH,)),
     Step("matches", _matches, needs=("weapon_item",), made=(P.MATCHES_BP_PATH,)),
     Step("stick", _stick, needs=("weapon_item",), made=(P.STICK_BP_PATH,)),
-    Step("blood", _blood, made=(P.BLOOD_BP_PATH,)),
+    Step("blood", _blood, made=(P.BLOOD_BP_PATH, P.BLOOD_SPRITE_BP_PATH)),
     Step("bullet_impact", _bullet_impact, made=(P.BULLET_IMPACT_BP_PATH,)),
     Step("state", _state),
     Step("health", _health, needs=("state",), made=(P.HEALTH_BP_PATH,)),

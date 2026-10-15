@@ -1,6 +1,6 @@
 """verify.shot_hits -- a shot's impacts are told once (task A4,
 weapon_component/shot_hits.py): the fire graph notes each pellet's impact
-onto three arrays, FlushShotHits tells them in one Multicast_ShotHits after
+onto four arrays, FlushShotHits tells them in one Multicast_ShotHits after
 the last pellet, and that Multicast plays Fx_PelletHit once per entry on
 every machine with a screen. No pellet has a Multicast of its own.
 
@@ -18,7 +18,7 @@ from uebp import net
 
 FX_EVENT = FX.fx_event(FX.PELLET_HIT)
 CAST = FX.multicast_event(FX.SHOT_HITS)
-ARRAYS = (FX.ShotHitLocations, FX.ShotHitNormals, FX.ShotHitBloods)
+ARRAYS = (FX.ShotHitLocations, FX.ShotHitNormals, FX.ShotHitBloods, FX.ShotHitSplats)
 
 
 def _array_nodes(nodes, *extra):
@@ -83,7 +83,8 @@ def check_multicast():
     if len(inner) != 1:
         return
     for param, array in ((FX.LOCATION_PARAM, FX.LOCATIONS_PARAM),
-                         (FX.NORMAL_PARAM, FX.NORMALS_PARAM), (FX.BLOOD_PARAM, FX.BLOODS_PARAM)):
+                         (FX.NORMAL_PARAM, FX.NORMALS_PARAM), (FX.BLOOD_PARAM, FX.BLOODS_PARAM),
+                         (FX.SPLAT_PARAM, FX.SPLATS_PARAM)):
         gets = _feeders(inner[0], param)
         src = [str(PIN.get_pin_name(q)) for g in gets
                for q in PIN.list_connected_pins(BEL.find_input_pin(g, "TargetArray"))]
@@ -101,7 +102,7 @@ def check_notes():
     adds = _array_nodes(wg, "NewItem")
     by_array = {str(var): [n for n in adds if _array_of(n) == {f"Get {var}"}] for var in ARRAYS}
     check("the fire graph notes an impact twice (the scenery's chips, a body's blood): "
-          "an Add onto each of the three arrays per note, nothing else writes them",
+          "an Add onto each of the four arrays per note, nothing else writes them",
           all(len(v) == 2 for v in by_array.values()), str({k: len(v) for k, v in by_array.items()}))
     if not all(len(v) == 2 for v in by_array.values()):
         return
@@ -111,6 +112,14 @@ def check_notes():
                     for n in by_array[str(FX.ShotHitBloods)])
     check("...one with Blood false and one with Blood true",
           bloods == ["false", "true"], str(bloods))
+    # The splat: the chips' a literal 0 ("" once loaded), the blood's the
+    # zone's pick, a SelectFloat on bHead (impact._splat_size).
+    splats = sorted("SelectFloat" if any("Select" in _title(f) for f in _feeders(n, "NewItem"))
+                    else (str(pin_value(n, "NewItem")) or "0.0")
+                    for n in by_array[str(FX.ShotHitSplats)])
+    check("...with the splat's size the zone's pick for the blood and 0 for the chips",
+          len(splats) == 2 and splats[1] == "SelectFloat" and float(splats[0]) == 0.0,
+          str(splats))
     spots = {t for n in by_array[str(FX.ShotHitLocations)] for t in
              {_title(f) for f in _feeders(n, "NewItem")}}
     check(f"...each at {HIT_POINT_VAR}: the pellet's own hit, moved onto the body it struck",
@@ -164,14 +173,15 @@ def check_flush():
         want = {FX.LOCATIONS_PARAM: {f"Get {FX.ShotHitLocations}"},
                 FX.NORMALS_PARAM: {f"Get {FX.ShotHitNormals}"},
                 FX.BLOODS_PARAM: {f"Get {FX.ShotHitBloods}"},
+                FX.SPLATS_PARAM: {f"Get {FX.ShotHitSplats}"},
                 FX.SCALE_PARAM: {f"Get {FX.ShotHitScale}"}}
-        check("...with the three arrays and the shot's Scale", fed == want, str(fed))
+        check("...with the four arrays and the shot's Scale", fed == want, str(fed))
     clears = [n for n in _array_nodes(body) if "execute" in in_pins(n)]
     cleared = sorted(t for n in clears for t in _array_of(n))
     first = clears and sorted(str(PIN.get_pin_name(q)) for q in PIN.list_connected_pins(
         BEL.find_input_pin(next(n for n in clears if _array_of(n) == {f"Get {ARRAYS[0]}"}),
                            "execute")))
-    check("...and empties all three after, told or not: the next shot starts with none",
+    check("...and empties all four after, told or not: the next shot starts with none",
           cleared == sorted(f"Get {v}" for v in ARRAYS) and first == ["else", "then"],
           f"{cleared} off {first}")
 

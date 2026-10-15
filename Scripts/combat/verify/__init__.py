@@ -33,6 +33,8 @@ and it never relies on a variable another section left behind.
   asks        what a screen asks of the weapon component: an event per action
               (none an RPC yet), the loot take's refusals and what it moves,
               save and exit's countdown, freeze and call-off
+  blood_sprite  the splat at a wound: the flipbook, M_BloodSprite's frame off
+              the spawn time, the card facing the camera, its size by zone
   bullet_impact  BP_BulletImpact: the chips and dust, the seeded layout, and
               the fire graph spawning it off the health cast's failed arm
   body_setting  the one setting that names the player's body
@@ -223,7 +225,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "ammo_graph", "install",
-    "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "seat", "sight_cut", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "carry_pose", "block", "movement", "sprint", "stance", "accuracy", "bloom", "punch", "knife", "axe", "chop", "light", "torch",
+    "player_body", "body_setting", "blood", "blood_sprite", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "seat", "sight_cut", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "carry_pose", "block", "movement", "sprint", "stance", "accuracy", "bloom", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "melee_clips", "shotgun_pose", "gun_hold", "finger_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "reload_clip", "world_items", "relevancy", "leftovers", "glimmer", "heat", "trigger",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "wear_draw", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
     "var_tables",

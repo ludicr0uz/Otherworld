@@ -28,7 +28,7 @@ One cosmetic is told in a batch (task A4): a shot's pellets each strike
 something, and eight Multicasts a shotgun blast were eight packets' worth of
 headers to every client. The server now notes each impact as its pellet
 lands (weapon_component/shot_hits.py) and tells the lot once the last pellet
-is traced: Multicast_ShotHits(Locations, Normals, Bloods, Scale), whose gate
+is traced: Multicast_ShotHits(Locations, Normals, Bloods, Splats, Scale), whose gate
 is SCREEN and which calls Fx_PelletHit once per entry, counting each in
 FxPlayed as the single ones were.
 
@@ -55,7 +55,8 @@ THROW_CLIP = "ThrowClip"      # the overhand throw's clip, from the ready pose
 PICKUP_CLIP = "PickUpClip"    # the reach down to the ground for an item taken
 
 # --- at a point in the world: what a blow or a pellet did where it landed ---
-PELLET_HIT = "PelletHit"      # blood (Blood) or chips at (Location, Normal), sized Scale
+PELLET_HIT = "PelletHit"      # blood (Blood) or chips at (Location, Normal), sized Scale;
+                              # with blood, a splat Splat across (the zone's, blood_sprite_consts)
 SHOT_HITS = "ShotHits"        # every PelletHit of one shot, told at once
 PUNCH_HIT = "PunchHit"        # one of PunchHitSounds at Location
 BLADE_HIT = "BladeHit"        # one of BladeHitSounds at Location
@@ -65,17 +66,20 @@ LODGE = "Lodge"               # chips and the chop's sound: a thrown blade in a 
 MATCH = "Match"               # one of MatchSounds where a campfire is laid (Location)
 
 LOCATION_PARAM, NORMAL_PARAM, SCALE_PARAM = "Location", "Normal", "Scale"
-BLOOD_PARAM, HEAD_KILL_PARAM = "Blood", "HeadKill"
+BLOOD_PARAM, HEAD_KILL_PARAM, SPLAT_PARAM = "Blood", "HeadKill", "Splat"
 START_PARAM, SHARP_PARAM = "Start", "Sharp"
 POINT_PARAMS = ((LOCATION_PARAM, VECTOR), (NORMAL_PARAM, VECTOR))
-PELLET_HIT_PARAMS = POINT_PARAMS + ((SCALE_PARAM, FLOAT), (BLOOD_PARAM, BOOL))
+PELLET_HIT_PARAMS = POINT_PARAMS + ((SCALE_PARAM, FLOAT), (BLOOD_PARAM, BOOL),
+                                    (SPLAT_PARAM, FLOAT))
 STAB_PARAMS = POINT_PARAMS + ((HEAD_KILL_PARAM, BOOL),)
 SOUND_AT_PARAMS = ((LOCATION_PARAM, VECTOR),)
 # The batch: an entry per impact, and the one Scale they share (a gun's
 # pellets all do its damage).
 LOCATIONS_PARAM, NORMALS_PARAM, BLOODS_PARAM = "Locations", "Normals", "Bloods"
+SPLATS_PARAM = "Splats"
 SHOT_HITS_PARAMS = ((LOCATIONS_PARAM, array(VECTOR)), (NORMALS_PARAM, array(VECTOR)),
-                    (BLOODS_PARAM, array(BOOL)), (SCALE_PARAM, FLOAT))
+                    (BLOODS_PARAM, array(BOOL)), (SPLATS_PARAM, array(FLOAT)),
+                    (SCALE_PARAM, FLOAT))
 # The launch (task R2, weapon_component/throw_standin.py): what a client
 # needs to fly a stand-in of the item along the server's curve. Time is the
 # server's clock at the release, which names the throw.
@@ -139,6 +143,9 @@ FxPlayed = Var("FxPlayed", INT, 0)
 ShotHitLocations = Var("ShotHitLocations", array(VECTOR))
 ShotHitNormals = Var("ShotHitNormals", array(VECTOR))
 ShotHitBloods = Var("ShotHitBloods", array(BOOL))
+# The splat's spawn scale by the zone struck (head, chest, limb); 0 for chips.
+ShotHitSplats = Var("ShotHitSplats", array(FLOAT))
 ShotHitScale = Var("ShotHitScale", FLOAT, 1.0)
 
-TABLE = (FxPlayed, ShotHitLocations, ShotHitNormals, ShotHitBloods, ShotHitScale)
+TABLE = (FxPlayed, ShotHitLocations, ShotHitNormals, ShotHitBloods, ShotHitSplats,
+         ShotHitScale)

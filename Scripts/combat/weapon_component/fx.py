@@ -152,6 +152,18 @@ def spawn_blood(g, where, execs):
     return splash
 
 
+def spawn_blood_sprite(g, where, execs):
+    """BloodSpriteClass, the splat (blood_sprite.py), at ``where``. Returns
+    the spawn node."""
+    splat = g.keep(_palette(g.ed, NODE_SPAWN))
+    _connect(g.get(WV.BloodSpriteClass), _pin(splat, "Class"))
+    _connect(out(where), _pin(splat, "SpawnTransform"))
+    _set(splat, "CollisionHandlingOverride", "AlwaysSpawn")
+    for e in execs:
+        _connect(e, _pin(splat, "execute"))
+    return splat
+
+
 def body_chop(g, exec_in, event):
     """Chips off the cut and one of ChopSounds from it: the axe in the wood,
     whether swung (chop.py) or thrown (throw_strike.py)."""

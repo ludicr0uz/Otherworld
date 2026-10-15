@@ -3,15 +3,15 @@ to be a Multicast each, eight a shotgun blast; now the server notes each as
 its pellet lands and tells the lot when the last pellet is traced.
 
     note()            impact.py, where Multicast_PelletHit was told: the
-                      impact's point, normal and Blood onto three arrays, and
-                      the shot's Scale beside them
+                      impact's point, normal, Blood and splat size onto four
+                      arrays, and the shot's Scale beside them
     FlushShotHits     a plain event the fire graph calls after its pellet
                       loop: with anything noted, Multicast_ShotHits; then the
                       arrays are emptied for the next shot
-    Multicast_ShotHits(Locations, Normals, Bloods, Scale)
+    Multicast_ShotHits(Locations, Normals, Bloods, Splats, Scale)
                       unreliable, gate SCREEN (fx.py): each entry counted in
                       FxPlayed and played by Fx_PelletHit, the cosmetic
-                      itself, which is unchanged (impact.py)
+                      itself (impact.py)
 
 In single player the Multicast is a plain call, so the same graph plays the
 bursts there. combat/fx_vars.py has the names; verify/shot_hits.py the checks.
@@ -20,7 +20,8 @@ bursts there. combat/fx_vars.py has the names; verify/shot_hits.py the checks.
 from combat.fx_vars import (
     BLOOD_PARAM, BLOODS_PARAM, FLUSH_SHOT_HITS, FxPlayed, LOCATION_PARAM, LOCATIONS_PARAM,
     NORMAL_PARAM, NORMALS_PARAM, PELLET_HIT, SCALE_PARAM, SCREEN, SHOT_HITS, SHOT_HITS_PARAMS,
-    ShotHitBloods, ShotHitLocations, ShotHitNormals, ShotHitScale, fx_event, multicast_event,
+    SPLAT_PARAM, SPLATS_PARAM, ShotHitBloods, ShotHitLocations, ShotHitNormals, ShotHitScale,
+    ShotHitSplats, fx_event, multicast_event,
 )
 from combat.weapon_component.slot_nodes import op
 from combat.weapon_component.fx import GATES
@@ -33,7 +34,7 @@ from uebp.nodes.palette import MACRO_FOR_LOOP
 
 # The arrays, in the order of the Multicast's parameters.
 NOTED = ((ShotHitLocations, LOCATIONS_PARAM), (ShotHitNormals, NORMALS_PARAM),
-         (ShotHitBloods, BLOODS_PARAM))
+         (ShotHitBloods, BLOODS_PARAM), (ShotHitSplats, SPLATS_PARAM))
 
 
 def _array_call(g, fn, array, execs=()):
@@ -44,9 +45,10 @@ def _array_call(g, fn, array, execs=()):
     return n
 
 
-def note(g, execs, location, normal, scale, blood):
-    """One impact onto the shot's batch. ``blood`` is a Python bool. Returns
-    the exec pin after."""
+def note(g, execs, location, normal, scale, blood, splat=None):
+    """One impact onto the shot's batch. ``blood`` is a Python bool;
+    ``splat`` the splat's scale pin (None: no splat, 0). Returns the exec pin
+    after."""
     flow = g.put(ShotHitScale, scale, execs)
     for var, value in ((ShotHitLocations, location), (ShotHitNormals, normal)):
         add = _array_call(g, FN_ARR_ADD, g.get(var), [flow])
@@ -54,6 +56,11 @@ def note(g, execs, location, normal, scale, blood):
         flow = then(add)
     add = _array_call(g, FN_ARR_ADD, g.get(ShotHitBloods), [flow])
     _set(add, "NewItem", blood)
+    add = _array_call(g, FN_ARR_ADD, g.get(ShotHitSplats), [then(add)])
+    if splat is None:
+        _set(add, "NewItem", 0.0)
+    else:
+        _connect(splat, _loose_pin(add, "NewItem"))
     return then(add)
 
 
@@ -99,7 +106,7 @@ def _author_multicast(ed):
     index = _loose_pin(loop, "Index", is_input=False)
     call = g.keep(_node(ed, fx_event(PELLET_HIT)))
     for array, param in ((LOCATIONS_PARAM, LOCATION_PARAM), (NORMALS_PARAM, NORMAL_PARAM),
-                         (BLOODS_PARAM, BLOOD_PARAM)):
+                         (BLOODS_PARAM, BLOOD_PARAM), (SPLATS_PARAM, SPLAT_PARAM)):
         item = g.keep(_node(ed, FN_ARR_GET))
         _connect(out(cast, array), _loose_pin(item, "TargetArray"))
         _connect(index, _loose_pin(item, "Index"))

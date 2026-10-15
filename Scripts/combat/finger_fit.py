@@ -1,9 +1,16 @@
 """How far each finger bends to rest on a gun: the angles that close a
-finger's three joints onto the boxes of the model, and the swing that lays a
-thumb against it.
+finger's three joints onto a solid, and the swing that lays a thumb against
+it.
+
+A solid is anything with distance(p) (signed, cm, negative inside) and
+toward(p) (the nearest point of its surface): Boxes, the outline's parts the
+mannequin's fit uses (finger_pose.py; a plain list of boxes is taken as
+Boxes); the gun's own mesh, which the drawn hand's fit reads
+(drawn_grip_bake.py); Capsules, fingers already closed; a Union of them.
 
 Pure (no ``unreal``); finger_pose.py calls it for every finger of a gun whose
-fingers are fitted and keys the answer into that gun's ready clip, and
+fingers are fitted and keys the answer into that gun's ready clip,
+drawn_grip.py for the MetaHuman's hand on the real mesh, and
 verify/finger_pose.py measures the saved clip with the same nearest(). Tests:
 dev/tests/test_finger_fit.py.
 
@@ -25,15 +32,25 @@ So each finger is closed the way a hand closes on a thing:
   - a joint opens at most OPEN_DEG from the clip's pose and closes at most
     CLOSE_DEG, never back past straight nor past BEND_MAX_DEG;
   - a finger that cannot be laid on anything keeps the clip's pose (a little
-    finger past the end of a handguard is not made into a fist).
+    finger past the end of a handguard is not made into a fist), unless
+    that pose presses it into the gun: then it takes the least bend that
+    lifts it out (a fallback to a pose inside the gun was a finger through
+    it);
+  - a trigger finger is drawn to a place instead (close()'s ``aim``), the
+    pad of its last bone on the trigger, and only kept out of the gun.
 
 (Closing the knuckle until something touches, then the next joint, was tried
 first: the tip of an opened finger touches before the finger is round the
 part, and the outer joints then cannot move.)
 
 The thumb does not curl round a part; it is laid against it: one swing at
-its base towards the nearest box (swing()), stopped on contact or under a
-ceiling (the sight line).
+its base towards the nearest point of the solid (swing()), stopped on
+contact or under a ceiling (the sight line). A thumb that starts inside
+swings out the same way, the least that clears it.
+
+The points laid on the gun are all six of riding(): the three joints past
+the knuckle, the tip and each bone's middle (the first bone's middle was
+once left out, and it went through grips unseen).
 
 Everything is in one frame, the weapon's (+X down the barrel, +Z up), in cm.
 """
@@ -55,7 +72,7 @@ STEP_DEG = 0.5
 # together (degrees), nor back past straight.
 BEND_MAX_DEG = 100.0
 # A riding point counts as on the gun within this of a SKIN_CM off it (cm),
-# and a finger is fitted when this many of its five are.
+# and a finger is fitted when this many of its six are.
 TOUCH_CM = 0.3
 ON_POINTS = 2
 # A point pressed into the gun weighs this many times one as far off it; a
@@ -63,6 +80,9 @@ ON_POINTS = 2
 _PRESS_WEIGHT = 4.0
 _KEEP_WEIGHT = 1e-5
 _GRID_DEG = 5.0
+# A finger drawn to a place (misfit's ``aim``: the trigger finger's pad on
+# the trigger) weighs this per cm2 off it.
+AIM_WEIGHT = 4.0
 # The thumb's swing at its base (degrees), and how far under the ceiling its
 # points stay (hand_seat.THUMB_CLEAR_CM is the seat's).
 THUMB_SWING_DEG = 40.0
@@ -70,6 +90,79 @@ THUMB_CLEAR_CM = 0.3
 # A finger straighter than this (the sine of its bend, summed over its two
 # joints) has no plane of its own to bend in.
 _STRAIGHT = 0.05
+
+
+class Boxes:
+    """A solid of boxes ((lo), (hi)), every one in the weapon's frame: the
+    outline's parts (hand_seat.box_distance)."""
+
+    def __init__(self, boxes):
+        self.boxes = list(boxes)
+
+    def __bool__(self):
+        return bool(self.boxes)
+
+    def distance(self, p):
+        """Signed (cm): negative inside a box."""
+        return min(box_distance(box, p) for box in self.boxes)
+
+    def toward(self, p):
+        """The nearest point of the nearest box's surface."""
+        lo, hi = min(self.boxes, key=lambda box: box_distance(box, p))
+        if box_distance((lo, hi), p) > 0.0:
+            return tuple(min(max(x, l), h) for x, l, h in zip(p, lo, hi))
+        gaps = [(x - l, i, l) for i, (x, l) in enumerate(zip(p, lo))]
+        gaps += [(h - x, i, h) for i, (x, h) in enumerate(zip(p, hi))]
+        _gap, axis, face = min(gaps)
+        return tuple(face if i == axis else x for i, x in enumerate(p))
+
+
+class Union:
+    """Several solids as one: a gun and the fingers already on it."""
+
+    def __init__(self, solids):
+        self.solids = [as_solid(s) for s in solids if s]
+
+    def __bool__(self):
+        return bool(self.solids)
+
+    def distance(self, p):
+        return min(s.distance(p) for s in self.solids)
+
+    def toward(self, p):
+        return min(self.solids, key=lambda s: s.distance(p)).toward(p)
+
+
+class Capsules:
+    """Bones as a solid: each (a, b) segment with its skin, ``radius`` round
+    its axis (the fingers of a closed fist, which the other hand's lie on)."""
+
+    def __init__(self, segments, radius=SKIN_CM):
+        self.segments, self.radius = list(segments), radius
+
+    def __bool__(self):
+        return bool(self.segments)
+
+    def _foot(self, a, b, p):
+        ab = _sub(b, a)
+        t = _dot(_sub(p, a), ab) / max(_dot(ab, ab), 1e-12)
+        return _add(a, tuple(x * min(max(t, 0.0), 1.0) for x in ab))
+
+    def distance(self, p):
+        return min(_len(_sub(p, self._foot(a, b, p))) for a, b in self.segments) - self.radius
+
+    def toward(self, p):
+        foot = min((self._foot(a, b, p) for a, b in self.segments),
+                   key=lambda f: _len(_sub(p, f)))
+        way = _sub(p, foot)
+        n = _len(way)
+        return foot if n < 1e-9 else _add(foot, tuple(x * self.radius / n for x in way))
+
+
+def as_solid(solid):
+    """``solid`` as a solid: one with distance() and toward() is one; a list
+    of boxes is made Boxes."""
+    return solid if hasattr(solid, "distance") else Boxes(solid or ())
 
 
 def through(support):
@@ -148,9 +241,11 @@ def beyond(points, joint):
     return out
 
 
-def nearest(boxes, points):
-    """The least signed distance from any of ``points`` to any of ``boxes``."""
-    return min(box_distance(box, p) for box in boxes for p in points)
+def nearest(solid, points):
+    """The least signed distance from any of ``points`` to ``solid`` (a
+    solid or a list of boxes)."""
+    solid = as_solid(solid)
+    return min(solid.distance(p) for p in points)
 
 
 def _sweep(angles, clear):
@@ -176,66 +271,92 @@ def bend(points, axis):
                  for a, b in zip(lines, lines[1:]))
 
 
-def limits(points, axis):
+def limits(points, axis, reach=(OPEN_DEG, CLOSE_DEG)):
     """((lo, hi) in degrees for each of the three joints): OPEN_DEG back and
-    CLOSE_DEG on from the clip's pose, the last two joints never bent back
+    CLOSE_DEG on from the clip's pose (``reach``: another pair of the
+    two), the last two joints never bent back
     past straight nor past BEND_MAX_DEG."""
-    out = [(-OPEN_DEG[0], CLOSE_DEG[0])]
-    for now, back, on in zip(bend(points, axis), OPEN_DEG[1:], CLOSE_DEG[1:]):
+    opening, closing = reach
+    out = [(-opening[0], closing[0])]
+    for now, back, on in zip(bend(points, axis), opening[1:], closing[1:]):
         out.append((min(0.0, max(-back, -now)), max(0.0, min(on, BEND_MAX_DEG - now))))
     return tuple(out)
 
 
 def riding(points):
-    """The points of a finger that are laid on the gun: its two outer joints,
-    its tip and the middles of its two outer bones."""
-    return beyond(points, 1) + [points[1]]
+    """The points of a finger that are laid on the gun: its three joints past
+    the knuckle and its tip, and the middle of each of its three bones."""
+    return beyond(points, 0)
 
 
-def misfit(boxes, points, angles=(0.0, 0.0, 0.0)):
-    """How badly a finger lies on ``boxes`` with its joints bent by
+def misfit(solid, points, angles=(0.0, 0.0, 0.0), aim=None, reach=True, axis=None,
+           press=_PRESS_WEIGHT):
+    """How badly a finger lies on ``solid`` with its joints bent by
     ``angles``: the squares of how far each riding point is from a SKIN_CM
-    off the nearest box, one nearer than that (pressed in) counted
-    _PRESS_WEIGHT times, and a little for every degree off the clip's pose,
-    which decides between bends that fit alike."""
-    axis = hinge(points)
+    off the solid, one nearer than that (pressed in) counted ``press``
+    times (_PRESS_WEIGHT), and a little for every degree off the clip's pose, which decides
+    between bends that fit alike. ``reach`` False counts only the points
+    pressed in (the least bend that lifts a finger out). ``aim``, (which
+    riding point, where): that point drawn to that place, AIM_WEIGHT per cm2,
+    the others counted only where pressed in (a trigger finger, through a
+    guard, on the trigger); the place may be a segment, (a, b), and the
+    point is drawn to its nearest point of it. ``axis``: the one the finger
+    bends about, when not the plane of its points (hinge())."""
+    solid = as_solid(solid)
+    axis = axis or hinge(points)
     at = riding(posed(points, axis, angles)) if axis else riding(points)
     cost = _KEEP_WEIGHT * sum(a * a for a in angles)
     for p in at:
-        off = min(box_distance(box, p) for box in boxes) - SKIN_CM
-        cost += off * off * (_PRESS_WEIGHT if off < 0.0 else 1.0)
+        off = solid.distance(p) - SKIN_CM
+        if off < 0.0:
+            cost += off * off * press
+        elif reach and aim is None:
+            cost += off * off
+    if aim is not None:
+        which, where = aim
+        off = _sub(at[which], aimed(where, at[which]))
+        cost += AIM_WEIGHT * _dot(off, off)
     return cost
 
 
-def on(boxes, points):
-    """How many of a finger's riding points are on ``boxes``: within
-    TOUCH_CM of a SKIN_CM off one."""
+def aimed(where, p):
+    """The point of ``where`` (a point, or a segment (a, b)) nearest ``p``."""
+    if len(where) == 2 and hasattr(where[0], "__len__"):
+        a, b = where
+        ab = _sub(b, a)
+        t = _dot(_sub(p, a), ab) / max(_dot(ab, ab), 1e-12)
+        return _add(a, tuple(x * min(max(t, 0.0), 1.0) for x in ab))
+    return tuple(where)
+
+
+def on(solid, points):
+    """How many of a finger's riding points are on ``solid``: within
+    TOUCH_CM of a SKIN_CM off it."""
+    solid = as_solid(solid)
     return sum(1 for p in riding(points)
-               if abs(min(box_distance(box, p) for box in boxes) - SKIN_CM) <= TOUCH_CM)
+               if abs(solid.distance(p) - SKIN_CM) <= TOUCH_CM)
 
 
-def close(points, boxes):
-    """How a finger closes on ``boxes``: (the three joints' angles in degrees
-    from where ``points`` has them, True when it is laid on a box).
-    ``points``: its three joints and its tip. The bend whose riding points
-    lie best a SKIN_CM off the boxes (misfit), within the joints' limits; a
-    finger that even so has fewer than ON_POINTS of them on a box (one past
-    the end of the part) is left as the clip has it, and so is a straight
-    one."""
-    still = (0.0, 0.0, 0.0)
-    axis = hinge(points)
-    if axis is None or not boxes:
-        return still, False
-    ranges = limits(points, axis)
-    best, cost = still, misfit(boxes, points)
-    # Every bend on a coarse grid first: the fit has more than one hollow (a
-    # tip laid on the near face, or the finger round the far edge).
+def pressed(solid, points):
+    """True when a riding point of the finger is nearer ``solid`` than a
+    SKIN_CM less TOUCH_CM: its skin is in the gun."""
+    solid = as_solid(solid)
+    return any(solid.distance(p) < SKIN_CM - TOUCH_CM for p in riding(points))
+
+
+def _search(points, cost_of, ranges):
+    """The bend within ``ranges`` that costs least: every bend on a coarse
+    grid first (the fit has more than one hollow: a tip laid on the near
+    face, or the finger round the far edge), then each joint on its own in
+    halving steps."""
+    best = (0.0, 0.0, 0.0)
+    cost = cost_of(best)
     grids = [sorted(set(_steps(0.0, hi, _GRID_DEG)) | {-a for a in _steps(0.0, -lo, _GRID_DEG)})
              for lo, hi in ranges]
     for a in grids[0]:
         for b in grids[1]:
             for c in grids[2]:
-                found = misfit(boxes, points, (a, b, c))
+                found = cost_of((a, b, c))
                 if found < cost - 1e-9:
                     best, cost = (a, b, c), found
     step = _GRID_DEG / 2.0
@@ -245,25 +366,55 @@ def close(points, boxes):
             for way in (-step, step):
                 trial = list(best)
                 trial[joint] = min(max(trial[joint] + way, ranges[joint][0]), ranges[joint][1])
-                found = misfit(boxes, points, tuple(trial))
+                found = cost_of(tuple(trial))
                 if found < cost - 1e-9:
                     best, cost, moved = tuple(trial), found, True
         if not moved:
             step /= 2.0
-    if on(boxes, posed(points, axis, best)) < ON_POINTS:
+    return best
+
+
+def close(points, solid, aim=None, axis=None, reach=(OPEN_DEG, CLOSE_DEG),
+          press=_PRESS_WEIGHT, on_points=ON_POINTS):
+    """How a finger closes on ``solid``: (the three joints' angles in degrees
+    from where ``points`` has them, True when it is laid on the solid).
+    ``points``: its three joints and its tip. The bend whose riding points
+    lie best a SKIN_CM off the solid (misfit), within the joints' limits. A
+    finger that even so has fewer than ON_POINTS of them on it (one past the
+    end of the part) is left as the clip has it, unless the clip's pose
+    presses it into the gun: then it takes the least bend that lifts it
+    out. A straight finger is left as it is, unless given the ``axis`` it
+    bends about (its joint's own: the plane of a straight finger's points is
+    noise). ``aim``: misfit's; a finger drawn to a place is laid there
+    whether or not it touches. ``reach``: limits()'; ``press``: misfit()'s;
+    ``on_points``: how many riding points make it laid on (ON_POINTS)."""
+    still = (0.0, 0.0, 0.0)
+    solid = as_solid(solid)
+    axis = axis or hinge(points)
+    if axis is None or not solid:
         return still, False
-    return best, True
+    ranges = limits(points, axis, reach)
+    best = _search(points, lambda angles: misfit(solid, points, angles, aim, axis=axis,
+                                                 press=press), ranges)
+    if aim is not None:
+        return best, True
+    if on(solid, posed(points, axis, best)) >= on_points:
+        return best, True
+    if not pressed(solid, points):
+        return still, False
+    return _search(points, lambda angles: misfit(solid, points, angles, reach=False, axis=axis,
+                                                 press=press), ranges), False
 
 
-def wrapped(fingers, boxes):
-    """A fist closed on ``boxes``: the points of every finger of ``fingers``
-    (each its three joints and its tip) as close() lays it on them, one after
+def wrapped(fingers, solid):
+    """A fist closed on ``solid``: the points of every finger of ``fingers``
+    (each its three joints and its tip) as close() lays it on it, one after
     another in one list; a finger close() leaves is where it was. What the
     other hand closes over in a pistol's hold."""
     out = []
     for points in fingers:
-        angles, met = close(points, boxes)
-        out += posed(points, hinge(points), angles) if met else list(points)
+        angles, _met = close(points, solid)
+        out += posed(points, hinge(points), angles) if any(angles) else list(points)
     return out
 
 
@@ -273,29 +424,38 @@ def swung(points, axis, deg):
                           for p in points[1:]]
 
 
-def swing(points, boxes, ceiling):
-    """How a thumb is laid against ``boxes``: (the unit axis through its
+def swing(points, solid, ceiling=None):
+    """How a thumb is laid against ``solid``: (the unit axis through its
     first joint, the degrees it swings about it). ``points``: its three joints
-    and its tip. It swings its tip towards the nearest box and stops a
-    SKIN_CM off it, or THUMB_CLEAR_CM under ``ceiling`` (a z); a thumb that
-    meets neither in THUMB_SWING_DEG stays where it is."""
+    and its tip. It swings its tip towards the nearest point of the solid and
+    stops a SKIN_CM off it, or THUMB_CLEAR_CM under ``ceiling`` (a z, None
+    for none); a thumb that meets neither in THUMB_SWING_DEG stays where it
+    is. A thumb the clip has pressed into the gun swings the same way (the
+    nearest point of the surface is the way out) and stops as soon as it is
+    clear; failing that, back the other way."""
     still = ((0.0, 0.0, 1.0), 0.0)
-    if not boxes:
+    solid = as_solid(solid)
+    if not solid:
         return still
     tip = points[-1]
-    lo, hi = min(boxes, key=lambda box: box_distance(box, tip))
-    on = tuple(min(max(p, l), h) for p, l, h in zip(tip, lo, hi))
-    axis = _cross(_sub(tip, points[0]), _sub(on, points[0]))
+    axis = _cross(_sub(tip, points[0]), _sub(solid.toward(tip), points[0]))
     if _len(axis) < 1e-6:
         return still
     axis = _unit(axis)
 
     def clear(angle):
         moved = swung(points, axis, angle)[1:]
-        under = ceiling - THUMB_CLEAR_CM - max(p[2] for p in moved)
-        return min(nearest(boxes, moved) - SKIN_CM, under)
+        off = nearest(solid, moved) - SKIN_CM
+        if ceiling is None:
+            return off
+        return min(off, ceiling - THUMB_CLEAR_CM - max(p[2] for p in moved))
 
     if clear(0.0) < 0.0:
+        for way in (1.0, -1.0):
+            out = next((way * a for a in _steps(0.0, THUMB_SWING_DEG) if clear(way * a) >= 0.0),
+                       None)
+            if out is not None:
+                return axis, out
         return still
     found, met = _sweep(_steps(0.0, THUMB_SWING_DEG), clear)
     return (axis, found) if met else still

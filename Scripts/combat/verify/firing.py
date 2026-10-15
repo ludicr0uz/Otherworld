@@ -4,6 +4,7 @@
 from combat.bloom_tuning import Bloom
 from combat.body_pose import POSE_KNEEL, POSE_WEIGHTS
 from combat.carry_pose_consts import CARRY_POSE, CARRY_SPRINT
+from combat.drawn_grip_vars import GripCarry, GripLeft
 from combat.gas_moves_tuning import POSE_SLIDE
 from combat.game_state import DEBUG_MODE_VAR, DEBUG_SHOTS_VAR, TRACE_DEBUG_SECONDS
 from net.state_consts import GAME_STATE_BP_PATH
@@ -94,10 +95,12 @@ def check_recoil():
     # (verify/body_pose.py checks those); each one's Current is its own weight.
     # So do the held breath's BreathScale (verify/breath.py) and the carry's two
     # (verify/carry_pose.py), the reload's ReloadHand (verify/reload_clip.py)
-    # and the hip burst's Bloom (verify/bloom.py).
+    # and the hip burst's Bloom (verify/bloom.py), and the drawn hands' two
+    # (verify/drawn_grip.py).
     pose_reads = {f"Get {name}" for name in (*POSE_WEIGHTS, POSE_KNEEL, POSE_SLIDE,
                                              CARRY_POSE, CARRY_SPRINT, "BreathScale",
-                                             "ReloadHand", str(Bloom))}
+                                             "ReloadHand", str(Bloom), str(GripLeft),
+                                             str(GripCarry))}
     interps = [n for n in by_pins(wg, "Current", "Target", "DeltaTime", "InterpSpeed")
                if not any(str(BEL.get_node_title(PIN.get_owning_node(q))) in pose_reads
                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Current")))]

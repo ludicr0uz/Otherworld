@@ -178,8 +178,8 @@ def expected(skin, spec):
 
     out = {}
     for label, (_bones, points, boxes) in fingers.items():
-        angles, met = finger_fit.close(points, boxes)
-        if met:
+        angles, _met = finger_fit.close(points, boxes)
+        if any(angles):
             points = finger_fit.posed(points, finger_fit.hinge(points), angles)
         out[label] = (finger_fit.on(boxes, points),) + off(finger_fit.riding(points), boxes)
     axis, deg = finger_fit.swing(thumb, thumb_boxes, gun_hold.ceiling(spec))
@@ -195,9 +195,9 @@ def fit(skin, spec):
     fingers, (thumb_bones, thumb, thumb_boxes) = hands(skin, spec, comp, placed)
     turns, bends = {}, {}
     for label, (bones, points, boxes) in fingers.items():
-        angles, met = finger_fit.close(points, boxes)
-        bends[label] = angles if met else None
-        if met:
+        angles, _met = finger_fit.close(points, boxes)
+        bends[label] = angles if any(angles) else None
+        if any(angles):
             axis, total = finger_fit.hinge(points), 0.0
             for bone, angle in zip(bones, angles):
                 total += angle

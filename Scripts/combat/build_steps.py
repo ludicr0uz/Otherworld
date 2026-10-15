@@ -65,6 +65,8 @@ from combat.weapon_items import build_weapon, build_weapon_item
 from combat.weapon_layers import build_weapon_layers
 from combat.weapon_specs import DROP_TICKETS, _weapon_specs
 from combat.wood import build_wood
+from asset_pipeline.gas_bridge_paths import ABP_RETARGET_UEFN
+from combat.drawn_grip_graph import patch_drawn_grip
 from net.players import build_players
 from net.state import build_state
 from Sound.build import build_sound_assets
@@ -294,6 +296,14 @@ def _ammo_pickup(c):
     c.put("ammo_bp", build_ammo_pickup())
 
 
+def _drawn_grip(c):
+    # After the weapon component, whose weights the drawn body's update reads.
+    if c.skin.retarget != ABP_RETARGET_UEFN:
+        _log("drawn grip: the player is not the MetaHuman over the UEFN rig, skipped")
+        return
+    patch_drawn_grip()
+
+
 def _health_defaults(c):
     # After the ammo pickup and the weapons: a default written here rather than
     # a parameter of the health component, which the pickup's spawner precedes.
@@ -360,6 +370,7 @@ STEPS = (
                 "blood", "bullet_impact", "throw_arc", "health"),
          made=(P.WEAPON_COMP_BP_PATH,)),
     Step("ammo_pickup", _ammo_pickup, needs=("weapon_component",), made=(P.AMMO_BP_PATH,)),
+    Step("drawn_grip", _drawn_grip, needs=("weapon_component",)),
     Step("health_defaults", _health_defaults, needs=("health", "weapons", "ammo_pickup")),
     Step("bodies", _bodies),
     Step("install", _install, needs=("health", "weapon_component", "footsteps", "input_assets")),

@@ -68,6 +68,7 @@ _author_* fragment per concern, each in its own module:
   sight_pitch down the sights: write the anim BP's AimPitch (the view's pitch
               x SightBlend), which tips the upper body and the gun onto the aim
   support_hand  down the sights: write the anim BP's SupportHand (SightBlend)
+  drawn_grip    which gun's frames of A_DrawnGrip the drawn hands take, and their weights
               and SupportPoint (HeldSupportPoint), which hold the left hand on
               the gun
   pose_weights  ease the anim BP's PoseCrouch/PoseProne/GuardArms/GuardGun

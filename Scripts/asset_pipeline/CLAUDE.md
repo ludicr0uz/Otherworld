@@ -507,8 +507,10 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/measure_gas_bridge.py   # Sav
   `probes/probe_drawn_grip.py` holds, in every gun state, the wrists within 1 cm (0.00
   measured), the hands within 3 degrees of the mannequin's turn (0.0) and the elbows
   within 12 cm (3 to 6 cm; the left 9 to 11 cm down a long gun's sights, where the
-  arm reaches furthest). The fingers are still the MetaHuman's retarget of the
-  mannequin's: the 1911's drawn fingers sit open by the grip.
+  arm reaches furthest). The fingers are laid over the retarget's in the same anim
+  Blueprint, fitted on the MetaHuman's own hand against each gun's real mesh
+  (`combat/drawn_grip_graph.py`; `Scripts/combat/docs/aiming.md`, "The drawn fingers").
+  `build_gas_bridge.py` rewrites only the retarget node's settings, so it keeps them.
 - **A sequence player's clip is not a Python property.** `ABP_GasIdle`'s node comes from the
   palette entry `Animation|Sequences|Play'<clip name>'`, which exists only while the clip is
   loaded; the clip is read back out of the node's `export_text()` (`gas_idle_abp.playing`).

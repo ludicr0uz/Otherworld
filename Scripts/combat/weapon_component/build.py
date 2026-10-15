@@ -15,7 +15,9 @@ from combat.paths import (
     BLOOD_SPRITE_BP_PATH, CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, THROW_ARC_BP_PATH,
     THROW_READY_ANIM_PATH, WEAPON_COMP_BP_PATH,
 )
-from combat.finger_pose import carry_clips
+from combat.drawn_grip_consts import GUNS as DRAWN_GUNS
+from combat.drawn_grip_vars import COMP as DRAWN_GRIP_TABLE, GripPoses
+from combat.finger_pose import carry_clips, clip_for
 from combat.skin import player_skin
 from combat.weapon_component.interact import INTERACT_NO_GAP, RETIRED_VARS
 from combat.weapon_component.inventory import _author_wc_begin_play
@@ -125,6 +127,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     declare(ed, WV.STATE)
     # The hip burst's bloom (bloom.py).
     declare(ed, BLOOM_TABLE)
+    # The drawn hands' weights (drawn_grip.py).
+    declare(ed, DRAWN_GRIP_TABLE)
     # The names the interact had as the pick-up are taken off a component
     # built before the rename.
     for name in RETIRED_VARS + native.RETIRED_VARS + trigger.RETIRED_VARS + WV.RETIRED:
@@ -223,6 +227,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
             WV.CarryAlso: [_must_load(clip) for clip in carry_clips()]}
            if player_skin().carry_idle else {}),
         WV.ThrowArcClass: arc_class,
+        GripPoses: [_must_load(clip_for(gun)) for gun in DRAWN_GUNS],
     })
     # The component replicates (its look, to the other players): a class
     # default, so after the compile and with one more (uebp/CLAUDE.md).

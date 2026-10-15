@@ -593,9 +593,50 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
   `Saved/grip_report/drawn_grip.md`. Before the pin the drawn wrists were 2.5 to 6.6 cm
   off the mannequin's. With it (15 Oct 2026): wrists 0.00 cm and hands 0.0 degrees off in
   every gun state, elbows 3 to 6 cm off (the left 9 to 11 cm down a long gun's sights).
-  The drawn fingers are still the MetaHuman's retarget of the mannequin's: up to 2 cm in
-  or off the grip on the right, and the 1911's sit open by its grip. Lowered, a pistol's
-  left hand hangs free (50 to 70 cm off), as meant.
+  Lowered, a pistol's left hand hangs free (50 to 70 cm off), as meant.
+- **The drawn fingers are fitted on the MetaHuman's own hand against each gun's real mesh**
+  (15 Oct 2026; before it they were the retarget of the mannequin's, up to 2 cm in or off
+  the grip). `/Game/Sourced/MetaHuman/A_DrawnGrip` holds three frames a gun at one a
+  second (hold, sights, carry; `drawn_grip_consts.GUNS`' order), both hands' fingers, and
+  `ABP_MetaHuman_Retarget_UEFN` lays it over the retarget's fingers, each from its root in
+  local space: the right by `GripRight`, the left by `GripLeft` over a blend of the gun's
+  three frames by the sights' and the carry's weights (`drawn_grip_graph.py`). The weapon
+  component writes them, finding the gun by the ready pose in hand
+  (`weapon_component/drawn_grip.py`): the right hand is on the gun whenever it is held,
+  the left raised, down the sights and in a long gun's carry, never on a lowered pistol,
+  through a reload's clip or over a searched body.
+  - **The fit** (`drawn_grip.py`, pure; `drawn_grip_bake.py` in the editor, run by
+    `Scripts/build_drawn_grip.py`, about 7 minutes, so not a step of the weapons build,
+    whose `drawn_grip` step lays the clip over the fingers) reads the
+    wrists the probe captured (`drawn_grip_capture.json`; the wrists are pinned, so they
+    are the mannequin's) and the gun's meshes as one solid (`drawn_grip_mesh.py`). Each
+    finger is closed by `finger_fit.close` with a press weight of 400 (a point in the gun
+    costs as much as one 20 cm off it); a finger whose own knuckle is in the gun first
+    turns its metacarpal (a cup about the curl axis up to 15 degrees, else a lift away
+    from the surface up to 25), the turn chosen by the deepest point, then the knuckle,
+    then the fit. The thumb swings onto the gun, and out of it the least either way. The
+    right index is drawn to the trigger (a segment per gun, `TRIGGER`), its pad on it.
+    A handgun's left fingers are fitted on the gun and the fitted right fingers together.
+    One frame holds every hand placement of its state (the carry's four clips), and the
+    fingers are kept out of the gun in all of them.
+  - **The clip plays retargeted** (Taro's mesh against the skeleton's reference pose:
+    root `CLAUDE.md`, "Skeletons and retargeting"), so the bake keys each frame, reads it
+    back as played and corrects the keys until the played pose is the fit's (0.13 degrees
+    at worst: `drawn_grip_bake.settle`).
+  - **Measured** (`probe_drawn_grip`, 329 checks, 15 Oct 2026): no finger more than 0.3 cm
+    into a gun raised or down the sights but the left knuckle of the shotgun's little
+    finger (0.44) and the SMG's index (0.38), which no turn of the metacarpal clears at
+    the pinned wrist (`PRESSED_CM_BY_GUN`); every finger within 1 cm of the surface
+    there. Carried, within 1.5 cm in and 2 cm off (crouched, the shotgun's left little
+    stands 1.7 off: one frame serves the four carry clips), but the left thumb, which the
+    carry's clips hold 6 to 9 cm off along the stock (`CARRY_OFF`). The right index's
+    pad is 0.01 cm (the 1911) to 1.14 (the Val) off the trigger's face, the shotgun's
+    2.45 (its trigger is 5 cm under the hand: `TRIGGER_NEAR_CM_BY_GUN`).
+  - **No fingertip IK at run time**: the wrists are pinned and the right hand is rigid on
+    the gun, so the baked fingers do not drift; the carry's spread is the one place they
+    move against the gun, and stays inside the bounds above.
+  - **Not done:** a frame of its own for the crouched carry; the reload's fingers are
+    Lyra's on the left (the left hand lets go for the clip), the fitted grip's on the right.
 - **A gun's fingers are bent onto its model** (`finger_pose.py`, `finger_fit.py`), for
   the guns `weapon_models.GUN_FINGERS` names (all five: the AK, the Val, the shotgun,
   and the 1911 and the SMG, "The pistols" below). The hands above are rigid pieces of a clip made for Lyra's rifle:

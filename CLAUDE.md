@@ -466,6 +466,14 @@ each: `systemDesign.md`, section 0.
   skeleton's reference pose, and the mesh's own reference pose fills them. The retargeter reads
   the pose as shown (`rig_util.visible_bone_xf`). Sampled raw, `MM_Idle`'s fingers read 15° off
   what it retargets.
+- **A clip plays retargeted on a mesh whose reference pose is not its skeleton's.** Each
+  bone's key is moved by the difference between the two (translation retargeting,
+  AnimationRelative): a MetaHuman finger keyed on `metahuman_base_skel` and played on Taro's
+  body came out 29° off at the metacarpal. `AnimPoseExtensions.get_anim_pose_at_time` with
+  `should_retarget=True` and `optional_skeletal_mesh` set reads the pose as played;
+  `AnimationLibrary.get_bone_pose_for_time` reads neither that nor the raw keys. A clip keyed
+  to a pose on one mesh is keyed, read back as played, and corrected
+  (`combat/drawn_grip_bake.settle`).
 - **`SkeletonModifier` adds bones and moves them,** but moving a bone that already exists never
   updates the skeleton's copy of it. `SkinWeightModifier` addresses the vertices of the mesh
   description, and a DynamicMesh copy lists the same ids first.

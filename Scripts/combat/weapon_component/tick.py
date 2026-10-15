@@ -22,6 +22,7 @@ from combat.weapon_component.consume import (
     _author_trigger_latch, _author_use_gate,
 )
 from combat.weapon_component.dead import _author_dead_gate
+from combat.weapon_component.drawn_grip import _author_drawn_grip
 from combat.weapon_component.light import _author_light_press
 from combat.weapon_component.look import _author_local_carry, _author_look_mirror
 from combat.weapon_component.local import (
@@ -208,6 +209,8 @@ def _author_wc_tick(ed, tick):
     # --- and the left hand holds the gun, down the sights (support_hand.py) ---
     # After SightBlend and HeldTwoHanded are written, which it copies.
     ads_exits = _author_support_hand(ed, ads_exits)
+    # And the drawn body's fingers on the gun (drawn_grip.py), after ReloadHand.
+    ads_exits = _author_drawn_grip(ed, ads_exits)
 
     # --- and how true the gun shoots from here -------------------------------
     # After the stance and the aim state it reads, before the trigger and the

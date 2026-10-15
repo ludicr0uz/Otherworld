@@ -19,8 +19,10 @@ from combat.weapon_models import GUN_FINGERS
 from combat.weapon_specs import _weapon_specs
 
 # A riding point of a fitted finger is no nearer the model than this (cm;
-# its axis rides SKIN_CM off: measured at least 0.43, the sniper's left ring)
-# and none is further than FAR_CM (measured at most 1.44, its right ring).
+# its axis rides SKIN_CM off: measured at least 0.33, the 1911's left ring)
+# and none is further than FAR_CM (measured at most 1.44, the Val's left
+# little). The points are all six of finger_fit.riding() since 15 Oct 2026,
+# the first bone's middle among them: it once went through grips unseen.
 NEAR_CM = 0.3
 FAR_CM = 1.6
 # A gun the ready pose's hand does not suit has bounds of its own, measured:
@@ -29,9 +31,17 @@ FAR_CM = 1.6
 # barrel's top holds the knuckles 1.6 to 4.6 cm below the wood: a finger
 # comes up to the pump's lower edge and turns that corner, its middle joint
 # pressed nearer the edge and its first bone still coming up to it.
-# Measured 0.17 (the left middle's joint at the edge) to 2.66 (the left
+# Measured 0.13 (the left middle's joint at the edge) to 3.79 (the left
 # little's first bone, coming up to the magazine tube behind the pump).
-BOUNDS = {"BP_Shotgun": (0.1, 2.9)}
+# The AK's left fingers come up to its handguard from below, their first
+# bones 1.9 off it (the little's joint at 0.26), and its left index, past
+# the handguard's front, is lifted out of it with its tip 3.1 off. The
+# SMG's left fingers lie on the closed right fist, and the left ring's first
+# bone is in it at the knuckle (-0.48; the fit took it from -0.99).
+# These are the hidden mannequin's: the MetaHuman drawn over it lays its own
+# fingers, fitted on the guns' real meshes, over every gun it holds
+# (drawn_grip.py; measured by probes/probe_drawn_grip.py).
+BOUNDS = {"BP_Shotgun": (0.1, 3.9), "BP_AssaultRifle": (0.2, 3.2), "BP_SMG": (-0.5, 1.6)}
 # The saved clip against the fit's arithmetic (cm).
 KEYED_CM = 0.05
 # The left thumb's nearest point to the part (cm; measured 0.81 and 0.82).
@@ -57,6 +67,12 @@ def _dot(a, b):
 def _worst(near, far):
     """How far a finger's worst riding point is from a skin off the model."""
     return max(abs(near - finger_fit.SKIN_CM), abs(far - finger_fit.SKIN_CM))
+
+
+def _lifted(was_near, near):
+    """True when the pose pressed a finger into the model and the fit took it
+    out to a skin off it (finger_fit.close()'s least bend that lifts it out)."""
+    return was_near < finger_fit.SKIN_CM - KEYED_CM and near >= finger_fit.SKIN_CM - KEYED_CM
 
 
 def check_rows():
@@ -120,13 +136,16 @@ def _check_fingers(skin, spec):
             check("...which leaves it the pose's (it cannot be laid on the model)",
                   _same(now[label], was[label], KEYED_CM), f"{now[label]} was {was[label]}")
             continue
+        lifted = _lifted(was[label][1], near)
         check(f"...on the model: at least {finger_fit.ON_POINTS} of its points a "
-              f"skin off it, none nearer than {near_cm:g} cm, none further than {far_cm:g}",
-              on >= finger_fit.ON_POINTS and near >= near_cm and far <= far_cm,
+              f"skin off it (or lifted out of it), none nearer than {near_cm:g} cm, "
+              f"none further than {far_cm:g}",
+              (on >= finger_fit.ON_POINTS or lifted) and near >= near_cm and far <= far_cm,
               f"{on} on, {near:.2f} to {far:.2f} cm")
         check("...and better laid than the pose had it: its worst point nearer a "
-              "skin off the model than the pose's worst was (in it or in the air)",
-              _worst(near, far) <= _worst(*was[label][1:]) + KEYED_CM,
+              "skin off the model than the pose's worst was (in it or in the air), "
+              "or lifted out of the model the pose pressed it into",
+              lifted or _worst(near, far) <= _worst(*was[label][1:]) + KEYED_CM,
               f"{near:.2f} to {far:.2f} cm, {was[label][1]:.2f} to {was[label][2]:.2f} before")
     _on, near, _far = now["left thumb"]
     comp, _weapon, placed = gun_hold.held(skin, spec, spec["aim"])

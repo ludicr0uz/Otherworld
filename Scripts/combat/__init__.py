@@ -328,6 +328,17 @@ wrong module.
                     onto that gun's model, which its item is held in (AimPose); a
                     pistol's left fingers on the right fist as fitted (fist), and
                     which clips the carry takes (carry_clips)
+  drawn_grip        the drawn MetaHuman's fingers on a gun (pure): each finger bent
+                    (its metacarpal cupped when its knuckle is on the gun) and each
+                    thumb swung onto the gun's real mesh, in the hand's own frame,
+                    for every placement a frame of A_DrawnGrip covers (Seen)
+  drawn_grip_bake   fits each gun's three frames (hold, sights, carry) on its mesh
+                    and keys A_DrawnGrip, settled so it plays as fitted
+  drawn_grip_consts A_DrawnGrip's names, its frames, each gun's trigger, the probe's bounds
+  drawn_grip_graph  ABP_MetaHuman_Retarget_UEFN: A_DrawnGrip laid over the retarget's
+                    fingers by layered blends, weighted by the weapon component's
+  drawn_grip_mesh   a gun's drawn meshes as one solid in its actor's frame (GeometryScript)
+  drawn_grip_vars   the drawn grip's variables, the weapon component's and the anim BP's
 
   gas_turn  Standing, the legs step round after the view: the sample's turn-in-place switched on (WantsToAim), the root's offset released by a traversal alone
 

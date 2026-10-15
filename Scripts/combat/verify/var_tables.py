@@ -12,11 +12,13 @@ table names any more: ``declare`` re-declares its rows and removes nothing,
 so they sit in the saved asset until a builder prunes them.
 """
 
+from asset_pipeline.gas_bridge_paths import ABP_RETARGET_UEFN
 from asset_pipeline.gas_paths import ABP as GAS_ABP_PATH
 from combat import ammo_vars as AV
 from combat import anim_vars as AN
 from combat import bloom_tuning as BLOOM
 from combat import burst_vars as BV
+from combat import drawn_grip_vars as DG
 from combat import footstep_vars as FV
 from combat import fx_vars as FX
 from combat import game_mode_vars as GV
@@ -41,7 +43,7 @@ from uebp.verify_vars import check_table
 # (Blueprint, its rows, the variables left beside them by an earlier build)
 TABLES = (
     (WEAPON_COMP_BP_PATH, WV.CORE + FX.TABLE + LV.TABLE + RV.TABLE + SH.TABLE + ST.TABLE
-     + WV.STATE + BLOOM.TABLE, ("PoseSprinting",)),
+     + WV.STATE + BLOOM.TABLE + DG.COMP, ("PoseSprinting",)),
     (ITEM_BP_PATH, IV.TABLE, ("LodgePitchDeg",)),
     (HEALTH_BP_PATH, HV.TABLE + HV.STATE + LOOT.TABLE, ()),
     (GAME_MODE_BP_PATH, GV.TABLE, ()),
@@ -54,11 +56,12 @@ TABLES = (
     (NS.GAME_STATE_BP_PATH, NS.GAME_TABLE, ()),
 )
 # Added to, not made: the stock anim blueprint, the weapon layers copied from
-# it, and the sample's.
+# it, the sample's, and the drawn MetaHuman's (drawn_grip_graph.py).
 PATCHED = (
     (ABP_PATH, AN.AIM + AN.GROUND + AN.POSE + AN.SERVER + AN.SUPPORT),
     (LAYERS_ABP, AN.CRAWL + AN.GROUND + AN.CARRY),
     (GAS_ABP_PATH, AN.SERVER + ADDED_VARS),
+    (ABP_RETARGET_UEFN, DG.ANIM),
 )
 
 

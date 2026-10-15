@@ -30,26 +30,38 @@ The checks hold the staging (both bodies there and posed, each gun in hand,
 its meshes read, each state reached, the pictures written) and, since the
 retarget pins the drawn wrists to the mannequin's (asset_pipeline/
 hand_goals.py), each drawn wrist within WRIST_PINNED_CM of the mannequin's
-and each drawn elbow within ELBOW_NEAR_CM; the fingers are a measurement,
-for a person to read.
+and each drawn elbow within ELBOW_NEAR_CM; and the fitted fingers
+(A_DrawnGrip, combat/drawn_grip_graph.py, since 15 Oct 2026): each hand's
+layer weighed in (the left only on a long gun or a raised one), no finger
+of a hand on the gun deeper in it than drawn_grip_consts.PRESSED_CM
+(PRESSED_CM_BY_GUN's own, CARRY_PRESSED_CM carried), none further off it
+than OFF_CM (CARRY_OFF_CM carried, and not CARRY_OFF's), and the right
+index's pad at the gun's TRIGGER. A handgun's left fingers are measured to
+the nearer of the gun and the right fingers, which they lie on.
 
   python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_drawn_grip.py
 """
 
 SYSTEMS = ('weapons', 'animation')
 
+import json
 import os
 
 import unreal
 
+from combat import drawn_grip as D
 from combat import finger_fit, gun_hold
+from combat.drawn_grip_consts import (
+    CARRY_OFF, CARRY_OFF_CM, CARRY_PRESSED_CM, GRIP_LEFT_VAR, GRIP_RIGHT_VAR, HANDGUNS, OFF_CM,
+    PRESSED_CM, PRESSED_CM_BY_GUN, TRIGGER, TRIGGER_NEAR_CM, TRIGGER_NEAR_CM_BY_GUN,
+)
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import SEAT_VAR, SIGHTS_FORCED_VAR
 from combat.skin import skin_of_mesh
 from combat.sprint_tuning import SPRINT_FORCED_VAR
 from combat.weapon_component.stance import CROUCH, STAND
 from combat.weapon_component import vars as WV
-from combat.carry_tuning import RAISE_FORCED_VAR
+from combat.carry_tuning import LOWERED_VAR, RAISE_FORCED_VAR
 from combat.weapon_models import GUN_HOLDS
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from probes import grip_report as R
@@ -59,15 +71,18 @@ from probes.probe_sight_align import HUD_BP_PATH
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR)] + [(WEAPON_COMP_BP_PATH, v) for v in
             (WV.Stance, RAISE_FORCED_VAR, SIGHTS_FORCED_VAR, SPRINT_FORCED_VAR)]
 
-# (label, forward input, sprint, stance, sights, pitch, seconds held).
+# (label, forward input, sprint, stance, raised, sights, pitch, seconds held).
+# "raised" is the ready pose off the sights (an aim over the shoulder, a shot
+# from the hip): the left hand where the clip has it.
 STATES = (
-    ("standing", 0.0, False, STAND, False, 0.0, 1.2),
-    ("walking", 0.45, False, STAND, False, 0.0, 1.4),
-    ("crouched", 0.0, False, CROUCH, False, 0.0, 1.4),
-    ("sprinting", 1.0, True, STAND, False, 0.0, 1.8),
-    ("ads pitch up", 0.0, False, STAND, True, 25.0, 1.2),
-    ("ads level", 0.0, False, STAND, True, 0.0, 1.0),
-    ("ads pitch down", 0.0, False, STAND, True, -25.0, 1.0),
+    ("standing", 0.0, False, STAND, False, False, 0.0, 1.2),
+    ("walking", 0.45, False, STAND, False, False, 0.0, 1.4),
+    ("crouched", 0.0, False, CROUCH, False, False, 0.0, 1.4),
+    ("sprinting", 1.0, True, STAND, False, False, 0.0, 1.8),
+    ("raised", 0.0, False, STAND, True, False, 0.0, 1.2),
+    ("ads pitch up", 0.0, False, STAND, True, True, 25.0, 1.2),
+    ("ads level", 0.0, False, STAND, True, True, 0.0, 1.0),
+    ("ads pitch down", 0.0, False, STAND, True, True, -25.0, 1.0),
 )
 SEATED = 0.99
 # The drawn wrists are pinned to the mannequin's by hand IK goals in the
@@ -82,6 +97,9 @@ HAND_TURN_DEG = 3.0
 # Further than this off the mannequin's reads as a broken or flipped arm.
 ELBOW_NEAR_CM = 12.0
 SEAT_WAIT_S = 4.0
+# Wall seconds: five guns in eight states, and windowed two pictures each
+# (about 50 s bare, past the runner's 60 rendered).
+TIMEOUT = 180.0
 FINGERS = ("thumb", "index", "middle", "ring", "little")
 EYE_FOV = 50.0
 # The close pictures' camera off the hands' middle (cm): (name, right, ahead,
@@ -90,6 +108,10 @@ EYE_FOV = 50.0
 VIEWS = (("left", -35.0, 40.0, -25.0), ("right", 55.0, 27.0, 12.0))
 SHOTS_DIR = os.path.join(unreal.Paths.project_saved_dir(), "Screenshots", "MacEditor")
 REPORT = os.path.join(unreal.Paths.project_saved_dir(), "grip_report", "drawn_grip.md")
+# What the drawn finger fit is made from (combat/drawn_grip_bake.py): each drawn
+# hand in the gun's frame and every bone under it in its parent's, per gun
+# and state.
+CAPTURE = os.path.join(unreal.Paths.project_saved_dir(), "grip_report", "drawn_hands.json")
 GS = unreal.GeometryScript_MeshSpatial
 OPTS = unreal.GeometryScriptSpatialQueryOptions()
 
@@ -156,9 +178,12 @@ def _hands(skin):
     return out
 
 
-def _measure(body, mannequin, held, surfaces, hands):
+def _measure(body, mannequin, held, surfaces, hands, fist=False):
     """{"drawn"/"mannequin": {"wrist"/"elbow": {hand: point}, "fingers":
-    {(hand, finger): signed distances}}} in the gun's frame."""
+    {(hand, finger): signed distances}}} in the gun's frame. ``fist``: a
+    handgun, whose left fingers lie on the right fist as well as on the
+    gun (finger_pose.fist, drawn_grip_bake), so theirs are to the nearer of
+    the two (the right fingers' skin a finger_fit.SKIN_CM round their bones)."""
     gun = held.get_actor_transform()
     into = gun.inverse()
     out = {}
@@ -172,10 +197,72 @@ def _measure(body, mannequin, held, surfaces, hands):
             turn[hand] = (q.x, q.y, q.z, q.w)
             v = unreal.MathLibrary.transform_location(into, mesh.get_socket_location(arm))
             elbow[hand] = (v.x, v.y, v.z)
-        fingers = {k: [_signed(surfaces, pt) for pt in
-                       finger_fit.riding(_points(mesh, gun, bones, tip))]
-                   for k, (bones, tip) in hands.items()}
+        pts = {k: _points(mesh, gun, bones, tip) for k, (bones, tip) in hands.items()}
+        right = finger_fit.Capsules([s for (h, f), q in pts.items() if h == "right"
+                                     and f != "thumb" for s in zip(q, q[1:])])
+        fingers = {k: [min(_signed(surfaces, pt), right.distance(pt)) if fist and k[0] == "left"
+                       else _signed(surfaces, pt) for pt in finger_fit.riding(q)]
+                   for k, q in pts.items()}
         out[label] = {"wrist": wrist, "elbow": elbow, "turn": turn, "fingers": fingers}
+    return out
+
+
+def _grip(p, name, state, raised, body, held, hands, m):
+    """The fitted fingers' checks (drawn_grip_consts' bounds): the layer
+    on, no finger of a hand on the gun in it deeper than its bound, none
+    further off it (but CARRY_OFF's, carried), and the right index's pad at
+    the trigger."""
+    anim = body.get_anim_instance()
+    weight = {h: anim.get_editor_property(v) for h, v in
+              (("right", GRIP_RIGHT_VAR), ("left", GRIP_LEFT_VAR))}
+    on = {"right": True, "left": raised or name not in HANDGUNS}
+    p.check(f"{name}, {state}: the fitted hands are laid over the drawn fingers",
+            all(weight[h] > 0.99 if on[h] else weight[h] < 0.01 for h in on), f"right {weight['right']:.2f}, left {weight['left']:.2f}")
+    fingers = {k: R.finger(v) for k, v in m["drawn"]["fingers"].items() if on[k[0]]}
+    pressed = PRESSED_CM_BY_GUN.get(name, PRESSED_CM) if raised else CARRY_PRESSED_CM
+    pen = max(fingers.items(), key=lambda kv: kv[1][1])
+    held_on = {k: v for k, v in fingers.items() if raised or k not in CARRY_OFF}
+    gap = max(held_on.items(), key=lambda kv: kv[1][2])
+    off = OFF_CM if raised else CARRY_OFF_CM
+    p.check(f"{name}, {state}: no drawn finger is in the gun",
+            pen[1][1] <= pressed, f"deepest {pen[0][0]} {pen[0][1]} {pen[1][1]:.2f} cm "
+            f"(at most {pressed})")
+    p.check(f"{name}, {state}: the drawn fingers are on the gun",
+            gap[1][2] <= off, f"widest {gap[0][0]} {gap[0][1]} {gap[1][2]:.2f} cm "
+            f"off (at most {off})")
+    bones, tip = hands[("right", "index")]
+    pad = finger_fit.riding(_points(body, held.get_actor_transform(), bones, tip))[D.PAD]
+    near = finger_fit._len(finger_fit._sub(pad, finger_fit.aimed(TRIGGER[name], pad)))
+    bound = TRIGGER_NEAR_CM_BY_GUN.get(name, TRIGGER_NEAR_CM) + R.SKIN_CM
+    p.check(f"{name}, {state}: the right index is at the trigger",
+            near <= bound, f"its pad {near:.2f} cm off the trigger's face (at most {bound:.2f})")
+
+
+def _xf(xf):
+    t, q = xf.translation, xf.rotation
+    return [[t.x, t.y, t.z], [q.x, q.y, q.z, q.w]]
+
+
+def _under(body, hand):
+    """Every bone below ``hand`` on ``body``, parents first."""
+    names = [str(body.get_bone_name(i)) for i in range(body.get_num_bones())]
+    out, keep = [], {hand}
+    for name in names:
+        if str(body.get_parent_bone(name)) in keep:
+            keep.add(name)
+            out.append(name)
+    return out
+
+
+def _capture(body, held):
+    """{"hand_r"/"hand_l": [location, quat] in the gun's frame, "local":
+    {bone: [location, quat] in its parent's}} of the drawn body."""
+    gun = held.get_actor_transform()
+    out = {h: _xf(unreal.MathLibrary.make_relative_transform(body.get_socket_transform(h), gun))
+           for h in ("hand_r", "hand_l")}
+    out["local"] = {b: _xf(body.get_socket_transform(
+        b, unreal.RelativeTransformSpace.RTS_PARENT_BONE_SPACE))
+        for h in ("hand_r", "hand_l") for b in _under(body, h)}
     return out
 
 
@@ -256,7 +343,7 @@ def probe(p):
     bag = [i.get_class().get_name() for i in p.get(wc, "Inventory")]
     guns = [name for name in GUN_HOLDS if name + "_C" in bag]
     p.check("every gun of GUN_HOLDS is in the bag", len(guns) == len(GUN_HOLDS), str(bag))
-    wrists, rows, shots, summary = [], [], [], []
+    wrists, rows, shots, summary, captured = [], [], [], [], {}
     yaw = pc.get_control_rotation().yaw
     for n, name in enumerate(guns):
         _clear_npcs(p)
@@ -272,11 +359,11 @@ def probe(p):
         facing = yaw + 180.0 * (n % 2)
         ahead = unreal.MathLibrary.get_forward_vector(
             unreal.Rotator(roll=0.0, pitch=0.0, yaw=facing))
-        for state, fwd, sprint, stance, sights, pitch, hold_s in STATES:
+        for state, fwd, sprint, stance, raised, sights, pitch, hold_s in STATES:
             _clear_npcs(p)
             p.set(wc, WV.Stance, stance)
             p.set(wc, SPRINT_FORCED_VAR, sprint)
-            p.set(wc, RAISE_FORCED_VAR, sights)
+            p.set(wc, RAISE_FORCED_VAR, raised)
             p.set(wc, SIGHTS_FORCED_VAR, sights)
             look = unreal.Rotator(roll=0.0, pitch=pitch, yaw=facing)
             t0 = unreal.GameplayStatics.get_time_seconds(world)
@@ -295,11 +382,14 @@ def probe(p):
                                or unreal.GameplayStatics.get_time_seconds(world) > end)
             speed = player.get_velocity().length()
             seat = p.get(wc, SEAT_VAR)
-            reached = (seat > SEATED) if sights else (seat < 0.01 and (speed > 50.0) == bool(fwd))
+            reached = ((seat > SEATED) if sights else
+                       (seat < 0.01 and (speed > 50.0) == bool(fwd)
+                        and bool(p.get(wc, LOWERED_VAR)) != raised))
             p.check(f"{name}, {state}: the state is reached",
                     reached, f"seat {seat:.2f}, {speed:.0f} cm/s, "
                     f"view pitch {pc.get_control_rotation().pitch:+.0f}")
-            m = _measure(body, mannequin, held, surfaces, hands)
+            m = _measure(body, mannequin, held, surfaces, hands, name in HANDGUNS)
+            captured.setdefault(name, {})[state] = _capture(body, held)
             wrist, got = _rows(name, state, m)
             wrists.append([name, state, f"{speed:.0f}"] + wrist)
             rows += got
@@ -307,6 +397,7 @@ def probe(p):
             summary.append([name, state, wrist[0], wrist[1],
                             f"{pen[0][0]} {pen[0][1]} {pen[1]:.2f}" if pen else "none",
                             f"{gap[0][0]} {gap[0][1]} {gap[1]:.2f}" if gap else "none"])
+            _grip(p, name, state, raised, body, held, hands, m)
             p.check(f"{name}, {state}: the drawn wrists are on the mannequin's",
                     max(wrist[:2]) <= WRIST_PINNED_CM,
                     f"right {wrist[0]:.2f} cm, left {wrist[1]:.2f} cm "
@@ -361,4 +452,6 @@ def probe(p):
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     with open(REPORT, "w") as f:
         f.write("\n".join(lines) + "\n")
-    p.note(f"report: {REPORT}")
+    with open(CAPTURE, "w") as f:
+        json.dump(captured, f, indent=1, sort_keys=True)
+    p.note(f"report: {REPORT}; capture: {CAPTURE}")

@@ -440,8 +440,9 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
     IK would pin the hand to the handguard (a pistol's to the right fist) through the
     magazine change.
   - **Not done:** the gun's magazine does not leave the model; the shotgun's clip is one
-    motion for the whole refill, at 1.77 times its speed, not a shell at a time; the fingers are Lyra's,
-    not fitted; the sights are not lowered for it; not played on a server by a probe
+    motion for the whole refill, at 1.77 times its speed, not a shell at a time; the hidden
+    mannequin's fingers are Lyra's, not fitted (the drawn right hand keeps its fitted grip,
+    the left lets go to the retarget's: "The gun poses", the drawn fingers); the sights are not lowered for it; not played on a server by a probe
     (the `Fx_`/`Multicast_` pair is the reload sound's own).
   Checked by `verify/reload_clip.py`, played in `probes/probe_reload_clip.py` (the five
   guns raised, the AKM, the pistol and the shotgun lowered and down the sights, the pistol
@@ -523,6 +524,23 @@ until C3.
   `pose`: the seat's open fist, `gun_hold.support_box`, stands up to a centimetre proud
   of it). `CarryAlso` is `finger_pose.carry_clips()`, the fitted clips that are the
   rifle's pose: not a pistol's, or a lowered pistol would be carried in both hands.
+  `finger_fit` counts all six of a finger's riding points (the first bone's two too,
+  since 15 Oct 2026), and a finger no bend clears of the gun takes the least bend that
+  lifts it out, not the clip's pose. These fit the hidden mannequin.
+- **The drawn MetaHuman's fingers are fitted on its own hand against each gun's real
+  mesh** (15 Oct 2026; `drawn_grip.py` the fit, pure, `drawn_grip_mesh.py` the gun as one
+  solid, `drawn_grip_bake.py` the clip, `drawn_grip_graph.py` the layer in
+  `ABP_MetaHuman_Retarget_UEFN`, `weapon_component/drawn_grip.py` its weights,
+  `drawn_grip_consts.py`, `drawn_grip_vars.py`; `verify/drawn_grip.py`,
+  `probes/probe_drawn_grip.py`). `A_DrawnGrip` holds three frames a gun (hold, sights,
+  carry) laid over the retarget's fingers: the right hand while a gun is held, the left
+  raised, down the sights and in a long gun's carry. The bake is
+  `Scripts/build_drawn_grip.py` (about 7 minutes, so not a step of the weapons build); run
+  it after a gun's model, grip or ready pose changes, then the weapons build (its
+  `drawn_grip` step lays the clip over the fingers), then the probe. **The clip plays
+  retargeted**: the bake corrects its keys until the pose as played is the fit's
+  (`drawn_grip_bake.settle`). The numbers and what is not done: `docs/aiming.md`, "The
+  drawn fingers".
 - **Every gun's left hand is seated on its own model** (`gun_hold.py`), the shotgun's
   being one case: the AK's on its handguard clear of the magazine, the Val's on the front
   of its receiver, the pistol's and the SMG's over the right hand's fingers on the grip.

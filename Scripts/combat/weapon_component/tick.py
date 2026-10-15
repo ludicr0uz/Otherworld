@@ -175,7 +175,7 @@ def _author_wc_tick(ed, tick):
     # --- and where the camera is, down the sights ----------------------------
     # After the aim state it reads (SightAiming). The camera trace at the top
     # of the next frame then starts from wherever this puts the camera.
-    ads_exits = _author_sight_camera(ed, tick, owner_out, held, armed_out, ads_exits)
+    ads_exits = _author_sight_camera(ed, tick, pc_out, owner_out, held, armed_out, ads_exits)
 
     # --- and the player's own head leaves the sight picture (head_hide.py) ----
     # After SightSeat is written, which it reads.

@@ -42,6 +42,8 @@ _author_* fragment per concern, each in its own module:
               settling (by SightLook) onto Held's SightOffset as it turns onto
               Held's sight line (towards SightAim); hide a scoped weapon behind
               its glass
+  sight_cut   the cut to the sights keeps the point aimed at: on SightCut
+              the control rotation turns from the anchor onto ViewPoint
   head_hide   down the sights: the player's own head bone is hidden past
               SightSeat HEAD_HIDE_SEAT, whatever gun is held, and shown again
               off them (the eye point is inside or beside the head); a

@@ -49,6 +49,8 @@ and it never relies on a variable another section left behind.
               sight camera: where it goes and the line it is turned onto
   seat        the sight camera's seat: SightSeat 1 at once on the key and
               eased home, SightSeated's latch, SightLook eased toward it
+  sight_cut   the cut to the sights keeps the point aimed at: SightCut,
+              ViewPoint, the control rotation turned onto it from the anchor
   near_clip   the camera's near plane: Config/DefaultEngine.ini sets it to
               NEAR_CLIP_CM, once, in the engine's own section
   head_hide   down the sights the player's own head is hidden: the Branch on
@@ -221,7 +223,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "ammo_graph", "install",
-    "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "seat", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "carry_pose", "block", "movement", "sprint", "stance", "accuracy", "bloom", "punch", "knife", "axe", "chop", "light", "torch",
+    "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "seat", "sight_cut", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "carry_pose", "block", "movement", "sprint", "stance", "accuracy", "bloom", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "melee_clips", "shotgun_pose", "gun_hold", "finger_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "reload_clip", "world_items", "relevancy", "leftovers", "glimmer", "heat", "trigger",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "wear_draw", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
     "var_tables",

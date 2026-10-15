@@ -188,6 +188,8 @@ def _author_sight_snap(ed, tick, held, sight_on, shoulder, exec_in, keep):
     the view has cut to the sights yet.
 
         SightHeld    = SightAiming ? SightHeld + dt : 0
+        SightCut     = SightAiming AND SightHeld >= Held.AdsZoomInSeconds
+                       AND NOT SightSnapped (last frame's: the cut's frame)
         SightSnapped = SightAiming AND SightHeld >= Held.AdsZoomInSeconds
         SightPending = SightAiming AND NOT SightSnapped AND NOT shoulder
         AdsSpeed     = Held.AdsZoomSpeed
@@ -232,9 +234,20 @@ def _author_sight_snap(ed, tick, held, sight_on, shoulder, exec_in, keep):
     cut = keep(_node(ed, FN_AND))
     _connect(sight_on, _pin(cut, "A"))
     _connect(out(past), _pin(cut, "B"))
+    # The cut's own frame: written before SightSnapped, so the Get reads
+    # last frame's (sights.py turns the view onto what was aimed at).
+    was = keep(ed.add_get_member_variable_node(WV.SightSnapped))
+    fresh = keep(_node(ed, FN_NOT))
+    _connect(out(was, WV.SightSnapped), _pin(fresh, "A"))
+    first = keep(_node(ed, FN_AND))
+    _connect(out(cut), _pin(first, "A"))
+    _connect(out(fresh), _pin(first, "B"))
+    cut_now = keep(ed.add_set_member_variable_node(WV.SightCut))
+    _connect(out(first), _pin(cut_now, WV.SightCut))
+    _connect(then(held_for), _pin(cut_now, "execute"))
     snapped = keep(ed.add_set_member_variable_node(WV.SightSnapped))
     _connect(out(cut), _pin(snapped, WV.SightSnapped))
-    _connect(then(held_for), _pin(snapped, "execute"))
+    _connect(then(cut_now), _pin(snapped, "execute"))
 
     not_yet = keep(_node(ed, FN_NOT))
     _connect(_loose_pin(snapped, "Output_Get", is_input=False), _pin(not_yet, "A"))
@@ -263,8 +276,8 @@ def _author_sight_unsnap(ed, exec_in, keep):
     and nothing is pending. AdsSpeed is left as it was (see _author_sight_snap).
     Returns the exec pin to carry on from."""
     flow = exec_in
-    for var, value in ((WV.SightHeld, 0.0), (WV.SightSnapped, False),
-                       (WV.SightPending, False)):
+    for var, value in ((WV.SightHeld, 0.0), (WV.SightCut, False),
+                       (WV.SightSnapped, False), (WV.SightPending, False)):
         put = keep(ed.add_set_member_variable_node(var))
         _set(put, var, value)
         _connect(flow, _pin(put, "execute"))

@@ -51,6 +51,7 @@ from combat.weapon_component.body_parts import author_parts_no_see
 from combat.weapon_component.common import _prop
 from combat.weapon_component.head_hide import head_bone
 from combat.weapon_component.seat import _author_sight_seat, _author_unseat
+from combat.weapon_component.sight_cut import author_cut_turn
 from uebp.nodes.actor import (
     FN_ADD_TICK_PREREQ, FN_COMP_SET_WORLD_LOC, FN_COMP_SET_WORLD_ROT, FN_GET_COMP,
     FN_GET_TRANSFORM, FN_SET_HIDDEN, FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC, FN_SOCKET_ROT)
@@ -164,7 +165,7 @@ def _author_tick_order(ed, owner_out, exec_in):
     return then(posed)
 
 
-def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
+def _author_sight_camera(ed, tick, pc_out, owner_out, held, armed_out, exec_ins):
     """Put the camera in the sights' view from the key, and ease it home.
 
         SightBlend = FInterpTo(SightBlend,
@@ -178,6 +179,7 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
                                   Owner.GetTransform(),
                                   OwnerMesh.GetSocketLocation(head bone))
             anchor = TransformLocation(Owner.GetTransform(), SightAnchor)
+            if SightCut: turn the view onto ViewPoint     (sight_cut.py)
             SightSeat, SightSeated, SightLook = ...       (seat.py)
             Camera.SetWorldLocation(VLerp(shoulder, VLerp(anchor, eye, SightLook),
                                           SightSeat))
@@ -300,13 +302,16 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     stand = keep(ed.add_set_member_variable_node(WV.SightAnchor))
     _connect(out(local), _pin(stand, WV.SightAnchor))
     _connect(then(taking), _pin(stand, "execute"))
-    seated, seat_out, look_out = _author_sight_seat(
-        ed, tick, keep, line_out, has_line_out, boom_rot_out,
-        (then(stand), else_(taking)))
     kept = keep(ed.add_get_member_variable_node(WV.SightAnchor))
     anchor = keep(_node(ed, FN_TRANSFORM_LOC))
     _connect(out(frame), _pin(anchor, "T"))
     _connect(out(kept, WV.SightAnchor), _pin(anchor, "Location"))
+    # On the cut's frame the view turns from the anchor onto what the boom's
+    # view was on, so the crosshair's point does not move (sight_cut.py).
+    turned, view_rot = author_cut_turn(
+        ed, keep, pc_out, out(anchor), boom_rot_out, (then(stand), else_(taking)))
+    seated, seat_out, look_out = _author_sight_seat(
+        ed, tick, keep, line_out, has_line_out, view_rot, turned)
     perch = keep(_node(ed, FN_VLERP))
     _connect(out(anchor), _pin(perch, "A"))
     _connect(out(eye), _pin(perch, "B"))
@@ -319,7 +324,7 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     _connect(cam_out, _pin(to_sight, "self"))
     _connect(out(mix), _pin(to_sight, "NewLocation"))
     _connect(seated, _pin(to_sight, "execute"))
-    look = _author_sight_look(ed, keep, line_out, has_line_out, boom_rot_out, look_out)
+    look = _author_sight_look(ed, keep, line_out, has_line_out, view_rot, look_out)
     to_line = keep(_node(ed, FN_COMP_SET_WORLD_ROT))
     _connect(cam_out, _pin(to_line, "self"))
     _connect(look, _pin(to_line, "NewRotation"))

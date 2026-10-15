@@ -12,6 +12,7 @@ from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, wc_cdo, wg
 from combat.verify.chop import is_chop_node
 from combat.verify.throw import launch_nodes
+from combat.verify.sight_cut import cut_turns
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, out_pins,
     pin_value,
@@ -67,10 +68,14 @@ def check_recoil():
     # The throw's launch reads the view too, and writes nothing back.
     throw_launch = launch_nodes()
     # ...and the sight sway (verify/sway.py) turns it the same way: the third.
+    # The cut to the sights writes it once more, with nothing to read back
+    # (verify/sight_cut.py), and is left out.
+    cut = set(cut_turns())
     for label, want, n in (("written", "SetControlRotation", 3),
                            ("read back first", "GetControlRotation", 3)):
         hits = [t for node, t in zip(wg, flat)
-                if t.startswith(want) and node not in throw_launch]
+                if t.startswith(want) and node not in throw_launch
+                and node not in cut]
         if want == "GetControlRotation":
             hits = hits[pitch_reads:]
         check(f"the control rotation is {label} exactly {n}x: the kick, the "

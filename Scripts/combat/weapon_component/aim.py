@@ -101,12 +101,19 @@ def _author_resolve_aim(ed, held, pc_out, exec_ins):
     _connect(sky_out, _pin(at_sky, WV.AimPoint))
     _connect(else_(saw), _pin(at_sky, "execute"))
 
+    # What the view is on, kept before the muzzle's trace can move AimPoint:
+    # the cut to the sights turns the view onto it (sights.py).
+    seen = keep(ed.add_get_member_variable_node(WV.AimPoint))
+    viewed = keep(ed.add_set_member_variable_node(WV.ViewPoint))
+    _connect(out(seen, WV.AimPoint), _pin(viewed, WV.ViewPoint))
+    _connect(then(on_surface), _pin(viewed, "execute"))
+    _connect(then(at_sky), _pin(viewed, "execute"))
+
     armed = keep(_node(ed, FN_IS_VALID))
     _connect(held, _pin(armed, "Object"))
     holding = keep(ed.add_branch_node())
     _connect(out(armed), _pin(holding, "Condition"))
-    _connect(then(on_surface), _pin(holding, "execute"))
-    _connect(then(at_sky), _pin(holding, "execute"))
+    _connect(then(viewed), _pin(holding, "execute"))
 
     # Empty-handed: there is nothing to draw a reticle for, and no muzzle to
     # trace from -- reading one off a null weapon is how Accessed None happens.

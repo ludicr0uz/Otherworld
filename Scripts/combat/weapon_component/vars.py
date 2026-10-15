@@ -102,6 +102,12 @@ SightBlend = Var("SightBlend", FLOAT, 0.0)
 # camera with it.
 SightHeld = Var("SightHeld", FLOAT, 0.0)
 SightSnapped = Var("SightSnapped", BOOL, False)
+# SightCut is true on the cut's frame alone: sights.py turns the view from the
+# anchor onto ViewPoint there, what the boom's view was on (aim.py: the
+# camera trace's point, before the muzzle's), so the cut does not move what
+# is under the crosshair by the shoulder's offset.
+SightCut = Var("SightCut", BOOL, False)
+ViewPoint = Var("ViewPoint", VECTOR, ZERO_VECTOR)
 SightPending = Var("SightPending", BOOL, False)
 AdsSpeed = Var("AdsSpeed", FLOAT, COMBAT.ads_interp_speed)
 SightAnchor = Var("SightAnchor", VECTOR, ZERO_VECTOR)
@@ -410,7 +416,7 @@ CORE = (
     Inventory, Held, EquippedIndex, NeedsRefresh, OwnerMesh, AimPoint, AimValid, AimBlocked,
     Stamina, MaxStamina, Sprinting, Blocking, BaseFOV, CurrentFOV, TargetFOV, Aiming,
     SightAiming, AimZoom, SightBlend, SightHeld, SightSnapped, SightPending, AdsSpeed,
-    SightAnchor, MouseSensitivity, ScopeSensitivity, BaseYawScale,
+    SightAnchor, SightCut, ViewPoint, MouseSensitivity, ScopeSensitivity, BaseYawScale,
     BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ItemClass,
     BloodClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds, ThrowSounds, ThrowSharpSounds,
     PunchHitSounds, BladeHitSounds, LodgeSounds, HeadKillSounds, BreathSounds, BreathNextTime,

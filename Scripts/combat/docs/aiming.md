@@ -61,6 +61,19 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
      `TargetFOV`, `SightSeat` is 1 and the gun's raise begins, all on that frame.
   3. **The raise.** The gun rises into the view from below and to the right onto the
      crosshair, the camera standing still; the turn onto its line waits for it (below).
+  - **The cut keeps the point aimed at** (`weapon_component/sight_cut.py`). The boom's
+    camera is behind and beside the shoulder; cut to the head with the boom's rotation
+    kept, the middle of the view moved by that offset and the target jumped aside (5.8°
+    at 5.4 m, probed). On the cut's frame alone (`SightCut`, written by `ads.py` just
+    before `SightSnapped`) the control rotation turns from the anchor onto `ViewPoint`,
+    the camera trace's point kept by `aim.py` before the muzzle's trace can move
+    `AimPoint`, and the camera takes that rotation on the same frame (the boom ticked
+    with the old one). The mouse, the body and the gun follow the control rotation, so
+    the gun rises onto the same target. From the hip the body's own turn to the new yaw
+    carries the camera about 0.5° on that one frame; the next frame's trace lands on the
+    point. Letting go is not turned back: the point drifts the offset back over the
+    ease home. `probes/probe_sight_cut_aim.py` (from the hip and from the shoulder aim),
+    `verify/sight_cut.py`.
   Letting go eases everything out at the same `AdsZoomSpeed`, the zoom-in's inverse. The
   three numbers are rows of the GUN SETTINGS tab (`sights zoom speed`, `sights zoom-in (s)`,
   `sights raise (s)`), the same default on every gun. `AdsSpeed` on the component is the

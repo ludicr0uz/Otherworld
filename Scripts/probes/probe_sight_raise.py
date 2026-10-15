@@ -1,5 +1,5 @@
 """Bringing the sights up from a lowered gun: a glimpse of the zoom easing
-in on the boom for the gun's AdsZoomInSeconds, then the cut (SightSnapped):
+in on the boom for the player's SightZoomIn, then the cut (SightSnapped):
 the camera in the sights' view (at the anchor, zoomed to the weapon's own)
 on that frame, and the gun raised from that frame into the view from below
 and to the right onto the crosshair, the camera standing still meanwhile; it
@@ -17,9 +17,9 @@ Per gun (the shotgun, level and looking down; the pistol; the sniper):
   - the frame the sights key goes down: the camera is still on the boom
     (SightSeat 0), the zoom has started easing toward the weapon's own, and
     the gun is still lowered (SightPending);
-  - the frame of the cut, once SightHeld is past the gun's AdsZoomInSeconds
-    (the pistol's is written longer on its live item, LONG_ZOOM_IN, which the
-    cut then waits for: the column is the gun's own): SightSeat is 1 and the
+  - the frame of the cut, once SightHeld is past the player's SightZoomIn
+    (written longer on the component for the pistol, LONG_ZOOM_IN, which the
+    cut then waits for: the PLAYER SETTINGS row is read live): SightSeat is 1 and the
     zoom is the weapon's own (the sniper's 4x: no stop at the shoulder's),
     the camera is at the head bone, the gun's front sight is below and to the
     right of the middle of the view, and the gun is no longer lowered;
@@ -60,7 +60,7 @@ import unreal
 from combat.carry_tuning import LOWERED_VAR
 from combat.game_state import DEBUG_MODE_VAR
 from net.state_consts import GAME_STATE_BP_PATH
-from combat.paths import ITEM_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
+from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import (
     LOOK_VAR, SEAT_HOLD, SEAT_VAR, SEATED_VAR, SIGHT_SEAT_DEG, SIGHTS_FORCED_VAR,
 )
@@ -71,15 +71,14 @@ from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
-            (GAME_STATE_BP_PATH, DEBUG_MODE_VAR),
-            (ITEM_BP_PATH, "AdsZoomInSeconds")] + [
+            (GAME_STATE_BP_PATH, DEBUG_MODE_VAR)] + [
     (WEAPON_COMP_BP_PATH, v) for v in
-    (WV.EquippedIndex, WV.NeedsRefresh, SIGHTS_FORCED_VAR)]
+    (WV.EquippedIndex, WV.NeedsRefresh, SIGHTS_FORCED_VAR, WV.SightZoomIn)]
 ML = unreal.MathLibrary
 GS = unreal.GameplayStatics
 # (class, label, the view's pitch when the key goes down, the zoom-in written
-# on the live item for the case, or None for the gun's own)
-LONG_ZOOM_IN = 0.3      # the pistol's case: the cut waits for the item's own number
+# on the component for the case, or None for the built one)
+LONG_ZOOM_IN = 0.3      # the pistol's case: the cut waits for the number as it is now
 CASES = (("BP_Shotgun_C", "Shotgun", "SHOTGUN", 0.0, None),
          ("BP_Shotgun_C", "Shotgun, looking -25", "SHOTGUN", -25.0, None),
          ("BP_Pistol_C", "Pistol", "PISTOL", 0.0, LONG_ZOOM_IN),
@@ -226,14 +225,14 @@ def _case(p, wc, cam, bag, cls, label, key, pitch, zoom_in, first):
     held = lambda: p.get(wc, "Held")
     yield _until(lambda: held() is not None and held().get_class().get_name() == cls)
     _look(p, pitch)
-    own_zoom_in = held().get_editor_property("AdsZoomInSeconds")
+    own_zoom_in = p.get(wc, WV.SightZoomIn)
     if zoom_in is not None:
-        p.set(held(), "AdsZoomInSeconds", zoom_in)
+        p.set(wc, WV.SightZoomIn, zoom_in)
     try:
         yield from _raise(p, wc, cam, held, sights, label, first)
     finally:
-        if zoom_in is not None and held() is not None:
-            p.set(held(), "AdsZoomInSeconds", own_zoom_in)
+        if zoom_in is not None:
+            p.set(wc, WV.SightZoomIn, own_zoom_in)
 
 
 def _raise(p, wc, cam, held, sights, label, first):
@@ -255,7 +254,7 @@ def _raise(p, wc, cam, held, sights, label, first):
 
     # --- the sights key goes down: the zoom-in, on the boom ----------------------
     zoom = held().get_editor_property("AdsZoom")
-    zoom_in = held().get_editor_property("AdsZoomInSeconds")
+    zoom_in = p.get(wc, WV.SightZoomIn)
     p.set(wc, SIGHTS_FORCED_VAR, True)
     yield       # one tick: the Tick has read the key once
     watch.sample()
@@ -290,7 +289,7 @@ def _raise(p, wc, cam, held, sights, label, first):
     held1 = p.get(wc, "SightHeld")
     right0, up0 = watch.front_in_view()
     p.check(f"{label}: the cut comes on the first frame the key has been held "
-            f"{zoom_in:g} s (the item's own AdsZoomInSeconds)",
+            f"{zoom_in:g} s (the component's SightZoomIn)",
             p.get(wc, "SightSnapped") and held1 >= zoom_in and held_before[0] < zoom_in,
             f"SightHeld {held1:.4f} at the cut, {held_before[0]:.4f} the frame before")
     p.check(f"{label}: ...and on that frame the camera is in the sights' view at "

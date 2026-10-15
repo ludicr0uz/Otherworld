@@ -7,12 +7,14 @@ import dataclasses
 
 from combat.breath_tuning import HOLD_BREATH_KEY
 from combat.player_tuning import (
-    JOG_SPEED, SPRINT_DURATION, SPRINT_SPEED, STAMINA_RECHARGE, cms, per_second,
+    JOG_SPEED, SIGHT_RAISE, SIGHT_ZOOM_IN, SPRINT_DURATION, SPRINT_SPEED, STAMINA_RECHARGE,
+    cms, per_second,
 )
 from combat.player_tuning import table as _player_table
 from combat.slot_tuning import BAG_SIZE
 
-# player_tuning.csv over its defaults: jog, sprint, how long the bar lasts.
+# player_tuning.csv over its defaults: jog, sprint, how long the bar lasts,
+# the sights' zoom-in and raise.
 _PLAYER = _player_table()
 
 
@@ -249,14 +251,16 @@ class CombatConfig:
     # on the boom and the zoom eases in at ads_interp_speed (a glimpse of the
     # zoom starting, like the old glide), then the view cuts to the sights'
     # (the weapon's own zoom, the camera at the head) and the gun is raised
-    # into it. Letting go eases out at the same speed, the inverse. Both are
-    # columns of gun_tuning.csv (AdsZoomSpeed, AdsZoomInSeconds), tuned per
-    # gun on the GUN SETTINGS tab; these are every gun's defaults.
-    ads_zoom_in_s: float = 0.1
+    # into it. Letting go eases out at the same speed, the inverse. The speed
+    # is a column of gun_tuning.csv (AdsZoomSpeed), tuned per gun on the GUN
+    # SETTINGS tab; the zoom-in is the player's, a row of player_tuning.csv
+    # (the PLAYER SETTINGS tab; the component's SightZoomIn). 0 is the cut on
+    # the key's own frame.
+    ads_zoom_in_s: float = _PLAYER[SIGHT_ZOOM_IN]
     # How long the gun takes to rise into the sights' view: the ready pose's
-    # blend in (the equip's PlaySlotAnimation, inventory.py). A column too
-    # (AdsRaiseSeconds); this is every gun's default, and the blend out.
-    ads_raise_s: float = 0.25
+    # blend in (the equip's PlaySlotAnimation, inventory.py). The player's
+    # too (SightRaise); the blend out is every pose's, the built raise.
+    ads_raise_s: float = _PLAYER[SIGHT_RAISE]
     # And what it costs in mobility: at full ADS the player walks at half
     # speed. Aiming is meant to be a commitment -- the cloud is narrower (or
     # gone, down the sights) and the camera is inside a scope, so the price is that you cannot also

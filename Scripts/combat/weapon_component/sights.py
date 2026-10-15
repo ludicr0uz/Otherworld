@@ -193,7 +193,7 @@ def _author_sight_camera(ed, tick, pc_out, owner_out, held, armed_out, exec_ins)
     SightBlend is the body's share of the sights (the pitch, the sway, the
     steady hand): it starts with the cut, as the gun's raise does, and lasts
     until the camera has left the gun. SightSeat is 1 from the cut (seat.py:
-    SightSnapped, the gun's AdsZoomInSeconds after the key, during which the
+    SightSnapped, the player's SightZoomIn after the key, during which the
     camera stays on the boom and the zoom eases in): the camera is at the
     anchor on that frame, and ads.py lands the weapon's own zoom on the same
     frame, so the sniper's glass (which fades on the zoom) is closed round
@@ -372,7 +372,7 @@ def _author_sight_camera(ed, tick, pc_out, owner_out, held, armed_out, exec_ins)
     shown_tail = author_parts_no_see(ed, keep, then(shown), no_see=False)
 
     ed.add_comment_to_nodes(
-        "Down the sights: with the cut (SightSnapped, the gun's AdsZoomInSeconds "
+        "Down the sights: with the cut (SightSnapped, the player's SightZoomIn "
         "after the key, the zoom easing in meanwhile) the camera is at once "
         f"(SightSeat 1) in the sights' view, standing at the anchor (the head "
         f"bone, {head_bone()}, in the owner's frame, held from the cut so the "

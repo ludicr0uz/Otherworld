@@ -4,7 +4,6 @@ weapon property, trace defaults and the muzzle location.
 
 from uebp.graph import _connect, _node, _pin, _set, out
 from combat.paths import ITEM_CLASS_PATH
-from combat.tuning import COMBAT
 from uebp.nodes.actor import FN_GET_TRANSFORM
 from uebp.nodes.math import FN_TRANSFORM_LOC
 from combat import item_vars as IV
@@ -14,7 +13,10 @@ from combat import item_vars as IV
 
 AIM_LOOPS = 9999          # PlaySlotAnimation has no "loop forever"; 9999 x 8 s
                           # is about a day, which outlasts any play session.
-AIM_BLEND = COMBAT.ads_raise_s   # the blend out; the blend in is Held's AdsRaiseSeconds
+# Every pose's blend out, and the blend in of an item with no sights; a gun's
+# blend in is the player's SightRaise (look.py's HandRaise). A literal, not
+# COMBAT.ads_raise_s: a player who tunes the raise to 0 keeps this.
+AIM_BLEND = 0.25
 
 
 def _prop(ed, name, self_pin, class_path=ITEM_CLASS_PATH):

@@ -30,7 +30,7 @@ _author_* fragment per concern, each in its own module:
   ads         the two aim keys (shoulder, sights) -> Aiming/SightAiming/AimZoom
               (the sights key aims only while it is not Using); the zoom (eased
               at the gun's AdsZoomSpeed, landed with the cut), the cut to the
-              sights after the gun's AdsZoomInSeconds (SightHeld, SightSnapped,
+              sights after the player's SightZoomIn (SightHeld, SightSnapped,
               SightPending: the gun kept lowered until the cut), the scope's
               look slowdown, and the aim-walk flag handed to the movement
               component

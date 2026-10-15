@@ -4,6 +4,7 @@ mobility, and sprint dropping the ready pose.
 
 from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR
 from combat.tuning import COMBAT
+from combat.weapon_component.common import AIM_BLEND
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, w, wc_cdo, wg
 from combat.verify.pickup import is_pickup_play
@@ -114,7 +115,7 @@ def check_aiming_down_sights():
 
 def check_sights_cut():
     """ads.py's _author_sight_snap: how long the sights key has been down,
-    the cut once that is past the gun's AdsZoomInSeconds, the zoom-in before
+    the cut once that is past the player's SightZoomIn, the zoom-in before
     it that keeps the gun lowered (unless the shoulder key holds it up), and
     the gun's AdsZoomSpeed taken as AdsSpeed."""
     def one_hop(n, pin):
@@ -152,10 +153,10 @@ def check_sights_cut():
             for n in [PIN.get_owning_node(q) for q in
                       PIN.list_connected_pins(BEL.find_input_pin(m, "B"))]
             if {"A", "B"} <= in_pins(n)]
-    check("...the cut: SightAiming AND SightHeld >= Held's AdsZoomInSeconds (a GUN "
-          "SETTINGS column), so the zoom eases in for the gun's own time first",
+    check("...the cut: SightAiming AND SightHeld >= SightZoomIn (the player's, a "
+          "PLAYER SETTINGS row), so the zoom eases in for that long first",
           len(past) == 1 and one_hop(past[0], "A") == {"Set SightHeld"}
-          and one_hop(past[0], "B") == {"Get AdsZoomInSeconds"}
+          and one_hop(past[0], "B") == {"Get SightZoomIn"}
           and any("Set SightAiming" in one_hop(m, "A") for x in wired for m in
                   [PIN.get_owning_node(q) for q in
                    PIN.list_connected_pins(BEL.find_input_pin(x, "SightSnapped"))]),
@@ -185,6 +186,24 @@ def check_sights_cut():
     got = w.get_editor_property("AdsSpeed")
     check(f"...and AdsSpeed starts at every gun's default ({COMBAT.ads_interp_speed:g})",
           isinstance(got, float) and abs(got - COMBAT.ads_interp_speed) < 1e-9, repr(got))
+
+    raises, wired = writes("HandRaise")
+    picks = [PIN.get_owning_node(q) for x in wired
+             for q in PIN.list_connected_pins(BEL.find_input_pin(x, "HandRaise"))]
+    pick = [n for n in picks if {"A", "B", "bPickA"} <= in_pins(n)]
+    check("HandRaise, the ready pose's blend in, is the player's SightRaise for an "
+          "item with sights (a gun's raise into them) and every pose's blend else",
+          len(raises) == 1 and len(pick) == 1
+          and one_hop(pick[0], "A") == {"Get SightRaise"}
+          and one_hop(pick[0], "bPickA") == {"Get HasSights"}
+          and abs(float(BEL.find_input_pin(pick[0], "B").get_pin_value() or 0)
+                  - AIM_BLEND) < 1e-6,
+          f"{len(raises)} writes, {len(pick)} selects")
+    for var, built in (("SightZoomIn", COMBAT.ads_zoom_in_s),
+                       ("SightRaise", COMBAT.ads_raise_s)):
+        got = w.get_editor_property(var)
+        check(f"...{var} starts at player_tuning.csv's {built:g} s",
+              isinstance(got, float) and abs(got - built) < 1e-9, repr(got))
 
 
 def _reach(pin, limit=60):

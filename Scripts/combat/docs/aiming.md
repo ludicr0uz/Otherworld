@@ -49,15 +49,15 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 - **A glimpse of the zoom, then a cut; only the turn waits for the gun**
   (`weapon_component/ads.py`, `seat.py`, numbers in `seat_tuning.py` and the gun's row of
   `gun_tuning.csv`). A gun is carried lowered, and the sights key raises it over the ready
-  pose's blend (the gun's `AdsRaiseSeconds`, 0.25 s on every gun; `HandRaise`, taken with
+  pose's blend (the player's `SightRaise`, 0.25 s built, 0 a gun up at once; `HandRaise`, taken with
   `HandPose` in `look.py`, is the equip's `BlendInTime`), from 70–95° off the view. The
   sequence is:
   1. **The zoom-in.** On the key `TargetFOV` is the weapon's own, and the zoom eases toward
      it (`FInterpTo` at the gun's `AdsZoomSpeed`, 12 on every gun) while the camera stays on
      the boom and the gun stays lowered (`SightPending`, read by the carry). `SightHeld`
      counts the seconds the key has been down.
-  2. **The cut.** On the first frame `SightHeld` is past the gun's `AdsZoomInSeconds` (0.1 s
-     on every gun; 0 is a cut on the key's own frame) `SightSnapped` is set: `CurrentFOV` is
+  2. **The cut.** On the first frame `SightHeld` is past the player's `SightZoomIn` (0.1 s
+     built; 0 is a cut on the key's own frame) `SightSnapped` is set: `CurrentFOV` is
      `TargetFOV`, `SightSeat` is 1 and the gun's raise begins, all on that frame.
   3. **The raise.** The gun rises into the view from below and to the right onto the
      crosshair, the camera standing still; the turn onto its line waits for it (below).
@@ -75,8 +75,15 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     ease home. `probes/probe_sight_cut_aim.py` (from the hip and from the shoulder aim),
     `verify/sight_cut.py`.
   Letting go eases everything out at the same `AdsZoomSpeed`, the zoom-in's inverse. The
-  three numbers are rows of the GUN SETTINGS tab (`sights zoom speed`, `sights zoom-in (s)`,
-  `sights raise (s)`), the same default on every gun. `AdsSpeed` on the component is the
+  speed is a row of the GUN SETTINGS tab (`sights zoom speed`), the same default on every
+  gun. The zoom-in's length and the raise's are the player's, not a gun's: rows of the
+  PLAYER SETTINGS tab (`sights zoom-in (s)`, `sights raise (s)`, step 0.05, down to 0;
+  `combat/player_tuning.csv`), applied onto the component's `SightZoomIn` and `SightRaise`.
+  A zoom-in of 0 skips the glimpse: the key's own frame is the cut, straight from the boom
+  into the sights. A raise of 0 has the gun up at once (`HandRaise` 0, only for an item
+  with sights; anything else blends in over every pose's 0.25 s, `common.AIM_BLEND`). Not
+  replicated: the aim runs on the owning machine, whose own table applies them.
+  `probes/probe_sight_timing.py` plays both at 0 through the tab. `AdsSpeed` on the component is the
   gun's speed, taken while aiming and kept on letting go (as `AimZoom` is), so the ease out
   with empty hands is the aimed gun's; every ease here reads it.
   The sights are three values:
@@ -129,8 +136,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - An item with no sight line is seated at once.
   - `SightsForced` is the probes' stand-in for the sights key. `probes/probe_sight_raise.py`
     runs the whole raise: on the frame of the key the camera is on the boom, the zoom has
-    started and the gun is lowered; the cut comes on the first frame past the item's own
-    `AdsZoomInSeconds` (the pistol's is written to 0.3 s on its live item for the case),
+    started and the gun is lowered; the cut comes on the first frame past the component's
+    `SightZoomIn` (written to 0.3 s for the pistol's case),
     and on it `SightSeat` is 1, the zoom is the weapon's own, the camera is at the head bone,
     the gun's front sight is below and right of the middle of the view and the gun is no
     longer lowered; from the cut to the latch the camera moves under 0.01 cm a frame in the

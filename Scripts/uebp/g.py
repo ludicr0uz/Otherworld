@@ -36,7 +36,7 @@ class _G:
     def call(g, fn, execs=(), **inputs):
         n = g.keep(_node(g.ed, fn))
         for name, value in inputs.items():
-            if isinstance(value, (str, int)):
+            if isinstance(value, (str, int, float)):
                 _set(n, name, value)
             else:
                 _connect(value, _loose_pin(n, name))

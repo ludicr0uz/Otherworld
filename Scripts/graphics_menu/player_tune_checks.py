@@ -9,9 +9,10 @@ import unreal
 
 from combat.player_tuning import PLAYER_STATS
 from combat.sprint_tuning import BASE_SPEED_VAR, SPRINT_RATE_VARS
+from combat.weapon_component import vars as WV
 from graphics_menu import player_tune_consts as PC
 from graphics_menu import umg_consts as UC
-from graphics_menu.player_tune_tick import APPLIES, SPEED, player_tune_defaults
+from graphics_menu.player_tune_tick import APPLIES, COPY, SPEED, TIME, player_tune_defaults
 from graphics_menu.umg_checks import _tree
 from graphics_menu.world_tune_checks import _feeds, _pins, _same, _title
 
@@ -27,7 +28,7 @@ def _check_widgets(check):
               for k in (box.get_all_children() if box else [])]
     check(f"WBP_PauseMenu has the player tuning panel, its {TAB.row_count} rows "
           f"labelled player, jog and sprint speed, sprint from full, recharge to "
-          f"full, and the saved line",
+          f"full, the sights' zoom-in and raise, and the saved line",
           TAB.panel in widgets and TAB.saved_text in widgets
           and labels == list(TAB.row_labels), str(labels))
     hidden = [n for n in (TAB.panel, TAB.saved_text) if n in widgets
@@ -49,10 +50,13 @@ def _check_graph(check, nodes):
     writes = [n for n in nodes if {"TargetArray", "Index", "Item", "bSizeToFit"} <= _pins(n)
               and f"Get {TAB.values_var}" in _feeds(BEL.find_input_pin(n, "TargetArray"))]
     check("a player nudge writes PlayerTuneValues, held at the row's minimum (so "
-          "no time reaches zero), and nothing else does",
+          "no stamina time reaches zero; the sights' go down to 0), and nothing "
+          "else does",
           len(writes) == 1
           and any("Max" in t for t in _feeds(BEL.find_input_pin(writes[0], "Item")))
-          and all(s[3] > 0.0 for s in PLAYER_STATS), f"{len(writes)} writes")
+          and all(s[3] > 0.0 for s in PLAYER_STATS if APPLIES[s[0]][1] == TIME)
+          and all(s[3] == 0.0 for s in PLAYER_STATS if APPLIES[s[0]][1] == COPY),
+          f"{len(writes)} writes")
 
     wrong = []
     for s, (col, *_rest) in enumerate(PLAYER_STATS):
@@ -65,6 +69,15 @@ def _check_graph(check, nodes):
             continue
         maths = [PIN.get_owning_node(q)
                  for q in BEL.find_input_pin(sets[0], var).list_connected_pins()]
+        if kind == COPY:
+            # The cell itself, no sum.
+            ok = (len(maths) == 1
+                  and str(BEL.find_input_pin(maths[0], "Index").get_pin_value()) == str(s)
+                  and f"Get {TAB.values_var}"
+                  in _feeds(BEL.find_input_pin(maths[0], "TargetArray")))
+            if not ok:
+                wrong.append(f"{var} from {[_title(m) for m in maths]}")
+            continue
         # A speed is its cell x 100; a time divides the component's MaxStamina.
         cell_pin, other = ("A", "B") if kind == SPEED else ("B", "A")
         cells = [PIN.get_owning_node(q) for m in maths
@@ -80,10 +93,12 @@ def _check_graph(check, nodes):
         if not ok:
             wrong.append(f"{var} from {[_title(m) for m in maths]}")
     check("once touched, the tab sets the weapon component's BaseSpeed and "
-          "SprintSpeed (m/s x 100) and its stamina drain and regen (MaxStamina / "
-          "seconds), once each, from its own cell",
+          "SprintSpeed (m/s x 100), its stamina drain and regen (MaxStamina / "
+          "seconds) and its SightZoomIn and SightRaise (seconds, as they are), "
+          "once each, from its own cell",
           not wrong and set(v for v, _k in APPLIES.values())
-          == {BASE_SPEED_VAR, *SPRINT_RATE_VARS}, str(wrong))
+          == {BASE_SPEED_VAR, *SPRINT_RATE_VARS, WV.SightZoomIn, WV.SightRaise},
+          str(wrong))
 
 
 def check_player_tune(check, bp, nodes):

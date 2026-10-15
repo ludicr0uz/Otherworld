@@ -46,9 +46,11 @@ from combat.aim_pitch import AIM_PITCH_VAR
 from combat import item_vars as IV
 from combat.carry_tuning import LOWERED_VAR
 from combat.paths import ITEM_CLASS_PATH
+from combat.seat_tuning import HAS_SIGHTS_VAR
 from combat.skin import player_skin
 from combat.tuning import COMBAT
 from combat.weapon_component import vars as WV
+from combat.weapon_component.common import AIM_BLEND
 from combat.weapon_component.look_vars import (
     HIP, LOOK_PARAMS, REPLICATED, SERVER_SET_LOOK, SHOULDER, SIGHTS, HandPose, HandRaise,
     LookAim,
@@ -62,7 +64,7 @@ from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, o
 from uebp.nodes.actor import FN_GET_BASE_AIM_ROT
 from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_BOOL_TO_FLOAT, FN_BREAK_ROT, FN_CLAMP_II, FN_EQ_II, FN_GE_II, FN_INTERP_FF, FN_MUL_FF,
-    FN_NE_OO, FN_NEQ_BB, FN_NEQ_II, FN_NORMALIZE_AXIS, FN_OR, FN_SELECT_II)
+    FN_NE_OO, FN_NEQ_BB, FN_NEQ_II, FN_NORMALIZE_AXIS, FN_OR, FN_SELECT_FF, FN_SELECT_II)
 from uebp.nodes.move import FN_GET_STANCE
 from uebp.nodes.palette import NODE_CAST_PAWN
 from uebp.nodes.system import FN_IS_VALID
@@ -98,12 +100,17 @@ def _author_hand_pose(ed, exec_in):
     held = g.get(WV.Held)
     armed, empty = g.branch(out(g.call(FN_IS_VALID, Object=held)), [local])
     took = g.put(HandPose, g.iget(held, IV.AimPose), [armed])
-    took = g.put(HandRaise, g.iget(held, IV.AdsRaiseSeconds), [took])
+    # A gun rises into the sights over the player's SightRaise; anything
+    # else blends in over every pose's AIM_BLEND.
+    rise = g.call(FN_SELECT_FF, A=g.get(WV.SightRaise), B=AIM_BLEND,
+                  bPickA=g.iget(held, HAS_SIGHTS_VAR))
+    took = g.put(HandRaise, out(rise), [took])
     none = g.put(HandPose, None, [empty])
     ed.add_comment_to_nodes(
         "HandPose (look.py): the pose the hand's item is held in, off Held "
-        "where the keys are, and HandRaise, how long it blends in (the gun's "
-        "AdsRaiseSeconds: its raise into the sights). Read behind IsValid: "
+        "where the keys are, and HandRaise, how long it blends in (a gun's "
+        "raise into the sights is the player's SightRaise, PLAYER SETTINGS; "
+        "anything else every pose's blend). Read behind IsValid: "
         "empty hands have none.", g.made)
     return (took, none, remote)
 

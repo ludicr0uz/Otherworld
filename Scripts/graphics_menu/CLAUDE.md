@@ -616,6 +616,11 @@ Moved word for word: `docs/history/menu.md#the-monster-settings-tab`.
 
 Moved word for word: `docs/history/menu.md#the-player-settings-tab`.
 
+Its rows are `combat/player_tuning.PLAYER_STATS`. Two of them, the sights' zoom-in and raise
+(`sight_zoom_in_s`, `sight_raise_s`), go down to 0 and are copied onto the weapon component's
+`SightZoomIn` and `SightRaise` as they are (`player_tune_tick` kind `COPY`), not replicated:
+the aim runs on the owning machine (`combat/docs/aiming.md`).
+
 ## The SOUND SETTINGS tab (`sound_tune_*.py`)
 
 Moved word for word: `docs/history/menu.md#the-sound-settings-tab`.

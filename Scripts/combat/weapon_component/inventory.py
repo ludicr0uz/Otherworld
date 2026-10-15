@@ -277,8 +277,8 @@ def _author_equip(ed, exec_in):
     _connect(anim_out, _pin(play, "self"))
     _connect(pose_pin, _pin(play, "Asset"))
     _set(play, "SlotNodeName", AIM_SLOT)
-    # The blend in is the gun's raise into the sights (HandRaise, look.py:
-    # Held's AdsRaiseSeconds); the blend out every pose's.
+    # The blend in is a gun's raise into the sights (HandRaise, look.py: the
+    # player's SightRaise); the blend out every pose's.
     raise_for = keep(ed.add_get_member_variable_node(HandRaise))
     _connect(out(raise_for, HandRaise), _pin(play, "BlendInTime"))
     _set(play, "BlendOutTime", AIM_BLEND)

@@ -738,17 +738,18 @@ don't re-count it).
 live: lethality, sprint and stamina, ADS, mouse sensitivity, recoil and the hit reactions.
 Per-weapon numbers live in `_weapon_specs()`.
 
-**The jog, the sprint and the stamina bar's times are `player_tuning.csv`'s** (`player_tuning.py`),
-laid over `COMBAT` and tuned in game by the menu's PLAYER SETTINGS tab (`docs/stance.md`).
+**The jog, the sprint, the stamina bar's times and the sights' zoom-in and raise are
+`player_tuning.csv`'s** (`player_tuning.py`), laid over `COMBAT` and tuned in game by the menu's
+PLAYER SETTINGS tab (`docs/stance.md`; the sights' two, down to 0: `docs/aiming.md`).
 
 **Per-gun numbers can be tuned in game** (the M panel's **T** tab, `graphics_menu/tune_*.py`):
-- `gun_tuning.csv` (tracked) holds each gun's 21 tunable stats (`gun_tuning.TUNE_STATS`: damage,
+- `gun_tuning.csv` (tracked) holds each gun's 22 tunable stats (`gun_tuning.TUNE_STATS`: damage,
   pellets, range, interval, reload, magazine, sights zoom, shot volume, the accuracy columns,
   the sway's rate and the throw's arc).
 - **The melee weapons have rows too** (`Knife`, `Axe`, under the guns:
   `gun_tuning.MELEE_WEAPONS`), holding their throw alone: `throw_arc` and `throw_damage`
   (`melee_tuning.py`, which `knife.py` and `axe.py` lay over `MELEE_THROW`; the defaults
-  are `throw_tuning`'s). `throw_damage` is the table's 22nd column and no gun's: a gun's
+  are `throw_tuning`'s). `throw_damage` is the table's 23rd column and no gun's: a gun's
   `ThrowDamage` stays 0, which is what keeps a thrown gun from wounding.
   `gun_tuning.columns_of(weapon)` says which columns are a weapon's own; a cell outside
   them is empty in the CSV, a dash on the tab, and never written onto the weapon. The

@@ -89,8 +89,8 @@ SightAiming = Var("SightAiming", BOOL, False)
 AimZoom = Var("AimZoom", FLOAT, COMBAT.shoulder_zoom)
 SightBlend = Var("SightBlend", FLOAT, 0.0)
 # Bringing the sights up (ads.py, seat.py, sights.py). SightHeld is how long
-# the sights key has been down (s); SightSnapped is that past Held's
-# AdsZoomInSeconds: the view has cut to the sights (the seat, the zoom and
+# the sights key has been down (s); SightSnapped is that past SightZoomIn:
+# the view has cut to the sights (the seat, the zoom and
 # the gun's raise key off it, the body's SightBlend too). SightPending is
 # the brief zoom-in before it, with no shoulder key holding the gun up: the
 # carry keeps the gun lowered through it, so the raise starts with the cut.
@@ -110,6 +110,12 @@ SightCut = Var("SightCut", BOOL, False)
 ViewPoint = Var("ViewPoint", VECTOR, ZERO_VECTOR)
 SightPending = Var("SightPending", BOOL, False)
 AdsSpeed = Var("AdsSpeed", FLOAT, COMBAT.ads_interp_speed)
+# The player's, not a gun's (combat/player_tuning, the PLAYER SETTINGS tab,
+# which writes them here): how long the zoom eases in before the view cuts to
+# the sights, 0 a cut on the key's frame (ads.py), and how long a gun takes
+# to rise into the view, the ready pose's blend in (look.py's HandRaise).
+SightZoomIn = Var("SightZoomIn", FLOAT, COMBAT.ads_zoom_in_s)
+SightRaise = Var("SightRaise", FLOAT, COMBAT.ads_raise_s)
 SightAnchor = Var("SightAnchor", VECTOR, ZERO_VECTOR)
 # Mouse sensitivity, and the two controller scales it multiplies. Both
 # bases are cached off the PlayerController at BeginPlay -- BasePitchScale
@@ -427,6 +433,7 @@ CORE = (
     Inventory, Held, EquippedIndex, NeedsRefresh, OwnerMesh, AimPoint, AimValid, AimBlocked,
     Stamina, MaxStamina, Sprinting, Blocking, BaseFOV, CurrentFOV, TargetFOV, Aiming,
     SightAiming, AimZoom, SightBlend, SightHeld, SightSnapped, SightPending, AdsSpeed,
+    SightZoomIn, SightRaise,
     SightAnchor, SightCut, ViewPoint, MouseSensitivity, ScopeSensitivity, BaseYawScale,
     BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ItemClass,
     BloodClass, BloodSpriteClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds, ThrowSounds, ThrowSharpSounds,

@@ -20,3 +20,5 @@ probe:probe_net_see_each_other | client 2 walked | since 2026-10-10 | the same
 probe:probe_net_survival | the server has both clients' characters | since 2026-10-10 | characters left by earlier probes in the shared launch
 probe:probe_net_survival | the probe raised | since 2026-10-10 | the check above raised on its way out
 verify_graphics_menu.py | no graph asks for a controller or a camera by player index | since 2026-10-13 | PN_GlobalUpdater.EventGraph, a Blueprint of the grass library pack (/Game/PN_GrassLibrary/Blueprints, not ours and not committed), calls one
+probe:probe_sight_raise | Shotgun: carried, the gun is lowered and its sight line is far off the view (> 25 deg) | since 2026-10-15 | the two-handed carry (b55d2994, 7309dac4) holds a lowered long gun about 14 deg off the view, under the probe's 25; seen running the probe for task 04 (the sights timings), which does not touch the lowered pose
+probe:probe_sight_raise | Sniper: carried, the gun is lowered and its sight line is far off the view (> 25 deg) | since 2026-10-15 | the same (14.1 deg)

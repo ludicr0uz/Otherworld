@@ -14,7 +14,7 @@ import math
 # raise looked down at the hand and then swung up onto the target. Looking
 # where the player looks until the gun is nearly there, it keeps the target
 # in the middle and the sights rise to it. The camera does not wait for the
-# gun: with the cut (SightSnapped, the gun's AdsZoomInSeconds after the key,
+# gun: with the cut (SightSnapped, the player's SightZoomIn after the key,
 # the zoom easing in meanwhile) it is at once in the sights' view, zoomed
 # (SightSeat 1, the weapon's zoom), standing at the anchor (the head bone in
 # the owner's frame, held from the cut; sights.py) while the gun rises into

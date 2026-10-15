@@ -79,7 +79,7 @@ The raise becomes one curve, `GunOnSight`, from 0 to 1.
   - The camera goes to the ADS view on its own schedule: the existing zoom glimpse, then the cut.
   - The gun starts from wherever the carry or ready animation has it: low, to the right and off the
     reticle.
-  - `GunOnSight` rises over the gun's `AdsRaiseSeconds` (0.25 s today) with an ease-out. The IK blends
+  - `GunOnSight` rises over the player's `SightRaise` (0.25 s built) with an ease-out. The IK blends
     the hand from the animated pose to the target. At 1 the gun is exactly on the reticle.
 - **While held:** at 1, the gun is pinned to the view exactly, whatever the legs or the breathing do.
 - **Key up:** it eases back to 0 while the camera returns to the shoulder.
@@ -108,7 +108,7 @@ remote players see the gun come up onto their aim. The camera manager only matte
    - At `GunOnSight` 1, walking at real speed on the horde map: the front sight is on the reticle
      within 0.02° on every frame.
    - During the raise: it starts off the reticle and closes in steadily, landing within
-     `AdsRaiseSeconds`.
+     `SightRaise`.
    - The IK can reach for every gun in every stance: the hand target is within arm length, checked
      for all five guns.
 4. **Docs:** update `docs/aiming.md` to describe the new model.

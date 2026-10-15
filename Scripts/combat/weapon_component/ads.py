@@ -54,7 +54,7 @@ def _author_aim_state(ed, tick, pc_out, held, armed_out, key_pins, sights_key,
 
     The weapon's own zoom starts on the sights key: TargetFOV is the
     weapon's from the key's frame, and the zoom eases toward it for the
-    gun's AdsZoomInSeconds, then the view cuts to the sights (SightSnapped,
+    player's SightZoomIn, then the view cuts to the sights (SightSnapped,
     _author_sight_snap: the zoom lands, seat.py puts the camera in the
     sights' view, the gun is raised into it). The scope's 4x, and the glass
     that fades in on it, arrive with the cut. The sights key never stops at
@@ -188,14 +188,14 @@ def _author_sight_snap(ed, tick, held, sight_on, shoulder, exec_in, keep):
     the view has cut to the sights yet.
 
         SightHeld    = SightAiming ? SightHeld + dt : 0
-        SightCut     = SightAiming AND SightHeld >= Held.AdsZoomInSeconds
+        SightCut     = SightAiming AND SightHeld >= SightZoomIn
                        AND NOT SightSnapped (last frame's: the cut's frame)
-        SightSnapped = SightAiming AND SightHeld >= Held.AdsZoomInSeconds
+        SightSnapped = SightAiming AND SightHeld >= SightZoomIn
         SightPending = SightAiming AND NOT SightSnapped AND NOT shoulder
         AdsSpeed     = Held.AdsZoomSpeed
 
-    Bringing the sights up is two parts. For the gun's AdsZoomInSeconds after
-    the key the camera stays on the boom and the zoom eases in (a glimpse of
+    Bringing the sights up is two parts. For SightZoomIn after the key (the
+    player's, the PLAYER SETTINGS tab's "sights zoom-in") the camera stays on the boom and the zoom eases in (a glimpse of
     the zoom starting, as the old glide did, only shorter); then the view
     cuts to the sights (SightSnapped): the zoom lands on the weapon's own
     (_author_zoom), seat.py puts the camera in the sights' view, and the gun
@@ -226,11 +226,10 @@ def _author_sight_snap(ed, tick, held, sight_on, shoulder, exec_in, keep):
     _connect(out(pick), _pin(held_for, WV.SightHeld))
     _connect(exec_in, _pin(held_for, "execute"))
 
-    wait, wait_n = _prop(ed, IV.AdsZoomInSeconds, held)
-    keep(wait_n)
+    wait = keep(ed.add_get_member_variable_node(WV.SightZoomIn))
     past = keep(_node(ed, FN_GE_FF))
     _connect(_loose_pin(held_for, "Output_Get", is_input=False), _pin(past, "A"))
-    _connect(wait, _pin(past, "B"))
+    _connect(out(wait, WV.SightZoomIn), _pin(past, "B"))
     cut = keep(_node(ed, FN_AND))
     _connect(sight_on, _pin(cut, "A"))
     _connect(out(past), _pin(cut, "B"))
@@ -292,8 +291,8 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
                      : FInterpTo(CurrentFOV, TargetFOV, dt, AdsSpeed)
         Camera.SetFieldOfView(CurrentFOV)
 
-    Down the sights the zoom eases toward the weapon's own for the gun's
-    AdsZoomInSeconds after the key (TargetFOV is the weapon's from the key's
+    Down the sights the zoom eases toward the weapon's own for the player's
+    SightZoomIn after the key (TargetFOV is the weapon's from the key's
     frame), then lands on it with the cut to the sights (SightSnapped:
     seat.py's SightSeat is 1 on the same frame) and the gun rises into the
     view. Everything else is interpolated at the gun's AdsSpeed: the
@@ -461,8 +460,8 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,
         f"{AIM_KEY} aims over the shoulder at {COMBAT.shoulder_zoom:g}x; "
         f"{SIGHTS_KEY} aims down the sights at the weapon's own AdsZoom "
         f"({COMBAT.ads_zoom_irons:g}x irons, {COMBAT.ads_zoom_scope:g}x on the sniper's "
-        f"scope): the zoom eases in for the gun's AdsZoomInSeconds (every gun's "
-        f"{COMBAT.ads_zoom_in_s:g} s), then the view cuts to the sights "
+        f"scope): the zoom eases in for the player's SightZoomIn (PLAYER SETTINGS, "
+        f"built {COMBAT.ads_zoom_in_s:g} s; 0 cuts on the key's frame), then the view cuts to the sights "
         f"(SightSnapped: the zoom lands, sights.py puts the camera in the "
         f"sights' view) and the gun is raised into it (SightPending keeps it "
         f"lowered until the cut, unless the shoulder key holds it up). The "

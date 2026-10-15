@@ -81,13 +81,14 @@ AdsZoom = Var("AdsZoom", FLOAT)
 # to be a 4x with irons or a 2x with glass without either answer moving.
 Scoped = Var("Scoped", BOOL)
 # Bringing this weapon's sights up (weapon_component/ads.py, seat.py): how
-# fast the zoom eases in and out, how long it eases in before the view cuts
-# to the sights, and how long the gun takes to rise into them (the ready
-# pose's blend in). Columns of gun_tuning.csv, so per gun; the defaults are
-# COMBAT's, the same on every gun.
+# fast the zoom eases in and out. A column of gun_tuning.csv, so per gun; the
+# default is COMBAT's, the same on every gun. How long the zoom eases in
+# before the cut and how long the gun rises are the player's (the weapon
+# component's SightZoomIn and SightRaise, the PLAYER SETTINGS tab).
 AdsZoomSpeed = Var("AdsZoomSpeed", FLOAT, COMBAT.ads_interp_speed)
-AdsZoomInSeconds = Var("AdsZoomInSeconds", FLOAT, COMBAT.ads_zoom_in_s)
-AdsRaiseSeconds = Var("AdsRaiseSeconds", FLOAT, COMBAT.ads_raise_s)
+# Once this weapon's (AdsZoomInSeconds, AdsRaiseSeconds): the build removes
+# them from a Blueprint that still has them.
+RETIRED = ("AdsZoomInSeconds", "AdsRaiseSeconds")
 # How far this weapon's shot is heard by the wanderers, in cm (see
 # SHOT_VOLUME_CM in tuning.py). On the item so the shot's noise is read off
 # Held like every other per-weapon number.
@@ -230,7 +231,7 @@ TABLE = (
     Damage, SpreadDegrees, WeaponRange, FireInterval, NextFireTime, ReloadSeconds,
     MuzzleOffset, SightOffset, SightAim, GripLocation, GripRotation, SlotColor, Icon,
     FireSound, DryFireSound, ReloadSound, HandleSounds, UseSounds, AimPose, TwoHanded, AdsZoom, Scoped, ShotVolume,
-    AdsZoomSpeed, AdsZoomInSeconds, AdsRaiseSeconds,
+    AdsZoomSpeed,
     Lodged, InWorld, Dormant, ThrowStamp, RestSeen, ShowAt, Released,
     DisplayName, PelletCount, Dropped, GlimmerWait, UsesAmmo, MagazineSize, Loaded, Reserve,
     InfiniteReserve, Automatic, Consumable, Melee, Chops, Lights, HasSights, Burns, Lit,

@@ -8,6 +8,8 @@ the player's weapon component, which owns the sprint.
       SprintSpeed           := sprint speed (m/s) x 100
       StaminaDrainPerSecond := MaxStamina / sprint from full (s)
       StaminaRegenPerSecond := MaxStamina / recharge to full (s)
+      SightZoomIn           := sights zoom-in (s), as it is
+      SightRaise            := sights raise (s), as it is
 
 The table is in a person's units and the component in its own; the sums are
 combat/player_tuning.cms and per_second, which the build uses. Every Tick
@@ -15,6 +17,11 @@ once touched, as the guns' table: a respawned player is a new component, and
 takes the tuning on its first frame. BaseSpeed is the jog everywhere: sprint
 writes MaxWalkSpeed from it each frame, and the aim and the low stances
 scale it. A row's minimum (PLAYER_STATS) keeps the two divisions off zero.
+The sights' two timings go down to 0 (no division reads them): a zoom-in of
+0 cuts to the sights on the key's frame, a raise of 0 has the gun up at once
+(combat/weapon_component/ads.py, look.py). Neither is replicated: on a
+server's client it is the client's own copy, where the aim runs, that takes
+them (the client that tuned applies its own table, game_tuner's rule).
 """
 
 import unreal
@@ -22,8 +29,8 @@ import unreal
 from uebp.graph import BEL, _connect, _loose_pin, _palette, _pin, out, then
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.player_tuning import (
-    CM_PER_M, JOG_SPEED, PLAYER_STATS, SPRINT_DURATION, SPRINT_SPEED, STAMINA_RECHARGE,
-    table,
+    CM_PER_M, JOG_SPEED, PLAYER_STATS, SIGHT_RAISE, SIGHT_ZOOM_IN, SPRINT_DURATION,
+    SPRINT_SPEED, STAMINA_RECHARGE, table,
 )
 from combat.sprint_tuning import (
     BASE_SPEED_VAR, SPRINT_SPEED_VAR, STAMINA_DRAIN_VAR, STAMINA_REGEN_VAR,
@@ -39,11 +46,13 @@ from uebp.nodes.palette import NODE_CAST_WEAPON
 from combat.weapon_component import vars as WV
 
 # What each row writes on the component, and how: a speed is metres to
-# centimetres, a time is the stamina rate that crosses the bar in it.
-SPEED, TIME = "speed", "time"
+# centimetres, a time is the stamina rate that crosses the bar in it, a copy
+# is the cell as it is (the sights' seconds).
+SPEED, TIME, COPY = "speed", "time", "copy"
 APPLIES = {JOG_SPEED: (BASE_SPEED_VAR, SPEED), SPRINT_SPEED: (SPRINT_SPEED_VAR, SPEED),
            SPRINT_DURATION: (STAMINA_DRAIN_VAR, TIME),
-           STAMINA_RECHARGE: (STAMINA_REGEN_VAR, TIME)}
+           STAMINA_RECHARGE: (STAMINA_REGEN_VAR, TIME),
+           SIGHT_ZOOM_IN: (WV.SightZoomIn, COPY), SIGHT_RAISE: (WV.SightRaise, COPY)}
 
 
 def declare_player_tune_vars(ed):
@@ -94,6 +103,8 @@ def author_onto_pawn(ed, pawn, in_execs, made):
         cell = _value(ed, s, made)
         if kind == SPEED:
             value = out(_call(ed, FN_MUL_FF, made, A=cell, B=CM_PER_M))
+        elif kind == COPY:
+            value = cell
         else:
             full = _get(ed, WV.MaxStamina, made, WEAPON_COMP_CLASS_PATH, wc)
             value = out(_call(ed, FN_DIV_FF, made, A=full, B=cell))
@@ -113,7 +124,8 @@ def author_player_tune_tick(ed, pc_out, in_execs):
     tails = _author_apply(ed, flow, made)
     ed.add_comment_to_nodes(
         "Player tuning (its row in the menu): Up/Down pick a row, Left/Right "
-        "change the jog's or the sprint's speed, or how long the stamina bar "
-        "lasts and refills, Enter saves player_tuning.csv. Once anything is "
+        "change the jog's or the sprint's speed, how long the stamina bar "
+        "lasts and refills, or how long the sights take to zoom in and the gun "
+        "to rise (0: at once), Enter saves player_tuning.csv. Once anything is "
         "tuned, the player's weapon component takes the table each Tick.", made[:1])
     return tails

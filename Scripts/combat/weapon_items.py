@@ -67,6 +67,10 @@ def build_weapon_item():
     body = _add_component(bp, _root_handle(bp), unreal.SceneComponent, "Body")
     add_glimmer(bp, body)
 
+    # Variables this builder no longer declares stay on the asset (it is
+    # updated in place) until removed: the sights' timings, now the player's.
+    for name in IV.RETIRED:
+        ed.remove_member_variable(name)
     declare(ed, IV.TABLE)
 
     # What an item loose in the world shows every client (item_world.py):
@@ -210,8 +214,6 @@ def build_weapon(spec, item_bp):
         IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         IV.AdsZoom: float(spec.get("ads_zoom", COMBAT.ads_zoom_irons)),
         IV.AdsZoomSpeed: float(spec["ads_zoom_speed"]),
-        IV.AdsZoomInSeconds: float(spec["ads_zoom_in_s"]),
-        IV.AdsRaiseSeconds: float(spec["ads_raise_s"]),
         IV.Scoped: bool(spec.get("scoped", False)),
         **{name: float(spec[col]) for col, name in ACCURACY_VARS},
         IV.ShotVolume: float(spec["shot_volume"]),

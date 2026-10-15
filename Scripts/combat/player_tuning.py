@@ -4,7 +4,10 @@ setting (``setting,value``).
 The CSV is the tracked copy of the numbers the in-game PLAYER SETTINGS tab (the
 menu's player tuning row, graphics_menu/player_tune_*.py) saves: how fast the
 player jogs and sprints, how long a full stamina bar sprints for and how long
-an empty one takes to refill. tuning.py lays it over its literals, and
+an empty one takes to refill, and how the sights come up: how long the zoom
+eases in before the view cuts to them, and how long the gun takes to rise into
+the view (0 is straight to the sights on the key's frame, and a gun raised at
+once). tuning.py lays it over its literals, and
 build_weapons_and_combat.py bakes the result into the character's walk speed
 and BP_WeaponComponent's defaults, so a number tuned in a game and saved
 lands in the Blueprints on the next build and git shows what moved.
@@ -24,15 +27,21 @@ SETTING_COLUMN, VALUE_COLUMN = "setting", "value"
 
 JOG_SPEED, SPRINT_SPEED = "jog_speed_mps", "sprint_speed_mps"
 SPRINT_DURATION, STAMINA_RECHARGE = "sprint_duration_s", "stamina_recharge_s"
+SIGHT_ZOOM_IN, SIGHT_RAISE = "sight_zoom_in_s", "sight_raise_s"
 
 # The tab's rows, in order: (CSV setting, the tab's label, step, minimum,
 # the value with no CSV). 8.33 s is the refill the bar has always had (100
 # points at 12 a second); the sprint from full was 4 s before it was doubled.
+# The sights' two timings were every gun's own (gun_tuning.csv) until they
+# became the player's: the same 0.1 s and 0.25 s on every gun. Their minimum
+# is 0, no division reads them.
 PLAYER_STATS = (
     (JOG_SPEED, "jog speed (m/s)", 0.25, 0.5, 4.0),
     (SPRINT_SPEED, "sprint speed (m/s)", 0.25, 0.5, 6.0),
     (SPRINT_DURATION, "sprint from full (s)", 0.5, 0.5, 8.0),
     (STAMINA_RECHARGE, "recharge to full (s)", 0.5, 0.5, 8.33),
+    (SIGHT_ZOOM_IN, "sights zoom-in (s)", 0.05, 0.0, 0.1),
+    (SIGHT_RAISE, "sights raise (s)", 0.05, 0.0, 0.25),
 )
 SAVED_COLUMNS = tuple(s[0] for s in PLAYER_STATS)
 CM_PER_M = 100.0

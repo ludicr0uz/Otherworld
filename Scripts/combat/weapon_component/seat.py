@@ -9,7 +9,7 @@ what this writes.
     SightSeated = SightSnapped AND (SightSeated OR up)
     SightLook   = FInterpTo(SightLook, SightSeated ? 1 : 0, dt, AdsSpeed)
 
-A cut, after a glimpse of the zoom: for the gun's AdsZoomInSeconds after the
+A cut, after a glimpse of the zoom: for the player's SightZoomIn after the
 sights key goes down the camera stays on the boom while ads.py eases the
 zoom in; then SightSnapped (ads.py) and SightSeat is 1 on that frame, with
 the zoom landed on the weapon's own, so the camera is in the sights' view

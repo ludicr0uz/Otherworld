@@ -13,7 +13,7 @@ each frame; probe_sprint_latch.py runs one.
   - an emptied bar refills at the regen rate, timed on the game's clock;
   - a nudge of each row lands on the component in its units, and the jog on
     the character's MaxWalkSpeed the next Tick;
-  - the save writes all four into player_tuning.csv;
+  - the save writes every row into player_tuning.csv;
   - the panel, drawn by hand, shows the jog on its row.
 
 player_tuning.csv is set aside first and put back.
@@ -146,7 +146,7 @@ def _run(p):
     p.set(hud, TAB.save_var, True)
     yield lambda: not p.get(hud, TAB.save_var)
     saved = read_table()
-    p.check("the save writes all four into player_tuning.csv",
+    p.check("the save writes every row into player_tuning.csv",
             p.get(hud, TAB.saved_var)
             and all(abs(saved.get(c, -1.0) - want[c]) < 1e-6 for c in COLUMNS),
             str(saved))

@@ -92,16 +92,16 @@ class Guns(unittest.TestCase):
                 self.assertEqual(set(R.gun_row(gun, tuned={})), set(T.GUN_COLUMNS),
                                  f"{gun}: gun_rows' defaults against GUN_COLUMNS")
 
-    def test_the_sights_timing_defaults_the_same_on_every_gun(self):
-        # The zoom's speed, the zoom-in's length and the raise's (ads.py,
-        # seat.py) are per gun on the GUN SETTINGS tab, and every gun starts
-        # on COMBAT's one number for each.
-        want = {"ads_zoom_speed": COMBAT.ads_interp_speed,
-                "ads_zoom_in_s": COMBAT.ads_zoom_in_s,
-                "ads_raise_s": COMBAT.ads_raise_s}
+    def test_the_sights_zoom_speed_defaults_the_same_on_every_gun(self):
+        # The zoom's speed (ads.py) is per gun on the GUN SETTINGS tab, and
+        # every gun starts on COMBAT's one number; the zoom-in's length and
+        # the raise's are the player's (test_player_tuning.py), no gun's.
+        want = {"ads_zoom_speed": COMBAT.ads_interp_speed}
         for col in want:
             self.assertIn(col, T.GUN_COLUMNS, f"{col}: a gun's column")
             self.assertNotIn(col, T.MELEE_COLUMNS, f"{col}: not a melee weapon's")
+        for col in ("ads_zoom_in_s", "ads_raise_s"):
+            self.assertNotIn(col, T.TUNE_COLUMNS, f"{col}: the player's now")
         for gun in GUNS:
             with self.subTest(gun=gun):
                 row = R.gun_row(gun, tuned={})

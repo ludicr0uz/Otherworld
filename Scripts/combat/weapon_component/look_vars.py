@@ -17,9 +17,9 @@ LookPose = Var("LookPose", POSE_TYPE, rep=_REPLICATED)
 REPLICATED = (LookAim, LookLowered, LookPose)
 # The pose the hand's item is held in, on this copy: what the equip plays.
 HandPose = Var("HandPose", POSE_TYPE)
-# How long the pose takes to blend in: the gun's raise into the sights
-# (Held's AdsRaiseSeconds, a GUN SETTINGS column), taken with HandPose. A
-# remote copy keeps the default: the raise's length is not replicated.
+# How long the pose takes to blend in: a gun's raise into the sights (the
+# player's SightRaise, a PLAYER SETTINGS row), taken with HandPose. A remote
+# copy keeps the default: the raise's length is not replicated.
 HandRaise = Var("HandRaise", FLOAT, COMBAT.ads_raise_s)
 # What the owning machine last reported. SentAim starts at no mode, so the
 # first local frame reports.

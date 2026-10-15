@@ -280,11 +280,15 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     each gun's own, `SupportPoint` on `BP_WeaponItem`: one clip is the ready pose of three
     guns, and each has its handguard somewhere else. The joint target is the
     forearm bone itself, so the elbow stays on the side the pose has it.
-  - The component writes `SupportHand = SightBlend` (the IK's weight) and
-    `SupportPoint = HeldSupportPoint` (its copy of `Held.SupportPoint`, made beside
-    `HeldTwoHanded`). **Only down the sights:** at the hip and on the shoulder
-    the upper-body slot also plays things the left hand must be free for (a throw, a
-    search), and the camera is not on the gun.
+  - The component writes `SupportHand = max(SightBlend, Seated) x (1 - ReloadHand)`
+    (the IK's weight) and `SupportPoint = HeldSupportPoint` (its copy of
+    `Held.SupportPoint`, made beside `HeldTwoHanded`). `Seated` is the anim BP's
+    `CarryPose` when the held gun's `HandPose` is in `CarrySeated` (the clips of
+    `carry_pose_consts.CARRY_SEATED_GUNS`: the shotgun, whose carry clip laid the palm
+    on top of the receiver with the fingers on its outside), else 0. **Otherwise only
+    down the sights:** at the hip and on the shoulder the upper-body slot also plays
+    things the left hand must be free for (a throw, a search), and the camera is not on
+    the gun.
   - It eases in with `SightBlend`.
   - `aim_pitch._remove_previous` takes the IK out with its own nodes, so the build order is
     the pitch, the body poses, then `patch_support_hand`.
@@ -641,7 +645,11 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     the pinned wrist (`PRESSED_CM_BY_GUN`); every finger within 1 cm of the surface
     there. Carried, within 1.5 cm in and 2 cm off (crouched, the shotgun's left little
     stands 1.7 off: one frame serves the four carry clips), but the left thumb, which the
-    carry's clips hold 6 to 9 cm off along the stock (`CARRY_OFF`). The right index's
+    carry's clips hold 6 to 9 cm off along the stock (`CARRY_OFF`). A seated gun
+    (`CARRY_SEATED_GUNS`, the shotgun) is held on its sights seat in the carry too, so
+    its carry frame is captured starting from the sights' fingers
+    (`drawn_grip_consts.FRAME_START_BY_GUN`) and its thumb is held to the gun like the
+    rest: every left joint within 0.07 cm off. The right index's
     pad is 0.01 cm (the 1911) to 1.14 (the Val) off the trigger's face, the shotgun's
     2.45 (its trigger is 5 cm under the hand: `TRIGGER_NEAR_CM_BY_GUN`).
   - **No fingertip IK at run time**: the wrists are pinned and the right hand is rigid on
@@ -745,8 +753,8 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     and 5.4 down). The hand is moved as one piece; its shape is the clip's. The barrel
     lies only 2.2 cm over the pump's wood, so the thumb holds the hand low: its joints
     ride up to 5.0 cm off the wood.
-  - **Only down the sights** (`SupportHand` is `SightBlend`): at the hip and on the
-    shoulder the hand is the clip's own. `probes/probe_shotgun_hands.py` reads the live
+  - **Down the sights and in the carry** (`SupportHand` is `max(SightBlend, CarryPose)`,
+    the shotgun being in `CARRY_SEATED_GUNS`): at the hip the hand is the clip's own. `probes/probe_shotgun_hands.py` reads the live
     joints against the pump both ways; with `--windowed` and `OW_GRIP_SHOTS=1` it saves
     pictures of both hands from round the gun (its view target is a spare item from the
     bag: a game cannot spawn a camera from Python, and moving the pawn's own detached

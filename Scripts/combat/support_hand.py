@@ -33,9 +33,11 @@ SupportHand is its weight. The weapon component writes both
 (weapon_component/support_hand.py): SupportHand is SightBlend (less a
 reload's clip in the slot: weapon_component/reload_clip.py), so the hold
 eases in with the sights and is nothing at the hip, on the shoulder, or with
-no gun in hand. Only down the sights, because that is where the view rides the
-gun; elsewhere the upper-body slot also plays things the left hand must be
-free for (a throw, a search).
+no gun in hand. Down the sights, because that is where the view rides the
+gun; and in the carry for a gun in carry_pose_consts.CARRY_SEATED_GUNS (the
+shotgun: its carry clip held the left hand on the outside of the receiver),
+max(SightBlend, CarryPose). Elsewhere the upper-body slot also plays things the
+left hand must be free for (a throw, a search).
 
 This is the *player's* anim BP (PlayerSkin.anim_bp). aim_pitch.py takes this
 node out with its own on a rerun, so the build order is the pitch, the body

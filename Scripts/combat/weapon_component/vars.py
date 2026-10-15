@@ -18,7 +18,7 @@ from combat.breath_tuning import (
     BREATH_FORCED_VAR, BREATH_HELD_VAR, BREATH_HOLD_S, BREATH_SCALE_VAR, BREATH_VAR,
     WINDED_VAR,
 )
-from combat.carry_pose_consts import CARRY_ALSO_VAR, CARRY_FOR_VAR
+from combat.carry_pose_consts import CARRY_ALSO_VAR, CARRY_FOR_VAR, CARRY_SEATED_VAR
 from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR, RAISE_FORCED_VAR
 from combat.chop_tuning import (
     CHOP_COUNT_VAR, CHOP_ITEM_VAR, CHOP_TREE_VAR, WOOD_CLASS_VAR, WOOD_SPOT_VAR,
@@ -326,6 +326,9 @@ TreeChopAnim = Var("TreeChopAnim", _CLIP)
 CarryFor = Var(CARRY_FOR_VAR, _CLIP)
 # That pose with one gun's fingers fitted (finger_pose.py): carried too.
 CarryAlso = Var(CARRY_ALSO_VAR, array(_CLIP))
+# Of those, the ones whose carry holds the left hand at the gun's seat
+# (support_hand.py): the shotgun's.
+CarrySeated = Var(CARRY_SEATED_VAR, array(_CLIP))
 PunchPending = Var("PunchPending", BOOL, False)
 NextPunchTime = Var("NextPunchTime", FLOAT, 0.0)
 PunchDueTime = Var("PunchDueTime", FLOAT, 0.0)
@@ -443,7 +446,7 @@ STATE = (
     FirePressedAt,
     SprintForced, AimForced, AimHeld, DebugShots, HitBone, HitPoint, ShotgunClass, PistolClass,
     KnifeClass, AxeClass, MatchesClass, StickClass, StarterPantsClass,
-    ImpactClass, CampfireClass, PunchAnim, PunchAltAnim, TreeChopAnim, CarryFor, CarryAlso,
+    ImpactClass, CampfireClass, PunchAnim, PunchAltAnim, TreeChopAnim, CarryFor, CarryAlso, CarrySeated,
     PunchQueued, PunchPending, NextPunchTime, PunchDueTime, BlowDamage, KnifeAnim, AxeAnim,
     AxePose, KnifeQueued, KnifePending, NextKnifeTime, KnifeDueTime, InteractTarget,
     InteractGap, InteractForced, CrouchForced, ThrowAiming, ThrowKeyForced, ThrowClickForced,

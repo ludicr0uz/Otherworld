@@ -15,6 +15,7 @@ from combat.paths import (
     BLOOD_SPRITE_BP_PATH, CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, THROW_ARC_BP_PATH,
     THROW_READY_ANIM_PATH, WEAPON_COMP_BP_PATH,
 )
+from combat.carry_pose_consts import CARRY_SEATED_GUNS
 from combat.drawn_grip_consts import GUNS as DRAWN_GUNS
 from combat.drawn_grip_vars import COMP as DRAWN_GRIP_TABLE, GripPoses
 from combat.finger_pose import carry_clips, clip_for
@@ -224,7 +225,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
            if player_skin().pickup else {}),
         **reload_defaults(),
         **({WV.CarryFor: _must_load(player_skin().aim_rifle),
-            WV.CarryAlso: [_must_load(clip) for clip in carry_clips()]}
+            WV.CarryAlso: [_must_load(clip) for clip in carry_clips()],
+            WV.CarrySeated: [_must_load(clip_for(gun)) for gun in CARRY_SEATED_GUNS]}
            if player_skin().carry_idle else {}),
         WV.ThrowArcClass: arc_class,
         GripPoses: [_must_load(clip_for(gun)) for gun in DRAWN_GUNS],

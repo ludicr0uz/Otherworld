@@ -124,6 +124,26 @@ class Trim(unittest.TestCase):
         self.assertEqual(len(got["frames"]["hold"]["hands"]), 1)
         self.assertEqual(list(got["frames"]["sights"]["left"]), ["b_l"])
 
+    def test_trim_starts_a_guns_frame_from_its_own_state(self):
+        def state(x):
+            xf = [[x, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]]
+            return {"hand_r": xf, "hand_l": xf, "local": {"a_r": xf, "b_l": xf}}
+        capture = {"BP_Gun": {"carried": state(1.0), "ads": state(2.0)},
+                   "BP_Other": {"carried": state(1.0), "ads": state(2.0)}}
+        frames = {"sights": (("ads",), "ads"), "carry": (("carried",), "carried")}
+        got = D.trim(capture, frames, {"r": ["a_r"], "l": ["b_l"]},
+                     {"BP_Gun": {"carry": "ads"}})
+        self.assertEqual(got["BP_Gun"]["frames"]["carry"]["left"]["b_l"][0][0], 2.0)
+        self.assertEqual(got["BP_Gun"]["frames"]["carry"]["hands"][0][0][0], 1.0)
+        self.assertEqual(got["BP_Other"]["frames"]["carry"]["left"]["b_l"][0][0], 1.0)
+
+    def test_a_seated_carry_starts_from_the_sights(self):
+        from combat.carry_pose_consts import CARRY_SEATED_GUNS
+        from combat.drawn_grip_consts import FRAME_START_BY_GUN, FRAME_STATES
+        self.assertIn("BP_Shotgun", CARRY_SEATED_GUNS)
+        for gun in CARRY_SEATED_GUNS:
+            self.assertEqual(FRAME_START_BY_GUN[gun], {"carry": FRAME_STATES["sights"][1]})
+
 
 if __name__ == "__main__":
     unittest.main()

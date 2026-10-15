@@ -2,12 +2,17 @@
 player's anim BP ends its chain in a Two Bone IK on the left hand, aimed at a
 point in the right hand's space; the point is the held gun's own (where its
 ready pose has the hand), and the weapon component writes it and the IK's
-weight from SightBlend.
+weight from SightBlend, and in the carry of a gun of CARRY_SEATED_GUNS (the
+shotgun) from the carry's own weight too.
 """
 
 import unreal
 
 from combat.aim_pitch import IK_CLASS
+from combat.carry_pose_consts import CARRY_POSE, CARRY_SEATED_GUNS
+from combat.finger_pose import clip_for
+from combat.paths import WEAPON_COMP_BP_PATH
+from combat.weapon_component.look_vars import HandPose
 from combat.skin import player_skin
 from combat.support_hand import (
     SUPPORT_HAND_VAR, SUPPORT_POINT_VAR, target_bone,
@@ -86,10 +91,14 @@ def check_anim_bp_support_hand():
 
 def check_component_writes_support_hand():
     skin = player_skin()
+    # The carry's weight is read off the cast anim instance (OwnerMesh's).
+    carry = ((CARRY_POSE, str(WV.CarrySeated), str(HandPose), str(WV.OwnerMesh))
+             if skin.carry_idle else ())
     for var, source, why in (
-            (SUPPORT_HAND_VAR, ("SightBlend", str(WV.ReloadHand)),
-             "the hold eases in with the sights, is off at the hip, and lets go for "
-             "a reload's clip (verify/reload_clip.py)"),
+            (SUPPORT_HAND_VAR, ("SightBlend", str(WV.ReloadHand)) + carry,
+             "the hold eases in with the sights (and with the carry, on a gun of "
+             "CarrySeated), is off at the hip, and lets go for a reload's clip "
+             "(verify/reload_clip.py)"),
             (SUPPORT_POINT_VAR, (HELD_SUPPORT_POINT,),
              "the component's own copy, so nothing reads off an empty hand")):
         writes = [n for n in wg if _title(n) == f"Set {var}"]
@@ -105,6 +114,13 @@ def check_component_writes_support_hand():
         check("...onto the player's anim instance, cast to the player's anim BP",
               any(n.get_class().get_name() == "K2Node_DynamicCast" for n in target),
               str([_title(n) for n in target]))
+    if skin.carry_idle:
+        got = sorted(str(c.get_path_name()) for c in
+                     cdo(load(WEAPON_COMP_BP_PATH)).get_editor_property(str(WV.CarrySeated)) or [])
+        want = sorted(clip_for(g).split(".")[0] for g in CARRY_SEATED_GUNS)
+        check(f"{WV.CarrySeated} holds the fitted clips of {', '.join(CARRY_SEATED_GUNS)} "
+              "alone: their carry seats the left hand where it is down the sights",
+              [g.split(".")[0] for g in got] == want, f"{got} against {want}")
     copies = [n for n in wg if _title(n) == f"Set {HELD_SUPPORT_POINT}"]
     src = ({_title(x) for x in _feeds(BEL.find_input_pin(copies[0], HELD_SUPPORT_POINT), 3)}
            if len(copies) == 1 else set())

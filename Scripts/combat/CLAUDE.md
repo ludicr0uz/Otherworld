@@ -435,8 +435,9 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
     the hands 62 cm apart a second after the clip).
   - **Lowered, no pose is owed:** the clip plays over the carry (a pistol's over the
     locomotion's arms) and ends by itself.
-  - **Down the sights the left hand lets go:** `SupportHand` is `SightBlend x (1 -
-    ReloadHand)`, `ReloadHand` eased towards `holding()` (`author_hand_weight`), or the
+  - **Down the sights the left hand lets go:** `SupportHand` is `max(SightBlend,
+    Seated) x (1 - ReloadHand)` (`Seated`: the carry's weight for a gun in
+    `CARRY_SEATED_GUNS`), `ReloadHand` eased towards `holding()` (`author_hand_weight`), or the
     IK would pin the hand to the handguard (a pistol's to the right fist) through the
     magazine change.
   - **Not done:** the gun's magazine does not leave the model; the shotgun's clip is one
@@ -503,7 +504,10 @@ until C3.
   barrel's top. Unmoved, the thumb's tip is 4.2 cm above the shotgun's sight line. The
   hand's shape is the clip's, so its joints ride up to 5.0 cm off the wood
   (`verify/shotgun_pose.PUMP_REACH_CM`), and the point
-  holds only down the sights: at the hip the hand is where the clip has it. Lyra's own
+  holds down the sights and in the carry (`carry_pose_consts.CARRY_SEATED_GUNS`: the
+  carry clip laid the palm on the receiver's top, the fingers on its outside): at the
+  hip the hand is where the clip has it. The drawn left fingers still lie up the
+  pump's near face rather than round it (the seat is at the arm's reach). Lyra's own
   `MM_Shotgun_Idle_ADS` is the rifle's with the left hand 2 cm further back, further from
   this pump, so it is not taken.
 - **A gun's fingers are bent onto its model** (`finger_pose.py`, `finger_fit.py`): a

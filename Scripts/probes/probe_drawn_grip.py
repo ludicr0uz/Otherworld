@@ -64,6 +64,7 @@ from combat.skin import skin_of_mesh
 from combat.sprint_tuning import SPRINT_FORCED_VAR
 from combat.weapon_component.stance import CROUCH, STAND
 from combat.weapon_component import vars as WV
+from combat.carry_pose_consts import CARRY_SEATED_GUNS
 from combat.carry_tuning import LOWERED_VAR, RAISE_FORCED_VAR
 from combat.weapon_models import GUN_HOLDS
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
@@ -213,7 +214,8 @@ def _measure(body, mannequin, held, surfaces, hands, fist=False):
 def _grip(p, name, state, raised, body, held, hands, m):
     """The fitted fingers' checks (drawn_grip_consts' bounds): the layer
     on, no finger of a hand on the gun in it deeper than its bound, none
-    further off it (but CARRY_OFF's, carried), and the right index's pad at
+    further off it (but CARRY_OFF's, carried, on a gun whose carry is not
+    seated: CARRY_SEATED_GUNS), and the right index's pad at
     the trigger."""
     anim = body.get_anim_instance()
     weight = {h: anim.get_editor_property(v) for h, v in
@@ -224,7 +226,8 @@ def _grip(p, name, state, raised, body, held, hands, m):
     fingers = {k: R.finger(v) for k, v in m["drawn"]["fingers"].items() if on[k[0]]}
     pressed = PRESSED_CM_BY_GUN.get(name, PRESSED_CM) if raised else CARRY_PRESSED_CM
     pen = max(fingers.items(), key=lambda kv: kv[1][1])
-    held_on = {k: v for k, v in fingers.items() if raised or k not in CARRY_OFF}
+    held_on = {k: v for k, v in fingers.items()
+               if raised or name in CARRY_SEATED_GUNS or k not in CARRY_OFF}
     gap = max(held_on.items(), key=lambda kv: kv[1][2])
     off = OFF_CM if raised else CARRY_OFF_CM
     p.check(f"{name}, {state}: no drawn finger is in the gun",

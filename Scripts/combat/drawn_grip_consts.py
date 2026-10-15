@@ -5,6 +5,8 @@ variables that choose and weigh them.
 Pure constants: no ``unreal``.
 """
 
+from combat.carry_pose_consts import CARRY_SEATED_GUNS
+
 # The clip of fitted hands, on the MetaHuman's skeleton: FRAMES_PER_GUN frames
 # for each gun of GUNS, keyed at one frame a second so a frame's time is its
 # number (drawn_grip_graph plays it by explicit time, never forward).
@@ -28,6 +30,12 @@ FRAME_STATES = {
     "carry": (("standing", "walking", "crouched", "sprinting"), "standing"),
 }
 HANDGUNS = ("BP_Pistol", "BP_SMG")
+# A gun whose carry seats its left hand where it is down the sights
+# (carry_pose_consts.CARRY_SEATED_GUNS, the support hand's IK): its carry
+# frame starts from the sights' fingers, not the carry clip's, whose left
+# thumb stands 8 cm off the gun (CARRY_OFF); on the shotgun the sights' thumb
+# lies along the pump there, its tip 0.6 cm off.
+FRAME_START_BY_GUN = {gun: {"carry": FRAME_STATES["sights"][1]} for gun in CARRY_SEATED_GUNS}
 
 # Each gun's trigger in its actor's frame (cm, +X down the barrel, +Z up): a
 # segment just in front of the trigger's face, in the gun's middle plane,
@@ -83,6 +91,7 @@ PRESSED_CM_BY_GUN = {"BP_Shotgun": 0.5, "BP_SMG": 0.5}
 # Starter Pack's, carry_pose.py) hold the left thumb along the side of the
 # stock, 6 to 9 cm off the wood, and the wrist is the clip's there, not pinned
 # to a seat; the thumb is fitted where it is clear, so nothing pulls it on.
+# Not on a gun of CARRY_SEATED_GUNS, whose carry is the sights' hand.
 CARRY_OFF = (("left", "thumb"),)
 
 # The drawn anim Blueprint's variables, written from the weapon component's

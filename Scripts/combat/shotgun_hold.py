@@ -47,9 +47,10 @@ WHAT A SHIPPED CLIP COSTS
     within 1.6). The barrel is only 2.2 cm over the pump, and the thumb under
     its top holds the hand that low. The knuckles stay there; the fingers
     past them are bent up onto the wood by finger_pose.py.
-  - The point holds only down the sights (SupportHand is SightBlend). At the
-    hip and on the shoulder the hand is where the clip has it; the camera is
-    not on the sights there.
+  - The point holds down the sights (SightBlend) and, the shotgun being in
+    carry_pose_consts.CARRY_SEATED_GUNS, in the carry too (CarryPose): the
+    carry clip laid the palm on top of the receiver with the fingers on its
+    outside. At the hip the hand is where the clip has it.
   - The right thumb lies forward along the top of the stock's wrist, 3.6 cm
     under the sight line, as the clip has it on a pistol grip; the keyed pose
     wrapped it over the wrist.

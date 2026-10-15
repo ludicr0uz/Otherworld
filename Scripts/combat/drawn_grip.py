@@ -414,11 +414,13 @@ def capsules(locals_, side, base):
     return finger_fit.Capsules(segments)
 
 
-def trim(capture, frames, bones):
+def trim(capture, frames, bones, starts=None):
     """The part of probe_drawn_grip's capture the fit reads: {gun: {"hand_r":
     xf, "right": {bone: local}, "frames": {frame: {"hands": [hand_l xf, ...],
     "left": {bone: local}}}}}. ``frames``: {frame: (its states, the state
-    whose locals start it)}; ``bones``: the bones to keep, by side."""
+    whose locals start it)}; ``bones``: the bones to keep, by side;
+    ``starts``: {gun: {frame: state}}, a gun's own state to start a frame
+    from instead."""
     def rounded(xf):
         return [[round(x, 4) for x in xf[0]], [round(x, 6) for x in xf[1]]]
 
@@ -429,6 +431,7 @@ def trim(capture, frames, bones):
                "right": {b: rounded(start["local"][b]) for b in bones["r"]},
                "frames": {}}
         for frame, (names, first) in frames.items():
+            first = (starts or {}).get(gun, {}).get(frame, first)
             have = [n for n in names if n in states]
             row["frames"][frame] = {
                 "hands": [rounded(states[n]["hand_l"]) for n in have],
@@ -453,16 +456,17 @@ def finger_bones(names, side):
     return sorted(n for n in names if n.endswith(f"_{side}") and n.split("_")[0] in heads)
 
 
-def take_capture(source, out, frames, guns):
+def take_capture(source, out, frames, guns, starts=None):
     """Write the trimmed capture (trim()) of probe_drawn_grip's ``source``
-    JSON to ``out``: the guns of ``guns``, each frame's states."""
+    JSON to ``out``: the guns of ``guns``, each frame's states (``starts``:
+    trim()'s)."""
     import json
     with open(source) as f:
         capture = {g: s for g, s in json.load(f).items() if g in guns}
     names = next(iter(next(iter(capture.values())).values()))["local"]
     bones = {side: finger_bones(names, side) for side in "rl"}
     with open(out, "w") as f:
-        json.dump(trim(capture, frames, bones), f, indent=None, separators=(",", ":"))
+        json.dump(trim(capture, frames, bones, starts), f, indent=None, separators=(",", ":"))
         f.write("\n")
 
 
@@ -471,7 +475,8 @@ if __name__ == "__main__":
     # probe_drawn_grip run's capture (Saved/grip_report/drawn_hands.json)
     # into the tracked drawn_grip_capture.json the bake reads.
     import os
-    from combat.drawn_grip_consts import FRAME_STATES, GUNS
+    from combat.drawn_grip_consts import FRAME_START_BY_GUN, FRAME_STATES, GUNS
     here = os.path.dirname(os.path.abspath(__file__))
     take_capture(os.path.join(here, "..", "..", "Saved", "grip_report", "drawn_hands.json"),
-                 os.path.join(here, "drawn_grip_capture.json"), FRAME_STATES, GUNS)
+                 os.path.join(here, "drawn_grip_capture.json"), FRAME_STATES, GUNS,
+                 FRAME_START_BY_GUN)

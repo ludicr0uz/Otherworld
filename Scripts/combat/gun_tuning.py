@@ -51,7 +51,7 @@ TUNE_STATS = (
     ("spread_shoulder", "SpreadShoulderScale", "spread x shoulder", 0.05, 0.0, float),
     ("spread_crouch", "SpreadCrouchScale", "spread x crouch", 0.05, 0.0, float),
     ("spread_prone", "SpreadProneScale", "spread x prone", 0.05, 0.0, float),
-    ("pellet_spread", "PelletSpreadDegrees", "pellet pattern (deg)", 0.25, 0.0, float),
+    ("pellet_spread", "PelletSpreadDegrees", "pellet spread (deg)", 0.25, 0.0, float),
     ("recoil", "RecoilPitch", "recoil up (deg)", 0.05, 0.0, float),
     ("recoil_yaw", "RecoilYaw", "recoil side (deg)", 0.01, 0.0, float),
     ("recoil_shoulder", "RecoilShoulderScale", "recoil x shoulder", 0.05, 0.0, float),

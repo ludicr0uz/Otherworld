@@ -63,7 +63,7 @@ from uebp.nodes.actor import (
     FN_PLAY_SLOT)
 from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_VV, FN_AND, FN_EQ_OO, FN_GE_FF, FN_MUL_VF, FN_NOT, FN_RANDOM_BOOL)
-from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_HEALTH
+from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_HEALTH, NODE_CAST_INSTANCED
 from uebp.nodes.system import FN_IS_VALID, FN_SPHERE_TRACE, FN_TIME_SECONDS
 from combat.weapon_component import look_vars as LV
 from combat.weapon_component import vars as WV
@@ -113,6 +113,12 @@ class Strike:
     # swing while it holds a clip (the punch's jab beside its cross). Each
     # machine draws its own: which fist a copy throws is cosmetic.
     alt_anim_var: str = None
+    # (ready-pose variable, clip variable): while HandPose is that pose and
+    # the blow's own sweep, cast at the swing, meets a tree (an instanced
+    # mesh, chop.py), that clip plays instead of every other (the axe's chop
+    # at a trunk, UAL2's TreeChopping_Loop, on the knife's Strike). Each
+    # machine sweeps its own: which clip a copy shows is cosmetic.
+    tree: tuple = ()
 
 
 PUNCH = Strike("punch", PUNCH_ANIM_VAR, PUNCH_QUEUED_VAR, PUNCH_PENDING_VAR,
@@ -210,25 +216,33 @@ def _author_clip(ed, strike, exec_in):
     exec pin after them, the strike's own play node). With
     ``strike.alt_anim_var`` holding a clip, a coin picks it instead."""
     played = []
+    exec_ins = [exec_in]
+    if strike.tree:
+        exec_ins, chop = _author_tree_clip(ed, strike, exec_in)
+        played.append(chop)
     for pose_var, anim_var in strike.by_pose:
         same = _node(ed, FN_EQ_OO)
         _connect(_get(ed, LV.HandPose), _pin(same, "A"))
         _connect(_get(ed, pose_var), _pin(same, "B"))
         pick = ed.add_branch_node()
         _connect(out(same), _pin(pick, "Condition"))
-        _connect(exec_in, _pin(pick, "execute"))
+        for pin in exec_ins:
+            _connect(pin, _pin(pick, "execute"))
         played.append(then(_author_play(ed, strike, anim_var, then(pick))))
-        exec_in = else_(pick)
+        exec_ins = [else_(pick)]
     if strike.alt_anim_var:
         # A coin, and a clip to throw on it: both plain bools, read once.
         has = _node(ed, FN_IS_VALID)
         _connect(_get(ed, strike.alt_anim_var), _pin(has, "Object"))
         pick = ed.add_branch_node()
         _connect(_and(ed, out(_node(ed, FN_RANDOM_BOOL)), out(has)), _pin(pick, "Condition"))
-        _connect(exec_in, _pin(pick, "execute"))
+        for pin in exec_ins:
+            _connect(pin, _pin(pick, "execute"))
         played.append(then(_author_play(ed, strike, strike.alt_anim_var, then(pick))))
-        exec_in = else_(pick)
-    play = _author_play(ed, strike, strike.anim_var, exec_in)
+        exec_ins = [else_(pick)]
+    play = _author_play(ed, strike, strike.anim_var, exec_ins[0])
+    for pin in exec_ins[1:]:
+        _connect(pin, _pin(play, "execute"))
     owner = _node(ed, FN_GET_OWNER)
     here = _node(ed, FN_ACTOR_LOC)
     _connect(out(owner), _pin(here, "self"))
@@ -238,6 +252,68 @@ def _author_clip(ed, strike, exec_in):
     for pin in played:
         _connect(pin, sound)
     return after, play
+
+
+def _author_tree_clip(ed, strike, exec_in):
+    """``strike.tree``: with its ready pose in hand and its clip set, sweep
+    the blow's sphere now; on a tree, play its clip. Returns (the exec pin
+    every other case goes on from (exec pins), the exec pin after the tree's play)."""
+    pose_var, anim_var = strike.tree
+    same = _node(ed, FN_EQ_OO)
+    _connect(_get(ed, LV.HandPose), _pin(same, "A"))
+    _connect(_get(ed, pose_var), _pin(same, "B"))
+    has = _node(ed, FN_IS_VALID)
+    _connect(_get(ed, anim_var), _pin(has, "Object"))
+    armed = ed.add_branch_node()
+    _connect(_and(ed, out(same), out(has)), _pin(armed, "Condition"))
+    _connect(exec_in, _pin(armed, "execute"))
+    trace = _author_sweep(ed, strike, then(armed))
+    hit = ed.add_branch_node()
+    _connect(out(trace), _pin(hit, "Condition"))
+    _connect(then(trace), _pin(hit, "execute"))
+    brk = _palette(ed, NODE_BREAK_HIT)
+    _connect(out(trace, "OutHit"), _loose_pin(brk, "Hit"))
+    tree = _palette(ed, NODE_CAST_INSTANCED)
+    _connect(_loose_pin(brk, "HitComponent", is_input=False), _pin(tree, "Object"))
+    _connect(then(hit), _pin(tree, "execute"))
+    play = _author_play(ed, strike, anim_var, then(tree))
+    ed.add_comment_to_nodes(
+        f"The {strike.name} swung at a tree: with its ready pose in hand, the "
+        "blow's sweep cast now; an instanced mesh (a tree, chop.py) plays the "
+        "chop at a trunk instead of the swing.", [armed, trace, hit, tree, play])
+    return ([else_(armed), else_(hit), _loose_pin(tree, "CastFailed", is_input=False)],
+            then(play))
+
+
+def _author_sweep(ed, strike, exec_in):
+    """The strike's sphere, swept strike.reach_cm forward from the chest;
+    returns the trace node (its bool and OutHit)."""
+    owner = _node(ed, FN_GET_OWNER)
+    owner_out = out(owner)
+    loc = _node(ed, FN_ACTOR_LOC)
+    _connect(owner_out, _pin(loc, "self"))
+    chest = _node(ed, FN_ADD_VV)
+    _connect(out(loc), _pin(chest, "A"))
+    _connect(_vec(ed, 0.0, 0.0, strike.chest_cm), _pin(chest, "B"))
+    chest_out = out(chest)
+    fwd = _node(ed, FN_ACTOR_FORWARD)
+    _connect(owner_out, _pin(fwd, "self"))
+    # Multiply_VectorFloat's B is promoted to a vector: drive it with one.
+    reach = _node(ed, FN_MUL_VF)
+    _connect(out(fwd), _pin(reach, "A"))
+    r = strike.reach_cm
+    _connect(_vec(ed, r, r, r), _pin(reach, "B"))
+    end = _node(ed, FN_ADD_VV)
+    _connect(chest_out, _pin(end, "A"))
+    _connect(out(reach), _pin(end, "B"))
+
+    trace = _node(ed, FN_SPHERE_TRACE)
+    _connect(chest_out, _pin(trace, "Start"))
+    _connect(out(end), _pin(trace, "End"))
+    _set(trace, "Radius", strike.radius_cm)
+    _trace_defaults(trace)
+    _connect(exec_in, _pin(trace, "execute"))
+    return trace
 
 
 def _author_swing(ed, strike, exec_ins):
@@ -332,31 +408,7 @@ def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
         _connect(pin, _pin(gate, "execute"))
     step = _set_bool(ed, strike.pending_var, False, then(gate))
 
-    owner = _node(ed, FN_GET_OWNER)
-    owner_out = out(owner)
-    loc = _node(ed, FN_ACTOR_LOC)
-    _connect(owner_out, _pin(loc, "self"))
-    chest = _node(ed, FN_ADD_VV)
-    _connect(out(loc), _pin(chest, "A"))
-    _connect(_vec(ed, 0.0, 0.0, strike.chest_cm), _pin(chest, "B"))
-    chest_out = out(chest)
-    fwd = _node(ed, FN_ACTOR_FORWARD)
-    _connect(owner_out, _pin(fwd, "self"))
-    # Multiply_VectorFloat's B is promoted to a vector: drive it with one.
-    reach = _node(ed, FN_MUL_VF)
-    _connect(out(fwd), _pin(reach, "A"))
-    r = strike.reach_cm
-    _connect(_vec(ed, r, r, r), _pin(reach, "B"))
-    end = _node(ed, FN_ADD_VV)
-    _connect(chest_out, _pin(end, "A"))
-    _connect(out(reach), _pin(end, "B"))
-
-    trace = _node(ed, FN_SPHERE_TRACE)
-    _connect(chest_out, _pin(trace, "Start"))
-    _connect(out(end), _pin(trace, "End"))
-    _set(trace, "Radius", strike.radius_cm)
-    _trace_defaults(trace)
-    _connect(step, _pin(trace, "execute"))
+    trace = _author_sweep(ed, strike, step)
 
     hit = ed.add_branch_node()
     _connect(out(trace), _pin(hit, "Condition"))

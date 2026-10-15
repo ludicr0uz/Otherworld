@@ -208,6 +208,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         WV.PunchAnim: _must_load(player_skin().punch),
         **({WV.PunchAltAnim: _must_load(player_skin().punch_alt)}
            if player_skin().punch_alt else {}),
+        **({WV.TreeChopAnim: _must_load(player_skin().tree_chop)}
+           if player_skin().tree_chop else {}),
         WV.KnifeAnim: knife_clip,
         **axe_clip_defaults(),
         # No entry for a skin without the clip: the variable stays None.

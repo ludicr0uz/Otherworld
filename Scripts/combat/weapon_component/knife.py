@@ -8,7 +8,9 @@
             KnifeDueTime, sets KnifePending and plays the swing's clip into
             the upper-body slot: A_AxeSwing (AxeAnim) while the ready pose in
             hand (HandPose, which every machine's copy has) is the axe's
-            (AxePose), else A_KnifeSlash (KnifeAnim)
+            (AxePose), else A_KnifeSlash (KnifeAnim); with the axe's pose and
+            the blow's sweep meeting a tree now, UAL2's TreeChopping_Loop
+            (TreeChopAnim) instead
     blow    KnifePending AND now >= KnifeDueTime --> a sphere in front of the
             chest; a body with BP_HealthComponent loses COMBAT.knife_damage,
             or twice that off a creature afraid of fire while the blade in
@@ -60,7 +62,8 @@ KNIFE = Strike("knife", KNIFE_ANIM_VAR, KNIFE_QUEUED_VAR, KNIFE_PENDING_VAR,
                COMBAT.knife_impact_s, COMBAT.knife_damage, COMBAT.knife_reach_cm,
                COMBAT.knife_radius_cm, COMBAT.knife_chest_cm, WV.BladeHitSounds,
                SERVER_SLASH, True, SLASH, BLADE_HIT,
-               by_pose=((AXE_POSE_VAR, AXE_ANIM_VAR),))
+               by_pose=((AXE_POSE_VAR, AXE_ANIM_VAR),),
+               tree=(AXE_POSE_VAR, WV.TreeChopAnim))
 
 
 def axe_clip_defaults():

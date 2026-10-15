@@ -137,6 +137,9 @@ class PlayerSkin:
     # The punch's other clip, played instead at random each swing (SKIN_GAS:
     # UAL1's Punch_Jab); None for one punch.
     punch_alt: str = None
+    # The axe swung at a tree (SKIN_GAS: UAL2's TreeChopping_Loop); None
+    # where the rig has none, and the axe swings its own clip at a tree too.
+    tree_chop: str = None
     crouch_idle: str = None
     crouch_walk: str = None
     prone_crawl: str = None
@@ -356,6 +359,7 @@ SKIN_GAS = dataclasses.replace(
     idle=GAS.IDLE,
     punch=f"{GAS_UAL_ANIMS}UAL1_Punch_Cross",
     punch_alt=f"{GAS_UAL_ANIMS}UAL1_Punch_Jab",
+    tree_chop=f"{GAS_UAL_ANIMS}UAL2_TreeChopping_Loop",
     reload_rifle=LYRA.uefn_clip(LYRA.RELOAD_RIFLE),
     reload_pistol=LYRA.uefn_clip(LYRA.RELOAD_PISTOL),
     reload_shotgun=LYRA.uefn_clip(LYRA.RELOAD_SHOTGUN),
@@ -432,6 +436,10 @@ def _gas_skin(eas):
         _log(f"note: {skin.punch} or the jab is not here — the punch is the "
              "mannequin's. Run asset_pipeline/retarget_to_uefn.py.")
         skin = dataclasses.replace(skin, punch=GAS_PUNCH_WITHOUT_MIXAMO, punch_alt=None)
+    if not eas.does_asset_exist(skin.tree_chop):
+        _log(f"note: {skin.tree_chop} is not here — the axe swings its own clip at "
+             "a tree. Run asset_pipeline/retarget_to_uefn.py.")
+        skin = dataclasses.replace(skin, tree_chop=None)
     if not all(eas.does_asset_exist(p) for p in (skin.aim_rifle, skin.aim_pistol)):
         _log(f"note: {skin.aim_rifle} or the pistol's is not here — the guns are held "
              "in the mannequin's ready poses. Add Lyra and run asset_pipeline/"

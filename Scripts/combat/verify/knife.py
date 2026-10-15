@@ -38,6 +38,7 @@ from combat.weapon_component.knife import (
     KNIFE_QUEUED_VAR, MELEE_VAR, NEXT_KNIFE_VAR,
 )
 from combat.weapon_component.look_vars import HandPose
+from combat.weapon_component.vars import TreeChopAnim
 
 
 def is_knife_play(node):
@@ -57,7 +58,9 @@ def is_knife_gate(node):
 
 
 def is_melee_play(node):
-    return is_punch_play(node) or is_knife_play(node)
+    # The axe's chop at a tree too (verify/tree_chop.py).
+    return (is_punch_play(node) or is_knife_play(node)
+            or any(_title(f) == f"Get {TreeChopAnim}" for f in _feeders(node, "Asset")))
 
 
 def is_melee_sweep(node):
@@ -249,7 +252,9 @@ def check_knife_swing():
 
 
 def check_knife_blow():
-    sweeps = [n for n in by_pins(wg, "Start", "End", "TraceChannel") if is_knife_sweep(n)]
+    # The swing's own, for a tree ahead, is Fx_Slash's (verify/tree_chop.py).
+    sweeps = [n for n in by_pins(wg, "Start", "End", "TraceChannel") if is_knife_sweep(n)
+              and not fxv.in_fx(FX.SLASH, [n])]
     check("one knife sweep, of COMBAT.knife_radius_cm", len(sweeps) == 1, str(len(sweeps)))
     if len(sweeps) != 1:
         return

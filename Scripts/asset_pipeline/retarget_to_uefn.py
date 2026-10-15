@@ -45,6 +45,7 @@ from asset_pipeline.gas_bridge_paths import (                        # noqa: E40
 from asset_pipeline.plain_retarget import build_plain_retargeter     # noqa: E402
 from asset_pipeline.quaternius_paths import (                        # noqa: E402
     CROUCH_IDLE, CROUCH_WALK, PICKUP, PRONE_CRAWL, PUNCH_CROSS, PUNCH_JAB, SEARCH_KNEEL, THROW,
+    TREE_CHOP,
     ual_anim_dir,
     ual_clip,
     ual_retargeter_path, ual_source_clip,
@@ -59,7 +60,7 @@ from asset_pipeline.ual_retarget import _asset_data, _batch, _fresh, build_ual_r
 EAL = unreal.EditorAssetLibrary
 MANNEQUIN_CLIPS = AIM_SOURCES + (MELEE_SOURCE,) + HIT_SOURCES
 UAL_CLIPS = (CROUCH_IDLE, CROUCH_WALK, PRONE_CRAWL, SEARCH_KNEEL, THROW, PICKUP,
-             PUNCH_CROSS, PUNCH_JAB)
+             PUNCH_CROSS, PUNCH_JAB, TREE_CHOP)
 
 
 def _log(msg):

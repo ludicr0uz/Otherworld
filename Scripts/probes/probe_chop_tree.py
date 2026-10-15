@@ -5,7 +5,9 @@ facing the trunk, and swings by writing KnifeQueued (probe_knife.py says why).
 With the axe in hand each blow must count, and the CHOPS_PER_WOOD-th must
 leave one BP_Wood on the ground beside the trunk, Dropped, which E then takes
 into the bag. The same blows with the knife must leave nothing: only an item
-that Chops cuts a tree. Last, the fire key with the wood in hand must do
+that Chops cuts a tree. The axe's swings at the trunk play UAL2's
+TreeChopping_Loop (TreeChopAnim), the knife's its own slash, and the axe
+swung with its back to the tree its own swing. Last, the fire key with the wood in hand must do
 nothing to it.
 
 Any profile on disk is set aside first, so the game starts on the issued
@@ -23,6 +25,7 @@ import unreal
 from combat.chop_tuning import (
     CHOP_COUNT_VAR, CHOPS_PER_WOOD, CHOPS_VAR, WOOD_OUT_CM,
 )
+from combat.anim_blueprint import AIM_SLOT
 from combat.paths import ITEM_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.weapon_component.knife import (
     KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR, NEXT_KNIFE_VAR)
@@ -104,13 +107,19 @@ def _stand(p, player, base):
     return None
 
 
-def _swing(p, wc):
+def _swing(p, wc, clip=None, label=""):
     # Off cooldown first, as the key's press gate waits: the swing is a
     # server request, and a slash inside the knife's interval is refused.
     yield lambda: (unreal.GameplayStatics.get_time_seconds(p.world())
                    >= p.get(wc, NEXT_KNIFE_VAR))
     p.set(wc, KNIFE_QUEUED_VAR, True)
     yield lambda: not p.get(wc, KNIFE_QUEUED_VAR)
+    if clip is not None:
+        anim = p.pawn().get_editor_property("mesh").get_anim_instance()
+        montage = anim.get_current_active_montage() if anim else None
+        p.check(f"{label} plays {clip.get_name()} in {AIM_SLOT}",
+                anim is not None and anim.is_playing_slot_animation(clip, AIM_SLOT),
+                str(montage))
     yield lambda: not p.get(wc, KNIFE_PENDING_VAR)
     yield 0.02
 
@@ -160,8 +169,11 @@ def _run(p):
 
     yield from _equip(p, wc, AXE)
     p.check("there is no wood in the world before a blow", not _items(p, WOOD))
+    tree_clip = p.get(wc, WV.TreeChopAnim)
+    p.check("the chop at a tree is set on the live component", tree_clip is not None)
     for n in range(1, CHOPS_PER_WOOD):
-        yield from _swing(p, wc)
+        yield from _swing(p, wc, tree_clip if n == 1 else None,
+                          "the axe swung at the trunk")
         p.check(f"axe blow {n} on the trunk is counted, and leaves no wood yet",
                 p.get(wc, CHOP_COUNT_VAR) == n and not _items(p, WOOD),
                 f"count {p.get(wc, CHOP_COUNT_VAR)}, wood {len(_items(p, WOOD))}")
@@ -192,8 +204,9 @@ def _run(p):
             f"dropped {p.get(log, 'Dropped')} icon {p.get(log, 'Icon')}")
 
     yield from _equip(p, wc, KNIFE)
-    for _ in range(CHOPS_PER_WOOD):
-        yield from _swing(p, wc)
+    for n in range(CHOPS_PER_WOOD):
+        yield from _swing(p, wc, p.get(wc, WV.KnifeAnim) if n == 0 else None,
+                          "the knife swung at the trunk")
     p.check("the knife's blows on the same trunk cut nothing",
             len(_items(p, WOOD)) == 1 and p.get(wc, CHOP_COUNT_VAR) == 0,
             f"wood {len(_items(p, WOOD))}, count {p.get(wc, CHOP_COUNT_VAR)}")
@@ -216,3 +229,12 @@ def _run(p):
     p.check("the fire key with the wood in hand spends nothing and cuts nothing",
             p.get(wc, "Held") == log and bag.count(WOOD) == 1
             and len(_items(p, WOOD)) == 1, str(bag))
+
+    # Back to the tree, the axe swings its own clip: the chop at a trunk is
+    # for a trunk ahead.
+    away = unreal.Rotator(pitch=0.0, yaw=yaw + 180.0, roll=0.0)
+    player.set_actor_location_and_rotation(at, away, False, True)
+    player.get_controller().set_control_rotation(away)
+    yield from _equip(p, wc, AXE)
+    player.set_actor_location_and_rotation(at, away, False, True)
+    yield from _swing(p, wc, p.get(wc, WV.AxeAnim), "the axe swung away from the tree")

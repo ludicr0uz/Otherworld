@@ -130,6 +130,10 @@ PICKUP = ("UAL2", "Farm_Harvest")
 # a left jab, one of the two at random on each swing.
 PUNCH_CROSS = ("UAL1", "Punch_Cross")
 PUNCH_JAB = ("UAL1", "Punch_Jab")
+# The axe swung at a tree (combat/weapon_component/punch.py, the knife's
+# Strike's `tree`): a two-handed chop at a trunk, played in place of the axe's
+# swing when the blow's sweep would meet a tree.
+TREE_CHOP = ("UAL2", "TreeChopping_Loop")
 # The clip the hands are calibrated on (palm_twist): hands at rest.
 PALM_CALIBRATION = ("UAL1", "Idle_Loop")
 

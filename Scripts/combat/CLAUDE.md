@@ -577,6 +577,14 @@ into the game's own asset (`A_HoldKnife`, `A_KnifeSlash`, `A_HoldAxe`, `A_AxeSwi
   else the strike's own. Not by `Held`: another client's copy of a player has `HandPose`
   (`look.py`, off the replicated `LookPose`) and may not have the item.
   `probe_net_fx.py` has client 2 see the axe's clip and the knife's on client 1's copy.
+- **The axe swung at a tree plays Quaternius UAL2's `TreeChopping_Loop`** (`TreeChopAnim`,
+  `SKIN_GAS.tree_chop`, retargeted by `retarget_to_uefn.py`): `Strike.tree` on the `KNIFE`
+  Strike, `punch._author_tree_clip`. With `AxePose` in hand, the swing casts the blow's own
+  sphere (`_author_sweep`, shared with the blow) and an instanced mesh (a tree, `chop.py`'s
+  test) picks that clip ahead of `by_pose`. Each machine sweeps for itself, so it is
+  cosmetic, like the punch's coin. The clip's axe hand is at the trunk from 0.20 to 0.35 s,
+  so it plays from its start and the blow stays at `knife_impact_s` (`verify/tree_chop.py`;
+  `probe_chop_tree.py` sees it play at a trunk and `A_AxeSwing` with its back to one).
 - **A new melee item's clips** are two rows of `player_clips.csv` (and of
   `player_clips.ROLES`), two of `MELEE_CLIPS`, and a `by_pose` pair on the `KNIFE` Strike.
 - **Trying another clip in a role is one command** (H3), a few seconds in an open editor:

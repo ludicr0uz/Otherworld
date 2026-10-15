@@ -72,8 +72,10 @@ def _ran_by(node):
 
 def _casts():
     # A thrown blade asks the same of what it struck (verify/throw_strike.py).
+    # The swing's own test for a tree ahead is Fx_Slash's (verify/tree_chop.py).
     return [n for n in wg if "instancedstaticmesh" in _squash(n)
-            and has_in_pin(n, "Object") and not is_strike_node(n)]
+            and has_in_pin(n, "Object") and not is_strike_node(n)
+            and not fxv.in_fx(FX.SLASH, [n])]
 
 
 def _spawns(var):

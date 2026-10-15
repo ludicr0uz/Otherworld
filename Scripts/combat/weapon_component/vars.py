@@ -318,6 +318,9 @@ PunchAnim = Var("PunchAnim", _CLIP)
 # on a skin with one punch (punch._author_clip asks IsValid).
 PunchAltAnim = Var("PunchAltAnim", _CLIP)
 PunchQueued = Var("PunchQueued", BOOL, False)
+# The axe swung at a tree (punch._author_tree_clip): UAL2's TreeChopping_Loop
+# on the worn rig; None on a skin without it.
+TreeChopAnim = Var("TreeChopAnim", _CLIP)
 # The ready pose whose guns are carried at the hip (carry_weights.py): the
 # rifle's, which the sniper and the shotgun share. None without the clips.
 CarryFor = Var(CARRY_FOR_VAR, _CLIP)
@@ -440,7 +443,7 @@ STATE = (
     FirePressedAt,
     SprintForced, AimForced, AimHeld, DebugShots, HitBone, HitPoint, ShotgunClass, PistolClass,
     KnifeClass, AxeClass, MatchesClass, StickClass, StarterPantsClass,
-    ImpactClass, CampfireClass, PunchAnim, PunchAltAnim, CarryFor, CarryAlso,
+    ImpactClass, CampfireClass, PunchAnim, PunchAltAnim, TreeChopAnim, CarryFor, CarryAlso,
     PunchQueued, PunchPending, NextPunchTime, PunchDueTime, BlowDamage, KnifeAnim, AxeAnim,
     AxePose, KnifeQueued, KnifePending, NextKnifeTime, KnifeDueTime, InteractTarget,
     InteractGap, InteractForced, CrouchForced, ThrowAiming, ThrowKeyForced, ThrowClickForced,

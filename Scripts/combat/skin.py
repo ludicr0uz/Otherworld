@@ -118,8 +118,7 @@ class PlayerSkin:
     pose_bones: dict
     # The empty-handed punch (weapon_component/punch.py), on this rig, played
     # into the upper-body slot: the mannequin's MM_Attack_01, or on SKIN_GAS
-    # Mixamo's zombie punching (the punch role of asset_pipeline/
-    # player_clips.csv).
+    # Quaternius UAL1's Punch_Cross (retarget_to_uefn.py).
     punch: str
     # The head bone: hidden from the player's own view while the camera is on
     # a gun's sights, where the eye point is inside or beside the head
@@ -135,6 +134,9 @@ class PlayerSkin:
     # the kneel over a body being searched. None where the rig has none, and
     # the stance is then posed procedurally (body_pose.py) and a search is made
     # standing: the mannequin, or an adventurer before import_quaternius.
+    # The punch's other clip, played instead at random each swing (SKIN_GAS:
+    # UAL1's Punch_Jab); None for one punch.
+    punch_alt: str = None
     crouch_idle: str = None
     crouch_walk: str = None
     prone_crawl: str = None
@@ -326,7 +328,7 @@ SKIN_METAHUMAN = dataclasses.replace(
 # clip belongs to one skeleton, so its clips are the mannequin's and
 # Quaternius's retargeted onto this one (asset_pipeline/retarget_to_uefn.py),
 # its two ready poses Lyra's, retargeted the same way
-# (asset_pipeline/import_lyra.py), its punch Mixamo's (mixamo_player.py),
+# (asset_pipeline/import_lyra.py), its punches Quaternius's,
 # and its idle the sample's own.
 GAS_ANIMS = f"/Game/Sourced/Characters/Anims/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
 GAS_UAL_ANIMS = f"/Game/Sourced/Quaternius/UAL/{PLAYER_FAMILY}/A_{PLAYER_FAMILY}_"
@@ -338,7 +340,7 @@ CARRY_FIELDS = ("carry_idle", "carry_jog", "carry_sprint", "carry_crouch_idle",
 # Mixamo's zombie crawl, the prone_crawl role of player_clips.csv.
 GAS_CRAWL_WITHOUT_FAL = MIXAMO.player_clip("prone_crawl")
 # The two ready poses of a checkout that has no Lyra, and the punch of one
-# that has not retargeted Mixamo's (_gas_skin): the mannequin's.
+# that has not retargeted Quaternius's punches (_gas_skin): the mannequin's.
 GAS_PUNCH_WITHOUT_MIXAMO = f"{GAS_ANIMS}MM_Attack_01"
 GAS_AIM_WITHOUT_LYRA = dict(aim_rifle=f"{GAS_ANIMS}MF_Rifle_Idle_ADS",
                             aim_pistol=f"{GAS_ANIMS}MF_Pistol_Idle_ADS")
@@ -352,7 +354,8 @@ SKIN_GAS = dataclasses.replace(
     # pose has the finger closed, on the trigger.
     fist_index=LYRA.uefn_clip(LYRA.AIM_RIFLE),
     idle=GAS.IDLE,
-    punch=MIXAMO.player_clip("punch"),
+    punch=f"{GAS_UAL_ANIMS}UAL1_Punch_Cross",
+    punch_alt=f"{GAS_UAL_ANIMS}UAL1_Punch_Jab",
     reload_rifle=LYRA.uefn_clip(LYRA.RELOAD_RIFLE),
     reload_pistol=LYRA.uefn_clip(LYRA.RELOAD_PISTOL),
     reload_shotgun=LYRA.uefn_clip(LYRA.RELOAD_SHOTGUN),
@@ -423,12 +426,12 @@ def _gas_skin(eas):
                  f"mannequin. Run asset_pipeline/{by}.")
             return None
     skin = SKIN_GAS
-    if not eas.does_asset_exist(skin.punch):
-        # The copy is committed: a checkout without it has not run the
-        # Mixamo import, and keeps the motion matching all the same.
-        _log(f"note: {skin.punch} is not here — the punch is the mannequin's. Run "
-             "asset_pipeline/import_mixamo_player.py.")
-        skin = dataclasses.replace(skin, punch=GAS_PUNCH_WITHOUT_MIXAMO)
+    if not all(eas.does_asset_exist(p) for p in (skin.punch, skin.punch_alt)):
+        # The copies are committed: a checkout without them has not run the
+        # retarget, and keeps the motion matching all the same.
+        _log(f"note: {skin.punch} or the jab is not here — the punch is the "
+             "mannequin's. Run asset_pipeline/retarget_to_uefn.py.")
+        skin = dataclasses.replace(skin, punch=GAS_PUNCH_WITHOUT_MIXAMO, punch_alt=None)
     if not all(eas.does_asset_exist(p) for p in (skin.aim_rifle, skin.aim_pistol)):
         _log(f"note: {skin.aim_rifle} or the pistol's is not here — the guns are held "
              "in the mannequin's ready poses. Add Lyra and run asset_pipeline/"

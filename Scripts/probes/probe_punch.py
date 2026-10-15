@@ -14,7 +14,6 @@ SYSTEMS = ('melee',)
 
 import unreal
 
-from asset_pipeline import mixamo_paths as MIXAMO
 from combat.anim_blueprint import AIM_SLOT
 from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
@@ -63,10 +62,11 @@ def probe(p):
             p.get(wc, PUNCH_ANIM_VAR) is not None, str(p.get(wc, PUNCH_ANIM_VAR)))
     skin = skin_of_mesh(player.get_editor_property("mesh").get_skeletal_mesh_asset().get_path_name())
     if skin is not None and skin.gas:
-        got = p.get(wc, PUNCH_ANIM_VAR)
-        p.check("...Mixamo's punch, retargeted onto the worn skeleton",
-                got is not None and got.get_path_name().split(".")[0]
-                == MIXAMO.player_clip("punch"), str(got))
+        got = [p.get(wc, v) for v in (PUNCH_ANIM_VAR, WV.PunchAltAnim)]
+        p.check("...Quaternius's cross and jab, retargeted onto the worn skeleton",
+                all(g is not None for g in got)
+                and [g.get_path_name().split(".")[0] for g in got]
+                == [skin.punch, skin.punch_alt], str(got))
     p.check("the wanderer punched is a zombie", "Zombie" in npc.get_class().get_name(),
             npc.get_class().get_name())
 
@@ -90,9 +90,10 @@ def probe(p):
     anim = player.get_editor_property("mesh").get_anim_instance()
     p.check("the swing takes the queued punch",
             not p.get(wc, PUNCH_QUEUED_VAR) and p.get(wc, PUNCH_PENDING_VAR))
-    clip = p.get(wc, PUNCH_ANIM_VAR)
-    p.check(f"...and plays the punch clip in {AIM_SLOT}",
-            anim is not None and anim.is_playing_slot_animation(clip, AIM_SLOT),
+    clips = [c for c in (p.get(wc, PUNCH_ANIM_VAR), p.get(wc, WV.PunchAltAnim)) if c]
+    p.check(f"...and plays a punch clip (the cross or the jab) in {AIM_SLOT}",
+            anim is not None
+            and any(anim.is_playing_slot_animation(c, AIM_SLOT) for c in clips),
             str(anim.get_current_active_montage() if anim else None))
     montage = anim.get_current_active_montage() if anim else None
     p.check("...from COMBAT.punch_clip_start_s in, so the fist is out for the blow",
@@ -121,3 +122,16 @@ def probe(p):
             abs((before - after) - COMBAT.punch_damage) < 1e-3,
             f"{before} -> {after}")
     p.check("...and credits the player", p.get(health, "DamagedByPlayer") is True)
+
+    # The coin: over a run of swings both clips play. (Each swing is a fair
+    # coin, so twelve of one kind is 1 in 2048.)
+    if len(clips) == 2:
+        seen = set()
+        for _ in range(12):
+            yield lambda: unreal.GameplayStatics.get_time_seconds(world) >= p.get(wc, NEXT_PUNCH_VAR)
+            p.set(wc, PUNCH_QUEUED_VAR, True)
+            yield lambda: not p.get(wc, PUNCH_QUEUED_VAR)
+            seen |= {i for i, c in enumerate(clips) if anim.is_playing_slot_animation(c, AIM_SLOT)}
+            if seen == {0, 1}:
+                break
+        p.check("a run of swings throws both the cross and the jab", seen == {0, 1}, str(seen))

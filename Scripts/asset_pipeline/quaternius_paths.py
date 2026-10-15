@@ -126,6 +126,10 @@ THROW = ("UAL2", "OverhandThrow")
 # the harvest bends down and reaches the right hand to the floor, 2.5 s, in
 # place. UAL1's PickUp_Table reaches a table, waist high, and is no use here.
 PICKUP = ("UAL2", "Farm_Harvest")
+# The empty-handed punch (combat/weapon_component/punch.py): a right cross and
+# a left jab, one of the two at random on each swing.
+PUNCH_CROSS = ("UAL1", "Punch_Cross")
+PUNCH_JAB = ("UAL1", "Punch_Jab")
 # The clip the hands are calibrated on (palm_twist): hands at rest.
 PALM_CALIBRATION = ("UAL1", "Idle_Loop")
 

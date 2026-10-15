@@ -7,8 +7,8 @@ reads Held and none waits on a Delay (a component Tick cannot hold one):
           AND NOT TriggerSpent AND now >= NextPunchTime   --> PunchQueued
   swing   PunchQueued --> Server_Punch, which (empty hands, alive, not
           guarding, off cooldown) stamps NextPunchTime and PunchDueTime, sets
-          PunchPending and plays the skin's punch (PunchAnim) into the upper-body
-          slot
+          PunchPending and plays the skin's punch (PunchAnim, or at random its
+          jab, PunchAltAnim) into the upper-body slot
   blow    PunchPending AND now >= PunchDueTime --> a sphere in front of the
           chest; a body with BP_HealthComponent loses COMBAT.punch_damage
 
@@ -62,9 +62,9 @@ from uebp.nodes.actor import (
     FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GET_OWNER,
     FN_PLAY_SLOT)
 from uebp.nodes.math import (
-    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_EQ_OO, FN_GE_FF, FN_MUL_VF, FN_NOT)
+    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_EQ_OO, FN_GE_FF, FN_MUL_VF, FN_NOT, FN_RANDOM_BOOL)
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_HEALTH
-from uebp.nodes.system import FN_SPHERE_TRACE, FN_TIME_SECONDS
+from uebp.nodes.system import FN_IS_VALID, FN_SPHERE_TRACE, FN_TIME_SECONDS
 from combat.weapon_component import look_vars as LV
 from combat.weapon_component import vars as WV
 from Sound.play import _author_sound
@@ -109,13 +109,17 @@ class Strike:
     # instead while HandPose is that ready pose (the axe's, on the knife's
     # Strike). HandPose and not Held: every machine's copy has it (look.py).
     by_pose: tuple = ()
+    # A second clip variable, played instead of anim_var at random on each
+    # swing while it holds a clip (the punch's jab beside its cross). Each
+    # machine draws its own: which fist a copy throws is cosmetic.
+    alt_anim_var: str = None
 
 
 PUNCH = Strike("punch", PUNCH_ANIM_VAR, PUNCH_QUEUED_VAR, PUNCH_PENDING_VAR,
                NEXT_PUNCH_VAR, PUNCH_DUE_VAR, COMBAT.punch_interval_s,
                COMBAT.punch_impact_s, COMBAT.punch_damage, COMBAT.punch_reach_cm,
                COMBAT.punch_radius_cm, COMBAT.punch_chest_cm,
-               clip_start_s=COMBAT.punch_clip_start_s)
+               clip_start_s=COMBAT.punch_clip_start_s, alt_anim_var=WV.PunchAltAnim)
 
 
 def _and(ed, a, b):
@@ -203,7 +207,8 @@ def _author_clip(ed, strike, exec_in):
     """The strike's clip into the upper-body slot, and the air it moves,
     heard at the player. Which clip is the ready pose in hand's
     (``strike.by_pose``: a Branch each), else the strike's own. Returns (the
-    exec pin after them, the strike's own play node)."""
+    exec pin after them, the strike's own play node). With
+    ``strike.alt_anim_var`` holding a clip, a coin picks it instead."""
     played = []
     for pose_var, anim_var in strike.by_pose:
         same = _node(ed, FN_EQ_OO)
@@ -213,6 +218,15 @@ def _author_clip(ed, strike, exec_in):
         _connect(out(same), _pin(pick, "Condition"))
         _connect(exec_in, _pin(pick, "execute"))
         played.append(then(_author_play(ed, strike, anim_var, then(pick))))
+        exec_in = else_(pick)
+    if strike.alt_anim_var:
+        # A coin, and a clip to throw on it: both plain bools, read once.
+        has = _node(ed, FN_IS_VALID)
+        _connect(_get(ed, strike.alt_anim_var), _pin(has, "Object"))
+        pick = ed.add_branch_node()
+        _connect(_and(ed, out(_node(ed, FN_RANDOM_BOOL)), out(has)), _pin(pick, "Condition"))
+        _connect(exec_in, _pin(pick, "execute"))
+        played.append(then(_author_play(ed, strike, strike.alt_anim_var, then(pick))))
         exec_in = else_(pick)
     play = _author_play(ed, strike, strike.anim_var, exec_in)
     owner = _node(ed, FN_GET_OWNER)

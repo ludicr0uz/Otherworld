@@ -445,21 +445,22 @@ the link, `weapon_layers_consts.py` holds the picture and the names,
   guns raised, the AKM, the pistol and the shotgun lowered and down the sights, the pistol
   taken out mid-way through the AKM's; the left hand's leaving is measured in the right
   hand's frame, since the shotgun's starts out on the pump and comes in).
-- **The punch is Mixamo's zombie punching** (the `punch` row of
-  `asset_pipeline/player_clips.csv`, the Not So Scary Zombie Pack's; 14 Oct 2026, before
-  it Lyra's pistol melee, which read as a pistol whip). One straight right, 1.03 s: on
-  the player's skeleton the fist is drawn back 0.3 s in (-7 cm) and out 0.65-0.7 s in
-  (53 cm), the left hand pulling back as it lands. Played as retargeted (Mixamo's fist is
-  closed: `melee_clips.py` bakes nothing of it). Nothing about the strike changed: the
-  blow is still timed, `COMBAT.punch_impact_s` (0.3 s) after the swing, not notified,
-  with the same sweep and damage; the swing plays the clip from
-  `COMBAT.punch_clip_start_s` (0.35 s, the left hand out and the right drawn back;
-  `Strike.clip_start_s`, the slot play's `InTimeToStartMontageAt`), and
-  `verify/punch.py` measures the fist's reach at the blow's time off the clip (at least
-  80% of the swing's travel; from 0.3 s it is 72%). `swap_clip.py punch <fbx>` tries
-  another download and rebuilds the weapon component, but re-read the start against
-  that check. A checkout without the copy punches with the mannequin's clip
-  (`skin._gas_skin`).
+- **The punch is Quaternius UAL1's Punch_Cross or Punch_Jab, one at random each swing**
+  (15 Oct 2026; before it Mixamo's zombie punching, the `punch` row of
+  `asset_pipeline/player_clips.csv`, still imported but no longer worn, so
+  `swap_clip.py punch` no longer changes the game). Both are retargeted onto the player's
+  skeleton by `asset_pipeline/retarget_to_uefn.py` (`quaternius_paths.PUNCH_CROSS`,
+  `PUNCH_JAB`) and named by `SKIN_GAS.punch` / `punch_alt`, the component's `PunchAnim` /
+  `PunchAltAnim`. The cross (a right, 1.0 s) and the jab (a left, 0.87 s) both have the
+  fist out from 0.2-0.25 s to 0.5 s in, so both play from the start
+  (`COMBAT.punch_clip_start_s` 0) and the blow, still timed and not notified, lands at
+  `COMBAT.punch_impact_s` 0.25 s, same sweep and damage. The choice is a Branch on
+  `RandomBool AND IsValid(PunchAltAnim)` before the play (`Strike.alt_anim_var`,
+  `punch._author_clip`), in the Fx_ event, so **each machine draws its own coin**: another
+  player's copy may show the other fist. Cosmetic only; the blow is the server's.
+  `verify/punch.py` measures each clip's striking fist (whichever travels further) at the
+  blow's time (at least 80% of its travel); `probe_punch` sees both clips over a run of
+  swings. A checkout without the copies punches with the mannequin's clip (`skin._gas_skin`).
 - **The body is 10 cm shorter than the mannequin** and the ready poses are retargeted
   chain to chain, so the fist of a ready pose is 11-14 cm nearer and 14-19 cm lower in the
   capsule's frame (`carry_tuning.CARRY_GRIP`, re-measured) and the sights' view with it.

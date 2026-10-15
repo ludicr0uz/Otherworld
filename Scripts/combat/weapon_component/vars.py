@@ -314,6 +314,9 @@ CampfireClass = Var(CAMPFIRE_CLASS_VAR, cls("/Script/Engine.Actor"))
 # The empty-handed punch (punch.py): its clip on the worn rig, the press
 # queued for the swing, the cooldown, and the blow still to land.
 PunchAnim = Var("PunchAnim", _CLIP)
+# The punch's other clip (the jab), played instead at random each swing; None
+# on a skin with one punch (punch._author_clip asks IsValid).
+PunchAltAnim = Var("PunchAltAnim", _CLIP)
 PunchQueued = Var("PunchQueued", BOOL, False)
 # The ready pose whose guns are carried at the hip (carry_weights.py): the
 # rifle's, which the sniper and the shotgun share. None without the clips.
@@ -437,7 +440,7 @@ STATE = (
     FirePressedAt,
     SprintForced, AimForced, AimHeld, DebugShots, HitBone, HitPoint, ShotgunClass, PistolClass,
     KnifeClass, AxeClass, MatchesClass, StickClass, StarterPantsClass,
-    ImpactClass, CampfireClass, PunchAnim, CarryFor, CarryAlso,
+    ImpactClass, CampfireClass, PunchAnim, PunchAltAnim, CarryFor, CarryAlso,
     PunchQueued, PunchPending, NextPunchTime, PunchDueTime, BlowDamage, KnifeAnim, AxeAnim,
     AxePose, KnifeQueued, KnifePending, NextKnifeTime, KnifeDueTime, InteractTarget,
     InteractGap, InteractForced, CrouchForced, ThrowAiming, ThrowKeyForced, ThrowClickForced,

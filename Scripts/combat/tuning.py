@@ -173,16 +173,15 @@ class CombatConfig:
     # One swing every punch_interval_s; the blow lands punch_impact_s after
     # the swing starts, on the first body a sphere of punch_radius_cm meets
     # within punch_reach_cm in front of the chest. Seven punches kill a 100 HP
-    # wanderer: a last resort, not a weapon. The clip is Mixamo's zombie
-    # punching (the punch role of asset_pipeline/player_clips.csv), a
-    # straight right whose fist is drawn back 0.3 s in and out 0.65-0.7 s
-    # in on the player's skeleton: it is played from punch_clip_start_s, so
-    # the blow's time is what it was and the fist is out for it
-    # (verify/punch.py measures it).
+    # wanderer: a last resort, not a weapon. The clip is Quaternius UAL1's
+    # Punch_Cross (a right, 1.0 s) or Punch_Jab (a left, 0.87 s), one at
+    # random each swing; on the player's skeleton either fist is out from
+    # 0.2-0.25 s to 0.5 s in, so both play from the start and the blow lands
+    # at 0.25 s (verify/punch.py measures it, for each clip).
     punch_damage: float = 15.0
     punch_interval_s: float = 0.8
-    punch_impact_s: float = 0.3
-    punch_clip_start_s: float = 0.35
+    punch_impact_s: float = 0.25
+    punch_clip_start_s: float = 0.0
     punch_reach_cm: float = 130.0
     punch_radius_cm: float = 30.0
     punch_chest_cm: float = 30.0

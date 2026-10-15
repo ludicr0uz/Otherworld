@@ -9,7 +9,6 @@ hit's stamps set both melee attacks' nodes aside.
 
 import unreal
 
-from asset_pipeline import mixamo_paths as MIXAMO
 from combat.anim_blueprint import AIM_SLOT
 from combat.skin import player_skin
 from combat.tuning import COMBAT
@@ -21,6 +20,7 @@ from combat.verify.common import (
 from combat.verify import fx as fxv
 from combat import fx_vars as FX
 from combat.verify.fixtures import w, wg
+from combat.weapon_component.vars import PunchAltAnim as PUNCH_ALT_VAR
 from combat.weapon_component.punch import (
     NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR,
     PUNCH_QUEUED_VAR,
@@ -54,7 +54,8 @@ def _feeds(pin, limit=250):
 
 
 def is_punch_play(node):
-    return any(_title(f) == f"Get {PUNCH_ANIM_VAR}" for f in _feeders(node, "Asset"))
+    return any(_title(f) in (f"Get {PUNCH_ANIM_VAR}", f"Get {PUNCH_ALT_VAR}")
+               for f in _feeders(node, "Asset"))
 
 
 def is_punch_sweep(node):
@@ -85,30 +86,28 @@ def _reach(clip, bone, t):
 
 def check_punch_clip(skin, clip):
     """The blow is timed, not notified: its time has to be one the clip's
-    fist is out at."""
-    if skin.gas:
-        source = MIXAMO.source_clip(*MIXAMO.PLAYER_CLIPS["punch"])
-        check("on the motion-matching skin the punch is Mixamo's punch role, retargeted "
-              "(asset_pipeline/player_clips.csv, mixamo_player.py)",
-              skin.punch == MIXAMO.player_clip("punch")
-              and load(source) is not None
-              and abs(clip.get_play_length() - load(source).get_play_length()) < 0.05,
-              skin.punch)
-    check("...in place: a clip with root motion played into the slot would root the player",
+    fist is out at -- whichever fist travels further (the jab is a left)."""
+    name = clip.get_name()
+    check(f"{name}: in place: a clip with root motion played into the slot would root the player",
           not clip.get_editor_property("enable_root_motion"))
-    start, fist = COMBAT.punch_clip_start_s, skin.pose_bones["hand_r"]
+    start = COMBAT.punch_clip_start_s
+    steps = int(COMBAT.punch_interval_s / 0.05) + 1
+
+    def curve(bone):
+        return [_reach(clip, bone, min(start + i * 0.05, clip.get_play_length()))
+                for i in range(steps)]
+    fist = max((skin.pose_bones["hand_r"], skin.pose_bones["hand_l"]),
+               key=lambda b: max(curve(b)) - min(curve(b)))
     check("...the swing starts inside the clip, and the clip outlasts the blow",
           0.0 <= start and start + COMBAT.punch_impact_s < clip.get_play_length(),
           f"{start} + {COMBAT.punch_impact_s} of {clip.get_play_length():.2f} s")
-    steps = int(COMBAT.punch_interval_s / 0.05) + 1
-    reach = [_reach(clip, fist, min(start + i * 0.05, clip.get_play_length()))
-             for i in range(steps)]
+    reach = curve(fist)
     back, out_ = min(reach), max(reach)
     at_blow = _reach(clip, fist, start + COMBAT.punch_impact_s)
     check("...and the fist is out when the blow lands: at least 80% of the way from "
           "where the swing draws it back to where it stops",
           out_ - back > 30.0 and at_blow >= back + 0.8 * (out_ - back),
-          f"{at_blow:.0f} cm of {back:.0f}..{out_:.0f}")
+          f"{fist} {at_blow:.0f} cm of {back:.0f}..{out_:.0f}")
 
 
 def check_punch_defaults():
@@ -119,6 +118,20 @@ def check_punch_defaults():
           clip is not None and clip == want, f"{clip} vs {skin.punch}")
     if clip is not None:
         check_punch_clip(skin, clip)
+    alt = w.get_editor_property(PUNCH_ALT_VAR)
+    check(f"{PUNCH_ALT_VAR} is the worn skin's other punch (or none for one)",
+          (alt is None and skin.punch_alt is None)
+          or (alt is not None and alt == load(skin.punch_alt)),
+          f"{alt} vs {skin.punch_alt}")
+    if alt is not None:
+        check_punch_clip(skin, alt)
+        check("...on the worn skeleton too",
+              alt.get_editor_property("skeleton") == clip.get_editor_property("skeleton"))
+    if skin.gas:
+        check("on the motion-matching skin the punches are Quaternius UAL1's cross and jab "
+              "(retarget_to_uefn.py)",
+              skin.punch.endswith("UAL1_Punch_Cross") and skin.punch_alt is not None
+              and skin.punch_alt.endswith("UAL1_Punch_Jab"), skin.punch)
     worn = load(skin.mesh)
     check("...authored for the worn skeleton, or the slot would play nothing",
           clip is not None and worn is not None
@@ -172,18 +185,27 @@ def check_punch_press():
 
 def check_punch_swing():
     plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if is_punch_play(n)]
-    check("one punch clip play, in its Fx_ event: the Server event's Multicast and "
-          "the owning client's prediction both call it (verify/fx.py)",
-          len(plays) == 1 and fxv.in_fx(FX.PUNCH, plays) == plays, str(len(plays)))
-    if len(plays) != 1:
+    check("two punch clip plays (the cross, and the jab a coin picks), in its Fx_ "
+          "event: the Server event's Multicast and the owning client's prediction "
+          "both call it (verify/fx.py)",
+          len(plays) == 2 and fxv.in_fx(FX.PUNCH, plays) == plays, str(len(plays)))
+    if len(plays) != 2:
         return
+    coins = [b for p in plays for b in _feeders(p, "execute") if _title(b) == "Branch"
+             and any("Random Bool" in _title(x) or "RandomBool" in _title(x)
+                     for x in _feeds(BEL.find_input_pin(b, "Condition")))]
+    # The coin's two arms run the two plays: one Branch, found from each.
+    check("...the jab or the cross behind one Branch on a RandomBool and "
+          "IsValid(PunchAltAnim)",
+          len(coins) == 2 and len({c.get_name() for c in coins}) == 1, str(len(coins)))
     check(f"...into {AIM_SLOT}, the upper-body slot, once",
           all(pin_value(p, "SlotNodeName") == AIM_SLOT
               and int(float(pin_value(p, "LoopCount"))) == 1 for p in plays))
     check("...from COMBAT.punch_clip_start_s into the clip, the wind-up the blow's time "
           "has no room for skipped",
-          num_pin(plays[0], "InTimeToStartMontageAt") == COMBAT.punch_clip_start_s,
-          pin_value(plays[0], "InTimeToStartMontageAt"))
+          all(float(pin_value(p, "InTimeToStartMontageAt") or 0.0)
+              == COMBAT.punch_clip_start_s for p in plays),
+          str([pin_value(p, "InTimeToStartMontageAt") for p in plays]))
     # The two callers: the server's tell, and the client's prediction.
     plays = fxv.calls(FX.PUNCH) + fxv.predicts(FX.PUNCH)
 

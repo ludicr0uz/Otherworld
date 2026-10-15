@@ -85,6 +85,10 @@ AUDIT = (
     Roll("combat/weapon_component/recoil.py", COSMETIC,
          "the kick's sideways drift, on the view of the player who fired",
          "the owning client: it turns its own controller, as the mouse does", ""),
+    Roll("combat/blood_sprite.py", COSMETIC,
+         "the roll of a blood splat's card about its facing, so no two look alike",
+         "each machine's BP_BloodSprite at BeginPlay, spawned by Fx_PelletHit "
+         "where there is a screen", ""),
     Roll("npc/stats.py", COSMETIC,
          "the gap before a wanderer's next growl",
          "the AIController (the server's); every client hears the growl "
@@ -104,5 +108,5 @@ CATALOG_NAMES = (
 # starts with Get or Set.)
 BLUEPRINTS = (
     "BP_HealthComponent", "BP_WeaponComponent", "BP_FootstepComponent",
-    "BP_DayNightCycle", "BP_ForestWandererAI",
+    "BP_DayNightCycle", "BP_ForestWandererAI", "BP_BloodSprite",
 )

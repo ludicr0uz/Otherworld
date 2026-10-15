@@ -253,7 +253,7 @@ cast's failed arm, `weapon_component/surface_impact.py`). Never both.
     `(Time − SpawnTime) / 0.5`, `SpawnTime` a scalar read from the card's custom primitive
     data slot 0, which `BeginPlay` stamps with `GetTimeSeconds`: one material, no instance,
     no Tick. Its colour is the atlas's shade times `M_Blood`'s colour ×1.25.
-  - At `BeginPlay` the actor turns to the local camera (random roll); the card sits 35 % of
+  - At `BeginPlay` the actor turns to the local camera, the camera manager of the PlayerController that `IsLocalController` (never one by player index; random roll); the card sits 35 % of
     its width toward it so a splat seen side-on is not half inside the body. No camera (a
     dedicated server never plays it anyway): it keeps the hit normal.
   - A thrown blade's `Fx_Stab` and melee blows spawn no splat.

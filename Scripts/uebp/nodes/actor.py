@@ -135,7 +135,6 @@ FN_MOVEMENT_BASE = "/Script/Engine.Pawn.GetMovementBaseActor"
 
 FN_CAM_LOC = "/Script/Engine.PlayerCameraManager.GetCameraLocation"
 FN_CAM_ROT = "/Script/Engine.PlayerCameraManager.GetCameraRotation"
-FN_CAM_MANAGER = "/Script/Engine.GameplayStatics.GetPlayerCameraManager"
 # One float of a primitive's custom data, read by a material's parameter that
 # takes it (the blood sprite's spawn time, combat/blood_sprite.py).
 FN_SET_CPD_FLOAT = "/Script/Engine.PrimitiveComponent.SetCustomPrimitiveDataFloat"

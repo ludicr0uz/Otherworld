@@ -14,7 +14,9 @@ nothing:
     node is the same clock, so (Time - SpawnTime) / SPLAT_LIFETIME is how far
     through the flipbook this one card is: one material for every splat, no
     material instance, no Tick;
-  * turns to face the local camera (with a random roll, so no two splats
+  * turns to face the local camera (the camera manager of the
+    PlayerController that IsLocalController, never one asked for by index
+    (net/CLAUDE.md); with a random roll, so no two splats
     look alike), the card lifted toward it by SPLAT_LIFT so a splat seen
     from the side is not half inside the body. Without a camera it keeps the
     spawn's facing, the hit normal;
@@ -36,13 +38,18 @@ from combat.paths import BLOOD_SPRITE_BP_PATH, MAT_BLOOD_SPRITE, PLANE, TEX_BLOO
 from uebp.g import _G
 from uebp.graph import (
     BEL, BGE, _add_component, _assets, _component_object, _create_blueprint, _drop_components,
-    _events, _must_load, _root_handle, _rot, _set, out, then)
+    _connect, _events, _loose_pin, _must_load, _pin, _root_handle, _rot, _set, out, then)
 from uebp.layout import arrange
 from uebp.nodes.actor import (
-    FN_ACTOR_LOC, FN_CAM_LOC, FN_CAM_MANAGER, FN_LIFESPAN, FN_SET_ACTOR_ROT, FN_SET_CPD_FLOAT)
+    FN_ACTOR_LOC, FN_CAM_LOC, FN_IS_LOCAL_CONTROLLER, FN_LIFESPAN, FN_SET_ACTOR_ROT,
+    FN_SET_CPD_FLOAT)
 from uebp.nodes.math import FN_BREAK_ROT, FN_LOOK_AT, FN_MAKE_ROT, FN_RANDOM_FLOAT
-from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
+from uebp.nodes.palette import MACRO_FOR_EACH
+from uebp.nodes.system import FN_ALL_ACTORS, FN_IS_VALID, FN_TIME_SECONDS
 
+
+PC_CLASS_PATH = "/Script/Engine.PlayerController"
+CAM_MANAGER_VAR = "PlayerCameraManager"
 
 
 # --- T_BloodSprite -------------------------------------------------------------
@@ -172,18 +179,30 @@ def _author_begin_play(ed, begin):
     stamp = g.call(FN_SET_CPD_FLOAT, [then(begin)], self=card, DataIndex=SPLAT_SPAWN_SLOT,
                    Value=out(g.call(FN_TIME_SECONDS)))
 
-    cam = g.call(FN_CAM_MANAGER, PlayerIndex=0)
-    seen, unseen = g.branch(out(g.call(FN_IS_VALID, Object=out(cam))), [then(stamp)])
+    # The local camera, never asked for by player index (net/CLAUDE.md): the
+    # PlayerController that is local, out of those this machine has (a client
+    # has its own alone), and that controller's own camera manager.
+    every = g.call(FN_ALL_ACTORS, [then(stamp)], ActorClass=PC_CLASS_PATH)
+    loop = g.keep(ed.add_macro_node(MACRO_FOR_EACH))
+    _connect(out(every, "OutActors"), _loose_pin(loop, "Array"))
+    _connect(then(every), _loose_pin(loop, "Exec"))
+    pc = _loose_pin(loop, "ArrayElement", is_input=False)
+    local, _remote = g.branch(out(g.call(FN_IS_LOCAL_CONTROLLER, self=pc)),
+                              [_loose_pin(loop, "LoopBody", is_input=False)])
+    cam = g.keep(ed.add_get_member_variable_node(CAM_MANAGER_VAR, PC_CLASS_PATH))
+    _connect(pc, _pin(cam, "self"))
+    cam = out(cam, CAM_MANAGER_VAR)
+    seen, _unseen = g.branch(out(g.call(FN_IS_VALID, Object=cam)), [local])
     toward = g.call(FN_LOOK_AT, Start=out(g.call(FN_ACTOR_LOC)),
-                    Target=out(g.call(FN_CAM_LOC, self=out(cam))))
+                    Target=out(g.call(FN_CAM_LOC, self=cam)))
     parts = g.call(FN_BREAK_ROT, InRot=out(toward))
     roll = g.call(FN_RANDOM_FLOAT)
     _set(roll, "Min", 0.0)
     _set(roll, "Max", 360.0)
     facing = g.call(FN_MAKE_ROT, Roll=out(roll), Pitch=out(parts, "Pitch"),
                     Yaw=out(parts, "Yaw"))
-    turn = g.call(FN_SET_ACTOR_ROT, [seen], NewRotation=out(facing))
-    life = g.call(FN_LIFESPAN, [then(turn), unseen])
+    g.call(FN_SET_ACTOR_ROT, [seen], NewRotation=out(facing))
+    life = g.call(FN_LIFESPAN, [_loose_pin(loop, "Completed", is_input=False)])
     _set(life, "InLifespan", SPLAT_LIFETIME)
     ed.add_comment_to_nodes(
         f"BP_BloodSprite (blood_sprite.py): the spawn time into the card's custom data "

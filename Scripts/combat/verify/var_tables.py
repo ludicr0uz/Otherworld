@@ -15,6 +15,7 @@ so they sit in the saved asset until a builder prunes them.
 from asset_pipeline.gas_paths import ABP as GAS_ABP_PATH
 from combat import ammo_vars as AV
 from combat import anim_vars as AN
+from combat import bloom_tuning as BLOOM
 from combat import burst_vars as BV
 from combat import footstep_vars as FV
 from combat import fx_vars as FX
@@ -40,7 +41,7 @@ from uebp.verify_vars import check_table
 # (Blueprint, its rows, the variables left beside them by an earlier build)
 TABLES = (
     (WEAPON_COMP_BP_PATH, WV.CORE + FX.TABLE + LV.TABLE + RV.TABLE + SH.TABLE + ST.TABLE
-     + WV.STATE, ("PoseSprinting",)),
+     + WV.STATE + BLOOM.TABLE, ("PoseSprinting",)),
     (ITEM_BP_PATH, IV.TABLE, ("LodgePitchDeg",)),
     (HEALTH_BP_PATH, HV.TABLE + HV.STATE + LOOT.TABLE, ()),
     (GAME_MODE_BP_PATH, GV.TABLE, ()),

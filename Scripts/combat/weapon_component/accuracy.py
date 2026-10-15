@@ -2,7 +2,7 @@
 will kick, given the stance and the aim (the numbers are GUN_ACCURACY in
 gun_rows.py, copied onto each weapon as variables).
 
-    AimSpread     = Held.SpreadDegrees x aim(Spread) x stance(Spread)
+    AimSpread     = Held.SpreadDegrees x aim(Spread) x stance(Spread) x (1 + Bloom)
     RecoilScale   = aim(Recoil) x stance(Recoil)
     ReticleSpread = DegTan(AimSpread) / DegTan(CurrentFOV / 2)
 
@@ -17,12 +17,16 @@ RecoilScale, and the HUD draws the reticle's gap from ReticleSpread -- a
 fraction of half the viewport's width, since UE's field of view is horizontal.
 The reticle is therefore the cloud: what it encloses is where the shot can go.
 
+Bloom is bloom.py's: the hip burst's shake, settled here first each frame.
+
 Every read off Held is behind an IsValid Branch (the root CLAUDE.md's nested
 Branch rule); with nothing held all three are zero. After ads.py (Aiming,
 SightAiming, CurrentFOV) and stance.py (Stance) in the Tick, and before the
 trigger.
 """
 
+from combat.weapon_component.bloom import author_bloom_rest, bloom_scale
+from uebp.g import _G
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.weapon_component.common import _prop
 from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR
@@ -91,6 +95,7 @@ def _author_accuracy(ed, held, armed_out, exec_ins):
         made.append(n)
         return n
 
+    exec_ins = author_bloom_rest(ed, exec_ins)
     gate = keep(ed.add_branch_node())
     _connect(armed_out, _pin(gate, "Condition"))
     for e in exec_ins:
@@ -99,6 +104,9 @@ def _author_accuracy(ed, held, armed_out, exec_ins):
     hip, hip_n = _prop(ed, IV.SpreadDegrees, held)
     keep(hip_n)
     spread = _mul(ed, keep, hip, _factors(ed, keep, held, "Spread", 0.0))
+    g = _G(ed)
+    spread = _mul(ed, keep, spread, bloom_scale(g))
+    made.extend(g.made)
     sights_kick, sights_n = _prop(ed, IV.RecoilSightsScale, held)
     keep(sights_n)
     kick = _factors(ed, keep, held, "Recoil", sights_kick)
@@ -141,6 +149,7 @@ def _author_accuracy(ed, held, armed_out, exec_ins):
         "the sights), RecoilScale (what the kick is multiplied by) and "
         "ReticleSpread (the cloud as a fraction of the half screen, which the "
         "HUD draws). Each is the held gun's own number times its aim and "
-        "stance factors (GUN_ACCURACY in gun_rows.py).",
+        "stance factors (GUN_ACCURACY in gun_rows.py), the cloud widened by "
+        "1 + Bloom (bloom.py).",
         made)
     return (then(put_reticle), flow)

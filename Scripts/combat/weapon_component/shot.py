@@ -57,6 +57,7 @@ from combat.shot_vars import (
 from combat.weapon_component import vars as WV
 from combat.fx_vars import RELOAD, SHOT
 from combat.weapon_component import fx
+from combat.weapon_component.bloom import author_bloom_shot
 from combat.weapon_component.carry import _author_shot_origin
 from combat.weapon_component.firing import _author_fire
 from combat.weapon_component.impact import author_pellet_flew
@@ -117,8 +118,10 @@ def _author_shot_fired(ed):
         f"and its cooldown over (within {FIRE_GRACE_S:g} s: packets do not arrive evenly), "
         "then spent the round and stamped the cooldown. The shot is traced from this "
         "machine's muzzle to the client's AimPoint.", g.made)
+    # The round's bloom, for the next round's draw (this one's is in AimSpread).
+    bloomed = author_bloom_shot(ed, held, [then(event)])
     # Heard by everyone who did not predict it, before the pellets fly.
-    told = fx.tell(g, SHOT, [then(event)])
+    told = fx.tell(g, SHOT, bloomed)
     # The server's own muzzle: where the gun is here, not where a client says.
     muzzle = _author_shot_origin(ed, held)
     fired, flew = _author_fire(ed, held, muzzle, out(event, AIM_PARAM), told)
@@ -179,9 +182,11 @@ def _author_shot_ask(ed, held, muzzle, exec_in):
     again = op(g, FN_ADD_FF, out(g.call(FN_TIME_SECONDS)), g.iget(held, IV.FireInterval))
     flow = g.iput(held, IV.NextFireTime, again, [flow])
     flow = _count(g, AsksSent, [flow])
+    # The round's bloom, predicted (the server adds its own in ShotFired).
+    flow = author_bloom_shot(ed, held, [flow])
     ask = g.keep(_node(ed, FN_SERVER_FIRE))
     _connect(g.get(WV.AimPoint), _pin(ask, AIM_PARAM))
-    for e in (owns, flow):
+    for e in (owns, *flow):
         _connect(e, _pin(ask, "execute"))
     ed.add_comment_to_nodes(
         f"The shot is asked of the server ({SERVER_FIRE}, shot.py), with where the "

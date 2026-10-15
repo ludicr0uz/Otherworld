@@ -26,6 +26,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
   sway_tuning       the sight sway's numbers (SWAY_*): angles, periods, the
                     default rate (SWAY_RATE, a gun_tuning column), the stance's
                     steadying, the component's variables, sway_at()
+  bloom_tuning      the hip burst's bloom: what a round of an automatic adds,
+                    the cap, the hold and the settling speed; its variables
   breath_tuning     holding the breath down the sights: the key, how long, the
                     sway's scale held and winded, the variables, breath_step()
   headshot_tuning   the headshot mark: its variable's name, how long the X

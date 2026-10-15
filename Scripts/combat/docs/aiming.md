@@ -293,8 +293,21 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   `gun_rows.py`, copied onto each weapon; `weapon_component/accuracy.py`):
   - **The cloud** decides where a shot lands. Once a frame, behind an `IsValid(Held)` Branch:
     `AimSpread = SpreadDegrees × (sights ? 0 : shoulder ? SpreadShoulderScale : 1) ×
-    (prone ? SpreadProneScale : crouched ? SpreadCrouchScale : 1)`. Down the sights it is
+    (prone ? SpreadProneScale : crouched ? SpreadCrouchScale : 1) × (1 + Bloom)`. Down the sights it is
     exactly zero, and `VRandCone` returns the direction itself for a zero cone.
+  - **The bloom: a burst from the hip shakes the hands** (`combat/bloom_tuning.py` has the
+    numbers and the rule in Python, `weapon_component/bloom.py` the graph). Each round of an
+    automatic (`Held.Automatic`: the SMG and the rifle) fired while not `SightAiming` adds
+    `BLOOM_PER_SHOT` (0.12) to `Bloom`, up to `BLOOM_MAX` (1.5: the cloud 2.5 times the gun's
+    own; the SMG is there after 13 rounds), and stamps `BloomShotTime`. `BLOOM_HOLD_S` (0.2 s,
+    longer than either automatic's interval) after the last round it eases to zero once a
+    frame (`FInterpTo`, speed 5: ~8% left half a second later), at the head of the accuracy
+    block, on every machine. A round adds in `ShotFired` (the server, and single player) and
+    in the owning client's prediction of the ask, so its reticle and the server's draw bloom
+    alike. Down the sights a round adds nothing (and the cloud is zero there anyway). Checked
+    by `verify/bloom.py`, `Scripts/dev/tests/test_bloom_tuning.py` and
+    `probes/probe_hip_bloom.py` (the SMG: 2.6 -> 6.5 degrees over a burst, under 0.01 a second
+    after the hold; the pistol and the sights add none).
   - The shot's draw is **stored** in `ShotDirection` before the pellet loop: the cone is pure, and
     read per pellet it would give the shotgun's pattern a new centre per pellet.
   - **The reticle is the cloud.** `ReticleSpread = DegTan(AimSpread) / DegTan(CurrentFOV/2)`, a

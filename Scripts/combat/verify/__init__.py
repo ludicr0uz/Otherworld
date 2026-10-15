@@ -91,6 +91,8 @@ and it never relies on a variable another section left behind.
               the crouch it drives, the footsteps' volume and reach per stance
   accuracy    the per-gun cloud and recoil factors: the table, the weapons'
               variables, AimSpread/RecoilScale/ReticleSpread, the shot's draw
+  bloom       the hip burst's bloom: the numbers, the cloud times 1 + Bloom,
+              a round's add (ShotFired, the client's prediction), the settling
   punch       empty hands: the press gate, the clip, the sweep and the blow
   knife       the knife: the item, the swing's clip, the loadout, the press
               behind the fire gate, the swing and the blow; is_melee_*
@@ -219,7 +221,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "ammo_graph", "install",
-    "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "seat", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "carry_pose", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
+    "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "seat", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "carry_pose", "block", "movement", "sprint", "stance", "accuracy", "bloom", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "melee_clips", "shotgun_pose", "gun_hold", "finger_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "shot_hits", "server_anim", "gas_locomotion", "gas_moves", "weapon_layers", "interact", "slots", "record", "guard", "shot", "strike", "fire", "pickup", "reload_clip", "world_items", "relevancy", "leftovers", "glimmer", "heat", "trigger",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "wear_draw", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
     "var_tables",

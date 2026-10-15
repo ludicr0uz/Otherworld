@@ -73,6 +73,9 @@ _author_* fragment per concern, each in its own module:
               and PoseKneel from Searching (the HUD's loot window), with KneelTime
   accuracy    once a frame: AimSpread (the shot's cloud), RecoilScale and
               ReticleSpread from Held's GUN_ACCURACY factors, stance and aim
+  bloom       the hip burst's bloom: each round of an automatic off the
+              sights adds to Bloom (ShotFired; a client's prediction), which
+              settles soon after; accuracy widens the cloud by 1 + Bloom
   native      the component's native parent (W1; C++, Source/Otherworld,
               OtherworldWeaponComponentBase): the reparent, and the names its
               Server_Fire, FirePellets and reload read the Blueprints'

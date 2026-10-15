@@ -39,7 +39,8 @@ in the body or a tree, and is taken back with E; on a server every machine flies
 throw itself from the one release, the thrower's from its click, and the server alone
 judges it), and interacts with the nearest thing in
 reach. Items lying near the player glimmer, from 5 s after they come to lie there. Each gun has its own accuracy cloud, recoil and
-sway, steadied by stance and the aim; a headshot draws an X round the reticle. Bodies are
+sway, steadied by stance and the aim, and an automatic's cloud blooms over a burst from the hip, settling
+soon after the trigger is let go; a headshot draws an X round the reticle. Bodies are
 hit only where their fitted physics bodies are.
 
 **The inventory** (`Scripts/combat/CLAUDE.md`, "The slots"; the panel:

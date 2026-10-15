@@ -47,6 +47,7 @@ from combat.weapon_component.throw_strike import author_throw_strike_fx
 from combat import fx_vars as FX
 from combat.shot_vars import TABLE as SHOT_TABLE
 from combat.strike_vars import TABLE as STRIKE_TABLE
+from combat.bloom_tuning import TABLE as BLOOM_TABLE
 from combat.weapon_component.holds import author_set_holds, replicate_holds
 from combat.weapon_component.knife import KNIFE
 from combat.weapon_component.pickup import author_take_event
@@ -122,6 +123,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # free: declared ahead of the tables above, the one literal on an array
     # node (shot_hits.note's Add onto ShotHitBloods) is kept as "0", not "false".
     declare(ed, WV.STATE)
+    # The hip burst's bloom (bloom.py).
+    declare(ed, BLOOM_TABLE)
     # The names the interact had as the pick-up are taken off a component
     # built before the rename.
     for name in RETIRED_VARS + native.RETIRED_VARS + trigger.RETIRED_VARS + WV.RETIRED:
@@ -183,7 +186,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         raise RuntimeError("BP_WeaponComponent failed to compile")
     # The names the native base reads the Blueprints by, baked in with the rest.
     native.write_names(bp)
-    _apply_defaults(bp, {**defaults(WV.TABLE), **defaults(LOOK_TABLE), **defaults(RECORD_TABLE), **defaults(SHOT_TABLE), **defaults(FX.TABLE), **defaults_for(WEAPON_COMP_BP_PATH, WEAPON_SOUNDS + ITEM_SOUNDS + WORLD_SOUNDS),
+    _apply_defaults(bp, {**defaults(WV.TABLE), **defaults(LOOK_TABLE), **defaults(RECORD_TABLE), **defaults(SHOT_TABLE), **defaults(BLOOM_TABLE), **defaults(FX.TABLE), **defaults_for(WEAPON_COMP_BP_PATH, WEAPON_SOUNDS + ITEM_SOUNDS + WORLD_SOUNDS),
         # What the table cannot name: a constant of a graph module, a class
         # this build was handed, a clip it loads.
         WV.Stance: STAND,

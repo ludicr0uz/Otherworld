@@ -1,6 +1,7 @@
 """verify.firing -- Recoil, automatic fire and debug mode.
 """
 
+from combat.bloom_tuning import Bloom
 from combat.body_pose import POSE_KNEEL, POSE_WEIGHTS
 from combat.carry_pose_consts import CARRY_POSE, CARRY_SPRINT
 from combat.gas_moves_tuning import POSE_SLIDE
@@ -87,10 +88,11 @@ def check_recoil():
     # The four body-pose weights and the kneel's ease with FInterpTo too
     # (verify/body_pose.py checks those); each one's Current is its own weight.
     # So do the held breath's BreathScale (verify/breath.py) and the carry's two
-    # (verify/carry_pose.py), and the reload's ReloadHand (verify/reload_clip.py).
+    # (verify/carry_pose.py), the reload's ReloadHand (verify/reload_clip.py)
+    # and the hip burst's Bloom (verify/bloom.py).
     pose_reads = {f"Get {name}" for name in (*POSE_WEIGHTS, POSE_KNEEL, POSE_SLIDE,
                                              CARRY_POSE, CARRY_SPRINT, "BreathScale",
-                                             "ReloadHand")}
+                                             "ReloadHand", str(Bloom))}
     interps = [n for n in by_pins(wg, "Current", "Target", "DeltaTime", "InterpSpeed")
                if not any(str(BEL.get_node_title(PIN.get_owning_node(q))) in pose_reads
                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Current")))]
@@ -217,8 +219,16 @@ def check_automatic_fire():
              for x in wg
              if x.get_class().get_name() == "K2Node_IfThenElse"
              and BEL.find_input_pin(x, "Condition")]
-    with_auto = [(x, up) for x, up in conds if reads(up, "Automatic")]
-    check("exactly one Branch consults Automatic", len(with_auto) == 1,
+    # The bloom's gates read Automatic too: a round of an automatic off the
+    # sights adds to it (verify/bloom.py). Each is the Branch that runs a
+    # Set Bloom.
+    def blooms(branch):
+        then = BEL.find_output_pin(branch, "then")
+        return any(str(BEL.get_node_title(PIN.get_owning_node(q))) == f"Set {Bloom}"
+                   for q in PIN.list_connected_pins(then)) if then else False
+
+    with_auto = [(x, up) for x, up in conds if reads(up, "Automatic") and not blooms(x)]
+    check("exactly one Branch consults Automatic, besides the bloom's", len(with_auto) == 1,
           f"{len(with_auto)} branches")
     if with_auto:
         _, up = with_auto[0]

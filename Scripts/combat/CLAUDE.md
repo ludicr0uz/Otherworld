@@ -112,7 +112,9 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   (`gun_hold.py`): the row's `support` names the part the left hand holds down the sights,
   and `weapon_models.GUN_HOLDS` has the gun's line; `verify/gun_hold.py` and
   `probes/probe_gun_hands.py` hold every gun to it (`docs/aiming.md`, "Both hands are
-  fitted to each gun's model"). A gun's name in `weapon_models.GUN_FINGERS` bends its
+  fitted to each gun's model"); those measure the hidden mannequin, and
+  `probes/probe_drawn_grip.py` the drawn MetaHuman's hands against each gun's real mesh).
+  A gun's name in `weapon_models.GUN_FINGERS` bends its
   fingers onto the model too (`finger_pose.py`; all five guns today). Adding the SMG, the rifle and the sniper changed **no** node
   in the fire, reload or gate graphs.
 - **The pistol is a 1911** (`weapon_models.py`): Stein Games' `SM_1911_02`, a Fab listing

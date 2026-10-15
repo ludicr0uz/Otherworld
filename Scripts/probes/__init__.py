@@ -58,5 +58,7 @@ Scripts/net/CLAUDE.md has the conventions and the traps.
 
   crawl_watch  What a crawling body does, read off its joints: the measurements probe_stance_clips.py and probe_net_crawl.py ...
 
+  grip_report  The arithmetic of probe_drawn_grip: a finger's signed distances to a gun's mesh as its penetration and gap, the drawn wrist against the mannequin's, the report's tables (pure)
+
   png_pixels  Reading a screenshot's pixels in a probe: the editor's Python has no image library, and a picture is the only ...
 """

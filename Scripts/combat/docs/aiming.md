@@ -579,6 +579,21 @@ position. A row of zeros, or no row, is skipped: the seat is the `Grip`'s alone.
     and `probes/probe_gun_hands.py` reads the live hands down each gun's sights, the wrist
     against the point first. A hand that cannot be fitted says so there: move the row's
     box, or the grip (a fist further back takes the handguard out of the arm's reach).
+- **Every check above measures the hidden mannequin; the drawn MetaHuman is measured by
+  `probes/probe_drawn_grip.py`** (15 Oct 2026). The grip is fitted on the UEFN mannequin
+  and the gun hangs off its hand, while the Body is retargeted rotation-only, so its hands
+  sit where its own arm lengths put them. The probe reads both bodies' wrists and every
+  finger and thumb against each gun's real meshes (GeometryScript, signed distance;
+  `probes/grip_report.py` makes a finger's riding points into its penetration and gap a
+  0.75 cm skin off its axis), for each gun standing, walking, crouched, sprinting
+  (lowered) and down the sights at pitch +25/0/-25, with two close pictures each
+  (`--windowed`; `Saved/Screenshots/MacEditor/grip_*.png`) and the tables in
+  `Saved/grip_report/drawn_grip.md`. Measured: the drawn wrists are 2.5 to 4.9 cm off
+  the mannequin's lowered and 4.2 to 6.6 cm down the sights (the right about 6, the left
+  about 5); down the sights the mannequin's fingers lie within 0.2 cm of the AK's mesh
+  while the drawn ones are up to 1 cm in or 3 cm off; the 1911's and the SMG's drawn
+  right hand is off its grip (index 4 to 6 cm off, the left fingers 3.5 to 8 cm off the
+  fist). Lowered, a pistol's left hand hangs free (55 to 80 cm off), as meant.
 - **A gun's fingers are bent onto its model** (`finger_pose.py`, `finger_fit.py`), for
   the guns `weapon_models.GUN_FINGERS` names (all five: the AK, the Val, the shotgun,
   and the 1911 and the SMG, "The pistols" below). The hands above are rigid pieces of a clip made for Lyra's rifle:

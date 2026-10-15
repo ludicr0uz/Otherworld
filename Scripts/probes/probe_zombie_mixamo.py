@@ -4,7 +4,8 @@ import_mixamo.py checks the assets: the blend space rows play the Mixamo idle,
 walk and run, and the clips stand, stay in place and step. This proves the
 game uses them: a zombie wanderer wears SKM_Zombie01 with its anim Blueprint
 running, and put beside the player it swings -- and the montage its swing
-plays is built from the Mixamo attack, not the mannequin's MM_Attack_01.
+plays is built from UAL2's scratch (asset_pipeline/ual_creatures.py), not the
+mannequin's MM_Attack_01.
 """
 
 SYSTEMS = ('npc',)
@@ -12,7 +13,7 @@ SYSTEMS = ('npc',)
 import unreal
 
 BESIDE_CM = 100.0     # well inside the touch range and the melee range
-MIXAMO_ATTACK = "A_Zombie01_Mx_Scary_ZombieAttack"
+SCRATCH = "A_Zombie01_UAL2_Zombie_Scratch"
 
 
 def _zombies(p):
@@ -56,5 +57,5 @@ def probe(p):
     if montage is None:
         return
     clips = _montage_clips(montage)
-    p.check("...and the swing is the Mixamo zombie attack",
-            MIXAMO_ATTACK in clips, f"{clips}")
+    p.check("...and the swing is the UAL2 zombie scratch",
+            SCRATCH in clips, f"{clips}")

@@ -77,6 +77,9 @@ Editor-side, in pipeline order:
     retarget_player_clips.py    entry point: the UAL clips onto the player's body
                                 alone, from the packs as imported (the swap's step)
     ual_retarget.py             IK_UAL1/2, RTG_<Character>_from_UAL1/2, batch retarget
+    ual_creatures.py            the few UAL clips a creature plays (the zombie's
+                                scratch) retargeted onto it, and their checks
+    import_ual_creatures.py     entry point: that step alone, without the zips
     patch_gas_notifies.py       entry point: empty the two GAS notifies only the
                                 sample's Mover character answers, so they compile
     check_gas_load.py           entry point: load everything under /Game/GAS and

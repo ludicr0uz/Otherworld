@@ -56,7 +56,8 @@ pants and boots they wear. A weapon (melee or ranged) picked up with empty hands
 hand; any other pick-up goes to a free weapon slot of its kind, else the bag, else empty hands.
 
 **The wanderers** (`Scripts/npc/CLAUDE.md`). Ten zombies and wendigos on Behavior Trees:
-patrol until they notice a player, then chase and melee, sidestepping between swings. Each
+patrol until they notice a player, then chase and melee (the zombie swings Quaternius's
+two-handed scratch), sidestepping between swings. Each
 hunts one player, chosen among the living ones near it and kept until they die or leave,
 then the nearest; its AI runs on the server alone and its sounds and clips reach every
 machine by Multicast. What it hears is a list of recent noises the server keeps, one per

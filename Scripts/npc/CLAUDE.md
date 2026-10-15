@@ -106,10 +106,12 @@ Wanderer (selector)
   - It is a distance check (`TuneMeleeRange`, 200) plus a wall-clock cooldown per controller
     (`TuneMeleeInterval`).
   - It plays the creature's `NpcVariant.melee` into the upper-body-only `DefaultSlot`:
-    the retargeted `MM_Attack_01`, except the zombie's, which is the Mixamo
-    `A_Zombie01_Mx_Scary_ZombieAttack` (`asset_pipeline/import_mixamo.py`). Its own
-    `MM_Attack_01` is the fallback when that clip is missing, and the never-spawned parent
-    controller always holds it. `probes/probe_zombie_mixamo.py` proves the swing plays it.
+    the retargeted `MM_Attack_01`, except the zombie's, which is the Quaternius UAL2
+    scratch, a two-handed claw, `A_Zombie01_UAL2_Zombie_Scratch`
+    (`asset_pipeline/ual_creatures.py`, run alone by `import_ual_creatures.py`; not
+    Mixamo's "Zombie Scratch Idle", which scratches itself). Its own `MM_Attack_01` is the
+    fallback when that clip is missing, and the never-spawned parent controller always
+    holds it. `probes/probe_zombie_mixamo.py` proves the swing plays it.
   - Damage is dealt by calling `TakeHit` on the player's health component
     (`combat/damage.py`: only the server runs it), told the swing's bearing, this
     wanderer's controller and the wanderer. Not the engine's `ApplyDamage`/`AnyDamage`,

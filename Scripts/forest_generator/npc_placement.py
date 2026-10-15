@@ -221,12 +221,12 @@ def _creature(key, folder, health=NPC_BASE_HEALTH, speed_scale=1.0,
 
 
 NPC_VARIANTS = (
-    # The zombie swings the Mixamo pack's two-handed lunge
-    # (asset_pipeline/import_mixamo.py, which checks this literal against
-    # mixamo_paths.MELEE).
+    # The zombie swings the Quaternius UAL2 scratch, a two-handed claw
+    # (asset_pipeline/ual_creatures.py, which checks this literal against
+    # quaternius_paths.ZOMBIE_MELEE).
     _creature("Zombie", "Zombie01",
-              melee="/Game/Sourced/Mixamo/Zombie01/"
-                    "A_Zombie01_Mx_Scary_ZombieAttack"),
+              melee="/Game/Sourced/Quaternius/UAL/Zombie01/"
+                    "A_Zombie01_UAL2_Zombie_Scratch"),
     _creature("Wendigo", "Wendigo01",
               health=NPC_BASE_HEALTH * WENDIGO_HEALTH_MULTIPLIER,
               speed_scale=WENDIGO_SPEED_MULTIPLIER),

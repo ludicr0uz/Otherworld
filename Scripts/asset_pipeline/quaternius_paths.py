@@ -128,3 +128,13 @@ THROW = ("UAL2", "OverhandThrow")
 PICKUP = ("UAL2", "Farm_Harvest")
 # The clip the hands are calibrated on (palm_twist): hands at rest.
 PALM_CALIBRATION = ("UAL1", "Idle_Loop")
+
+# ─── What the creatures use ─────────────────────────────────────────────────
+# The zombie's swing (npc/melee.py plays NpcVariant.melee): UAL2's scratch, a
+# two-handed claw that sweeps the hands about 1.4 m, in place, 1.8 s.  Not
+# Mixamo's "Zombie Scratch Idle", which is the zombie scratching itself.
+# Only these clips are retargeted onto a creature (ual_creatures.py), with
+# PALM_CALIBRATION beside them for the palms.  forest_generator/npc_placement.py
+# spells the result out as a literal; ual_creatures.py checks the two agree.
+ZOMBIE_MELEE = ("UAL2", "Zombie_Scratch")
+UAL_CREATURE_CLIPS = {"Zombie01": (ZOMBIE_MELEE,)}

@@ -17,8 +17,10 @@ the names quaternius_paths lists.  Then:
     2. IK_UAL1/2, RTG_Adventurer01_from_UAL1/2, every clip retargeted into
        Quaternius/UAL/Adventurer01/, palms calibrated     (ual_retarget)
     3. every gun and survival FBX -> Quaternius/Guns|Survival/SM_*
-    4. the zombie -> Quaternius/Zombie/SKM_Zombie and its clips
-    5. check it all, and log [VERIFY] lines like the suites do
+    4. the creatures' clips (the zombie's scratch) -> Quaternius/UAL/Zombie01/
+                                                        (ual_creatures)
+    5. the zombie -> Quaternius/Zombie/SKM_Zombie and its clips
+    6. check it all, and log [VERIFY] lines like the suites do
 
 Then rebuild the weapons (build_weapons_and_combat.py): the player's anim BP
 plays the crouch and the crawl.
@@ -31,7 +33,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # A live editor keeps imported modules between runs: drop the packages so an
 # edit to any of their modules is what actually runs.
 for _name in [m for m in sys.modules
-              if m.split(".")[0] in ("uebp", "asset_pipeline", "combat")]:
+              if m.split(".")[0] in ("uebp", "asset_pipeline", "combat",
+                                    "forest_generator")]:
     del sys.modules[_name]
 
 import unreal                                                     # noqa: E402
@@ -44,6 +47,9 @@ from asset_pipeline.quaternius_paths import (                     # noqa: E402
     THROW, UAL_CHARACTERS, ual_clip,
 )
 from asset_pipeline.rig_util import _bone_world, _load            # noqa: E402
+from asset_pipeline.ual_creatures import (                        # noqa: E402
+    check_creature_clips, retarget_creatures,
+)
 from asset_pipeline.ual_retarget import retarget_ual              # noqa: E402
 from combat.skin import SKIN_ADVENTURER                           # noqa: E402
 
@@ -96,6 +102,7 @@ def main():
         unreal.log_warning(f"[RETARGET] note: no IK_{who} yet, so no UAL clips on it: "
                            "run build_retarget.py, then this again")
     palms = {who: retarget_ual(who, packs) for who in ready}
+    creatures = retarget_creatures()
     props = import_prop_packs()
     zombie = import_zombie()
 
@@ -115,6 +122,8 @@ def main():
               len(made) == want, f"({len(made)}/{want})")
     if UAL_CHARACTERS[0] in palms:
         check_player_clips(check)
+    if creatures:
+        check_creature_clips(check)
 
     for short, (fbxs, meshes) in props.items():
         check(f"{short}: every FBX of the pack is a static mesh",

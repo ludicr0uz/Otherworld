@@ -14,8 +14,8 @@ reads are mixamo_paths.PACKS.  Then:
     3. IK_XBot, RTG_<Creature>_from_XBot, every clip retargeted
        into Mixamo/<Creature>/                               (mixamo_retarget)
     4. the creature's blend space plays the Mixamo idle/walk/run
-       (mixamo_locomotion); its melee clip is NPC_VARIANTS's, so
-       rebuild the NPCs afterwards: build_npc_blueprints.py
+       (mixamo_locomotion), so rebuild the NPCs afterwards:
+       build_npc_blueprints.py (its swing is UAL2's scratch, ual_creatures.py)
     5. the roar alone onto each of mixamo_paths.ROAR_CREATURES (the
        wendigo), for the hunt's first beat (npc/stalk.py)
     6. the player's melee set (mixamo_paths.PLAYER_CLIPS: the knife's and
@@ -50,7 +50,7 @@ from asset_pipeline.mixamo_locomotion import (                    # noqa: E402
     apply_locomotion, check_mixamo_set,
 )
 from asset_pipeline.mixamo_paths import (                         # noqa: E402
-    MELEE, MIXAMO_CREATURES, MIXAMO_ROOT, ROAR, ROAR_CREATURES, mixamo_clip,
+    MIXAMO_CREATURES, MIXAMO_ROOT, ROAR, ROAR_CREATURES, mixamo_clip,
 )
 from asset_pipeline.mixamo_player import import_player_set        # noqa: E402
 from asset_pipeline.mixamo_retarget import (                      # noqa: E402
@@ -75,11 +75,8 @@ def _creatures(check):
 
     check("Mixamo Clips Imported", len(clips) >= 36, f"({len(clips)})")
     for creature in MIXAMO_CREATURES:
+        # Its swing is UAL2's scratch now: ual_creatures.py checks that.
         check_mixamo_set(creature, check)
-        worn = [v for v in NPC_VARIANTS if v.mesh.endswith(f"SKM_{creature}")]
-        check(f"{creature} Wanderer Swings The Mixamo Attack",
-              all(v.melee == mixamo_clip(creature, *MELEE) for v in worn),
-              f"(NPC_VARIANTS melee: {[v.melee for v in worn]})")
     for creature in ROAR_CREATURES:
         roar = unreal.EditorAssetLibrary.load_asset(mixamo_clip(creature, *ROAR))
         mesh = unreal.EditorAssetLibrary.load_asset(

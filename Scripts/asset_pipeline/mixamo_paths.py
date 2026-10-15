@@ -99,6 +99,8 @@ MIXAMO_CREATURES = ("Zombie01",)
 LOCOMOTION = {0.0: ("Scary", "ZombieIdle"),
               300.0: ("Scary", "ZombieWalk"),
               600.0: ("Scary", "ZombieRun")}
+# The pack's attack: still retargeted and checked on the creature, but the
+# zombie swings UAL2's scratch now (quaternius_paths.ZOMBIE_MELEE).
 MELEE = ("Scary", "ZombieAttack")
 
 # The wendigo's roar, played when it goes aggro (npc/stalk.py): the Scary

@@ -1561,3 +1561,21 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       effort: low
 
 - [x] Add a debug option to enable a trace log for shots that are fired, origin, end, source manequin position, target manequin position and contact point(s). Whatever information would be necessary to help troubleshoot shot issues.
+
+- [ ] In ADS view for pistol, the thumb placement covers the ironsights. Fix the thumb gripping logic for pistols so that it holds correctly around the grip rather than the thumb pointing upwards.
+
+- [ ] For uzi and pistol, the ADS is too close up. set the camera farther back such that the gun is held farther out in front of it. More hands will be seen in the shot
+
+- [ ] The recent wrist pinning improvements we a good improvement in the gun holding animations. There are some remaining issues with the gun holding. Shotgun left hand carry does not hold the gun correctly. Right hand is good. Left hand fingers rest on the outside of the gun rather than holding around it.
+
+- [ ]  The recent wrist pinning improvements we a good improvement in the gun holding animations. There are some remaining issues with the gun holding. For ADS, make the frame duration of the zoom in motion from TPP to ADS configurable in player settings, down to 0 seconds in which case it's effectively skipped, and the view goes straight into FPP from tpp on button press. The gun raise duration should also be configurable - how long it takes to pull out the gun from the side to the crosshairs. 
+
+- [ ] ADS wepapon hover motion (that happens without holding breath) should move in a randomized slow gliding path rather than jitter. 
+
+- [ ] The inventory screen model of the character should also show the weapon that is being currently held in hand. It seems it is shown with lower quality at the moment. It should effectively be a front facing view of the character as you would see him in the world. Move the location of the character image on the right side above the clothing items list.
+
+- [ ] When in game, the multiplayer choice menu should just not be present in the menu. (Right now it's there, but says "from the title"). Remove the logic that has the "from the title" text concept. The menu options should either be present (and visible) or not present (at all) depending on the state of the game.
+
+- [ ] Create a new 4km by 4km map that has a "C" shaped landscape, with water in the middle of the C. Do not worry about implementing swimming or character movement in water. Prevent the ability to walk in the area that has water. One end of the landscape should have a mountain on it. The mountain should have a semi relistic landscape (I.E not just one portrusion). The peak of the mountain should reach 400m. The gameplay on this map should be the same as on the 1k by 1k map. (I.E just the map changes). Add a new option in the game menu for this map "Survival Large" both single player and multiplayer. Vary tree densities throughout the landscape, some areas treeated as forests with density same as we have in the center of the 1km map, areas with less trees around forestes, and field areas with no trees. 
+
+- [ ] There were recent changes made to improve prone position as the legs were too wide. The legs are still too wide in the prone position, like a frog. Make the prone legs more narrow, more aligned with the laying down upper body.

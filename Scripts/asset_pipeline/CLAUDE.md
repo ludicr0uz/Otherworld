@@ -373,6 +373,14 @@ reverse instead (`Scripts/combat/docs/stance.md`).
   the reference pose, and the motion-matching graph's Leg IK pulls the feet to them
   (`Scripts/combat/CLAUDE.md`, "The feet are off while the player lies down"). Every other
   retargeted copy (Lyra's, Mixamo's) still has them there: harmless on the arms and spine.
+- **The legs drawn in** (`narrow_legs.py`, `leg_spread.LEG_SPREAD` 0.55; 2026-10-15): the
+  pack lies frog-legged, feet 55-63 cm apart and the forward crawl's knees 81 cm, over hips
+  15 cm wide, which read too wide. Before the IK feet are keyed, each copy's thighs and then
+  calves are turned about the vertical through their joint, frame by frame, to 0.55 of their
+  angle off straight back: feet 33-49 cm apart, knees 35-62, the legs never nearer than
+  33 cm; heights are untouched, so nothing goes into the ground. The importer logs both
+  spreads and fails a copy that did not narrow; `dev/tests/test_leg_spread.py` holds the
+  math. Another width is the constant and a re-run.
 - **A checkout without the pack** wears the zombie crawl (`combat/skin._gas_skin`) and says
   so in the build's log. `dev/tests/test_fal_import.py` holds the table.
 

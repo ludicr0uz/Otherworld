@@ -43,6 +43,8 @@ from asset_pipeline.fal_paths import (                                 # noqa: E
 from asset_pipeline.gas_bridge_paths import IK_UEFN, PLAYER_MESH_GAS   # noqa: E402
 from asset_pipeline.plain_retarget import build_plain_retargeter       # noqa: E402
 from asset_pipeline.ik_follow import follow_feet, off_cm               # noqa: E402
+from asset_pipeline.leg_spread import LEG_SPREAD                       # noqa: E402
+from asset_pipeline.narrow_legs import narrow_legs, spread_cm          # noqa: E402
 from asset_pipeline.retarget_rig import build_ik_rig                   # noqa: E402
 from asset_pipeline.rig_chains import (                                # noqa: E402
     CHAINS_MANNEQUIN, RETARGET_ROOT_MANNEQUIN, ROOT_MOTION_BONE_MANNEQUIN,
@@ -120,18 +122,24 @@ def main():
         # No clip of the stance line may have root motion (Scripts/combat/
         # CLAUDE.md, "The weapon layers"): the player would lie rooted.
         asset.set_editor_property("enable_root_motion", False)
-        # The legs are the clip's: its IK feet onto its feet (ik_follow.py).
+        # The pack lies frog-legged: the legs in toward the body's line
+        # (leg_spread.py), then the IK feet onto the feet (ik_follow.py).
+        wide = spread_cm(asset)
+        narrow_legs(asset)
         follow_feet(asset)
-        travel, ik_off = _travel(asset), off_cm(asset)
+        travel, ik_off, spread = _travel(asset), off_cm(asset), spread_cm(asset)
         good = (asset.get_editor_property("skeleton") == skeleton
                 and not asset.get_editor_property("enable_root_motion")
                 and travel < IN_PLACE_CM and ik_off < IN_PLACE_CM
+                and spread[0] < wide[0] and spread[1] < wide[1]
                 and abs(asset.get_play_length() - _load(source_clip).get_play_length()) < 0.05)
         ok = ok and good
         unreal.log_warning(f"[VERIFY] {'PASS' if good else 'FAIL'} {name} is a clip on "
                            f"{skeleton.get_name()}, as long as the pack's and in place "
                            f"(root and pelvis travel {travel:.2f} cm), its IK feet on its feet "
-                           f"({ik_off:.2f} cm off)")
+                           f"({ik_off:.2f} cm off), its legs drawn in to {LEG_SPREAD:g} of "
+                           f"their angle (feet {wide[0]:.0f} -> {spread[0]:.0f} cm apart, "
+                           f"knees {wide[1]:.0f} -> {spread[1]:.0f})")
     _log(f"{len(CLIPS)} clip(s) onto {skeleton.get_name()}")
     return ok
 

@@ -194,6 +194,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
       over an arm; nothing goes under the ground in any direction (lowest limb 2.8 cm).
     - **A checkout with the pack's idle and forward loop but not all four** crawls forward in
       every direction, as P1 did (`skin._gas_skin` says so in the build's log).
+  - **The legs are drawn in** from the pack's frog-legged spread (feet 55-63 cm apart) to
+    33-49 cm by the import (`asset_pipeline/narrow_legs.py`; `Scripts/asset_pipeline/CLAUDE.md`).
   - **The copies are in place** (root and pelvis travel 0.00 cm: the plain retargeter drops the
     root's travel), with no root motion; the verifier holds both.
   - **`body_pose` lifts the hips 3.3 cm** (from the copy's 12.7 to `PRONE_HIPS_CM`) and has no

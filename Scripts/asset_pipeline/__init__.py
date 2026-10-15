@@ -125,6 +125,8 @@ Editor-side, in pipeline order:
   fal_paths   Where the Free Animation Library lies and which of its clips the game plays
   ik_follow   Key a retargeted clip's IK foot bones onto its feet
   import_fal  the Free Animation Library's clips the game plays, onto the player's skeleton
+  leg_spread  How far apart the crawl's legs lie: the share of each leg's angle the copies keep
+  narrow_legs Draw a retargeted crawl's legs in toward the body's line (leg_spread.py says how far)
 
   asp_paths   Where the Animation Starter Pack lies and which of its clips the game plays
   import_asp  the Animation Starter Pack's clips the game plays, onto the player's skeleton

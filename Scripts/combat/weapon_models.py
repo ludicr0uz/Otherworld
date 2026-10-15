@@ -92,10 +92,12 @@ SMG_MUZZLE = (19.5, 0.0, 8.0)
 # lie at |y| 1.4-2.2, up to 12.8), through the cocking knob's U (11.3 deep,
 # the line clear of it inside |y| 0.45) and under the stock's hinge bar. The
 # stock's butt is the part nearest the eye, and the eye must be a near plane
-# (10 cm) behind it: that puts it 23 cm behind the grip.
+# (10 cm) behind it; it sits 15 cm farther back than that (39 cm behind the
+# grip, 15 Oct 2026) so the gun is held out in front of the view and the hands
+# round it are in the shot.
 SMG_SIGHT_REAR = (-9.1, 0.0, 11.7)
 SMG_SIGHT_FRONT = (14.1, 0.0, 11.7)
-SMG_SIGHT = _eye_behind(SMG_SIGHT_REAR, SMG_SIGHT_FRONT, -24.0)
+SMG_SIGHT = _eye_behind(SMG_SIGHT_REAR, SMG_SIGHT_FRONT, -39.0)
 
 # What the left hand holds down the sights (gun_hold.py): a machine pistol in
 # the pistol's pose, so the right hand's fingers on the grip.
@@ -331,12 +333,13 @@ PISTOL_MUZZLE = (16.3, 0.0, 6.48)
 # The sight line: the top of the rear blades (8.06 high at their front edge,
 # x -0.58, a notch 4.9 mm wide between them) and the tip of the front post
 # (7.90 at x 15.0, 2.6 mm wide): the post stands 1.6 mm lower than the
-# blades, so the line falls a little to the front. The eye is 21 cm behind
-# the hammer: far enough that both hands stand partly in the view, round the
-# gun (at 10 cm the slide's back alone filled a quarter of it).
+# blades, so the line falls a little to the front. The eye is 36 cm behind
+# the hammer: the gun held well out in front, both hands round it in the view
+# (at 10 cm the slide's back alone filled a quarter of it; at 21 cm the shot
+# was still too close, 15 Oct 2026).
 PISTOL_SIGHT_REAR = (-0.58, 0.0, 8.064)
 PISTOL_SIGHT_FRONT = (15.01, 0.0, 7.902)
-PISTOL_SIGHT = _eye_behind(PISTOL_SIGHT_REAR, PISTOL_SIGHT_FRONT, -25.0)
+PISTOL_SIGHT = _eye_behind(PISTOL_SIGHT_REAR, PISTOL_SIGHT_FRONT, -40.0)
 
 # What the left hand holds down the sights (gun_hold.py): the right hand's
 # fingers on the grip, a two-handed pistol hold.

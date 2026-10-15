@@ -42,7 +42,7 @@ reach. Items lying near the player glimmer, from 5 s after they come to lie ther
 sway, steadied by stance and the aim, and an automatic's cloud blooms over a burst from the hip, settling
 soon after the trigger is let go; a headshot draws an X round the reticle. Bodies are
 hit only where their fitted physics bodies are. A round that draws blood leaves a splat
-at the wound beside the droplets, a half-second flipbook facing the camera, sized by
+at the wound beside the droplets, one splat frame held a third of a second facing the camera, sized by
 the zone struck: a limb's smallest, the chest's medium, the head's largest.
 
 **The inventory** (`Scripts/combat/CLAUDE.md`, "The slots"; the panel:

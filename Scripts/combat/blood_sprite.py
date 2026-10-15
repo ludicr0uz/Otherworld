@@ -6,14 +6,11 @@ throw_strike.py; the sizes are blood_sprite_consts.py).
 **A flat card, not Niagara or Paper2D,** for the reason burst.py gives for
 the droplets: nothing here may be an asset a script cannot rebuild. The
 frames are drawn in plain Python (blood_sprite_image.py) and imported; the
-material picks the frame; the actor does three things at BeginPlay and then
-nothing:
+material shows one frame of them, the fullest (SPLAT_HOLD_FRAME): the bloom
+and the break-up are not played, since their small frames read as drops
+hanging in the air after the hit. The actor does two things at BeginPlay and
+then nothing:
 
-  * writes the world's time into the card's custom primitive data, slot
-    SPLAT_SPAWN_SLOT. The material's SpawnTime reads it there, and its Time
-    node is the same clock, so (Time - SpawnTime) / SPLAT_LIFETIME is how far
-    through the flipbook this one card is: one material for every splat, no
-    material instance, no Tick;
   * turns to face the local camera (the camera manager of the
     PlayerController that IsLocalController, never one asked for by index
     (net/CLAUDE.md); with a random roll, so no two splats
@@ -28,8 +25,8 @@ import os
 import unreal
 
 from combat.blood_sprite_consts import (
-    SPLAT_COLOUR_GAIN, SPLAT_COMPONENT, SPLAT_FRAMES, SPLAT_GRID, SPLAT_LIFETIME, SPLAT_LIFT,
-    SPLAT_ROOT, SPLAT_ROUGHNESS, SPLAT_SPAWN_PARAM, SPLAT_SPAWN_SLOT,
+    SPLAT_COLOUR_GAIN, SPLAT_COMPONENT, SPLAT_FRAMES, SPLAT_GRID, SPLAT_HOLD_FRAME,
+    SPLAT_LIFETIME, SPLAT_LIFT, SPLAT_ROOT, SPLAT_ROUGHNESS,
 )
 from combat.blood_sprite_image import splat_png
 from combat.log import _log
@@ -41,11 +38,10 @@ from uebp.graph import (
     _connect, _events, _loose_pin, _must_load, _pin, _root_handle, _rot, _set, out, then)
 from uebp.layout import arrange
 from uebp.nodes.actor import (
-    FN_ACTOR_LOC, FN_CAM_LOC, FN_IS_LOCAL_CONTROLLER, FN_LIFESPAN, FN_SET_ACTOR_ROT,
-    FN_SET_CPD_FLOAT)
+    FN_ACTOR_LOC, FN_CAM_LOC, FN_IS_LOCAL_CONTROLLER, FN_LIFESPAN, FN_SET_ACTOR_ROT)
 from uebp.nodes.math import FN_BREAK_ROT, FN_LOOK_AT, FN_MAKE_ROT, FN_RANDOM_FLOAT
 from uebp.nodes.palette import MACRO_FOR_EACH
-from uebp.nodes.system import FN_ALL_ACTORS, FN_IS_VALID, FN_TIME_SECONDS
+from uebp.nodes.system import FN_ALL_ACTORS, FN_IS_VALID
 
 
 PC_CLASS_PATH = "/Script/Engine.PlayerController"
@@ -97,7 +93,7 @@ def _link(a, b, pin, out_pin=""):
 
 
 def build_splat_material(tex):
-    """Masked, lit, two-sided: the frame (Time - SpawnTime) / life picks,
+    """Masked, lit, two-sided: the atlas's SPLAT_HOLD_FRAME cell alone,
     its shade times M_Blood's colour, its alpha the mask."""
     mel = unreal.MaterialEditingLibrary
     eas = _assets()
@@ -113,37 +109,9 @@ def build_splat_material(tex):
     mat.set_editor_property("opacity_mask_clip_value", 0.5)
 
     E = unreal
-    now = _expr(mat, E.MaterialExpressionTime)
-    born = _expr(mat, E.MaterialExpressionScalarParameter,
-                 parameter_name=SPLAT_SPAWN_PARAM, use_custom_primitive_data=True,
-                 primitive_data_index=SPLAT_SPAWN_SLOT)
-    age = _expr(mat, E.MaterialExpressionSubtract)
-    _link(now, age, "A")
-    _link(born, age, "B")
-    phase = _expr(mat, E.MaterialExpressionMultiply, const_b=1.0 / SPLAT_LIFETIME)
-    _link(age, phase, "A")
-    played = _expr(mat, E.MaterialExpressionSaturate)
-    _link(phase, played, "")
-    # frame = min(floor(played * FRAMES), FRAMES - 1)
-    scaled = _expr(mat, E.MaterialExpressionMultiply, const_b=float(SPLAT_FRAMES))
-    _link(played, scaled, "A")
-    whole = _expr(mat, E.MaterialExpressionFloor)
-    _link(scaled, whole, "")
-    frame = _expr(mat, E.MaterialExpressionMin, const_b=float(SPLAT_FRAMES - 1))
-    _link(whole, frame, "A")
-    # row = floor(frame / GRID), column = frame - row * GRID
-    per_row = _expr(mat, E.MaterialExpressionMultiply, const_b=1.0 / SPLAT_GRID)
-    _link(frame, per_row, "A")
-    row = _expr(mat, E.MaterialExpressionFloor)
-    _link(per_row, row, "")
-    row_start = _expr(mat, E.MaterialExpressionMultiply, const_b=float(SPLAT_GRID))
-    _link(row, row_start, "A")
-    column = _expr(mat, E.MaterialExpressionSubtract)
-    _link(frame, column, "A")
-    _link(row_start, column, "B")
-    cell = _expr(mat, E.MaterialExpressionAppendVector)
-    _link(column, cell, "A")
-    _link(row, cell, "B")
+    # The held frame's cell: column k % GRID, row k // GRID.
+    cell = _expr(mat, E.MaterialExpressionConstant2Vector,
+                 r=float(SPLAT_HOLD_FRAME % SPLAT_GRID), g=float(SPLAT_HOLD_FRAME // SPLAT_GRID))
     uv = _expr(mat, E.MaterialExpressionTextureCoordinate)
     shifted = _expr(mat, E.MaterialExpressionAdd)
     _link(uv, shifted, "A")
@@ -175,14 +143,11 @@ def build_splat_material(tex):
 
 def _author_begin_play(ed, begin):
     g = _G(ed)
-    card = g.get(SPLAT_COMPONENT)
-    stamp = g.call(FN_SET_CPD_FLOAT, [then(begin)], self=card, DataIndex=SPLAT_SPAWN_SLOT,
-                   Value=out(g.call(FN_TIME_SECONDS)))
 
     # The local camera, never asked for by player index (net/CLAUDE.md): the
     # PlayerController that is local, out of those this machine has (a client
     # has its own alone), and that controller's own camera manager.
-    every = g.call(FN_ALL_ACTORS, [then(stamp)], ActorClass=PC_CLASS_PATH)
+    every = g.call(FN_ALL_ACTORS, [then(begin)], ActorClass=PC_CLASS_PATH)
     loop = g.keep(ed.add_macro_node(MACRO_FOR_EACH))
     _connect(out(every, "OutActors"), _loose_pin(loop, "Array"))
     _connect(then(every), _loose_pin(loop, "Exec"))
@@ -205,10 +170,9 @@ def _author_begin_play(ed, begin):
     life = g.call(FN_LIFESPAN, [_loose_pin(loop, "Completed", is_input=False)])
     _set(life, "InLifespan", SPLAT_LIFETIME)
     ed.add_comment_to_nodes(
-        f"BP_BloodSprite (blood_sprite.py): the spawn time into the card's custom data "
-        f"slot {SPLAT_SPAWN_SLOT}, which M_BloodSprite's {SPLAT_SPAWN_PARAM} reads: the "
-        f"material plays the {SPLAT_FRAMES}-frame flipbook from it over "
-        f"{SPLAT_LIFETIME}s. Then the card turns to the local camera, rolled at random "
+        f"BP_BloodSprite (blood_sprite.py): M_BloodSprite shows frame {SPLAT_HOLD_FRAME} "
+        f"of the {SPLAT_FRAMES}-frame atlas, its fullest. The card turns to the local "
+        f"camera, rolled at random "
         f"(no camera: it keeps the hit normal), and lives {SPLAT_LIFETIME}s.", g.made)
 
 

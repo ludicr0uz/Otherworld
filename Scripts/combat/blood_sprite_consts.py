@@ -29,13 +29,14 @@ SPLAT_GRID = 4
 SPLAT_FRAMES = SPLAT_GRID * SPLAT_GRID
 SPLAT_CELL = 128
 SPLAT_SEED = 23
-# Played once over this many seconds, then the actor is gone (SetLifeSpan).
-SPLAT_LIFETIME = 0.5
+# The card shows one frame of the flipbook, its fullest (the last of the bloom,
+# before the break-up: the unit tests hold it to the largest coverage), for
+# this many seconds, then the actor is gone (SetLifeSpan). The bloom and the
+# break-up frames are not played: they read as blood hanging in the air.
+SPLAT_LIFETIME = 0.35
+SPLAT_HOLD_FRAME = 8
 # The share of the life spent blooming out; the rest breaks it up to nothing.
 SPLAT_GROW = 0.55
-# The material's custom primitive data slot that holds the spawn time.
-SPLAT_SPAWN_SLOT = 0
-SPLAT_SPAWN_PARAM = "SpawnTime"
 # The texture is a shade (thick blood darker) times this, the M_Blood colour
 # lifted a little: a flat card lit face-on reads darker than a droplet's
 # highlight does.

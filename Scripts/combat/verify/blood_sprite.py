@@ -1,5 +1,5 @@
 """verify.blood_sprite -- the splat at a wound (combat/blood_sprite.py): the
-flipbook texture, the material that plays it off the spawn time, the card
+flipbook texture, the material that shows its fullest frame, the card
 that faces the camera, and the size the pellet's zone picks (head largest,
 then the chest, a limb least). The splat in a running game is
 probes/probe_blood_sprite.py.
@@ -9,7 +9,7 @@ import unreal
 
 from combat import fx_vars as FX
 from combat.blood_sprite_consts import (
-    SPLAT_CELL, SPLAT_COMPONENT, SPLAT_GRID, SPLAT_LIFETIME, SPLAT_SPAWN_PARAM, SPLAT_SPAWN_SLOT, splat_scale,
+    SPLAT_CELL, SPLAT_COMPONENT, SPLAT_GRID, SPLAT_HOLD_FRAME, SPLAT_LIFETIME, splat_scale,
 )
 from combat.paths import BLOOD_SPRITE_BP_PATH, MAT_BLOOD_SPRITE, PLANE, TEX_BLOOD_SPRITE
 from combat.verify import fx as fxv
@@ -66,19 +66,13 @@ def check_splat_material():
     if mask is None:
         return
     read = _walk(mat, mask)
-    born = [n for n in read if isinstance(n, unreal.MaterialExpressionScalarParameter)]
-    check(f"...the frame picked by the age since {SPLAT_SPAWN_PARAM}, read off the card's "
-          f"custom primitive data slot {SPLAT_SPAWN_SLOT}, against the Time node",
-          len(born) == 1
-          and str(born[0].get_editor_property("parameter_name")) == SPLAT_SPAWN_PARAM
-          and born[0].get_editor_property("use_custom_primitive_data")
-          and born[0].get_editor_property("primitive_data_index") == SPLAT_SPAWN_SLOT
-          and any(isinstance(n, unreal.MaterialExpressionTime) for n in read),
-          f"{len(born)} parameter(s)")
-    rates = [n.get_editor_property("const_b") for n in read
-             if isinstance(n, unreal.MaterialExpressionMultiply)]
-    check(f"...over {SPLAT_LIFETIME}s", any(abs(r - 1.0 / SPLAT_LIFETIME) < 1e-4 for r in rates),
-          str(rates))
+    cells = [(n.get_editor_property("r"), n.get_editor_property("g")) for n in read
+             if isinstance(n, unreal.MaterialExpressionConstant2Vector)]
+    want = (SPLAT_HOLD_FRAME % SPLAT_GRID, SPLAT_HOLD_FRAME // SPLAT_GRID)
+    check(f"...showing frame {SPLAT_HOLD_FRAME} alone (column {want[0]}, row {want[1]}), "
+          "no bloom or break-up played off the time",
+          len(cells) == 1 and tuple(round(c) for c in cells[0]) == want
+          and not any(isinstance(n, unreal.MaterialExpressionTime) for n in read), str(cells))
 
 
 def check_splat_actor():
@@ -96,11 +90,6 @@ def check_splat_actor():
     life = by_pins(nodes, "InLifespan")
     check(f"...lives {SPLAT_LIFETIME}s", len(life) == 1
           and abs((num_pin(life[0], "InLifespan") or 0.0) - SPLAT_LIFETIME) < 1e-4)
-    stamp = by_pins(nodes, "DataIndex", "Value")
-    check(f"...stamps the world's time into slot {SPLAT_SPAWN_SLOT} at BeginPlay",
-          len(stamp) == 1 and int(num_pin(stamp[0], "DataIndex") or 0) == SPLAT_SPAWN_SLOT
-          and [_squash(n) for n in _feeders(stamp[0], "Value")] == ["gettimeseconds"],
-          str([_title(n) for n in _feeders(stamp[0], "Value")]) if stamp else "none")
     check("...and turns to the local camera",
           any(_squash(n) == "findlookatrotation" for n in nodes)
           and bool(by_pins(nodes, "NewRotation")))

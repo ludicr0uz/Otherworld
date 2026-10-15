@@ -37,6 +37,10 @@ class Flipbook(unittest.TestCase):
         self.assertTrue(all(a >= b - 1e-9 for a, b in zip(cover[peak:], cover[peak + 1:])),
                         f"then only shrinks: {cover}")
 
+    def test_hold_frame_is_the_fullest(self):
+        cover = [I.coverage(f) for f in self.frames]
+        self.assertEqual(cover[C.SPLAT_HOLD_FRAME], max(cover), cover)
+
     def test_seeded(self):
         self.assertEqual(I.atlas_rgba(I.draw_frames()), I.atlas_rgba(self.frames))
 

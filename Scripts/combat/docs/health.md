@@ -248,17 +248,15 @@ cast's failed arm, `weapon_component/surface_impact.py`). Never both.
 - **The splat (`blood_sprite.py`):** beside the splash, `Fx_PelletHit`'s blood arm spawns
   `BP_BloodSprite` (`WV.BloodSpriteClass`): a 16-frame flipbook (4x4 atlas of 128 px cells,
   drawn seeded in plain Python by `blood_sprite_image.py`, imported as `T_BloodSprite`) that
-  blooms out of the wound and breaks up over 0.5 s, on the engine plane.
+  shows only its fullest frame (frame 8 of 16: the bloom and break-up are not played, they read as drops hanging in the air) for 0.35 s, on the engine plane.
   - Sized by the zone, not the round: head 38 cm, chest 26 cm, a limb 16 cm
     (`blood_sprite_consts.py`). The pellet graph picks it off `PelletFlew` with two
     `SelectFloat`s (`impact._splat_size`): `bHead`, else `Worth` under 1 (the limb
     multiplier), else the chest. So a character whose limb multiplier is 1 or more splats
     chest-size on its limbs. The size rides the shot's batch as `ShotHitSplats` /
     `Splats` / `Splat` (`shot_hits.py`); the chips note 0.
-  - `M_BloodSprite` (masked, lit, two-sided) picks the frame from
-    `(Time − SpawnTime) / 0.5`, `SpawnTime` a scalar read from the card's custom primitive
-    data slot 0, which `BeginPlay` stamps with `GetTimeSeconds`: one material, no instance,
-    no Tick. Its colour is the atlas's shade times `M_Blood`'s colour ×1.25.
+  - `M_BloodSprite` (masked, lit, two-sided) samples the atlas's `SPLAT_HOLD_FRAME` cell
+    alone: one material, no instance, no Tick. Its colour is the atlas's shade times `M_Blood`'s colour ×1.25.
   - At `BeginPlay` the actor turns to the local camera, the camera manager of the PlayerController that `IsLocalController` (never one by player index; random roll); the card sits 35 % of
     its width toward it so a splat seen side-on is not half inside the body. No camera (a
     dedicated server never plays it anyway): it keeps the hit normal.

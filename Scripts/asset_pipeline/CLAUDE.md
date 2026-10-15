@@ -484,6 +484,31 @@ python3 Scripts/dev/uepy.py Scripts/asset_pipeline/measure_gas_bridge.py   # Sav
   idle's; with `auto_align_all_bones(TARGET, CHAIN_TO_CHAIN)` they are 3.7 cm
   (`metahuman_retarget.build_retargeter(align=True)`). The fingers were measured at their
   tips, not looked at: a windowed look is owed when the game wears this.
+- **The drawn wrists are pinned to the mannequin's** (`hand_goals.py`, 15 Oct 2026). The
+  retarget copies rotations, so the drawn hands sat where the MetaHuman's own arm lengths
+  put them, 2.5 to 6.6 cm off the mannequin's wrists, which hold the gun. The bridge's
+  target rig is now `IK_MetaHuman_Hands` (`IK_MetaHuman`'s chains on the same body, plus
+  `LeftHandGoal`/`RightHandGoal` on `hand_l`/`hand_r`, each with a limb solver from the
+  upperarm; the goal's rotation alpha 1 leaves the hand turned as the goal), and
+  `RTG_MetaHuman_from_UEFN` has a **Blend to Source** op under Run IK Rig that puts each
+  arm's goal on the source's hand bone, its place and its turn (translation 1, rotation 1).
+  Place alone was not enough: the gun hangs off the mannequin's palm, and a drawn hand on
+  the right spot but turned as the retarget turns it held the 1911 a hand's width above
+  the grip. Blend to Source's rotation is a delta: the source hand's turn since its
+  retarget pose, laid on the target hand's retarget pose. So a hand rolled differently in
+  the two retarget poses stays rolled by as much (30.2 degrees on both hands), and
+  `turn_hands_as_source` writes a target retarget-pose offset on `hand_l`/`hand_r`, after
+  the auto-align, that gives them the source's turn in that pose (a local offset:
+  local = reference local x offset, `IKRetargetProcessor.cpp`). In 5.8 the old
+  "Retarget IK Goals" op (`IKChainsOp`) is deprecated: goals are moved by child ops of
+  Run IK Rig, and a child op runs before its parent. `IK_MetaHuman` (the mannequin
+  bridge's target) is untouched. The mannequin stays the gameplay truth: the gun socket,
+  the hit bodies and the server (which draws no MetaHuman) read the hidden mesh.
+  `probes/probe_drawn_grip.py` holds, in every gun state, the wrists within 1 cm (0.00
+  measured), the hands within 3 degrees of the mannequin's turn (0.0) and the elbows
+  within 12 cm (3 to 6 cm; the left 9 to 11 cm down a long gun's sights, where the
+  arm reaches furthest). The fingers are still the MetaHuman's retarget of the
+  mannequin's: the 1911's drawn fingers sit open by the grip.
 - **A sequence player's clip is not a Python property.** `ABP_GasIdle`'s node comes from the
   palette entry `Animation|Sequences|Play'<clip name>'`, which exists only while the clip is
   loaded; the clip is read back out of the node's `export_text()` (`gas_idle_abp.playing`).

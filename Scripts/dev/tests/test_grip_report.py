@@ -1,3 +1,4 @@
+import math
 import unittest
 
 import _paths  # noqa: F401
@@ -27,6 +28,12 @@ class FingerTest(unittest.TestCase):
 class ReportTest(unittest.TestCase):
     def test_offset(self):
         self.assertAlmostEqual(G.offset((0, 0, 0), (3, 4, 0)), 5.0)
+
+    def test_angle(self):
+        half = math.sqrt(0.5)
+        self.assertAlmostEqual(G.angle((0, 0, 0, 1), (0, 0, half, half)), 90.0)
+        # q and -q are the same turn.
+        self.assertAlmostEqual(G.angle((0, 0, half, half), (0, 0, -half, -half)), 0.0)
 
     def test_table(self):
         lines = G.table(["a", "b"], [["x", 1.234]])

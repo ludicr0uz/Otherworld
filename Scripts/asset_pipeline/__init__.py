@@ -93,6 +93,9 @@ Editor-side, in pipeline order:
     gas_player_mesh.py          SKM_UEFN_Player: the hidden mesh the player wears on
                                 the bridge, the sample's with the game's sockets
     gas_idle_abp.py             ABP_GasIdle: one sequence player on the UEFN skeleton
+    hand_goals.py               the drawn MetaHuman's wrists pinned to the mannequin's:
+                                hand IK goals on the UEFN bridge's target rig, and a
+                                Blend to Source op putting them on the source's hands
     metahuman_retarget.py       a retargeter between two rigs and the retargeting
                                 anim blueprint pointed at it (the mannequin's
                                 bridge, build_metahuman_retarget.py, and the UEFN's)

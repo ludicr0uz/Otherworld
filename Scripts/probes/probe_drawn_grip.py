@@ -4,8 +4,9 @@ mannequin's that every other grip check measures.
 
 The grip is fitted on the hidden UEFN mannequin (combat/gun_hold.py,
 finger_pose.py) and the gun is attached to its hand; the MetaHuman follows
-that mesh through a retargeter that copies rotations, so its hands sit where
-its own arm lengths put them. verify/gun_hold.py, verify/finger_pose.py and
+that mesh through a retargeter that copies rotations, with each wrist pinned
+to the mannequin's by a hand IK goal (asset_pipeline/hand_goals.py, since
+15 Oct 2026; before it the drawn wrists sat 2.5 to 6.6 cm off). verify/gun_hold.py, verify/finger_pose.py and
 probe_gun_hands.py all measure the mannequin against the guns' outline
 boxes. This probe reads, for every gun of weapon_models.GUN_HOLDS, in each
 state of STATES (lowered standing, walking, crouched and sprinting; down the
@@ -25,9 +26,12 @@ the left and the right, to Saved/Screenshots/MacEditor/grip_<gun>_<state>_
 <side>.png. The tables go to the log (NOTE lines) and to
 Saved/grip_report/drawn_grip.md.
 
-The checks hold the staging only (both bodies there and posed, each gun in
-hand, its meshes read, each state reached, the pictures written): the
-numbers are a measurement, for a person to read.
+The checks hold the staging (both bodies there and posed, each gun in hand,
+its meshes read, each state reached, the pictures written) and, since the
+retarget pins the drawn wrists to the mannequin's (asset_pipeline/
+hand_goals.py), each drawn wrist within WRIST_PINNED_CM of the mannequin's
+and each drawn elbow within ELBOW_NEAR_CM; the fingers are a measurement,
+for a person to read.
 
   python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_drawn_grip.py
 """
@@ -66,6 +70,17 @@ STATES = (
     ("ads pitch down", 0.0, False, STAND, True, -25.0, 1.0),
 )
 SEATED = 0.99
+# The drawn wrists are pinned to the mannequin's by hand IK goals in the
+# retarget (asset_pipeline/hand_goals.py): a wrist further off than this is
+# not pinned.
+WRIST_PINNED_CM = 1.0
+# ...and turned as the mannequin's hand is (the gun hangs off its palm).
+HAND_TURN_DEG = 3.0
+# The elbow gives what the pin takes up (the two arms are not one length):
+# 3 to 6 cm, and the left 9 to 11 cm down a long gun's sights, its arm
+# reaching furthest (15 Oct 2026), where the pictures show a natural arm.
+# Further than this off the mannequin's reads as a broken or flipped arm.
+ELBOW_NEAR_CM = 12.0
 SEAT_WAIT_S = 4.0
 FINGERS = ("thumb", "index", "middle", "ring", "little")
 EYE_FOV = 50.0
@@ -142,27 +157,33 @@ def _hands(skin):
 
 
 def _measure(body, mannequin, held, surfaces, hands):
-    """{"drawn"/"mannequin": {"wrist": {hand: point}, "fingers":
+    """{"drawn"/"mannequin": {"wrist"/"elbow": {hand: point}, "fingers":
     {(hand, finger): signed distances}}} in the gun's frame."""
     gun = held.get_actor_transform()
     into = gun.inverse()
     out = {}
     for label, mesh in (("drawn", body), ("mannequin", mannequin)):
-        wrist = {}
-        for hand, bone in (("right", "hand_r"), ("left", "hand_l")):
+        wrist, elbow, turn = {}, {}, {}
+        for hand, bone, arm in (("right", "hand_r", "lowerarm_r"),
+                                ("left", "hand_l", "lowerarm_l")):
             v = unreal.MathLibrary.transform_location(into, mesh.get_socket_location(bone))
             wrist[hand] = (v.x, v.y, v.z)
+            q = mesh.get_socket_rotation(bone).quaternion()
+            turn[hand] = (q.x, q.y, q.z, q.w)
+            v = unreal.MathLibrary.transform_location(into, mesh.get_socket_location(arm))
+            elbow[hand] = (v.x, v.y, v.z)
         fingers = {k: [_signed(surfaces, pt) for pt in
                        finger_fit.riding(_points(mesh, gun, bones, tip))]
                    for k, (bones, tip) in hands.items()}
-        out[label] = {"wrist": wrist, "fingers": fingers}
+        out[label] = {"wrist": wrist, "elbow": elbow, "turn": turn, "fingers": fingers}
     return out
 
 
 def _rows(gun, state, m):
     """The report's rows of one gun in one state."""
     d, k = m["drawn"], m["mannequin"]
-    wrist = [R.offset(d["wrist"][h], k["wrist"][h]) for h in ("right", "left")]
+    wrist = [R.offset(d[j][h], k[j][h]) for j in ("wrist", "elbow") for h in ("right", "left")]
+    wrist += [R.angle(d["turn"][h], k["turn"][h]) for h in ("right", "left")]
     rows = []
     for hand in ("right", "left"):
         for f in FINGERS:
@@ -280,14 +301,28 @@ def probe(p):
                     f"view pitch {pc.get_control_rotation().pitch:+.0f}")
             m = _measure(body, mannequin, held, surfaces, hands)
             wrist, got = _rows(name, state, m)
-            wrists.append([name, state, f"{speed:.0f}", wrist[0], wrist[1]])
+            wrists.append([name, state, f"{speed:.0f}"] + wrist)
             rows += got
             pen, gap = R.worst(m["drawn"]["fingers"])
             summary.append([name, state, wrist[0], wrist[1],
                             f"{pen[0][0]} {pen[0][1]} {pen[1]:.2f}" if pen else "none",
                             f"{gap[0][0]} {gap[0][1]} {gap[1]:.2f}" if gap else "none"])
+            p.check(f"{name}, {state}: the drawn wrists are on the mannequin's",
+                    max(wrist[:2]) <= WRIST_PINNED_CM,
+                    f"right {wrist[0]:.2f} cm, left {wrist[1]:.2f} cm "
+                    f"(at most {WRIST_PINNED_CM})")
+            p.check(f"{name}, {state}: the drawn hands are turned as the mannequin's",
+                    max(wrist[4:]) <= HAND_TURN_DEG,
+                    f"right {wrist[4]:.1f} deg, left {wrist[5]:.1f} deg "
+                    f"(at most {HAND_TURN_DEG})")
+            p.check(f"{name}, {state}: the drawn elbows stay by the mannequin's",
+                    max(wrist[2:4]) <= ELBOW_NEAR_CM,
+                    f"right {wrist[2]:.2f} cm, left {wrist[3]:.2f} cm "
+                    f"(at most {ELBOW_NEAR_CM})")
             p.note(f"{name}, {state}: drawn wrist off the mannequin's: right "
-                   f"{wrist[0]:.2f} cm, left {wrist[1]:.2f} cm; drawn fingers: "
+                   f"{wrist[0]:.2f} cm, left {wrist[1]:.2f} cm; turned right {wrist[4]:.1f} "
+                   f"deg, left {wrist[5]:.1f}; elbow right "
+                   f"{wrist[2]:.2f} cm, left {wrist[3]:.2f} cm; drawn fingers: "
                    + ", ".join(f"{h[0]}.{f} {R.finger_cell(v)}"
                                for (h, f), v in m["drawn"]["fingers"].items()))
             if eye is not None:
@@ -317,8 +352,10 @@ def probe(p):
              "## Worst drawn finger, and the drawn wrist off the mannequin's (cm)", ""]
     lines += R.table(["gun", "state", "right wrist", "left wrist", "deepest in",
                       "widest off"], summary)
-    lines += ["", "## Wrist offset, drawn vs mannequin (cm)", ""]
-    lines += R.table(["gun", "state", "speed cm/s", "right", "left"], wrists)
+    lines += ["", "## Wrist and elbow offset, drawn vs mannequin (cm)", ""]
+    lines += R.table(["gun", "state", "speed cm/s", "right wrist", "left wrist",
+                      "right elbow", "left elbow", "right turn deg", "left turn deg"],
+                     wrists)
     lines += ["", "## Each finger: drawn and mannequin", ""]
     lines += R.table(["gun", "state", "hand", "finger", "drawn", "mannequin"], rows)
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)

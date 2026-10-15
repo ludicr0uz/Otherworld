@@ -30,6 +30,9 @@ IDLE_CLIP = f"{UEFN}/Animations/Idle/M_Neutral_Stand_Idle_Loop"
 # What build_gas_bridge.py writes, beside the mannequin's bridge.
 IK_UEFN = f"{SOURCED_DIR}/IK_UEFN_Mannequin_Source"
 RTG_FROM_UEFN = f"{SOURCED_DIR}/RTG_MetaHuman_from_UEFN"
+# Its target rig: IK_MetaHuman's chains on the same body, with an IK goal on
+# each hand (hand_goals.py), so the drawn wrists land on the mannequin's.
+IK_METAHUMAN_HANDS = f"{SOURCED_DIR}/IK_MetaHuman_Hands"
 ABP_RETARGET_UEFN = f"{SOURCED_DIR}/ABP_MetaHuman_Retarget_UEFN"
 # The minimal anim blueprint on SK_UEFN_Mannequin: one sequence player.
 ABP_GAS_IDLE = f"{SOURCED_DIR}/ABP_GasIdle"

@@ -10,6 +10,8 @@ nearest axis distance (its penetration), and off it by the nearest axis
 distance less SKIN_CM (its gap). One of the two is always nought.
 """
 
+import math
+
 # The finger's skin off its bone's axis (cm): hand_seat.SEAT_OFF_CM, which the
 # fit lays every finger at. Repeated, not imported: this module stays pure.
 SKIN_CM = 0.75
@@ -25,6 +27,13 @@ def finger(signed, skin_cm=SKIN_CM):
 def offset(a, b):
     """How far apart two points are (cm)."""
     return sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5
+
+
+def angle(a, b):
+    """The angle between two rotations given as quaternions (x, y, z, w),
+    in degrees."""
+    dot = min(1.0, abs(sum(x * y for x, y in zip(a, b))))
+    return math.degrees(2.0 * math.acos(dot))
 
 
 def finger_cell(signed, skin_cm=SKIN_CM):

@@ -19,8 +19,13 @@ touching none of it:
                                    IK_MetaHuman is exact.  Not the sample's
                                    own IK_UEFN_Mannequin, whose chains are
                                    named for the sample's retargeters.
-    RTG_MetaHuman_from_UEFN        that rig -> IK_MetaHuman (build_metahuman_
-                                   retarget.py's, which must have run).
+    IK_MetaHuman_Hands             IK_MetaHuman's chains on the same body, with
+                                   an IK goal and a limb solver on each arm
+                                   (hand_goals.py).
+    RTG_MetaHuman_from_UEFN        that rig -> IK_MetaHuman_Hands, each hand's
+                                   goal blended fully onto the source's hand:
+                                   the drawn wrists sit on the mannequin's,
+                                   which hold the gun.
     ABP_MetaHuman_Retarget_UEFN    the retargeting anim blueprint, pointed at
                                    it: what the Body component wears while
                                    its parent is the UEFN mannequin.
@@ -43,8 +48,9 @@ for _name in [m for m in sys.modules if m.startswith(("asset_pipeline", "uebp"))
     del sys.modules[_name]          # a warm editor keeps yesterday's modules
 
 from asset_pipeline.gas_bridge_paths import (                      # noqa: E402
-    ABP_RETARGET_UEFN, HIDDEN_MESH_GAS, IK_UEFN, RTG_FROM_UEFN,
+    ABP_RETARGET_UEFN, HIDDEN_MESH_GAS, IK_METAHUMAN_HANDS, IK_UEFN, RTG_FROM_UEFN,
 )
+from asset_pipeline.hand_goals import add_hand_goals, pin_hands_to_source, turn_hands_as_source  # noqa: E402
 from asset_pipeline.gas_idle_abp import build_idle_blueprint       # noqa: E402
 from asset_pipeline.gas_player_mesh import build_player_mesh       # noqa: E402
 from asset_pipeline.metahuman_paths import BODY_MESH, IK_METAHUMAN  # noqa: E402
@@ -69,8 +75,13 @@ def main():
     src = build_ik_rig(IK_UEFN, HIDDEN_MESH_GAS, CHAINS_MANNEQUIN,
                        RETARGET_ROOT_MANNEQUIN,
                        root_motion_bone=ROOT_MOTION_BONE_MANNEQUIN)
-    rtg = build_retargeter(src, _load(IK_METAHUMAN), RTG_FROM_UEFN, _load(BODY_MESH),
-                           align=True)
+    tgt = build_ik_rig(IK_METAHUMAN_HANDS, BODY_MESH, CHAINS_MANNEQUIN,
+                       RETARGET_ROOT_MANNEQUIN,
+                       root_motion_bone=ROOT_MOTION_BONE_MANNEQUIN)
+    add_hand_goals(tgt, IK_METAHUMAN_HANDS)
+    rtg = build_retargeter(src, tgt, RTG_FROM_UEFN, _load(BODY_MESH), align=True)
+    turn_hands_as_source(rtg, src, tgt, RTG_FROM_UEFN)
+    pin_hands_to_source(rtg, RTG_FROM_UEFN)
     build_anim_blueprint(rtg, ABP_RETARGET_UEFN)
     build_idle_blueprint()
     build_player_mesh()

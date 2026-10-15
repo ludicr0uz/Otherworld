@@ -12,6 +12,7 @@
 #include "OtherworldInventoryRecord.h"
 #include "OtherworldRpcGuard.h"
 #include "OtherworldShotLibrary.h"
+#include "OtherworldShotLog.h"
 
 namespace
 {
@@ -126,6 +127,37 @@ bool UOtherworldWeaponComponentBase::MayFire(AActor* Gun) const
 	return World->GetTimeSeconds() + FireGraceSeconds >= ReadReal(Gun, ItemNextFireTimeVar);
 }
 
+FString UOtherworldWeaponComponentBase::WhyRefused(bool bAllowed, bool bAimed, AActor* Gun) const
+{
+	if (!bAllowed)
+	{
+		return TEXT("the RPC guard: too many asks");
+	}
+	if (!bAimed)
+	{
+		return TEXT("the RPC guard: the aim point is outside the view's cone");
+	}
+	const UWorld* World = GetWorld();
+	if (!IsValid(Gun) || !World)
+	{
+		return TEXT("nothing held");
+	}
+	if (!OwnerAlive())
+	{
+		return TEXT("the shooter is dead");
+	}
+	if (ReadBool(Gun, ItemMeleeVar) || ReadBool(Gun, ItemConsumableVar) || ReadBool(Gun, ItemLightsVar))
+	{
+		return FString::Printf(TEXT("%s is not a gun"), *GetNameSafe(Gun));
+	}
+	if (ReadBool(Gun, ItemUsesAmmoVar) && ReadInt(Gun, ItemLoadedVar) <= 0)
+	{
+		return FString::Printf(TEXT("%s is empty"), *GetNameSafe(Gun));
+	}
+	return FString::Printf(TEXT("%s not cooled: next shot in %.3f s, grace %.3f s"), *GetNameSafe(Gun),
+		ReadReal(Gun, ItemNextFireTimeVar) - World->GetTimeSeconds(), FireGraceSeconds);
+}
+
 bool UOtherworldWeaponComponentBase::Server_Fire_Validate(FVector AimPoint)
 {
 	return !AimPoint.ContainsNaN();
@@ -139,15 +171,26 @@ void UOtherworldWeaponComponentBase::Server_Fire_Implementation(FVector AimPoint
 	{
 		return;
 	}
+	const bool bLog = OtherworldShotLog::IsOn(World);
+	if (bLog)
+	{
+		OtherworldShotLog::Asked(Owner, AimPoint);
+	}
 	UOtherworldRpcGuard* Guard = Owner->FindComponentByClass<UOtherworldRpcGuard>();
 	// Asked first, and counted served whatever it said: a refused shot's
 	// round is handed back like any other the server did not fire.
 	const bool bAllowed = !Guard || Guard->Allow(FireEventName);
 	WriteInt(this, AsksServedVar, ReadInt(this, AsksServedVar) + 1);
 	AActor* Gun = Cast<AActor>(ReadObject(this, HeldVar));
-	if (!bAllowed || (Guard && !Guard->AimAllowed(AimPoint)) || !MayFire(Gun))
+	// The aim asked only of a shot the rate let in, as before: the guard counts its refusals.
+	const bool bAimed = bAllowed && (!Guard || Guard->AimAllowed(AimPoint));
+	if (!bAimed || !MayFire(Gun))
 	{
 		++ShotsRefused;
+		if (bLog)
+		{
+			OtherworldShotLog::Refused(Owner, WhyRefused(bAllowed, bAimed, Gun));
+		}
 		return;
 	}
 	// The round and the deadline before a single pellet is traced, so
@@ -268,6 +311,7 @@ void UOtherworldWeaponComponentBase::FirePellets(AActor* Gun, FVector Muzzle, FV
 	}
 	AController* By = Owner->GetInstigatorController();
 	const float Spread = FMath::DegreesToRadians(SpreadDegrees);
+	const bool bLog = OtherworldShotLog::IsOn(GetWorld());
 	for (int32 Pellet = 0; Pellet < Pellets; ++Pellet)
 	{
 		// The gun's own pattern around the shot's direction: nothing on a
@@ -285,11 +329,16 @@ void UOtherworldWeaponComponentBase::FirePellets(AActor* Gun, FVector Muzzle, FV
 		bool bHurt = false;
 		bool bScenery = false;
 		bool bHead = false;
+		bool bLimb = false;
 		float Worth = 1.f;
+		UOtherworldHealthComponent* StruckHealth = nullptr;
+		double HealthBefore = 0.0;
 		if (bStopped)
 		{
 			AActor* Struck = Hit.GetActor();
 			UOtherworldHealthComponent* Health = HealthOf(Struck);
+			StruckHealth = Health;
+			HealthBefore = Health ? Health->Health : 0.0;
 			if (!Health)
 			{
 				bScenery = true;
@@ -317,12 +366,40 @@ void UOtherworldWeaponComponentBase::FirePellets(AActor* Gun, FVector Muzzle, FV
 				}
 				else if (NamesHold(Health, LimbBonesVar, Bone))
 				{
+					bLimb = true;
 					Worth = static_cast<float>(ReadReal(Health, LimbMultiplierVar));
 				}
 				// Which way it came from is the impact normal: it points
 				// back out of the surface toward the muzzle.
 				Health->TakeHit(Damage * Worth, Hit.ImpactNormal, By, Gun);
 			}
+		}
+		if (bLog)
+		{
+			OtherworldShotLog::FPellet Log;
+			Log.Shooter = Owner;
+			Log.Gun = Gun;
+			Log.Index = Pellet;
+			Log.Count = Pellets;
+			Log.Muzzle = Muzzle;
+			Log.Direction = Direction;
+			Log.End = End;
+			Log.SpreadDegrees = SpreadDegrees;
+			Log.RewindSeconds = UOtherworldShotLibrary::LastRewindSeconds(Owner);
+			Log.bStopped = bStopped;
+			Log.Hit = &Hit;
+			Log.bBodyHit = bBodyHit;
+			Log.BodyBone = BodyBone;
+			Log.BodyPoint = BodyPoint;
+			Log.bHurt = bHurt;
+			Log.bScenery = bScenery;
+			Log.bHead = bHead;
+			Log.bLimb = bLimb;
+			Log.Worth = Worth;
+			Log.Damage = Damage;
+			Log.HealthBefore = HealthBefore;
+			Log.Health = StruckHealth;
+			OtherworldShotLog::Pellet(Log);
 		}
 		PelletFlew(Muzzle, bStopped ? Hit.Location : End, bStopped, Point, Hit.ImpactNormal,
 			bHurt, bScenery, Bone, bHead, Damage * Worth, Worth);

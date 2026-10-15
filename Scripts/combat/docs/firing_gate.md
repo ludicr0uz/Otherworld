@@ -78,12 +78,28 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   `ReloadNow`, and a client of a server runs it on its own copy first. A reload that moved
   rounds raises `Reloaded`, where the graph tells or predicts the clack.
 - **Debug mode:**
-  - Two switches on the GameState, because a component can't reach the HUD: `DebugMode` (the
-    monsters' overlays) and `DebugShots` (the shots'), the menu's DEBUG SETTINGS tab's two rows,
+  - Three switches on the GameState, because a component can't reach the HUD: `DebugMode` (the
+    monsters' overlays), `DebugShots` (the shots') and `DebugShotLog` (the shot log, below),
+    the menu's DEBUG SETTINGS tab's three rows,
     off by default and kept by the tab's own save (`graphics_menu/debug_tune_consts.py`).
   - `DebugShots` shows the pellet tracers, per-impact damage (`39.0 (x1.5)`, only on actors
     with a health component) and the crosshair down the sights; the weapon component caches
     it per shot under the same name. `DebugMode` shows the wanderers' sight cones and numbers.
+  - `DebugShotLog` (or the console variable `Otherworld.ShotLog 1`, or `-ShotLog` on a
+    dedicated server's command line) writes every shot the authority judges to the log as
+    `SHOT-LOG` lines (`LogOtherworldShotLog`; `Source/Otherworld/Private/OtherworldShotLog.h`):
+    the ask (shot number, net mode, the shooter and whether a player or an AI, its actor,
+    mesh and capsule, its eye and aim rotation, the aim point and how far off the view it is,
+    or why `Server_Fire` refused it), then per pellet the gun, muzzle, direction, end, spread
+    and rewind; what stopped it (actor, component, location, impact point and normal,
+    distance, physical material); a struck character's actor, mesh and capsule, the bone and
+    point its bodies were struck at (or that the line crossed the capsule and missed them),
+    and, rewound, where that bone's box stood then against now; the zone, worth, damage and
+    the health before and after. A pellet that did no damage names the character whose
+    capsule axis passed nearest its line, and by how much. Only the machine with authority
+    judges a shot: a client's switch does nothing on a server (its GameState is the
+    server's), so start the server with `-ShotLog` and read the server's log.
+    `probes/probe_shot_log.py` proves it.
   - The tracer (`weapon_component/tracer.py`) is a separate `DrawDebugLine` behind a Branch,
     since the enum pin can't be driven. Every trace's `DrawDebugType` is `None`.
     - It lasts `TRACE_DEBUG_SECONDS` (3 s) and stops where the pellet did, with a point there:

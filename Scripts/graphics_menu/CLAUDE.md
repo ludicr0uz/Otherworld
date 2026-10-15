@@ -574,7 +574,7 @@ only names itself: `TuneTab.kept` (default true), and from it `keep_slot` and `b
 ## The DEBUG SETTINGS tab (`debug_tune_*.py`)
 
 A tab like the others (a `TuneTab` in `TABS`, laid out by `wbp_tune`, its keys and nudge
-`tune_tick`'s), over one subject, `overlays`, and two switches, each OFF or ON (the tab's
+`tune_tick`'s), over one subject, `overlays`, and three switches, each OFF or ON (the tab's
 `words`: `tune_draw` shows the word, not the number; min 0, max 1, step 1):
 
 - **Monster vision & agro** sets the GameState's `DebugMode`: the sight cones (now drawn
@@ -583,6 +583,9 @@ A tab like the others (a `TuneTab` in `TABS`, laid out by `wbp_tune`, its keys a
 - **Shot trajectory** sets the GameState's `DebugShots` (replicated): the pellet tracers,
   the impact damage numbers, the crosshair down the sights (the HUD's `ShotsOn`, copied as
   `DebugOn` is).
+- **Shot log** sets the GameState's `DebugShotLog`: every shot the authority judges is
+  written to the log as `SHOT-LOG` lines, read by name by the C++
+  (`Source/Otherworld/Private/OtherworldShotLog.h`; `combat/docs/firing_gate.md`, "Debug mode").
 
 The switches are applied once per change (`DebugTuneTouched`), only where this machine owns
 the GameState, so a probe's direct write on the GameState stands. They are kept between

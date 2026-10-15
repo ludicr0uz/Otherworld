@@ -1,12 +1,13 @@
-"""The DEBUG SETTINGS tab in single player: its two switches set the
-GameState's two flags apart, and FULL STATS fills the player's stats.
+"""The DEBUG SETTINGS tab in single player: its three switches set the
+GameState's three flags apart, and FULL STATS fills the player's stats.
 
     python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_debug_tab.py
 
   - a nudge up on the first switch (the HUD's DebugTuneRow / DebugTuneNudge
     written, a probe having no keyboard) turns DebugMode on and leaves
-    DebugShots off; one on the second turns DebugShots on; both back down
-    turn both off, and the panel's draw reads ON, then OFF;
+    DebugShots off; one on the second turns DebugShots on; one on the third
+    turns DebugShotLog on (and the C++ shot log with it); all back down
+    turn all off, and the panel's draw reads ON, then OFF;
   - with health, stamina, hunger, thirst and warmth lowered, raising
     DebugTuneCheatRequested (what Enter or a click on FULL STATS does) puts
     each at its maximum and DebugTuneCheated up.
@@ -17,6 +18,8 @@ The kept tables' slots are set aside by the launch (probes/kept_slots.py).
 SYSTEMS = ('menu',)
 
 import time
+
+import unreal
 
 from combat import health_vars as HV
 from combat.paths import (HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH,
@@ -72,19 +75,25 @@ def _words(p, hud):
 def _switches(p, hud):
     yield from _nudge(p, hud, 0, 1)
     p.check("Monster vision & agro ON turns DebugMode on, and not DebugShots",
-            _flags(p) == [True, False], str(_flags(p)))
+            _flags(p) == [True, False, False], str(_flags(p)))
     yield from _nudge(p, hud, 1, 1)
-    p.check("...Shot trajectory ON turns DebugShots on", _flags(p) == [True, True],
+    p.check("...Shot trajectory ON turns DebugShots on", _flags(p) == [True, True, False],
             str(_flags(p)))
+    yield from _nudge(p, hud, 2, 1)
+    p.check("...Shot log ON turns DebugShotLog on, and the C++ shot log with it",
+            _flags(p) == [True, True, True]
+            and unreal.OtherworldShotLibrary.is_shot_log_on(p.world()), str(_flags(p)))
     on = _words(p, hud)
     yield from _nudge(p, hud, 0, -1)
-    p.check("...Monster vision & agro OFF leaves the shots on", _flags(p) == [False, True],
-            str(_flags(p)))
+    p.check("...Monster vision & agro OFF leaves the shots on",
+            _flags(p) == [False, True, True], str(_flags(p)))
     yield from _nudge(p, hud, 1, -1)
+    yield from _nudge(p, hud, 2, -1)
     off = _words(p, hud)
-    p.check("...and both OFF turns both off, the panel reading ON, then OFF",
-            _flags(p) == [False, False] and on == [DC.DEBUG_ON_WORD] * 2
-            and off == [DC.DEBUG_OFF_WORD] * 2, f"{_flags(p)}, {on} -> {off}")
+    n = len(FLAGS)
+    p.check("...and all OFF turns all off, the panel reading ON, then OFF",
+            _flags(p) == [False] * n and on == [DC.DEBUG_ON_WORD] * n
+            and off == [DC.DEBUG_OFF_WORD] * n, f"{_flags(p)}, {on} -> {off}")
 
 
 def _full_stats(p, hud):
@@ -111,7 +120,7 @@ def probe(p):
     p.set(hud, MV.MenuOpen, True)
     p.set(hud, TAB.open_var, True)
     yield 0.2
-    p.check("the debug tab starts with both switches off", _flags(p) == [False, False],
+    p.check("the debug tab starts with every switch off", _flags(p) == [False] * len(FLAGS),
             str(_flags(p)))
     yield from _switches(p, hud)
     yield from _full_stats(p, hud)

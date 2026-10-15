@@ -8,6 +8,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "OtherworldHitHistory.h"
+#include "OtherworldShotLog.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogOtherworldShot, Log, All);
 
@@ -173,4 +174,19 @@ int32 UOtherworldShotLibrary::RewoundHits(const UObject* WorldContextObject)
 {
 	const UOtherworldHitHistory* History = HistoryOf(WorldContextObject);
 	return History ? History->RewoundHits : 0;
+}
+
+bool UOtherworldShotLibrary::IsShotLogOn(const UObject* WorldContextObject)
+{
+	return OtherworldShotLog::IsOn(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+}
+
+int32 UOtherworldShotLibrary::ShotLogLines()
+{
+	return OtherworldShotLog::Lines();
+}
+
+FString UOtherworldShotLibrary::LastShotLog()
+{
+	return OtherworldShotLog::Last();
 }

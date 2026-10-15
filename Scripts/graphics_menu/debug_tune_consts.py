@@ -4,13 +4,17 @@ and tune_draw (the graph) and debug_tune_checks read one table.
 
     the menu's row              opens the tab (tune_tab.py); BACK shuts it
     Up / Down, Left / Right     as GUN SETTINGS (tune_tab.py), over one subject,
-                                "overlays", and two switches, each OFF or ON:
+                                "overlays", and three switches, each OFF or ON:
                                   monster vision and agro: the sight cones,
                                     the agro log, the wanderers' numbers
                                     (the GameState's DebugMode)
                                   shot trajectory: the tracers, the impact
                                     damage, the crosshair down the sights
                                     (the GameState's DebugShots)
+                                  shot log: every shot the authority judges,
+                                    SHOT-LOG lines in the log (the
+                                    GameState's DebugShotLog, read by the
+                                    C++: Private/OtherworldShotLog.h)
     FULL STATS (Enter on it,    the cheat: the player's health, stamina,
     or a click)                 hunger, thirst and warmth to their maximums
 
@@ -43,7 +47,8 @@ DEBUG_SUBJECT = "overlays"
 # (the row's label, the GameState flag it sets: combat/game_state.py)
 MONSTER_SWITCH = ("Monster vision & agro", "DebugMode")
 SHOTS_SWITCH = ("Shot trajectory", "DebugShots")
-DEBUG_SWITCHES = (MONSTER_SWITCH, SHOTS_SWITCH)
+SHOT_LOG_SWITCH = ("Shot log", "DebugShotLog")
+DEBUG_SWITCHES = (MONSTER_SWITCH, SHOTS_SWITCH, SHOT_LOG_SWITCH)
 # A switch reads ON above this.
 SWITCH_ON_ABOVE = 0.5
 DEBUG_OFF_WORD, DEBUG_ON_WORD = "OFF", "ON"

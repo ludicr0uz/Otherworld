@@ -1,6 +1,6 @@
 """verify_graphics_menu.py's checks for the DEBUG SETTINGS tab
 (debug_tune_tick, tune_draw and wbp_tune over DEBUG_TAB): its rows and FULL
-STATS, the two switches onto the GameState's DebugMode and DebugShots, OFF
+STATS, the three switches onto the GameState's DebugMode, DebugShots and DebugShotLog, OFF
 or ON in the panel, and the cheat filling the player's stats. What the flags
 turn on is verify_weapons_and_combat's (tracers, impact damage:
 combat/verify/firing.py) and verify_npc_blueprints' (the sight cones).
@@ -38,7 +38,7 @@ def _check_widgets(check):
     labels = [str(k.get_editor_property(UC.ROW_TEXT_VAR))
               for k in (box.get_all_children() if box else [])]
     check("WBP_PauseMenu has the debug panel, its rows overlays, monster vision "
-          "and agro, and shot trajectory, its FULL STATS row and the done line",
+          "and agro, shot trajectory and shot log, its FULL STATS row and the done line",
           TAB.panel in widgets and TAB.saved_text in widgets and TAB.save_widget in widgets
           and labels == list(TAB.row_labels), str(labels))
     hidden = [n for n in (TAB.panel, TAB.saved_text) if n in widgets
@@ -68,8 +68,8 @@ def _check_switches(check, nodes):
                       for t in _feeds(BEL.find_input_pin(sets[0], "self"))))
         if not ok:
             wrong.append(f"{flag} from {[_title(t) for t in tests]}")
-    check("the tab sets the GameState's DebugMode from its first switch and "
-          "DebugShots from its second, each ON above a half, once each",
+    check("the tab sets the GameState's DebugMode from its first switch, "
+          "DebugShots from its second and DebugShotLog from its third, each ON above a half, once each",
           not wrong, str(wrong))
     lowered = [n for n in nodes if _is_set(n, TAB.touched_var)
                and _literal(n, TAB.touched_var).lower() == "false"]
@@ -107,7 +107,7 @@ def check_debug_tune(check, bp, nodes):
     wrong = [k for k, v in debug_tune_defaults().items()
              if not (_same(cdo.get_editor_property(k), v) if isinstance(v, list)
                      else cdo.get_editor_property(k) == v)]
-    check("the debug tab starts shut, both switches off, each moving 0 to 1 by 1",
+    check("the debug tab starts shut, every switch off, each moving 0 to 1 by 1",
           not wrong, str(wrong))
     _check_widgets(check)
     _check_switches(check, nodes)

@@ -1,6 +1,6 @@
 """The DEBUG SETTINGS tab's HUD Tick fragment: the tab's keys and nudge
 (tune_tick._author_keys and _author_nudge, the other tabs'), the FULL STATS
-cheat in place of a save, and the two switches onto the GameState.
+cheat in place of a save, and the three switches onto the GameState.
 
     its menu row taken      DebugTuneOpen = NOT DebugTuneOpen; the other tabs shut
     Left / Right on a switch  it goes OFF (0) or ON (1): min 0, max 1, step 1;
@@ -16,6 +16,7 @@ cheat in place of a save, and the two switches onto the GameState.
     DebugTuneTouched, where this machine owns the GameState:
         GameState.DebugMode  := DebugTuneValues[0] > 0.5   (monster vision, agro)
         GameState.DebugShots := DebugTuneValues[1] > 0.5   (shot trajectory)
+        GameState.DebugShotLog := DebugTuneValues[2] > 0.5 (shot log)
         DebugTuneTouched := false
 
 Applied once per change, not every Tick: nothing else writes the flags in
@@ -58,7 +59,7 @@ def declare_debug_tune_vars(ed):
 
 
 def debug_tune_defaults():
-    """Both switches off; each moves 0..1 by 1."""
+    """Every switch off; each moves 0..1 by 1."""
     n = len(DEBUG_SWITCHES)
     return {**tab_defaults(DEBUG_TAB, [DEBUG_SUBJECT], [0.0] * n, [1.0] * n, [0.0] * n),
             DEBUG_TAB.maxs_var: [1.0] * n}
@@ -111,8 +112,8 @@ def author_debug_tune_tick(ed, pc_out, in_execs):
     tails = _author_apply(ed, flow, made)
     ed.add_comment_to_nodes(
         "Debug settings (its row in the menu): Up/Down pick a row, Left/Right "
-        "switch monster vision and agro, or the shots' trajectory, OFF or ON; "
+        "switch monster vision and agro, the shots' trajectory or the shot log, OFF or ON; "
         "FULL STATS fills health, stamina, hunger, thirst and warmth. Where "
-        "this machine owns the GameState: the switches go onto its DebugMode "
-        "and DebugShots once per change.", made[:1])
+        "this machine owns the GameState: the switches go onto its DebugMode, "
+        "DebugShots and DebugShotLog once per change.", made[:1])
     return tails

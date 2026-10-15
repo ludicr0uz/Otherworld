@@ -78,4 +78,18 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Shot", meta = (WorldContext = "WorldContextObject"))
 	static int32 RewoundHits(const UObject* WorldContextObject);
+
+	// --- the shot log (Private/OtherworldShotLog.h), for the probes.
+
+	/** Whether this world logs its shots: Otherworld.ShotLog, -ShotLog or the GameState's DebugShotLog. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Shot", meta = (WorldContext = "WorldContextObject"))
+	static bool IsShotLogOn(const UObject* WorldContextObject);
+
+	/** SHOT-LOG lines written in this process. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Shot")
+	static int32 ShotLogLines();
+
+	/** The last block the shot log wrote: an ask, a refusal or a pellet, one line each. */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Shot")
+	static FString LastShotLog();
 };

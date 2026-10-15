@@ -6118,34 +6118,35 @@ graphics_menu/debug_tune_checks.py:35: _check_widgets
 graphics_menu/debug_tune_checks.py:52: _check_switches
 graphics_menu/debug_tune_checks.py:84: _check_cheat
 graphics_menu/debug_tune_checks.py:105: check_debug_tune
-graphics_menu/debug_tune_consts.py:24: DEBUG_TUNE_ACTION
-graphics_menu/debug_tune_consts.py:25: DEBUG_TUNE_ROW_LABEL
-graphics_menu/debug_tune_consts.py:27: DEBUG_TUNE_OPEN_VAR
-graphics_menu/debug_tune_consts.py:28: DEBUG_TUNE_ROW_VAR
-graphics_menu/debug_tune_consts.py:29: DEBUG_TUNE_PICK_VAR
-graphics_menu/debug_tune_consts.py:30: DEBUG_TUNE_NUDGE_VAR
-graphics_menu/debug_tune_consts.py:32: DEBUG_TUNE_SAVE_VAR
-graphics_menu/debug_tune_consts.py:33: DEBUG_TUNE_SAVED_VAR
-graphics_menu/debug_tune_consts.py:34: DEBUG_TUNE_TOUCHED_VAR
-graphics_menu/debug_tune_consts.py:36: DEBUG_TUNE_VALUES_VAR
-graphics_menu/debug_tune_consts.py:37: DEBUG_TUNE_NAMES_VAR
-graphics_menu/debug_tune_consts.py:38: DEBUG_TUNE_STEPS_VAR
-graphics_menu/debug_tune_consts.py:39: DEBUG_TUNE_MINS_VAR
-graphics_menu/debug_tune_consts.py:40: DEBUG_TUNE_MAXS_VAR
-graphics_menu/debug_tune_consts.py:42: DEBUG_SUBJECT
-graphics_menu/debug_tune_consts.py:44: MONSTER_SWITCH
-graphics_menu/debug_tune_consts.py:45: SHOTS_SWITCH
-graphics_menu/debug_tune_consts.py:46: DEBUG_SWITCHES
-graphics_menu/debug_tune_consts.py:48: SWITCH_ON_ABOVE
-graphics_menu/debug_tune_consts.py:51: FULL_STATS_LABEL
-graphics_menu/debug_tune_consts.py:52: FULL_STATS_DONE
-graphics_menu/debug_tune_consts.py:54: DEBUG_TAB
-graphics_menu/debug_tune_tick.py:49: FILLS
-graphics_menu/debug_tune_tick.py:56: declare_debug_tune_vars
-graphics_menu/debug_tune_tick.py:60: debug_tune_defaults
-graphics_menu/debug_tune_tick.py:67: _author_cheat
-graphics_menu/debug_tune_tick.py:85: _author_apply
-graphics_menu/debug_tune_tick.py:105: author_debug_tune_tick
+graphics_menu/debug_tune_consts.py:28: DEBUG_TUNE_ACTION
+graphics_menu/debug_tune_consts.py:29: DEBUG_TUNE_ROW_LABEL
+graphics_menu/debug_tune_consts.py:31: DEBUG_TUNE_OPEN_VAR
+graphics_menu/debug_tune_consts.py:32: DEBUG_TUNE_ROW_VAR
+graphics_menu/debug_tune_consts.py:33: DEBUG_TUNE_PICK_VAR
+graphics_menu/debug_tune_consts.py:34: DEBUG_TUNE_NUDGE_VAR
+graphics_menu/debug_tune_consts.py:36: DEBUG_TUNE_SAVE_VAR
+graphics_menu/debug_tune_consts.py:37: DEBUG_TUNE_SAVED_VAR
+graphics_menu/debug_tune_consts.py:38: DEBUG_TUNE_TOUCHED_VAR
+graphics_menu/debug_tune_consts.py:40: DEBUG_TUNE_VALUES_VAR
+graphics_menu/debug_tune_consts.py:41: DEBUG_TUNE_NAMES_VAR
+graphics_menu/debug_tune_consts.py:42: DEBUG_TUNE_STEPS_VAR
+graphics_menu/debug_tune_consts.py:43: DEBUG_TUNE_MINS_VAR
+graphics_menu/debug_tune_consts.py:44: DEBUG_TUNE_MAXS_VAR
+graphics_menu/debug_tune_consts.py:46: DEBUG_SUBJECT
+graphics_menu/debug_tune_consts.py:48: MONSTER_SWITCH
+graphics_menu/debug_tune_consts.py:49: SHOTS_SWITCH
+graphics_menu/debug_tune_consts.py:50: SHOT_LOG_SWITCH
+graphics_menu/debug_tune_consts.py:51: DEBUG_SWITCHES
+graphics_menu/debug_tune_consts.py:53: SWITCH_ON_ABOVE
+graphics_menu/debug_tune_consts.py:56: FULL_STATS_LABEL
+graphics_menu/debug_tune_consts.py:57: FULL_STATS_DONE
+graphics_menu/debug_tune_consts.py:59: DEBUG_TAB
+graphics_menu/debug_tune_tick.py:50: FILLS
+graphics_menu/debug_tune_tick.py:57: declare_debug_tune_vars
+graphics_menu/debug_tune_tick.py:61: debug_tune_defaults
+graphics_menu/debug_tune_tick.py:68: _author_cheat
+graphics_menu/debug_tune_tick.py:86: _author_apply
+graphics_menu/debug_tune_tick.py:106: author_debug_tune_tick
 graphics_menu/dev_consts.py:18: DEV_GUNS_ACTION
 graphics_menu/dev_consts.py:19: DEV_GUNS_ROW_LABEL
 graphics_menu/dev_consts.py:23: DEV_GUNS_REQUEST_VAR
@@ -7785,15 +7786,16 @@ net/state_consts.py:32: GAME_STATE_BP_PATH
 net/state_consts.py:33: GAME_STATE_CLASS_PATH
 net/state_consts.py:43: PLAYER_KILL_COUNT_VAR
 net/state_consts.py:45: PLAYER_TABLE
-net/state_consts.py:64: WORLD_CLOCK_OFFSET_VAR
-net/state_consts.py:65: WORLD_DAY_LENGTH_VAR
-net/state_consts.py:66: WORLD_NIGHT_LENGTH_VAR
-net/state_consts.py:70: WORLD_CLOCK
-net/state_consts.py:77: DEV_TUNING_VAR
-net/state_consts.py:87: TUNED
-net/state_consts.py:88: GAME_TABLE
-net/state_consts.py:91: GAME_STATE_PROP
-net/state_consts.py:92: PLAYER_STATE_PROP
+net/state_consts.py:56: DEBUG_SHOT_LOG_VAR
+net/state_consts.py:69: WORLD_CLOCK_OFFSET_VAR
+net/state_consts.py:70: WORLD_DAY_LENGTH_VAR
+net/state_consts.py:71: WORLD_NIGHT_LENGTH_VAR
+net/state_consts.py:75: WORLD_CLOCK
+net/state_consts.py:82: DEV_TUNING_VAR
+net/state_consts.py:92: TUNED
+net/state_consts.py:93: GAME_TABLE
+net/state_consts.py:96: GAME_STATE_PROP
+net/state_consts.py:97: PLAYER_STATE_PROP
 net/state_graph.py:29: PAWN_CLASS_PATH
 net/state_graph.py:30: CONTROLLER_CLASS_PATH
 net/state_graph.py:31: PLAYER_STATE_PROP
@@ -8482,17 +8484,17 @@ probes/probe_dead_no_actions.py:77: _swing
 probes/probe_dead_no_actions.py:86: _wanderer_half
 probes/probe_dead_no_actions.py:124: _player_half
 probes/probe_death_pause.py:24: WAIT
-probes/probe_debug_tab.py:31: HUD_BP_PATH
-probes/probe_debug_tab.py:32: TAB
-probes/probe_debug_tab.py:37: FLAGS
-probes/probe_debug_tab.py:39: STATS
-probes/probe_debug_tab.py:45: DRIFT
-probes/probe_debug_tab.py:48: _await
-probes/probe_debug_tab.py:54: _flags
-probes/probe_debug_tab.py:58: _nudge
-probes/probe_debug_tab.py:65: _words
-probes/probe_debug_tab.py:72: _switches
-probes/probe_debug_tab.py:90: _full_stats
+probes/probe_debug_tab.py:34: HUD_BP_PATH
+probes/probe_debug_tab.py:35: TAB
+probes/probe_debug_tab.py:40: FLAGS
+probes/probe_debug_tab.py:42: STATS
+probes/probe_debug_tab.py:48: DRIFT
+probes/probe_debug_tab.py:51: _await
+probes/probe_debug_tab.py:57: _flags
+probes/probe_debug_tab.py:61: _nudge
+probes/probe_debug_tab.py:68: _words
+probes/probe_debug_tab.py:75: _switches
+probes/probe_debug_tab.py:99: _full_stats
 probes/probe_dev_all_guns.py:26: HUD_BP_PATH
 probes/probe_dev_all_guns.py:28: SETTLE
 probes/probe_dev_all_guns.py:29: GUNS
@@ -9715,6 +9717,11 @@ probes/probe_scope_hide.py:83: _drawn
 probes/probe_scope_hide.py:92: _state
 probes/probe_scope_hide.py:108: _run
 probes/probe_scope_hide.py:130: _scoped
+probes/probe_shot_log.py:42: SHL
+probes/probe_shot_log.py:43: BODY_ROUNDS
+probes/probe_shot_log.py:44: BESIDE_CM
+probes/probe_shot_log.py:59: _switch
+probes/probe_shot_log.py:64: _run
 probes/probe_shotgun_hands.py:42: SHOTS
 probes/probe_shotgun_hands.py:43: SEATED
 probes/probe_shotgun_hands.py:47: SINK_CM
@@ -11573,6 +11580,9 @@ Source/Otherworld/Public/OtherworldShotLibrary.h:68: UFUNCTION static float Last
 Source/Otherworld/Public/OtherworldShotLibrary.h:72: UFUNCTION static void LastShotLine(const UObject* WorldContextObject, FVector& S
 Source/Otherworld/Public/OtherworldShotLibrary.h:76: UFUNCTION static int32 RewoundShots(const UObject* WorldContextObject);
 Source/Otherworld/Public/OtherworldShotLibrary.h:79: UFUNCTION static int32 RewoundHits(const UObject* WorldContextObject);
+Source/Otherworld/Public/OtherworldShotLibrary.h:85: UFUNCTION static bool IsShotLogOn(const UObject* WorldContextObject);
+Source/Otherworld/Public/OtherworldShotLibrary.h:89: UFUNCTION static int32 ShotLogLines();
+Source/Otherworld/Public/OtherworldShotLibrary.h:93: UFUNCTION static FString LastShotLog();
 Source/Otherworld/Public/OtherworldTuningLibrary.h:18: UCLASS class OTHERWORLD_API UOtherworldTuningLibrary : public UBlueprintFunct
 Source/Otherworld/Public/OtherworldTuningLibrary.h:25: UFUNCTION static bool CanRunPython();
 Source/Otherworld/Public/OtherworldTuningLibrary.h:36: UFUNCTION static bool SaveTuningCsv(const FString& FileName, const FString& Head

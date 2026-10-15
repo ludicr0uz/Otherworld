@@ -50,6 +50,11 @@ DebugMode = Var(DEBUG_MODE_VAR, BOOL, False, rep=REPLICATED)
 # The shots' developer overlays (tracers, impact damage, the crosshair down the
 # sights) are on.
 DebugShots = Var(DEBUG_SHOTS_VAR, BOOL, False, rep=REPLICATED)
+# Every shot the authority judges is logged (SHOT-LOG: the shooter, the aim,
+# each pellet's line, what stopped it, the body struck, the target, the damage).
+# Read by name by the C++ (Source/Otherworld/Private/OtherworldShotLog.h).
+DEBUG_SHOT_LOG_VAR = "DebugShotLog"
+DebugShotLog = Var(DEBUG_SHOT_LOG_VAR, BOOL, False, rep=REPLICATED)
 # The world's difficulty (combat/difficulty.py; 0 is EASY).
 Difficulty = Var(DIFFICULTY_VAR, INT, 0, rep=REPLICATED)
 # The world's clock (M30; world/world_clock.py). The server's BP_DayNightCycle
@@ -85,7 +90,7 @@ TunedMonsters = Var("TunedMonsters", array(FLOAT))
 TunedWorld = Var("TunedWorld", array(FLOAT))
 TunedPlayer = Var("TunedPlayer", array(FLOAT))
 TUNED = (TunedGuns, TunedMonsters, TunedWorld, TunedPlayer)
-GAME_TABLE = (DebugMode, DebugShots, Difficulty, *WORLD_CLOCK, DevTuning, *TUNED)
+GAME_TABLE = (DebugMode, DebugShots, DebugShotLog, Difficulty, *WORLD_CLOCK, DevTuning, *TUNED)
 
 # The GameMode's class defaults that name the two.
 GAME_STATE_PROP = "game_state_class"

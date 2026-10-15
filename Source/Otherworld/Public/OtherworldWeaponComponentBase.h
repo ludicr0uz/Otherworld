@@ -277,4 +277,7 @@ private:
 
 	/** Whether the shot may be fired now: a gun in a living hand, a round in it, cooled. */
 	bool MayFire(AActor* Gun) const;
+
+	/** For the shot log: why Server_Fire refused, in words. */
+	FString WhyRefused(bool bAllowed, bool bAimed, AActor* Gun) const;
 };

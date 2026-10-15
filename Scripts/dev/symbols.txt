@@ -7578,8 +7578,8 @@ net/random_checks.py:70: check_random_audit
 net/random_consts.py:15: STATE
 net/random_consts.py:16: COSMETIC
 net/random_consts.py:25: AUDIT
-net/random_consts.py:100: CATALOG_NAMES
-net/random_consts.py:109: BLUEPRINTS
+net/random_consts.py:104: CATALOG_NAMES
+net/random_consts.py:113: BLUEPRINTS
 net/relevancy.py:14: _cdo
 net/relevancy.py:18: apply
 net/relevancy.py:30: read

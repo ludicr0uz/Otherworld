@@ -89,6 +89,10 @@ AUDIT = (
          "the roll of a blood splat's card about its facing, so no two look alike",
          "each machine's BP_BloodSprite at BeginPlay, spawned by Fx_PelletHit "
          "where there is a screen", ""),
+    Roll("combat/weapon_component/punch.py", COSMETIC,
+         "which clip the punch's swing plays, the cross or the jab",
+         "every machine that plays Fx_Punch (the owning client's prediction "
+         "and the Multicast's), each its own coin; the blow is the server's", ""),
     Roll("npc/stats.py", COSMETIC,
          "the gap before a wanderer's next growl",
          "the AIController (the server's); every client hears the growl "
